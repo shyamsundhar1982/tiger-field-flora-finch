@@ -1,10 +1,10 @@
 import { Link, Outlet } from "@tanstack/react-router";
-import { Activity, AlertTriangle, Bike, BookOpen, CheckSquare, Landmark, Scale, Shield, Wallet, Wrench } from "lucide-react";
+import { Activity, AlertTriangle, Bike, BookOpen, CheckSquare, Factory, Landmark, Scale, Shield, Wallet, Wrench } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { cn } from "@/lib/utils";
 
 const NAV: Array<{
-  to: "/command" | "/command/finance" | "/command/product" | "/command/ops" | "/command/legal" | "/command/legal-control" | "/command/gtm" | "/command/risk" | "/command/actions" | "/command/knowledge" | "/command/technical" | "/command/finance-control" | "/command/funding";
+  to: "/command" | "/command/finance" | "/command/product" | "/command/ops" | "/command/legal" | "/command/legal-control" | "/command/gtm" | "/command/risk" | "/command/actions" | "/command/knowledge" | "/command/technical" | "/command/finance-control" | "/command/funding" | "/command/manufacturing";
   label: string;
   icon: typeof Activity;
   exact?: boolean;
@@ -15,6 +15,7 @@ const NAV: Array<{
   { to: "/command/technical", label: "Technical", icon: Wrench },
   { to: "/command/finance-control", label: "Finance Control", icon: Wallet },
   { to: "/command/funding", label: "Funding", icon: Landmark },
+  { to: "/command/manufacturing", label: "Manufacturing", icon: Factory },
   { to: "/command/ops", label: "Ops", icon: Landmark },
   { to: "/command/legal", label: "Legal", icon: Scale },
   { to: "/command/legal-control", label: "Legal Control", icon: Scale },
