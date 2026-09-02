@@ -9,6 +9,7 @@ import {
   Scale,
   Shield,
   Wallet,
+  Wrench,
 } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { cn } from "@/lib/utils";
@@ -23,7 +24,8 @@ const NAV: Array<{
     | "/command/gtm"
     | "/command/risk"
     | "/command/actions"
-    | "/command/knowledge";
+    | "/command/knowledge"
+    | "/command/technical";
   label: string;
   icon: typeof Activity;
   exact?: boolean;
@@ -31,6 +33,7 @@ const NAV: Array<{
   { to: "/command", label: "Board", icon: Activity, exact: true },
   { to: "/command/finance", label: "Finance", icon: Wallet },
   { to: "/command/product", label: "Product", icon: Bike },
+  { to: "/command/technical", label: "Technical", icon: Wrench },
   { to: "/command/ops", label: "Ops", icon: Landmark },
   { to: "/command/legal", label: "Legal", icon: Scale },
   { to: "/command/gtm", label: "GTM", icon: Shield },
@@ -48,13 +51,7 @@ export function CommandShell() {
           <p className="px-5 pb-3 text-[10px] uppercase tracking-[0.2em] text-subtle">Command</p>
           <nav className="flex flex-col gap-0.5 px-2">
             {NAV.map((item) => (
-              <Link
-                key={item.to}
-                to={item.to}
-                activeOptions={item.exact ? { exact: true } : undefined}
-                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted transition-colors duration-150 hover:bg-surface hover:text-fg"
-                activeProps={{ className: "bg-surface text-fg" }}
-              >
+              <Link key={item.to} to={item.to} activeOptions={item.exact ? { exact: true } : undefined} className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted transition-colors duration-150 hover:bg-surface hover:text-fg" activeProps={{ className: "bg-surface text-fg" }}>
                 <item.icon className="size-4" />
                 {item.label}
               </Link>
@@ -64,13 +61,7 @@ export function CommandShell() {
         <div className="min-w-0 flex-1">
           <div className="flex gap-1 overflow-x-auto border-b border-border px-3 py-2 lg:hidden">
             {NAV.map((item) => (
-              <Link
-                key={item.to}
-                to={item.to}
-                activeOptions={item.exact ? { exact: true } : undefined}
-                className={cn("shrink-0 rounded-md px-3 py-2 text-xs text-muted")}
-                activeProps={{ className: "bg-surface text-fg" }}
-              >
+              <Link key={item.to} to={item.to} activeOptions={item.exact ? { exact: true } : undefined} className={cn("shrink-0 rounded-md px-3 py-2 text-xs text-muted")} activeProps={{ className: "bg-surface text-fg" }}>
                 {item.label}
               </Link>
             ))}
