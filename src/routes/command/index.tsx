@@ -50,20 +50,20 @@ function Board() {
       </div>
 
       <Panel title="12-stage execution roadmap" kicker="Command architecture">
-        <div className="rounded-xl border border-accent/15 bg-gradient-to-br from-accent/10 via-green/7 to-transparent p-3">
+        <div className="rounded-xl border border-border bg-bg-elevated/30 p-3">
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {STAGES.map((stage) => (
               <Link
                 key={stage.n}
                 to={stage.to}
                 activeOptions={{ exact: stage.n === 1 }}
-                className="group flex items-start gap-3 rounded-lg border border-border bg-bg-elevated/95 p-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/65 hover:bg-bg hover:shadow-[0_0_24px_rgb(255_116_23/0.12)]"
-                activeProps={{ className: "bg-bg border-accent shadow-[0_0_0_1px_rgb(255_116_23/0.45),0_0_24px_rgb(255_116_23/0.12)]" }}
+                className="group flex items-start gap-3 rounded-lg border border-border bg-bg-elevated/95 p-3 transition-colors duration-200 hover:border-accent/45 hover:bg-bg"
+                activeProps={{ className: "bg-bg border-accent" }}
               >
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-border text-xs tabular-nums text-accent transition-all group-hover:border-accent group-hover:shadow-[0_0_12px_rgb(255_116_23/0.4)]">{stage.n}</span>
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-border text-xs tabular-nums text-accent transition-colors group-hover:border-accent">{stage.n}</span>
                 <span className="min-w-0">
                   <span className="block text-[10px] uppercase tracking-[0.14em] text-subtle transition-colors group-hover:text-green">Stage {stage.n}</span>
-                  <span className="mt-0.5 block text-sm font-medium text-fg transition-all group-hover:text-accent group-hover:[text-shadow:0_0_14px_rgb(255_116_23/0.35)]">{stage.label}</span>
+                  <span className="mt-0.5 block text-sm font-medium text-fg transition-colors group-hover:text-accent">{stage.label}</span>
                 </span>
               </Link>
             ))}
@@ -72,11 +72,11 @@ function Board() {
       </Panel>
 
       <Panel title="Dedicated finance & fundraising workspaces" kicker="New controlled pages">
-        <div className="rounded-xl border border-green/15 bg-gradient-to-br from-green/10 via-accent/6 to-transparent p-3">
+        <div className="rounded-xl border border-border bg-bg-elevated/30 p-3">
           <div className="grid gap-3 md:grid-cols-3">
             {FINANCE_WORKSPACES.map((page) => (
-              <Link key={page.to} to={page.to} className="group rounded-lg border border-border bg-bg-elevated/95 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/65 hover:bg-bg hover:shadow-[0_0_24px_rgb(255_116_23/0.12)]">
-                <p className="text-sm font-medium text-fg transition-all group-hover:text-accent group-hover:[text-shadow:0_0_14px_rgb(255_116_23/0.35)]">{page.label}</p>
+              <Link key={page.to} to={page.to} className="group rounded-lg border border-border bg-bg-elevated/95 p-4 transition-colors duration-200 hover:border-accent/45 hover:bg-bg">
+                <p className="text-sm font-medium text-fg transition-colors group-hover:text-accent">{page.label}</p>
                 <p className="mt-2 text-xs leading-5 text-muted group-hover:text-fg/80">{page.note}</p>
               </Link>
             ))}
