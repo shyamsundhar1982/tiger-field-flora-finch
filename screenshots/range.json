@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/range",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "VéLOXIS",
+      "hasCanvas": false,
+      "bodyTextLen": 751,
+      "bodyTextHash": "38740730c4f93005a27189cf17199a5777170ec60def07aa0306556eca8ed092",
+      "bodyTextPrefix": "VéLOXIS VĀYÚ SHASTR House Range Command PLATFORM One geometry. T",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/range.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "VéLOXIS",
+      "hasCanvas": false,
+      "bodyTextLen": 719,
+      "bodyTextHash": "a68644204939dd54a5f3c570aab11b029314dde319e45815d55b6e99f901fdd6",
+      "bodyTextPrefix": "VéLOXIS PLATFORM One geometry. Three altitudes. Core, Pro and Ap",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/range-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/range.json"
+}

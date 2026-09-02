@@ -1,0 +1,130 @@
+import { t as create } from "../_libs/zustand.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/store-BsqAv0nA.js
+var ACTIONS = [
+	{
+		id: "lab",
+		window: "2w",
+		title: "Confirm ISO 4210 lab capacity (ARAI / ICAT / international)",
+		why: "3-month delay if labs are full. Book before prototypes exist.",
+		owner: "Founder",
+		verify: "External"
+	},
+	{
+		id: "oem",
+		window: "2w",
+		title: "Shortlist 4–5 Taiwan / Vietnam OEMs and send NDAs only",
+		why: "No CAD until NDA + provisional patent. Request indicative quotes in parallel.",
+		owner: "Founder",
+		verify: "Founder"
+	},
+	{
+		id: "ip",
+		window: "2w",
+		title: "Engage IP attorney — provisional at M3, not M4",
+		why: "File best-available geometry at CAD lock. Amend during FEA. Never wait for freeze.",
+		owner: "Founder + counsel",
+		verify: "External"
+	},
+	{
+		id: "hs",
+		window: "2w",
+		title: "Confirm HS classification with CA / customs broker",
+		why: "₹4,500–8,500/unit COGS swing. Do not lock price list until this is verified.",
+		owner: "CA",
+		verify: "CA/CS"
+	},
+	{
+		id: "ins",
+		window: "2w",
+		title: "Obtain product-liability + key-person insurance quotes",
+		why: "Carbon frames + single-founder risk. Quotes in M1; bind before launch.",
+		owner: "Founder",
+		verify: "External"
+	},
+	{
+		id: "cn",
+		window: "2w",
+		title: "Draft standby convertible note (₹25–40 L, cap ₹5 Cr, 20% discount)",
+		why: "Closes the M10–M11 cash gap. Execute only if grants slip.",
+		owner: "CA + counsel",
+		verify: "CA/CS"
+	},
+	{
+		id: "psg",
+		window: "M1-M3",
+		title: "PSG-STEP follow-up — incubatee status + Knowledge Partner certificate",
+		why: "Unlocks NIDHI-PRAYAS / TANSEED channel.",
+		owner: "Founder",
+		verify: "External"
+	},
+	{
+		id: "dpiit",
+		window: "M1-M3",
+		title: "Incorporate + DPIIT Deep Tech recognition",
+		why: "20-year window, ₹300 Cr ceiling, CGSS and grant eligibility.",
+		owner: "CA/CS",
+		verify: "CA/CS"
+	},
+	{
+		id: "esop",
+		window: "M1-M3",
+		title: "Create 10% ESOP pool at incorporation",
+		why: "Do it now — not at seed — so founders are not diluted twice.",
+		owner: "CA/CS",
+		verify: "CA/CS"
+	},
+	{
+		id: "fea",
+		window: "M1-M3",
+		title: "CAD lock + FEA + Para 58 board minute",
+		why: "Capitalisation starts M3. Pre-M3 stays expense. Irreversible.",
+		owner: "Founder + CA",
+		verify: "CA/CS"
+	},
+	{
+		id: "rfq",
+		window: "M4-M8",
+		title: "RFQ to NDAed OEMs after provisional filing",
+		why: "Staged release: NDA → RFQ → CAD. Never reverse.",
+		owner: "Founder",
+		verify: "Founder"
+	},
+	{
+		id: "visit",
+		window: "M4-M8",
+		title: "Factory visit (₹2–3 L, funded from T3)",
+		why: "Do not qualify an OEM on a PDF.",
+		owner: "Founder",
+		verify: "Founder"
+	},
+	{
+		id: "iso",
+		window: "M4-M8",
+		title: "Submit ISO articles M7 — freeze only on pass",
+		why: "Tooling at M10, not M9.",
+		owner: "Founder",
+		verify: "External"
+	},
+	{
+		id: "pilot",
+		window: "M9-M24",
+		title: "Pilot batch, QC, launch, first 100 staggered over 4–6 months",
+		why: "Protect service capacity. 25 hero endurance riders first.",
+		owner: "Founder",
+		verify: "Founder"
+	}
+];
+var initialActions = Object.fromEntries(ACTIONS.map((a) => [a.id, "open"]));
+var useVeloxis = create((set) => ({
+	scenario: "base",
+	drawStandby: true,
+	actions: initialActions,
+	setScenario: (scenario) => set({ scenario }),
+	setDrawStandby: (drawStandby) => set({ drawStandby }),
+	setAction: (id, s) => set((st) => ({ actions: {
+		...st.actions,
+		[id]: s
+	} }))
+}));
+//#endregion
+export { useVeloxis as n, ACTIONS as t };

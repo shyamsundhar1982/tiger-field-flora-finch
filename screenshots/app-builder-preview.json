@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "VéLOXIS",
+      "hasCanvas": false,
+      "bodyTextLen": 1141,
+      "bodyTextHash": "efb0320918dc4d45c8ad012d4944e7f6b0a85628eec35b0806c142b258802a34",
+      "bodyTextPrefix": "VéLOXIS VĀYÚ SHASTR House Range Command DESIGNED IN COIMBATORE W",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "VéLOXIS",
+      "hasCanvas": false,
+      "bodyTextLen": 1109,
+      "bodyTextHash": "f467349adc3b2e5868699b3dd5fb00d6ae157a7a825e3601bdc1db5a902c9fb3",
+      "bodyTextPrefix": "VéLOXIS DESIGNED IN COIMBATORE Wind, rendered in carbon. VéLOXIS",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-preview.json"
+}

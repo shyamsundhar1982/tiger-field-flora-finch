@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/command",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "VéLOXIS",
+      "hasCanvas": false,
+      "bodyTextLen": 1993,
+      "bodyTextHash": "461d692b21121f9bbf38b84839250ccda81e3b87ba2ce8bcb01601a68cbeec28",
+      "bodyTextPrefix": "VéLOXIS VĀYÚ SHASTR House Range Command COMMAND Board Finance Pr",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/command.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "VéLOXIS",
+      "hasCanvas": false,
+      "bodyTextLen": 1901,
+      "bodyTextHash": "a6f88ab2dfeba23beec8a1bbef29250e322cf07c118ce8c5ffc9bde5874b5361",
+      "bodyTextPrefix": "VéLOXIS Board Finance Product Ops Legal GTM Risk Actions BOARD P",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/command-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/command.json"
+}

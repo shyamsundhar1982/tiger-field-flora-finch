@@ -1,0 +1,242 @@
+//#region node_modules/.nitro/vite/services/ssr/assets/model-C7zrYnKC.js
+var SCENARIOS = {
+	base: {
+		label: "Base",
+		probability: "70%",
+		extra: 0,
+		note: "Grants on time. Prototype succeeds first pass. Launch M12."
+	},
+	delayed: {
+		label: "Delayed",
+		probability: "20%",
+		extra: 35,
+		note: "Grants slip 4–6 months. One prototype iteration. Standby CN drawn."
+	},
+	stress: {
+		label: "Stress",
+		probability: "10%",
+		extra: 90,
+		note: "No grants. OEM +20%. Launch M18, Core-only. Bridge capital required."
+	}
+};
+var ASP = 1.8;
+var COGS = 1.076;
+var PLAN_COGS = 1.1;
+function unitsFor(m, s) {
+	if (s === "base") {
+		const u = [
+			0,
+			0,
+			0,
+			0,
+			0,
+			0,
+			0,
+			0,
+			0,
+			0,
+			0,
+			2,
+			4,
+			6,
+			8,
+			10,
+			12,
+			14,
+			16,
+			18,
+			20,
+			22,
+			24,
+			26
+		][m - 1] ?? 0;
+		if (m === 12 || m === 13 || m === 23 || m === 24) return Math.round(u * 1.12);
+		return u;
+	}
+	if (s === "delayed") return [
+		0,
+		0,
+		0,
+		0,
+		0,
+		0,
+		0,
+		0,
+		0,
+		0,
+		0,
+		0,
+		0,
+		2,
+		3,
+		5,
+		7,
+		9,
+		11,
+		13,
+		15,
+		16,
+		18,
+		20
+	][m - 1] ?? 0;
+	return [
+		0,
+		0,
+		0,
+		0,
+		0,
+		0,
+		0,
+		0,
+		0,
+		0,
+		0,
+		0,
+		0,
+		0,
+		0,
+		0,
+		0,
+		2,
+		4,
+		6,
+		8,
+		10,
+		12,
+		14
+	][m - 1] ?? 0;
+}
+function opexFor(m, s) {
+	if (s === "stress" && m < 18) {
+		if (m <= 3) return 2.4;
+		if (m <= 8) return 3.2;
+		return 3.8;
+	}
+	if (m <= 3) return 2.8;
+	if (m <= 8) return 4.2;
+	if (m <= 11) return 6;
+	if (m <= 14) return 7.8;
+	return 9.2;
+}
+function fundingFor(m, s, drawStandby) {
+	if (s === "base") {
+		if (m === 1) return 15;
+		if (m === 3) return 35;
+		if (m === 6) return 35;
+		if (m === 9 && drawStandby) return 25;
+		if (m === 10) return 50;
+		if (m === 14) return 65;
+		return 0;
+	}
+	if (s === "delayed") {
+		if (m === 1) return 15;
+		if (m === 6) return 25;
+		if (m === 7) return 35;
+		if (m === 10) return 35;
+		if (m === 12) return 50;
+		if (m === 17) return 65;
+		return 0;
+	}
+	if (m === 1) return 15;
+	if (m === 3) return 20;
+	if (m === 6) return 40;
+	if (m === 10) return 50;
+	if (m === 18) return 65;
+	return 0;
+}
+function capexFor(m, s) {
+	const t = m - (s === "delayed" ? 2 : s === "stress" ? 6 : 0);
+	if (m === 3) return 4;
+	if (t === 5) return 5;
+	if (t === 6) return 6;
+	if (t === 7) return 5.5;
+	if (t === 8) return 4;
+	if (m === 8 && s === "base") return 6;
+	if (s === "base" && m === 10 || s === "delayed" && m === 12 || s === "stress" && m === 16) return 28;
+	if (m === 5 && s === "base") return 3;
+	return 0;
+}
+function inventoryBuy(m, s, units, cogs) {
+	if (s === "base") {
+		if (m === 8) return 2;
+		if (m === 10) return 8;
+		if (m === 11) return 10;
+		if (m === 12) return 12;
+	}
+	if (s === "delayed") {
+		if (m === 10) return 2;
+		if (m === 12) return 8;
+		if (m === 13) return 10;
+	}
+	if (s === "stress") {
+		if (m === 16) return 2;
+		if (m === 17) return 6;
+		if (m === 18) return 8;
+	}
+	if (units > 0) return Math.max(0, units * cogs * 1.15 - units * cogs);
+	return 0;
+}
+function buildModel(scenario, drawStandby) {
+	const cogsU = scenario === "stress" ? PLAN_COGS * 1.2 : COGS;
+	const rows = [];
+	let cash = 1;
+	let inventory = 0;
+	let iaud = 0;
+	let tooling = 0;
+	for (let m = 1; m <= 24; m++) {
+		const units = unitsFor(m, scenario);
+		const revenue = units * ASP;
+		const cogs = units * cogsU;
+		const gp = revenue - cogs;
+		const opex = opexFor(m, scenario);
+		const ebitda = gp - opex;
+		const capex = capexFor(m, scenario);
+		const invBuy = inventoryBuy(m, scenario, units, cogsU);
+		const funding = fundingFor(m, scenario, drawStandby);
+		const opening = cash;
+		cash = opening + funding + revenue - opex - capex - invBuy;
+		inventory = Math.max(0, inventory + invBuy - cogs);
+		if (m <= 8) iaud += capex * .7;
+		if (capex >= 20) tooling += capex;
+		else if (m >= 10) tooling += capex * .3;
+		rows.push({
+			m,
+			units,
+			revenue,
+			cogs,
+			gp,
+			opex,
+			ebitda,
+			capex,
+			inventoryBuy: invBuy,
+			funding,
+			opening,
+			closing: cash,
+			inventory,
+			iaud,
+			tooling
+		});
+	}
+	return rows;
+}
+function minCash(rows) {
+	return rows.reduce((a, r) => r.closing < a.cash ? {
+		m: r.m,
+		cash: r.closing
+	} : a, {
+		m: 1,
+		cash: rows[0]?.closing ?? 0
+	});
+}
+function totals(rows) {
+	return {
+		revenue: rows.reduce((s, r) => s + r.revenue, 0),
+		units: rows.reduce((s, r) => s + r.units, 0),
+		funding: rows.reduce((s, r) => s + r.funding, 0),
+		opex: rows.reduce((s, r) => s + r.opex, 0),
+		ebitda: rows.reduce((s, r) => s + r.ebitda, 0)
+	};
+}
+var GM = .724 / ASP * 100;
+//#endregion
+export { totals as a, minCash as i, SCENARIOS as n, buildModel as r, GM as t };
