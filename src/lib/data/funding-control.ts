@@ -160,7 +160,7 @@ export const FUNDING_LADDER = [
   { gate: "T2", amountLakh: 50, milestone: "M3 CAD / FEA / IP / prototype readiness", source: "Grants + founder/bridge if required" },
   { gate: "T3", amountLakh: 85, milestone: "M6 prototype / NDT / validation", source: "Grant-led + controlled bridge" },
   { gate: "T4", amountLakh: 135, milestone: "M10 tooling / pilot", source: "Grant/debt/equity decision gate" },
-  { gate: "T5", amountLakh: 200, milestone: "Launch / working capital / scale", source: "Equity only after evidence where possible" },
+  { gate: "T5", amountLakh: 200, milestone: "Launch / working capital / scale through M36", source: "Equity only after evidence where possible" },
 ] as const;
 
 export const FUNDING_DOCUMENTS = [
@@ -169,7 +169,7 @@ export const FUNDING_DOCUMENTS = [
   "Founder profile and defence-aviation engineering credentials",
   "Master Knowledge Register and controlled technical package",
   "VEDM / geometry / FEA / validation evidence package",
-  "24-month financial model and cash plan",
+  "36-month financial model, cash plan and projected balance sheet",
   "IP filing / assignment / trademark status register",
   "OEM RFQs, quotations, tooling and manufacturing plan",
   "Prototype and ISO 4210 validation plan",
