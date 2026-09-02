@@ -52,7 +52,7 @@ export const BOARD_DECISIONS: BoardDecision[] = [
   { id: "B-03", title: "Founder and contributor IP", decision: "Approve assignment and protection of relevant company IP", status: "decision-needed", owner: "Founder / Legal", evidence: "Legal Control L-01 to L-03", reservedMatter: true },
   { id: "B-04", title: "OEM and tooling strategy", decision: "Approve qualified OEM shortlist, NDA gates and buyer-owned tooling controls", status: "blocked", owner: "Founder / Operations", evidence: "Manufacturing M-01 to M-05", reservedMatter: true },
   { id: "B-05", title: "Validation release", decision: "Approve product progression only when dimensional, NDT and structural evidence is complete", status: "blocked", owner: "Founder / Quality", evidence: "Technical TC-12 to TC-15", reservedMatter: true },
-  { id: "B-06", title: "Launch budget", decision: "Approve launch and working-capital envelope against the current finance scenario", status: "proposed", owner: "Founder / Board", evidence: "Finance Control F1-F6 and 24-month plan", reservedMatter: true },
+  { id: "B-06", title: "Launch budget", decision: "Approve launch and working-capital envelope against the current finance scenario", status: "proposed", owner: "Founder / Board", evidence: "Finance Control F1-F8 and 36-month plan", reservedMatter: true },
 ];
 
 export const DILIGENCE_ITEMS: DiligenceItem[] = [
@@ -61,7 +61,7 @@ export const DILIGENCE_ITEMS: DiligenceItem[] = [
   { id: "D-03", domain: "IP", item: "IP ownership, assignment, trademark and filing position", evidence: "Legal Control L-01 to L-08", status: "in-progress" },
   { id: "D-04", domain: "Technical", item: "Engineering baseline, design controls and validation status", evidence: "Technical Control register and controlled evidence room", status: "blocked" },
   { id: "D-05", domain: "Manufacturing", item: "OEM capability, tooling, traceability and QC controls", evidence: "Manufacturing Control register, RFQs and supplier evidence", status: "in-progress" },
-  { id: "D-06", domain: "Financial", item: "24-month model, cash runway, use of proceeds and assumptions", evidence: "Finance Control and monthly cash plan", status: "ready" },
+  { id: "D-06", domain: "Financial", item: "36-month model, cash runway, use of proceeds and assumptions", evidence: "Finance Control, Balance Sheet and monthly cash plan", status: "ready" },
   { id: "D-07", domain: "Funding", item: "Grant/debt/equity pipeline and application readiness", evidence: "Funding Control pipeline and document checklist", status: "in-progress" },
   { id: "D-08", domain: "GTM", item: "Customer, channel and launch assumptions", evidence: "GTM plan and first-100 customer pathway", status: "in-progress" },
   { id: "D-09", domain: "Legal", item: "Contracts, warranty, privacy, insurance and product liability readiness", evidence: "Legal Control L-11 to L-18", status: "in-progress" },
