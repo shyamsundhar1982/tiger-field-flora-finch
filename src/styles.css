@@ -26,9 +26,27 @@
 }
 
 @layer base {
-  html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; background: var(--color-bg); color: var(--color-fg); }
-  body { min-height: 100dvh; background: var(--color-bg); color: var(--color-fg); font-family: var(--font-sans); }
-  h1, h2, h3 { text-wrap: balance; font-family: var(--font-display); }
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    background: var(--color-bg);
+    color: var(--color-fg);
+  }
+  body {
+    min-height: 100dvh;
+    background: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+  }
+  h1, h2, h3 {
+    text-wrap: balance;
+    font-family: var(--font-display);
+    font-synthesis: none;
+    letter-spacing: -0.018em;
+  }
   p { text-wrap: pretty; }
   button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
   img.media { outline: 1px solid rgb(255 255 255 / 0.1); outline-offset: -1px; }
