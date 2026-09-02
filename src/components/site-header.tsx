@@ -12,7 +12,7 @@ const LINKS = [
 export function SiteHeader({ ghost = false }: { ghost?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
-    <header className={cn("sticky top-0 z-40 border-b border-border/80", ghost ? "bg-bg/70 backdrop-blur-md" : "bg-bg")}>
+    <header className={cn("sticky top-0 z-40 border-b border-border/80", ghost ? "bg-bg/95" : "bg-bg")}>
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:h-16 sm:px-6">
         <Link to="/" className="flex items-baseline gap-2">
           <span className="text-xl font-bold tracking-tight text-accent sm:text-2xl">VéLOXIS</span>
