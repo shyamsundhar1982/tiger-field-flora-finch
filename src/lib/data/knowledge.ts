@@ -34,12 +34,9 @@ export type KnowledgeRecord = {
 /**
  * Stage 2 master layer.
  *
- * This is deliberately evidence-oriented: records distinguish known facts,
- * planning assumptions and unresolved engineering decisions instead of
- * presenting every value as equally authoritative.
- *
- * Do not add a new "locked" engineering value here unless its source has
- * been reviewed and the decision is explicitly recorded.
+ * Evidence-oriented: records distinguish known facts, planning assumptions
+ * and unresolved engineering decisions instead of presenting every value as
+ * equally authoritative.
  */
 export const MASTER_KNOWLEDGE: KnowledgeRecord[] = [
   {
@@ -201,6 +198,14 @@ export const MASTER_KNOWLEDGE: KnowledgeRecord[] = [
   },
 ];
 
+import { EXECUTION_PACKAGE_30 } from "./execution-package";
+
+/** The 45-point expanded execution register. */
+export const ALL_KNOWLEDGE: KnowledgeRecord[] = [
+  ...MASTER_KNOWLEDGE,
+  ...EXECUTION_PACKAGE_30,
+];
+
 export const KNOWLEDGE_STATUS_LABELS: Record<KnowledgeStatus, string> = {
   confirmed: "Confirmed",
   planned: "Planned",
@@ -221,7 +226,7 @@ export const KNOWLEDGE_DOMAINS: KnowledgeDomain[] = [
   "gtm",
 ];
 
-export function knowledgeSummary(records = MASTER_KNOWLEDGE) {
+export function knowledgeSummary(records = ALL_KNOWLEDGE) {
   return records.reduce(
     (summary, record) => {
       summary.total += 1;
