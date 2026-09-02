@@ -13,7 +13,7 @@ export function Kpi({
   tone?: "default" | "ok" | "warn" | "danger";
 }) {
   return (
-    <div className="rounded-lg bg-bg-elevated p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.08)]">
+    <div className="rounded-lg border border-border bg-bg-elevated p-4">
       <p className="text-[10px] uppercase tracking-[0.16em] text-subtle sm:text-[11px]">{label}</p>
       <p
         className={cn(
@@ -42,7 +42,7 @@ export function Panel({
   className?: string;
 }) {
   return (
-    <section className={cn("rounded-xl bg-bg-elevated p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.08)]", className)}>
+    <section className={cn("rounded-xl border border-border bg-bg-elevated p-5", className)}>
       {kicker ? (
         <p className="text-[11px] uppercase tracking-[0.16em] text-subtle">{kicker}</p>
       ) : null}
