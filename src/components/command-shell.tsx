@@ -3,6 +3,7 @@ import {
   Activity,
   AlertTriangle,
   Bike,
+  BookOpen,
   CheckSquare,
   Landmark,
   Scale,
@@ -13,7 +14,16 @@ import { SiteHeader } from "@/components/site-header";
 import { cn } from "@/lib/utils";
 
 const NAV: Array<{
-  to: "/command" | "/command/finance" | "/command/product" | "/command/ops" | "/command/legal" | "/command/gtm" | "/command/risk" | "/command/actions";
+  to:
+    | "/command"
+    | "/command/finance"
+    | "/command/product"
+    | "/command/ops"
+    | "/command/legal"
+    | "/command/gtm"
+    | "/command/risk"
+    | "/command/actions"
+    | "/command/knowledge";
   label: string;
   icon: typeof Activity;
   exact?: boolean;
@@ -26,6 +36,7 @@ const NAV: Array<{
   { to: "/command/gtm", label: "GTM", icon: Shield },
   { to: "/command/risk", label: "Risk", icon: AlertTriangle },
   { to: "/command/actions", label: "Actions", icon: CheckSquare },
+  { to: "/command/knowledge", label: "Knowledge", icon: BookOpen },
 ];
 
 export function CommandShell() {
