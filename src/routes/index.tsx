@@ -28,7 +28,7 @@ function Home() {
       <section className="mx-auto grid max-w-6xl gap-8 px-4 py-20 sm:px-6 lg:grid-cols-3">
         {TIERS.map((t) => (
           <Link key={t.id} to="/range/$tier" params={{ tier: t.id }} className="group block">
-            <div className="overflow-hidden rounded-xl border border-border bg-[rgb(127_255_0/0.035)] shadow-[0_0_0_1px_rgb(255_116_23/0.08)]">
+            <div className="overflow-hidden rounded-xl border border-border bg-bg-elevated/60 transition-colors duration-200 hover:border-accent/45">
               <img src={t.image} alt={`${t.name} carbon bicycle`} className="media aspect-[4/3] w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
               <div className="p-5">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">{t.epithet}</p>
@@ -43,7 +43,7 @@ function Home() {
         ))}
       </section>
 
-      <section className="border-y border-border bg-[rgb(255_116_23/0.025)]">
+      <section className="border-y border-border bg-bg-elevated/20">
         <div className="mx-auto grid max-w-6xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-2">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">Vāyú Shastr Pvt Ltd</p>
@@ -56,7 +56,7 @@ function Home() {
               ["Range", "Core ₹1,50,000 · Pro ₹1,80,000 · Apex ₹2,40,000."],
               ["Validation", "FEA and physical validation remain development milestones; final compliance claims follow completed testing."],
             ].map(([k, v]) => (
-              <li key={k} className="rounded-lg border border-border bg-[rgb(127_255_0/0.04)] p-4 shadow-[0_0_0_1px_rgb(255_116_23/0.06)]">
+              <li key={k} className="rounded-lg border border-border bg-bg-elevated/60 p-4 transition-colors duration-200 hover:border-accent/35">
                 <p className="font-semibold text-accent">{k}</p>
                 <p className="mt-1 text-muted">{v}</p>
               </li>
