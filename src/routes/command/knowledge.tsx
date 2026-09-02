@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Panel } from "@/components/kpi";
 import {
+  ALL_KNOWLEDGE,
   KNOWLEDGE_STATUS_LABELS,
-  MASTER_KNOWLEDGE,
   knowledgeSummary,
 } from "@/lib/data/knowledge";
 
@@ -10,6 +10,9 @@ export const Route = createFileRoute("/command/knowledge")({ component: Knowledg
 
 function Knowledge() {
   const summary = knowledgeSummary();
+  // Founder-only records remain in the master register but are not rendered
+  // in the general workspace until an authenticated founder view exists.
+  const visibleRecords = ALL_KNOWLEDGE.filter((record) => record.sensitivity === "workspace");
 
   return (
     <div className="space-y-6">
@@ -30,7 +33,7 @@ function Knowledge() {
         <Stat label="Conflicts" value={summary.conflict} />
       </div>
 
-      <Panel title="Controlled records" kicker="Evidence status matters">
+      <Panel title="Controlled records" kicker={`${visibleRecords.length} workspace records · founder-only records withheld`}>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="border-b border-line text-xs uppercase tracking-wider text-subtle">
@@ -43,7 +46,7 @@ function Knowledge() {
               </tr>
             </thead>
             <tbody>
-              {MASTER_KNOWLEDGE.map((record) => (
+              {visibleRecords.map((record) => (
                 <tr key={record.id} className="border-b border-line/60 align-top">
                   <td className="py-3 pr-4 text-accent">{record.domain}</td>
                   <td className="py-3 pr-4 font-medium text-fg">{record.title}</td>
