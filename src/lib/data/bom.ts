@@ -51,7 +51,10 @@ export const MIX = { core: 0.4, pro: 0.45, apex: 0.15 } as const;
 export const BLENDED_COGS =
   bomTotal("core") * MIX.core + bomTotal("pro") * MIX.pro + bomTotal("apex") * MIX.apex;
 
-export const BLENDED_ASP = 150000 * MIX.core + 180000 * MIX.pro + 240000 * MIX.apex;
+// Keep the blended commercial model tied to the published tier ASPs.
+// This prevents stale pricing from diverging from the Range page / product model.
+export const BLENDED_ASP =
+  129900 * MIX.core + 179900 * MIX.pro + 264900 * MIX.apex;
 
 export const CHANNEL = {
   d2cShare: 0.7,
