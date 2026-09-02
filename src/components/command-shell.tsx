@@ -1,19 +1,22 @@
 import { Link, Outlet } from "@tanstack/react-router";
-import { Activity, AlertTriangle, Bike, BookOpen, BrainCircuit, CheckSquare, ClipboardCheck, Factory, Landmark, Presentation, Rocket, Scale, Shield, UserRound, Wallet, Wrench } from "lucide-react";
+import { Activity, AlertTriangle, Bike, BookOpen, BrainCircuit, CheckSquare, ClipboardCheck, Factory, Landmark, Presentation, Rocket, Scale, Shield, UserRound, Wallet, Wrench, FileSpreadsheet, BadgeCheck } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { cn } from "@/lib/utils";
 
-const NAV: Array<{ to: "/command" | "/command/finance" | "/command/product" | "/command/ops" | "/command/legal" | "/command/legal-control" | "/command/gtm" | "/command/risk" | "/command/actions" | "/command/knowledge" | "/command/technical" | "/command/finance-control" | "/command/funding" | "/command/manufacturing" | "/command/founder-command" | "/command/investor-board" | "/command/ai-knowledge" | "/command/qa-verification" | "/command/deployment-readiness"; label: string; icon: typeof Activity; exact?: boolean }> = [
+const NAV: Array<{ to: "/command" | "/command/finance" | "/command/product" | "/command/ops" | "/command/legal" | "/command/legal-control" | "/command/gtm" | "/command/risk" | "/command/actions" | "/command/knowledge" | "/command/technical" | "/command/finance-control" | "/command/funding" | "/command/manufacturing" | "/command/founder-command" | "/command/investor-board" | "/command/ai-knowledge" | "/command/qa-verification" | "/command/deployment-readiness" | "/command/balance-sheet" | "/command/ca-audit" | "/command/investor-pitch"; label: string; icon: typeof Activity; exact?: boolean }> = [
   { to: "/command", label: "Board", icon: Activity, exact: true },
   { to: "/command/founder-command", label: "Founder", icon: UserRound },
+  { to: "/command/investor-pitch", label: "Investor Pitch", icon: Presentation },
   { to: "/command/investor-board", label: "Investor / Board", icon: Presentation },
   { to: "/command/ai-knowledge", label: "AI / Knowledge", icon: BrainCircuit },
   { to: "/command/qa-verification", label: "QA / Verify", icon: ClipboardCheck },
   { to: "/command/deployment-readiness", label: "Release", icon: Rocket },
   { to: "/command/finance", label: "Finance", icon: Wallet },
+  { to: "/command/finance-control", label: "Finance Control", icon: Wallet },
+  { to: "/command/balance-sheet", label: "Balance Sheet", icon: FileSpreadsheet },
+  { to: "/command/ca-audit", label: "CA Verification", icon: BadgeCheck },
   { to: "/command/product", label: "Product", icon: Bike },
   { to: "/command/technical", label: "Technical", icon: Wrench },
-  { to: "/command/finance-control", label: "Finance Control", icon: Wallet },
   { to: "/command/funding", label: "Funding", icon: Landmark },
   { to: "/command/manufacturing", label: "Manufacturing", icon: Factory },
   { to: "/command/ops", label: "Ops", icon: Landmark },
