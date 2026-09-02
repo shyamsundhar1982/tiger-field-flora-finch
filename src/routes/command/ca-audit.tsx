@@ -11,7 +11,7 @@ function CAAudit() {
   const financeChecks = QA_CHECKS.filter((c) => c.domain === "finance");
   const legalChecks = QA_CHECKS.filter((c) => c.domain === "legal");
   const blocked = QA_CHECKS.filter((c) => c.status === "blocked").length;
-  const caControls = LEGAL_CONTROLS.filter((c) => c.domain === "tax" || c.domain === "corporate" || c.domain === "commercial");
+  const caControls = LEGAL_CONTROLS.filter((c) => c.domain === "CA/GST" || c.domain === "Corporate" || c.domain === "Commercial");
 
   return (
     <div className="space-y-6">
