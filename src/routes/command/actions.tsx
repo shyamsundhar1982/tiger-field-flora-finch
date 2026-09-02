@@ -38,7 +38,7 @@ function ActionsPage() {
               return (
                 <li
                   key={a.id}
-                  className="flex flex-col gap-3 rounded-lg bg-bg-elevated p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.08)] sm:flex-row sm:items-start"
+                  className="flex flex-col gap-3 rounded-lg border border-border bg-bg-elevated p-4 sm:flex-row sm:items-start"
                 >
                   <div className="flex-1">
                     <p className={cn("text-sm", st === "done" && "text-muted line-through")}>{a.title}</p>
