@@ -16,7 +16,7 @@ export const FINANCE_CONTROL = {
   planningGrossMarginPct: GM,
   earlyBreakevenMonth: BREAKEVEN_EARLY,
   scaleBreakevenMonth: BREAKEVEN_SCALE,
-  horizonMonths: 24,
+  horizonMonths: 36,
   openingCashLakh: 1,
   fundingLadderLakh: [15, 50, 85, 135, 200],
   fundingStrategy: "Grants first; equity last; staged capital against evidence.",
@@ -29,6 +29,8 @@ export const FINANCE_GATES = [
   { id: "F4", title: "Prototype / validation funding", month: "M5–M9", evidence: "Prototype, lab and testing commitments" },
   { id: "F5", title: "Tooling + pilot funding", month: "M10–M12", evidence: "Frozen design + tooling/OEM commitments" },
   { id: "F6", title: "Launch working capital", month: "M12–M18", evidence: "Inventory, receivables and production plan" },
+  { id: "F7", title: "Scale working-capital review", month: "M24–M30", evidence: "Demand, margin, inventory turns and cash conversion review" },
+  { id: "F8", title: "36-month strategic review", month: "M36", evidence: "Actuals vs plan, audited accounts and next funding decision" },
 ] as const;
 
 export type ScenarioSnapshot = {
