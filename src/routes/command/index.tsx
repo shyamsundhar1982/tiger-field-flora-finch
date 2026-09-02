@@ -22,7 +22,7 @@ const STAGES = [
   { n: 1, label: "Command Board", to: "/command" as const },
   { n: 2, label: "Knowledge Base", to: "/command/knowledge" as const },
   { n: 3, label: "Engineering Control", to: "/command/technical" as const },
-  { n: 4, label: "Financial Control", to: "/command/finance-control" as const },
+  { n: 4, label: "Financial Control · 36M", to: "/command/finance-control" as const },
   { n: 5, label: "Funding Intelligence", to: "/command/funding" as const },
   { n: 6, label: "Legal / IP / CA Control", to: "/command/legal-control" as const },
   { n: 7, label: "Manufacturing Control", to: "/command/manufacturing" as const },
@@ -31,6 +31,12 @@ const STAGES = [
   { n: 10, label: "AI / Knowledge", to: "/command/ai-knowledge" as const },
   { n: 11, label: "QA / Verification", to: "/command/qa-verification" as const },
   { n: 12, label: "Final Deployment Readiness", to: "/command/deployment-readiness" as const },
+];
+
+const FINANCE_WORKSPACES = [
+  { label: "Balance Sheet", to: "/command/balance-sheet" as const, note: "36-month management position view + CA reconciliation checklist" },
+  { label: "CA Verification / Audit", to: "/command/ca-audit" as const, note: "Professional-review queue, evidence and sign-off protocol" },
+  { label: "Investor Pitch", to: "/command/investor-pitch" as const, note: "Controlled investor narrative and 36-month planning snapshot" },
 ];
 
 function Board() {
@@ -76,8 +82,14 @@ function Board() {
         </div>
       </Panel>
 
+      <Panel title="Dedicated finance & fundraising workspaces" kicker="New controlled pages">
+        <div className="grid gap-3 md:grid-cols-3">
+          {FINANCE_WORKSPACES.map((page) => <Link key={page.to} to={page.to} className="rounded-lg border border-border p-4 transition-colors hover:bg-surface"><p className="text-sm font-medium text-fg">{page.label}</p><p className="mt-2 text-xs leading-5 text-muted">{page.note}</p></Link>)}
+        </div>
+      </Panel>
+
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi label="24-mo funding" value={lakh(t.funding, 0)} hint={`${scenario} scenario`} />
+        <Kpi label="36-mo funding" value={lakh(t.funding, 0)} hint={`${scenario} scenario`} />
         <Kpi
           label="Cash trough"
           value={lakh(trough.cash)}
@@ -90,10 +102,10 @@ function Board() {
           hint={drawStandby ? `Standby on · M11 close ${lakh(m11.closing)}` : "Enable standby CN"}
           tone={drawStandby ? "ok" : "danger"}
         />
-        <Kpi label="Units by M24" value={String(t.units)} hint={`Revenue ${lakh(t.revenue, 0)}`} />
+        <Kpi label="Units by M36" value={String(t.units)} hint={`Revenue ${lakh(t.revenue, 0)}`} />
       </div>
 
-      <Panel title="Cash" kicker="Opening → close, ₹ L">
+      <Panel title="Cash" kicker="Opening → close, ₹ L · 36 months">
         <div className="h-56">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={rows}>
