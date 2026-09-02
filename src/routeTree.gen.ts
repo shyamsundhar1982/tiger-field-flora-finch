@@ -20,67 +20,83 @@ import { Route as CommandLegalRouteImport } from './routes/command/legal'
 import { Route as CommandOpsRouteImport } from './routes/command/ops'
 import { Route as CommandProductRouteImport } from './routes/command/product'
 import { Route as CommandRiskRouteImport } from './routes/command/risk'
+import { Route as CommandFinanceControlRouteImport } from './routes/command/finance-control'
+import { Route as CommandFundingRouteImport } from './routes/command/funding'
+import { Route as CommandManufacturingRouteImport } from './routes/command/manufacturing'
+import { Route as CommandLegalControlRouteImport } from './routes/command/legal-control'
+import { Route as CommandTechnicalRouteImport } from './routes/command/technical'
+import { Route as CommandFounderCommandRouteImport } from './routes/command/founder-command'
+import { Route as CommandInvestorBoardRouteImport } from './routes/command/investor-board'
+import { Route as CommandAiKnowledgeRouteImport } from './routes/command/ai-knowledge'
+import { Route as CommandQaVerificationRouteImport } from './routes/command/qa-verification'
+import { Route as CommandDeploymentReadinessRouteImport } from './routes/command/deployment-readiness'
 import { Route as RangeTierRouteImport } from './routes/range.$tier'
 
 const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
+  id: '/', path: '/', getParentRoute: () => rootRouteImport,
 } as any)
 const CommandRouteRoute = CommandRouteRouteImport.update({
-  id: '/command',
-  path: '/command',
-  getParentRoute: () => rootRouteImport,
+  id: '/command', path: '/command', getParentRoute: () => rootRouteImport,
 } as any)
 const RangeRoute = RangeRouteImport.update({
-  id: '/range',
-  path: '/range',
-  getParentRoute: () => rootRouteImport,
+  id: '/range', path: '/range', getParentRoute: () => rootRouteImport,
 } as any)
 const CommandIndexRoute = CommandIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => CommandRouteRoute,
+  id: '/', path: '/', getParentRoute: () => CommandRouteRoute,
 } as any)
 const CommandActionsRoute = CommandActionsRouteImport.update({
-  id: '/actions',
-  path: '/actions',
-  getParentRoute: () => CommandRouteRoute,
+  id: '/actions', path: '/actions', getParentRoute: () => CommandRouteRoute,
 } as any)
 const CommandFinanceRoute = CommandFinanceRouteImport.update({
-  id: '/finance',
-  path: '/finance',
-  getParentRoute: () => CommandRouteRoute,
+  id: '/finance', path: '/finance', getParentRoute: () => CommandRouteRoute,
 } as any)
 const CommandGtmRoute = CommandGtmRouteImport.update({
-  id: '/gtm',
-  path: '/gtm',
-  getParentRoute: () => CommandRouteRoute,
+  id: '/gtm', path: '/gtm', getParentRoute: () => CommandRouteRoute,
 } as any)
 const CommandLegalRoute = CommandLegalRouteImport.update({
-  id: '/legal',
-  path: '/legal',
-  getParentRoute: () => CommandRouteRoute,
+  id: '/legal', path: '/legal', getParentRoute: () => CommandRouteRoute,
 } as any)
 const CommandOpsRoute = CommandOpsRouteImport.update({
-  id: '/ops',
-  path: '/ops',
-  getParentRoute: () => CommandRouteRoute,
+  id: '/ops', path: '/ops', getParentRoute: () => CommandRouteRoute,
 } as any)
 const CommandProductRoute = CommandProductRouteImport.update({
-  id: '/product',
-  path: '/product',
-  getParentRoute: () => CommandRouteRoute,
+  id: '/product', path: '/product', getParentRoute: () => CommandRouteRoute,
 } as any)
 const CommandRiskRoute = CommandRiskRouteImport.update({
-  id: '/risk',
-  path: '/risk',
-  getParentRoute: () => CommandRouteRoute,
+  id: '/risk', path: '/risk', getParentRoute: () => CommandRouteRoute,
+} as any)
+const CommandFinanceControlRoute = CommandFinanceControlRouteImport.update({
+  id: '/finance-control', path: '/finance-control', getParentRoute: () => CommandRouteRoute,
+} as any)
+const CommandFundingRoute = CommandFundingRouteImport.update({
+  id: '/funding', path: '/funding', getParentRoute: () => CommandRouteRoute,
+} as any)
+const CommandManufacturingRoute = CommandManufacturingRouteImport.update({
+  id: '/manufacturing', path: '/manufacturing', getParentRoute: () => CommandRouteRoute,
+} as any)
+const CommandLegalControlRoute = CommandLegalControlRouteImport.update({
+  id: '/legal-control', path: '/legal-control', getParentRoute: () => CommandRouteRoute,
+} as any)
+const CommandTechnicalRoute = CommandTechnicalRouteImport.update({
+  id: '/technical', path: '/technical', getParentRoute: () => CommandRouteRoute,
+} as any)
+const CommandFounderCommandRoute = CommandFounderCommandRouteImport.update({
+  id: '/founder-command', path: '/founder-command', getParentRoute: () => CommandRouteRoute,
+} as any)
+const CommandInvestorBoardRoute = CommandInvestorBoardRouteImport.update({
+  id: '/investor-board', path: '/investor-board', getParentRoute: () => CommandRouteRoute,
+} as any)
+const CommandAiKnowledgeRoute = CommandAiKnowledgeRouteImport.update({
+  id: '/ai-knowledge', path: '/ai-knowledge', getParentRoute: () => CommandRouteRoute,
+} as any)
+const CommandQaVerificationRoute = CommandQaVerificationRouteImport.update({
+  id: '/qa-verification', path: '/qa-verification', getParentRoute: () => CommandRouteRoute,
+} as any)
+const CommandDeploymentReadinessRoute = CommandDeploymentReadinessRouteImport.update({
+  id: '/deployment-readiness', path: '/deployment-readiness', getParentRoute: () => CommandRouteRoute,
 } as any)
 const RangeTierRoute = RangeTierRouteImport.update({
-  id: '/$tier',
-  path: '/$tier',
-  getParentRoute: () => RangeRoute,
+  id: '/$tier', path: '/$tier', getParentRoute: () => RangeRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -94,6 +110,16 @@ export interface FileRoutesByFullPath {
   '/command/ops': typeof CommandOpsRoute
   '/command/product': typeof CommandProductRoute
   '/command/risk': typeof CommandRiskRoute
+  '/command/finance-control': typeof CommandFinanceControlRoute
+  '/command/funding': typeof CommandFundingRoute
+  '/command/manufacturing': typeof CommandManufacturingRoute
+  '/command/legal-control': typeof CommandLegalControlRoute
+  '/command/technical': typeof CommandTechnicalRoute
+  '/command/founder-command': typeof CommandFounderCommandRoute
+  '/command/investor-board': typeof CommandInvestorBoardRoute
+  '/command/ai-knowledge': typeof CommandAiKnowledgeRoute
+  '/command/qa-verification': typeof CommandQaVerificationRoute
+  '/command/deployment-readiness': typeof CommandDeploymentReadinessRoute
   '/range/$tier': typeof RangeTierRoute
   '/command/': typeof CommandIndexRoute
 }
@@ -107,6 +133,16 @@ export interface FileRoutesByTo {
   '/command/ops': typeof CommandOpsRoute
   '/command/product': typeof CommandProductRoute
   '/command/risk': typeof CommandRiskRoute
+  '/command/finance-control': typeof CommandFinanceControlRoute
+  '/command/funding': typeof CommandFundingRoute
+  '/command/manufacturing': typeof CommandManufacturingRoute
+  '/command/legal-control': typeof CommandLegalControlRoute
+  '/command/technical': typeof CommandTechnicalRoute
+  '/command/founder-command': typeof CommandFounderCommandRoute
+  '/command/investor-board': typeof CommandInvestorBoardRoute
+  '/command/ai-knowledge': typeof CommandAiKnowledgeRoute
+  '/command/qa-verification': typeof CommandQaVerificationRoute
+  '/command/deployment-readiness': typeof CommandDeploymentReadinessRoute
   '/range/$tier': typeof RangeTierRoute
   '/command': typeof CommandIndexRoute
 }
@@ -122,6 +158,16 @@ export interface FileRoutesById {
   '/command/ops': typeof CommandOpsRoute
   '/command/product': typeof CommandProductRoute
   '/command/risk': typeof CommandRiskRoute
+  '/command/finance-control': typeof CommandFinanceControlRoute
+  '/command/funding': typeof CommandFundingRoute
+  '/command/manufacturing': typeof CommandManufacturingRoute
+  '/command/legal-control': typeof CommandLegalControlRoute
+  '/command/technical': typeof CommandTechnicalRoute
+  '/command/founder-command': typeof CommandFounderCommandRoute
+  '/command/investor-board': typeof CommandInvestorBoardRoute
+  '/command/ai-knowledge': typeof CommandAiKnowledgeRoute
+  '/command/qa-verification': typeof CommandQaVerificationRoute
+  '/command/deployment-readiness': typeof CommandDeploymentReadinessRoute
   '/range/$tier': typeof RangeTierRoute
   '/command/': typeof CommandIndexRoute
 }
@@ -138,6 +184,16 @@ export interface FileRouteTypes {
     | '/command/ops'
     | '/command/product'
     | '/command/risk'
+    | '/command/finance-control'
+    | '/command/funding'
+    | '/command/manufacturing'
+    | '/command/legal-control'
+    | '/command/technical'
+    | '/command/founder-command'
+    | '/command/investor-board'
+    | '/command/ai-knowledge'
+    | '/command/qa-verification'
+    | '/command/deployment-readiness'
     | '/range/$tier'
     | '/command/'
   fileRoutesByTo: FileRoutesByTo
@@ -151,6 +207,16 @@ export interface FileRouteTypes {
     | '/command/ops'
     | '/command/product'
     | '/command/risk'
+    | '/command/finance-control'
+    | '/command/funding'
+    | '/command/manufacturing'
+    | '/command/legal-control'
+    | '/command/technical'
+    | '/command/founder-command'
+    | '/command/investor-board'
+    | '/command/ai-knowledge'
+    | '/command/qa-verification'
+    | '/command/deployment-readiness'
     | '/range/$tier'
     | '/command'
   id:
@@ -165,6 +231,16 @@ export interface FileRouteTypes {
     | '/command/ops'
     | '/command/product'
     | '/command/risk'
+    | '/command/finance-control'
+    | '/command/funding'
+    | '/command/manufacturing'
+    | '/command/legal-control'
+    | '/command/technical'
+    | '/command/founder-command'
+    | '/command/investor-board'
+    | '/command/ai-knowledge'
+    | '/command/qa-verification'
+    | '/command/deployment-readiness'
     | '/range/$tier'
     | '/command/'
   fileRoutesById: FileRoutesById
@@ -177,90 +253,28 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/command': {
-      id: '/command'
-      path: '/command'
-      fullPath: '/command'
-      preLoaderRoute: typeof CommandRouteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/range': {
-      id: '/range'
-      path: '/range'
-      fullPath: '/range'
-      preLoaderRoute: typeof RangeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/command/': {
-      id: '/command/'
-      path: '/'
-      fullPath: '/command/'
-      preLoaderRoute: typeof CommandIndexRouteImport
-      parentRoute: typeof CommandRouteRoute
-    }
-    '/command/actions': {
-      id: '/command/actions'
-      path: '/actions'
-      fullPath: '/command/actions'
-      preLoaderRoute: typeof CommandActionsRouteImport
-      parentRoute: typeof CommandRouteRoute
-    }
-    '/command/finance': {
-      id: '/command/finance'
-      path: '/finance'
-      fullPath: '/command/finance'
-      preLoaderRoute: typeof CommandFinanceRouteImport
-      parentRoute: typeof CommandRouteRoute
-    }
-    '/command/gtm': {
-      id: '/command/gtm'
-      path: '/gtm'
-      fullPath: '/command/gtm'
-      preLoaderRoute: typeof CommandGtmRouteImport
-      parentRoute: typeof CommandRouteRoute
-    }
-    '/command/legal': {
-      id: '/command/legal'
-      path: '/legal'
-      fullPath: '/command/legal'
-      preLoaderRoute: typeof CommandLegalRouteImport
-      parentRoute: typeof CommandRouteRoute
-    }
-    '/command/ops': {
-      id: '/command/ops'
-      path: '/ops'
-      fullPath: '/command/ops'
-      preLoaderRoute: typeof CommandOpsRouteImport
-      parentRoute: typeof CommandRouteRoute
-    }
-    '/command/product': {
-      id: '/command/product'
-      path: '/product'
-      fullPath: '/command/product'
-      preLoaderRoute: typeof CommandProductRouteImport
-      parentRoute: typeof CommandRouteRoute
-    }
-    '/command/risk': {
-      id: '/command/risk'
-      path: '/risk'
-      fullPath: '/command/risk'
-      preLoaderRoute: typeof CommandRiskRouteImport
-      parentRoute: typeof CommandRouteRoute
-    }
-    '/range/$tier': {
-      id: '/range/$tier'
-      path: '/$tier'
-      fullPath: '/range/$tier'
-      preLoaderRoute: typeof RangeTierRouteImport
-      parentRoute: typeof RangeRoute
-    }
+    '/': { id: '/'; path: '/'; fullPath: '/'; preLoaderRoute: typeof IndexRouteImport; parentRoute: typeof rootRouteImport }
+    '/command': { id: '/command'; path: '/command'; fullPath: '/command'; preLoaderRoute: typeof CommandRouteRouteImport; parentRoute: typeof rootRouteImport }
+    '/range': { id: '/range'; path: '/range'; fullPath: '/range'; preLoaderRoute: typeof RangeRouteImport; parentRoute: typeof rootRouteImport }
+    '/command/': { id: '/command/'; path: '/'; fullPath: '/command/'; preLoaderRoute: typeof CommandIndexRouteImport; parentRoute: typeof CommandRouteRoute }
+    '/command/actions': { id: '/command/actions'; path: '/actions'; fullPath: '/command/actions'; preLoaderRoute: typeof CommandActionsRouteImport; parentRoute: typeof CommandRouteRoute }
+    '/command/finance': { id: '/command/finance'; path: '/finance'; fullPath: '/command/finance'; preLoaderRoute: typeof CommandFinanceRouteImport; parentRoute: typeof CommandRouteRoute }
+    '/command/gtm': { id: '/command/gtm'; path: '/gtm'; fullPath: '/command/gtm'; preLoaderRoute: typeof CommandGtmRouteImport; parentRoute: typeof CommandRouteRoute }
+    '/command/legal': { id: '/command/legal'; path: '/legal'; fullPath: '/command/legal'; preLoaderRoute: typeof CommandLegalRouteImport; parentRoute: typeof CommandRouteRoute }
+    '/command/ops': { id: '/command/ops'; path: '/ops'; fullPath: '/command/ops'; preLoaderRoute: typeof CommandOpsRouteImport; parentRoute: typeof CommandRouteRoute }
+    '/command/product': { id: '/command/product'; path: '/product'; fullPath: '/command/product'; preLoaderRoute: typeof CommandProductRouteImport; parentRoute: typeof CommandRouteRoute }
+    '/command/risk': { id: '/command/risk'; path: '/risk'; fullPath: '/command/risk'; preLoaderRoute: typeof CommandRiskRouteImport; parentRoute: typeof CommandRouteRoute }
+    '/command/finance-control': { id: '/command/finance-control'; path: '/finance-control'; fullPath: '/command/finance-control'; preLoaderRoute: typeof CommandFinanceControlRouteImport; parentRoute: typeof CommandRouteRoute }
+    '/command/funding': { id: '/command/funding'; path: '/funding'; fullPath: '/command/funding'; preLoaderRoute: typeof CommandFundingRouteImport; parentRoute: typeof CommandRouteRoute }
+    '/command/manufacturing': { id: '/command/manufacturing'; path: '/manufacturing'; fullPath: '/command/manufacturing'; preLoaderRoute: typeof CommandManufacturingRouteImport; parentRoute: typeof CommandRouteRoute }
+    '/command/legal-control': { id: '/command/legal-control'; path: '/legal-control'; fullPath: '/command/legal-control'; preLoaderRoute: typeof CommandLegalControlRouteImport; parentRoute: typeof CommandRouteRoute }
+    '/command/technical': { id: '/command/technical'; path: '/technical'; fullPath: '/command/technical'; preLoaderRoute: typeof CommandTechnicalRouteImport; parentRoute: typeof CommandRouteRoute }
+    '/command/founder-command': { id: '/command/founder-command'; path: '/founder-command'; fullPath: '/command/founder-command'; preLoaderRoute: typeof CommandFounderCommandRouteImport; parentRoute: typeof CommandRouteRoute }
+    '/command/investor-board': { id: '/command/investor-board'; path: '/investor-board'; fullPath: '/command/investor-board'; preLoaderRoute: typeof CommandInvestorBoardRouteImport; parentRoute: typeof CommandRouteRoute }
+    '/command/ai-knowledge': { id: '/command/ai-knowledge'; path: '/ai-knowledge'; fullPath: '/command/ai-knowledge'; preLoaderRoute: typeof CommandAiKnowledgeRouteImport; parentRoute: typeof CommandRouteRoute }
+    '/command/qa-verification': { id: '/command/qa-verification'; path: '/qa-verification'; fullPath: '/command/qa-verification'; preLoaderRoute: typeof CommandQaVerificationRouteImport; parentRoute: typeof CommandRouteRoute }
+    '/command/deployment-readiness': { id: '/command/deployment-readiness'; path: '/deployment-readiness'; fullPath: '/command/deployment-readiness'; preLoaderRoute: typeof CommandDeploymentReadinessRouteImport; parentRoute: typeof CommandRouteRoute }
+    '/range/$tier': { id: '/range/$tier'; path: '/$tier'; fullPath: '/range/$tier'; preLoaderRoute: typeof RangeTierRouteImport; parentRoute: typeof RangeRoute }
   }
 }
 
@@ -272,36 +286,48 @@ interface CommandRouteRouteChildren {
   CommandOpsRoute: typeof CommandOpsRoute
   CommandProductRoute: typeof CommandProductRoute
   CommandRiskRoute: typeof CommandRiskRoute
+  CommandFinanceControlRoute: typeof CommandFinanceControlRoute
+  CommandFundingRoute: typeof CommandFundingRoute
+  CommandManufacturingRoute: typeof CommandManufacturingRoute
+  CommandLegalControlRoute: typeof CommandLegalControlRoute
+  CommandTechnicalRoute: typeof CommandTechnicalRoute
+  CommandFounderCommandRoute: typeof CommandFounderCommandRoute
+  CommandInvestorBoardRoute: typeof CommandInvestorBoardRoute
+  CommandAiKnowledgeRoute: typeof CommandAiKnowledgeRoute
+  CommandQaVerificationRoute: typeof CommandQaVerificationRoute
+  CommandDeploymentReadinessRoute: typeof CommandDeploymentReadinessRoute
   CommandIndexRoute: typeof CommandIndexRoute
 }
 
 const CommandRouteRouteChildren: CommandRouteRouteChildren = {
-  CommandActionsRoute: CommandActionsRoute,
-  CommandFinanceRoute: CommandFinanceRoute,
-  CommandGtmRoute: CommandGtmRoute,
-  CommandLegalRoute: CommandLegalRoute,
-  CommandOpsRoute: CommandOpsRoute,
-  CommandProductRoute: CommandProductRoute,
-  CommandRiskRoute: CommandRiskRoute,
-  CommandIndexRoute: CommandIndexRoute,
+  CommandActionsRoute,
+  CommandFinanceRoute,
+  CommandGtmRoute,
+  CommandLegalRoute,
+  CommandOpsRoute,
+  CommandProductRoute,
+  CommandRiskRoute,
+  CommandFinanceControlRoute,
+  CommandFundingRoute,
+  CommandManufacturingRoute,
+  CommandLegalControlRoute,
+  CommandTechnicalRoute,
+  CommandFounderCommandRoute,
+  CommandInvestorBoardRoute,
+  CommandAiKnowledgeRoute,
+  CommandQaVerificationRoute,
+  CommandDeploymentReadinessRoute,
+  CommandIndexRoute,
 }
 
-const CommandRouteRouteWithChildren = CommandRouteRoute._addFileChildren(
-  CommandRouteRouteChildren,
-)
+const CommandRouteRouteWithChildren = CommandRouteRoute._addFileChildren(CommandRouteRouteChildren)
 
-interface RangeRouteChildren {
-  RangeTierRoute: typeof RangeTierRoute
-}
-
-const RangeRouteChildren: RangeRouteChildren = {
-  RangeTierRoute: RangeTierRoute,
-}
-
+interface RangeRouteChildren { RangeTierRoute: typeof RangeTierRoute }
+const RangeRouteChildren: RangeRouteChildren = { RangeTierRoute }
 const RangeRouteWithChildren = RangeRoute._addFileChildren(RangeRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  IndexRoute,
   CommandRouteRoute: CommandRouteRouteWithChildren,
   RangeRoute: RangeRouteWithChildren,
 }
