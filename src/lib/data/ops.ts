@@ -52,4 +52,6 @@ export const GANTT = [
   { id: "pilot", label: "Pilot batch + QC", start: 11, end: 13, dep: "tool" },
   { id: "launch", label: "Commercial launch", start: 12, end: 13, dep: "pilot" },
   { id: "hun", label: "First 100 (staggered)", start: 13, end: 18, dep: "launch" },
+  { id: "scale", label: "Scale / working-capital review", start: 24, end: 30, dep: "launch" },
+  { id: "plan36", label: "36-month strategic review", start: 36, end: 36, dep: "scale" },
 ] as const;
