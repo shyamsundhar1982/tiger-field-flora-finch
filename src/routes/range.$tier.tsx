@@ -46,6 +46,8 @@ function TierPage() {
     return { groupset: g, tyre: ty, wheelset: w, total: g.price + ty.price + w.price };
   }, [groupset, tyre, wheelset]);
 
+  const buildPrice = t.asp + buildAdd.total;
+
   return (
     <div className="min-h-dvh bg-bg">
       <SiteHeader />
@@ -58,7 +60,7 @@ function TierPage() {
             <h1 className="mt-2 text-5xl font-bold text-accent">{t.name}</h1>
             <p className="mt-4 text-muted">{t.pitch}</p>
             <dl className="mt-8 grid grid-cols-2 gap-4 text-sm">
-              <div><dt className="text-subtle">ASP</dt><dd className="mt-1 text-2xl font-bold tabular-nums text-accent">{inr(t.asp)}</dd></div>
+              <div><dt className="text-subtle">Starting price</dt><dd className="mt-1 text-2xl font-bold tabular-nums text-accent">{inr(t.asp)}</dd></div>
               <div><dt className="text-subtle">Landed COGS</dt><dd className="mt-1 text-2xl font-bold tabular-nums text-fg">{inr(cogs)}</dd></div>
               <div><dt className="text-subtle">Gross margin</dt><dd className="mt-1 text-2xl font-bold tabular-nums text-fg">{pct(gm, 1)}</dd></div>
               <div><dt className="text-subtle">Frame target</dt><dd className="mt-1 text-2xl font-bold text-fg">{t.weight}</dd></div>
@@ -69,29 +71,36 @@ function TierPage() {
           </div>
         </div>
 
-        <section className="mt-16 rounded-2xl border border-accent/20 bg-gradient-to-br from-accent/10 via-green/5 to-transparent p-5 sm:p-7">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <section className="mt-16 rounded-2xl border border-accent/25 bg-gradient-to-br from-accent/12 via-green/8 to-transparent p-5 shadow-[0_0_50px_rgb(255_116_23/0.05)] sm:p-7">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">Build selection</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">Build configurator</p>
               <h2 className="mt-1 text-3xl font-bold text-accent">Choose your specification</h2>
-              <p className="mt-2 max-w-2xl text-sm text-muted">Outer panels use a transparent gradient; the selectable inner cards are deliberately darker so the choice reads clearly on every screen size.</p>
+              <p className="mt-2 max-w-2xl text-sm text-muted">Select a groupset, tyre and wheelset. Every option below shows its current indicative India-market price, and the build total updates immediately.</p>
             </div>
-            <div className="rounded-xl border border-accent/30 bg-bg/80 px-4 py-3 text-right backdrop-blur-sm">
-              <p className="text-[10px] uppercase tracking-[0.16em] text-subtle">Selected upgrades</p>
-              <p className="mt-1 text-xl font-bold tabular-nums text-accent">{inr(buildAdd.total)}</p>
+            <div className="rounded-xl border border-accent/40 bg-bg/90 px-5 py-3 text-right shadow-[0_0_22px_rgb(255_116_23/0.08)] backdrop-blur-sm">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-green">Configured build</p>
+              <p className="mt-1 text-2xl font-bold tabular-nums text-accent">{inr(buildPrice)}</p>
+              <p className="mt-0.5 text-[10px] text-subtle">Base + selected components</p>
             </div>
           </div>
 
-          <div className="mt-7 space-y-5">
+          <div className="mt-7 space-y-6">
             <Selection title="Groupset" options={GROUPSETS} value={groupset} onChange={setGroupset} />
-            <Selection title="Tyres" options={TYRES} value={tyre} onChange={setTyre} />
+            <Selection title="Tyres · pair" options={TYRES} value={tyre} onChange={setTyre} />
             <Selection title="Wheelset" options={WHEELSETS} value={wheelset} onChange={setWheelset} />
           </div>
 
-          <div className="mt-7 grid gap-3 rounded-xl border border-border bg-bg-elevated/95 p-4 sm:grid-cols-3">
-            <Summary label="Groupset" value={buildAdd.groupset.name} price={buildAdd.groupset.price} />
-            <Summary label="Tyres" value={buildAdd.tyre.name} price={buildAdd.tyre.price} />
-            <Summary label="Wheelset" value={buildAdd.wheelset.name} price={buildAdd.wheelset.price} />
+          <div className="mt-7 rounded-xl border border-border bg-bg-elevated/95 p-4 sm:p-5">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Summary label="Groupset" value={buildAdd.groupset.name} price={buildAdd.groupset.price} />
+              <Summary label="Tyres" value={buildAdd.tyre.name} price={buildAdd.tyre.price} />
+              <Summary label="Wheelset" value={buildAdd.wheelset.name} price={buildAdd.wheelset.price} />
+            </div>
+            <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <div><p className="text-[10px] uppercase tracking-[0.14em] text-subtle">Base bicycle</p><p className="text-sm text-muted">{t.name} · {inr(t.asp)}</p></div>
+              <div className="text-left sm:text-right"><p className="text-[10px] uppercase tracking-[0.14em] text-subtle">Final configured reference</p><p className="text-2xl font-bold tabular-nums text-accent">{inr(buildPrice)}</p></div>
+            </div>
           </div>
           <p className="mt-4 text-[11px] leading-5 text-subtle">Indicative India-market component references, checked September 2026. Prices can move with dealer stock, model year and availability. Tyre prices are shown as a pair. These are build-selection references, not a final quotation.</p>
         </section>
@@ -122,12 +131,12 @@ function TierPage() {
 
 function Selection<T extends { id: string; name: string; detail: string; price: number }>({ title, options, value, onChange }: { title: string; options: readonly T[]; value: string; onChange: (value: T["id"]) => void }) {
   return (
-    <div className="rounded-xl border border-border/80 bg-gradient-to-r from-green/10 via-accent/5 to-transparent p-3 sm:p-4">
-      <div className="mb-3 flex items-center justify-between gap-3 px-1">
-        <h3 className="font-semibold text-green">{title}</h3>
-        <span className="text-[10px] uppercase tracking-[0.14em] text-subtle">Select one</span>
+    <div className="rounded-2xl border border-green/20 bg-gradient-to-r from-green/12 via-accent/8 to-transparent p-3 sm:p-4">
+      <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-border/70 bg-bg/45 px-3 py-2">
+        <h3 className="text-base font-bold text-green">{title}</h3>
+        <span className="rounded-full border border-green/20 bg-green/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-green">Select one</span>
       </div>
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {options.map((option) => {
           const selected = option.id === value;
           return (
@@ -136,14 +145,17 @@ function Selection<T extends { id: string; name: string; detail: string; price: 
               type="button"
               aria-pressed={selected}
               onClick={() => onChange(option.id)}
-              className={`group rounded-lg border p-3 text-left transition-all duration-200 ${selected ? "border-accent bg-bg shadow-[0_0_0_1px_rgb(255_116_23/0.35),0_8px_24px_rgb(0_0_0/0.22)]" : "border-border bg-bg-elevated/95 hover:-translate-y-0.5 hover:border-green/50 hover:bg-bg"}`}
+              className={`group min-h-[112px] rounded-xl border p-4 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 ${selected ? "border-accent bg-[#111315] shadow-[0_0_0_1px_rgb(255_116_23/0.45),0_10px_28px_rgb(0_0_0/0.3)]" : "border-border bg-[#17191b] hover:-translate-y-1 hover:border-accent/55 hover:bg-[#121516] hover:shadow-[0_0_22px_rgb(255_116_23/0.08)]"}`}
             >
               <div className="flex items-start justify-between gap-3">
-                <span className={`text-sm font-semibold ${selected ? "text-accent" : "text-fg group-hover:text-accent"}`}>{option.name}</span>
-                <span className={`mt-0.5 size-2.5 shrink-0 rounded-full border ${selected ? "border-accent bg-accent" : "border-subtle"}`} />
+                <span className={`text-sm font-bold leading-5 ${selected ? "text-accent" : "text-fg group-hover:text-accent"}`}>{option.name}</span>
+                <span className={`mt-0.5 size-3 shrink-0 rounded-full border-2 ${selected ? "border-accent bg-accent shadow-[0_0_10px_rgb(255_116_23/0.55)]" : "border-subtle group-hover:border-green"}`} />
               </div>
-              <p className="mt-1 text-xs text-muted">{option.detail}</p>
-              <p className="mt-3 text-sm font-semibold tabular-nums text-green">{inr(option.price)}</p>
+              <p className="mt-2 text-xs leading-4 text-muted">{option.detail}</p>
+              <div className="mt-3 flex items-baseline justify-between gap-2">
+                <span className="text-[10px] uppercase tracking-[0.12em] text-subtle">Indicative price</span>
+                <span className={`text-base font-bold tabular-nums ${selected ? "text-accent" : "text-green"}`}>{inr(option.price)}</span>
+              </div>
             </button>
           );
         })}
@@ -153,5 +165,5 @@ function Selection<T extends { id: string; name: string; detail: string; price: 
 }
 
 function Summary({ label, value, price }: { label: string; value: string; price: number }) {
-  return <div><p className="text-[10px] uppercase tracking-[0.14em] text-subtle">{label}</p><p className="mt-1 text-sm font-semibold text-fg">{value}</p><p className="mt-1 text-xs tabular-nums text-accent">{inr(price)}</p></div>;
+  return <div className="rounded-lg border border-border/70 bg-bg/50 p-3"><p className="text-[10px] uppercase tracking-[0.14em] text-subtle">{label}</p><p className="mt-1 text-sm font-semibold text-fg">{value}</p><p className="mt-1 text-sm font-bold tabular-nums text-accent">{inr(price)}</p></div>;
 }
