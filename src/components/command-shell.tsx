@@ -25,7 +25,8 @@ const NAV: Array<{
     | "/command/risk"
     | "/command/actions"
     | "/command/knowledge"
-    | "/command/technical";
+    | "/command/technical"
+    | "/command/finance-control";
   label: string;
   icon: typeof Activity;
   exact?: boolean;
@@ -34,6 +35,7 @@ const NAV: Array<{
   { to: "/command/finance", label: "Finance", icon: Wallet },
   { to: "/command/product", label: "Product", icon: Bike },
   { to: "/command/technical", label: "Technical", icon: Wrench },
+  { to: "/command/finance-control", label: "Finance Control", icon: Wallet },
   { to: "/command/ops", label: "Ops", icon: Landmark },
   { to: "/command/legal", label: "Legal", icon: Scale },
   { to: "/command/gtm", label: "GTM", icon: Shield },
