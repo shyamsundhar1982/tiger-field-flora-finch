@@ -30,16 +30,25 @@ const PLAN_COGS = 1.1;
 
 function unitsFor(m: number, s: ScenarioId): number {
   if (s === "base") {
-    const ramp = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26];
+    const ramp = [
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26,
+      30, 34, 38, 42, 46, 50, 55, 60, 65, 70, 75, 80,
+    ];
     const u = ramp[m - 1] ?? 0;
     if (m === 12 || m === 13 || m === 23 || m === 24) return Math.round(u * 1.12);
     return u;
   }
   if (s === "delayed") {
-    const ramp = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 5, 7, 9, 11, 13, 15, 16, 18, 20];
+    const ramp = [
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 5, 7, 9, 11, 13, 15, 16, 18, 20,
+      23, 26, 29, 32, 35, 38, 41, 44, 47, 50, 53, 56,
+    ];
     return ramp[m - 1] ?? 0;
   }
-  const ramp = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 4, 6, 8, 10, 12, 14];
+  const ramp = [
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 4, 6, 8, 10, 12, 14,
+    16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38,
+  ];
   return ramp[m - 1] ?? 0;
 }
 
@@ -145,7 +154,7 @@ export function buildModel(scenario: ScenarioId, drawStandby: boolean): MonthRow
   let iaud = 0;
   let tooling = 0;
 
-  for (let m = 1; m <= 24; m++) {
+  for (let m = 1; m <= 36; m++) {
     const units = unitsFor(m, scenario);
     const revenue = units * ASP;
     const cogs = units * cogsU;
