@@ -4,7 +4,7 @@ import { SiteHeader } from "@/components/site-header";
 import { cn } from "@/lib/utils";
 
 const NAV: Array<{
-  to: "/command" | "/command/finance" | "/command/product" | "/command/ops" | "/command/legal" | "/command/gtm" | "/command/risk" | "/command/actions" | "/command/knowledge" | "/command/technical" | "/command/finance-control" | "/command/funding";
+  to: "/command" | "/command/finance" | "/command/product" | "/command/ops" | "/command/legal" | "/command/legal-control" | "/command/gtm" | "/command/risk" | "/command/actions" | "/command/knowledge" | "/command/technical" | "/command/finance-control" | "/command/funding";
   label: string;
   icon: typeof Activity;
   exact?: boolean;
@@ -17,6 +17,7 @@ const NAV: Array<{
   { to: "/command/funding", label: "Funding", icon: Landmark },
   { to: "/command/ops", label: "Ops", icon: Landmark },
   { to: "/command/legal", label: "Legal", icon: Scale },
+  { to: "/command/legal-control", label: "Legal Control", icon: Scale },
   { to: "/command/gtm", label: "GTM", icon: Shield },
   { to: "/command/risk", label: "Risk", icon: AlertTriangle },
   { to: "/command/actions", label: "Actions", icon: CheckSquare },
