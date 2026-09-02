@@ -1,13 +1,14 @@
 import { Link, Outlet } from "@tanstack/react-router";
-import { Activity, AlertTriangle, Bike, BookOpen, BrainCircuit, CheckSquare, Factory, Landmark, Presentation, Scale, Shield, UserRound, Wallet, Wrench } from "lucide-react";
+import { Activity, AlertTriangle, Bike, BookOpen, BrainCircuit, CheckSquare, ClipboardCheck, Factory, Landmark, Presentation, Scale, Shield, UserRound, Wallet, Wrench } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { cn } from "@/lib/utils";
 
-const NAV: Array<{ to: "/command" | "/command/finance" | "/command/product" | "/command/ops" | "/command/legal" | "/command/legal-control" | "/command/gtm" | "/command/risk" | "/command/actions" | "/command/knowledge" | "/command/technical" | "/command/finance-control" | "/command/funding" | "/command/manufacturing" | "/command/founder-command" | "/command/investor-board" | "/command/ai-knowledge"; label: string; icon: typeof Activity; exact?: boolean }> = [
+const NAV: Array<{ to: "/command" | "/command/finance" | "/command/product" | "/command/ops" | "/command/legal" | "/command/legal-control" | "/command/gtm" | "/command/risk" | "/command/actions" | "/command/knowledge" | "/command/technical" | "/command/finance-control" | "/command/funding" | "/command/manufacturing" | "/command/founder-command" | "/command/investor-board" | "/command/ai-knowledge" | "/command/qa-verification"; label: string; icon: typeof Activity; exact?: boolean }> = [
   { to: "/command", label: "Board", icon: Activity, exact: true },
   { to: "/command/founder-command", label: "Founder", icon: UserRound },
   { to: "/command/investor-board", label: "Investor / Board", icon: Presentation },
   { to: "/command/ai-knowledge", label: "AI / Knowledge", icon: BrainCircuit },
+  { to: "/command/qa-verification", label: "QA / Verify", icon: ClipboardCheck },
   { to: "/command/finance", label: "Finance", icon: Wallet },
   { to: "/command/product", label: "Product", icon: Bike },
   { to: "/command/technical", label: "Technical", icon: Wrench },
