@@ -1,1 +1,0 @@
-function e(e,t=1){let n=e<0?`−`:``,r=Math.abs(e);return r>=100?`${n}₹${r.toFixed(0)} L`:r>=10?`${n}₹${r.toFixed(1)} L`:`${n}₹${r.toFixed(Math.max(t,r<1?2:1))} L`}function t(e){return`₹`+Math.round(e).toLocaleString(`en-IN`)}function n(e,t=1){return`${e.toFixed(t)}%`}export{e as n,n as r,t};
