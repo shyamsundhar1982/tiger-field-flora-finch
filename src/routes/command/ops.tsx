@@ -16,7 +16,7 @@ function Ops() {
         </p>
       </div>
 
-      <Panel title="24-month critical path">
+      <Panel title="36-month operating critical path">
         <div className="space-y-2">
           {GANTT.map((g) => (
             <div key={g.id} className="grid grid-cols-[7rem_1fr] items-center gap-3 text-sm sm:grid-cols-[11rem_1fr_4rem]">
@@ -25,8 +25,8 @@ function Ops() {
                 <div
                   className="absolute inset-y-1 rounded-sm bg-accent/80"
                   style={{
-                    left: `${((g.start - 1) / 24) * 100}%`,
-                    width: `${((g.end - g.start + 1) / 24) * 100}%`,
+                    left: `${((g.start - 1) / 36) * 100}%`,
+                    width: `${((g.end - g.start + 1) / 36) * 100}%`,
                   }}
                 />
               </div>
@@ -36,7 +36,7 @@ function Ops() {
             </div>
           ))}
         </div>
-        <p className="mt-3 text-[11px] uppercase tracking-[0.16em] text-subtle">M1 — M24</p>
+        <p className="mt-3 text-[11px] uppercase tracking-[0.16em] text-subtle">M1 — M36</p>
       </Panel>
 
       <div className="grid gap-4 lg:grid-cols-2">
