@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Kpi, Panel } from "@/components/kpi";
 import { FINANCE_CONTROL, FINANCE_GATES, MONTHLY_CASH_PLAN, SCENARIO_SNAPSHOTS } from "@/lib/data/finance-control";
 
@@ -17,8 +17,13 @@ function FinanceControl() {
         <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Stage 4 · Financial control</p>
         <h1 className="font-display text-4xl">Finance Control</h1>
         <p className="mt-2 max-w-3xl text-sm text-muted">
-          A 24-month operating view linking burn, revenue, COGS, inventory, development, tooling, funding and runway to execution gates.
+          A 36-month operating view linking burn, revenue, COGS, inventory, development, tooling, funding and runway to execution gates.
         </p>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <Link to="/command/balance-sheet" className="rounded-md border border-border px-3 py-2 text-muted hover:bg-surface hover:text-fg">Balance Sheet</Link>
+          <Link to="/command/ca-audit" className="rounded-md border border-border px-3 py-2 text-muted hover:bg-surface hover:text-fg">CA Verification / Audit</Link>
+          <Link to="/command/investor-pitch" className="rounded-md border border-border px-3 py-2 text-muted hover:bg-surface hover:text-fg">Investor Pitch</Link>
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -28,7 +33,7 @@ function FinanceControl() {
         <Kpi label="Funding ladder" value="₹15L → ₹2Cr" hint="Evidence-led staged capital" />
       </div>
 
-      <Panel title="Scenario control" kicker="24-month model">
+      <Panel title="Scenario control" kicker="36-month model">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[52rem] text-left text-sm">
             <thead className="text-[11px] uppercase tracking-[0.14em] text-subtle">
@@ -60,7 +65,7 @@ function FinanceControl() {
         </div>
       </Panel>
 
-      <Panel title="24-month cash plan" kicker="Base / delayed / stress">
+      <Panel title="36-month cash plan" kicker="Base / delayed / stress">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[64rem] text-left text-xs">
             <thead className="text-[10px] uppercase tracking-[0.12em] text-subtle">
@@ -80,7 +85,7 @@ function FinanceControl() {
       <Panel title="Breakeven markers" kicker="Planning markers, not forecasts">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-md bg-surface p-4"><p className="text-xs text-subtle">Early contribution breakeven</p><p className="mt-1 font-display text-2xl">M{FINANCE_CONTROL.earlyBreakevenMonth}</p><p className="mt-1 text-xs text-muted">Current planning marker from the finance model.</p></div>
-          <div className="rounded-md bg-surface p-4"><p className="text-xs text-subtle">Scale breakeven</p><p className="mt-1 font-display text-2xl">M{FINANCE_CONTROL.scaleBreakevenMonth}</p><p className="mt-1 text-xs text-muted">Outside the current 24-month operating horizon.</p></div>
+          <div className="rounded-md bg-surface p-4"><p className="text-xs text-subtle">Scale breakeven</p><p className="mt-1 font-display text-2xl">M{FINANCE_CONTROL.scaleBreakevenMonth}</p><p className="mt-1 text-xs text-muted">Now inside the 36-month operating horizon.</p></div>
         </div>
       </Panel>
 
