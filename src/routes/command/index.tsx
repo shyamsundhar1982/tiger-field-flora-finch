@@ -18,6 +18,21 @@ import { useVeloxis } from "@/lib/store";
 
 export const Route = createFileRoute("/command/")({ component: Board });
 
+const STAGES = [
+  { n: 1, label: "Command Board", to: "/command" as const },
+  { n: 2, label: "Knowledge Base", to: "/command/knowledge" as const },
+  { n: 3, label: "Engineering Control", to: "/command/technical" as const },
+  { n: 4, label: "Financial Control", to: "/command/finance-control" as const },
+  { n: 5, label: "Funding Intelligence", to: "/command/funding" as const },
+  { n: 6, label: "Legal / IP / CA Control", to: "/command/legal-control" as const },
+  { n: 7, label: "Manufacturing Control", to: "/command/manufacturing" as const },
+  { n: 8, label: "Founder Command", to: "/command/founder-command" as const },
+  { n: 9, label: "Investor / Board", to: "/command/investor-board" as const },
+  { n: 10, label: "AI / Knowledge", to: "/command/ai-knowledge" as const },
+  { n: 11, label: "QA / Verification", to: "/command/qa-verification" as const },
+  { n: 12, label: "Final Deployment Readiness", to: "/command/deployment-readiness" as const },
+];
+
 function Board() {
   const scenario = useVeloxis((s) => s.scenario);
   const drawStandby = useVeloxis((s) => s.drawStandby);
@@ -38,6 +53,28 @@ function Board() {
           incorporation, provisional patents at M3, D2C-first.
         </p>
       </div>
+
+      <Panel title="12-stage execution roadmap" kicker="Command architecture">
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {STAGES.map((stage) => (
+            <Link
+              key={stage.n}
+              to={stage.to}
+              activeOptions={{ exact: stage.n === 1 }}
+              className="group flex items-start gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-surface"
+              activeProps={{ className: "bg-surface border-accent/40" }}
+            >
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-border text-xs tabular-nums text-accent">
+                {stage.n}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[10px] uppercase tracking-[0.14em] text-subtle">Stage {stage.n}</span>
+                <span className="mt-0.5 block text-sm font-medium text-fg group-hover:text-accent">{stage.label}</span>
+              </span>
+            </Link>
+          ))}
+        </div>
+      </Panel>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi label="24-mo funding" value={lakh(t.funding, 0)} hint={`${scenario} scenario`} />
