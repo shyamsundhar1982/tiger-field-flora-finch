@@ -1,15 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 import { Panel } from "@/components/kpi";
 
 export const Route = createFileRoute("/command/market-survey")({ component: MarketSurvey });
 
 const sources = [
-  ["Fortune Business Insights", "2026", "$1.45B", "₹13,877 cr", "4.8% global proxy"],
-  ["Ken Research", "2026", "$2.6B", "₹24,882 cr", "Not stated"],
-  ["6Wresearch", "2025", "$2.7B", "₹25,839 cr", "6.2% (2025–31)"],
-  ["TechSci Research", "2024", "$2.9B", "₹27,753 cr", "5.9% (2024–30)"],
-  ["Grand View Research", "2025", "$3.70B", "₹35,411 cr", "15.0% (2026–33)"],
-  ["Deep Market Insights", "2025", "$3.87B", "₹37,019 cr", "6.55% (2026–34)"],
+  ["Fortune Business Insights", "2026", "$1.45B", "₹13,877 cr", "4.8% global proxy"], ["Ken Research", "2026", "$2.6B", "₹24,882 cr", "Not stated"], ["6Wresearch", "2025", "$2.7B", "₹25,839 cr", "6.2% (2025–31)"], ["TechSci Research", "2024", "$2.9B", "₹27,753 cr", "5.9% (2024–30)"], ["Grand View Research", "2025", "$3.70B", "₹35,411 cr", "15.0% (2026–33)"], ["Deep Market Insights", "2025", "$3.87B", "₹37,019 cr", "6.55% (2026–34)"],
 ];
 const outlook = [["Fortune Business Insights", "₹17,542 cr"], ["6Wresearch", "₹36,366 cr"], ["TechSci Research", "₹41,448 cr"], ["Deep Market Insights", "₹54,176 cr"], ["Grand View Research", "₹81,906 cr"]];
 
@@ -27,5 +23,5 @@ function MarketSurvey() {
  </div>;
 }
 function Metric({label,value,note}:{label:string;value:string;note:string}){return <div className="rounded-xl border border-border bg-bg-elevated/30 p-4"><p className="text-[10px] uppercase tracking-[0.13em] text-subtle">{label}</p><p className="mt-2 font-display text-xl text-accent">{value}</p><p className="mt-1 text-xs text-muted">{note}</p></div>}
-function Note({title,children}:{title:string;children:React.ReactNode}){return <div className="rounded-lg border border-border p-4"><p className="font-medium text-fg">{title}</p><p className="mt-2 text-xs leading-5 text-muted">{children}</p></div>}
+function Note({title,children}:{title:string;children:ReactNode}){return <div className="rounded-lg border border-border p-4"><p className="font-medium text-fg">{title}</p><p className="mt-2 text-xs leading-5 text-muted">{children}</p></div>}
 function Material({title,value,note}:{title:string;value:string;note:string}){return <div className="rounded-lg border border-border p-4"><p className="text-xs uppercase tracking-[0.12em] text-subtle">{title}</p><p className="mt-2 font-display text-lg text-accent">{value}</p><p className="mt-2 text-xs leading-5 text-muted">{note}</p></div>}
