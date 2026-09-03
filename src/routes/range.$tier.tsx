@@ -9,8 +9,8 @@ import { inr, pct } from "@/lib/format";
 export const Route = createFileRoute("/range/$tier")({ component: TierPage });
 const DEFAULTS = {
   core:{groupset:"gs-105-r7000",tyre:"ty-rubino-pro",wheelset:"ws-alloy",handlebar:"hb-alloy-420",stem:"stem-90",saddle:"sad-men-broad-long",thruaxle:"ta-core","bottom-bracket":"bb-bsa","bottle-cage":"cage-plastic","tool-pouch":"tool-pouch",bracket:"bracket-computer",colour:"colour-bright-1"},
-  pro:{groupset:"gs-105-r7150",tyre:"ty-gp5000",wheelset:"ws-carbon-50",handlebar:"hb-carbon-420",stem:"stem-integrated-100",saddle:"sad-men-narrow-long",thruaxle:"ta-premium","bottom-bracket":"bb-t47i-85","bottle-cage":"cage-carbon","tool-pouch:"tool-pouch",bracket:"bracket-computer",colour:"colour-metal-2"},
-  apex:{groupset:"gs-ultegra-r8170",tyre:"ty-corsa-pro",wheelset:"ws-carbon-58",handlebar:"hb-carbon-420",stem:"stem-integrated-100",saddle:"sad-men-narrow-short",thruaxle:"ta-premium","bottom-bracket":"bb-t47i-85","bottle-cage":"cage-carbon","tool-pouch:"tool-pouch",bracket:"bracket-computer",colour:"colour-metal-5"}
+  pro:{groupset:"gs-105-r7150",tyre:"ty-gp5000",wheelset:"ws-carbon-50",handlebar:"hb-carbon-420",stem:"stem-integrated-100",saddle:"sad-men-narrow-long",thruaxle:"ta-premium","bottom-bracket":"bb-t47i-85","bottle-cage":"cage-carbon","tool-pouch":"tool-pouch",bracket:"bracket-computer",colour:"colour-metal-2"},
+  apex:{groupset:"gs-ultegra-r8170",tyre:"ty-corsa-pro",wheelset:"ws-carbon-58",handlebar:"hb-carbon-420",stem:"stem-integrated-100",saddle:"sad-men-narrow-short",thruaxle:"ta-premium","bottom-bracket":"bb-t47i-85","bottle-cage":"cage-carbon","tool-pouch":"tool-pouch",bracket:"bracket-computer",colour:"colour-metal-5"}
 } as const;
 type Tier = keyof typeof DEFAULTS;
 const CONFIG_CATEGORIES: { key: InventoryCategory; title:string }[] = [
