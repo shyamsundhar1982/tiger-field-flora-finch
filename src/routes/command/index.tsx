@@ -31,6 +31,11 @@ const FINANCE_WORKSPACES = [
   { label: "Investor Pitch", to: "/command/investor-pitch" as const, note: "Controlled investor narrative and 24-month operating view" },
 ];
 
+const OPERATIONS_WORKSPACES = [
+  { label: "Inventory Control", to: "/inventory" as const, note: "Components, stock, reorder levels, tier eligibility and configuration availability" },
+  { label: "Market Survey", to: "/command/market-survey" as const, note: "India market evidence, material mix and VéLOXIS price-positioning framework" },
+];
+
 function Board() {
   const scenario = useVeloxis((s) => s.scenario);
   const drawStandby = useVeloxis((s) => s.drawStandby);
@@ -76,6 +81,19 @@ function Board() {
         <div className="rounded-xl border border-border bg-bg-elevated/30 p-3">
           <div className="grid gap-3 md:grid-cols-3">
             {FINANCE_WORKSPACES.map((page) => (
+              <Link key={page.to} to={page.to} className="group rounded-lg border border-border bg-bg-elevated/95 p-4 transition-colors duration-200 hover:border-accent/45 hover:bg-bg">
+                <p className="text-sm font-medium text-fg transition-colors group-hover:text-accent">{page.label}</p>
+                <p className="mt-2 text-xs leading-5 text-muted group-hover:text-fg/80">{page.note}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </Panel>
+
+      <Panel title="Operations & market intelligence" kicker="Controlled internal workspaces">
+        <div className="rounded-xl border border-border bg-bg-elevated/30 p-3">
+          <div className="grid gap-3 md:grid-cols-2">
+            {OPERATIONS_WORKSPACES.map((page) => (
               <Link key={page.to} to={page.to} className="group rounded-lg border border-border bg-bg-elevated/95 p-4 transition-colors duration-200 hover:border-accent/45 hover:bg-bg">
                 <p className="text-sm font-medium text-fg transition-colors group-hover:text-accent">{page.label}</p>
                 <p className="mt-2 text-xs leading-5 text-muted group-hover:text-fg/80">{page.note}</p>
