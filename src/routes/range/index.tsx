@@ -4,6 +4,7 @@ import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { MODELS } from "@/lib/data/models";
 import { BOM, bomTotal } from "@/lib/data/bom";
 import { inr } from "@/lib/format";
+import { TIERS } from "@/lib/data/company";
 
 export const Route = createFileRoute("/range/")({ component: RangePage });
 
@@ -105,31 +106,40 @@ function ProductColumn({
   setId: (value: string) => void;
   model: typeof MODELS[number];
 }) {
-  return (
-    <section className="rounded-xl border border-border bg-bg-elevated">
-      <div className="border-b border-border p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-green">Product {label}</p>
-            <h2 className="mt-2 text-3xl font-bold tracking-tight text-accent">{model.name}</h2>
-          </div>
-          <span className="pt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-subtle">{model.tier}</span>
-        </div>
+  const tierData = TIERS.find((item) => item.id === tier(model.id)) ?? TIERS[0];
 
-        <label className="mt-6 block text-[10px] font-semibold uppercase tracking-[0.16em] text-subtle">
-          Build
-          <select
-            value={id}
-            onChange={(event) => setId(event.target.value)}
-            className="mt-2 w-full rounded-lg border border-border bg-bg px-3 py-3 text-sm text-fg outline-none focus:border-accent"
-          >
-            {MODELS.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.name} · {inr(option.asp)}
-              </option>
-            ))}
-          </select>
-        </label>
+  return (
+    <section className="overflow-hidden rounded-xl border border-border bg-bg-elevated">
+      <div className="border-b border-border">
+        <img
+          src={tierData.image}
+          alt={`${model.name} carbon bicycle`}
+          className="media aspect-[4/3] w-full object-cover"
+        />
+        <div className="p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-green">Product {label}</p>
+              <h2 className="mt-2 text-3xl font-bold tracking-tight text-accent">{model.name}</h2>
+            </div>
+            <span className="pt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-subtle">{model.tier}</span>
+          </div>
+
+          <label className="mt-6 block text-[10px] font-semibold uppercase tracking-[0.16em] text-subtle">
+            Build
+            <select
+              value={id}
+              onChange={(event) => setId(event.target.value)}
+              className="mt-2 w-full rounded-lg border border-border bg-bg px-3 py-3 text-sm text-fg outline-none focus:border-accent"
+            >
+              {MODELS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.name} · {inr(option.asp)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
 
       <dl className="divide-y divide-border px-6">
@@ -151,6 +161,3 @@ function Spec({ label, value, strong = false }: { label: string; value: string; 
     </div>
   );
 }
-
-const RouteComponent = RangePage;
-void RouteComponent;
