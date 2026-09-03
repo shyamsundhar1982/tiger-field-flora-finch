@@ -1,13 +1,15 @@
 import { Link, Outlet } from "@tanstack/react-router";
-import { Activity, AlertTriangle, Bike, BookOpen, BrainCircuit, CheckSquare, ClipboardCheck, Factory, Landmark, Presentation, Rocket, Scale, Shield, UserRound, Wallet, Wrench, FileSpreadsheet, BadgeCheck } from "lucide-react";
+import { Activity, AlertTriangle, Bike, BookOpen, BrainCircuit, CheckSquare, ClipboardCheck, Factory, Landmark, Presentation, Rocket, Scale, Shield, UserRound, Wallet, Wrench, FileSpreadsheet, BadgeCheck, Ruler, LineChart } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { cn } from "@/lib/utils";
 
-const NAV: Array<{ to: "/command" | "/command/finance" | "/command/product" | "/command/ops" | "/command/legal" | "/command/legal-control" | "/command/gtm" | "/command/risk" | "/command/actions" | "/command/knowledge" | "/command/technical" | "/command/finance-control" | "/command/funding" | "/command/manufacturing" | "/command/founder-command" | "/command/investor-board" | "/command/ai-knowledge" | "/command/qa-verification" | "/command/deployment-readiness" | "/command/balance-sheet" | "/command/ca-audit" | "/command/investor-pitch"; label: string; icon: typeof Activity; exact?: boolean }> = [
+const NAV: Array<{ to: "/command" | "/command/finance" | "/command/product" | "/command/ops" | "/command/legal" | "/command/legal-control" | "/command/gtm" | "/command/risk" | "/command/actions" | "/command/knowledge" | "/command/technical" | "/command/finance-control" | "/command/funding" | "/command/manufacturing" | "/command/founder-command" | "/command/investor-board" | "/command/ai-knowledge" | "/command/qa-verification" | "/command/deployment-readiness" | "/command/balance-sheet" | "/command/ca-audit" | "/command/investor-pitch" | "/command/market-survey" | "/command/design-philosophy"; label: string; icon: typeof Activity; exact?: boolean }> = [
   { to: "/command", label: "Board", icon: Activity, exact: true },
   { to: "/command/founder-command", label: "Founder", icon: UserRound },
   { to: "/command/investor-pitch", label: "Investor Pitch", icon: Presentation },
   { to: "/command/investor-board", label: "Investor / Board", icon: Presentation },
+  { to: "/command/market-survey", label: "Market Survey", icon: LineChart },
+  { to: "/command/design-philosophy", label: "Design Philosophy", icon: Ruler },
   { to: "/command/ai-knowledge", label: "AI / Knowledge", icon: BrainCircuit },
   { to: "/command/qa-verification", label: "QA / Verify", icon: ClipboardCheck },
   { to: "/command/deployment-readiness", label: "Release", icon: Rocket },
