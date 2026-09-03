@@ -137,13 +137,12 @@ export default defineConfig(({ command, isPreview }) => ({
     strictPort: true,
   },
   resolve: { tsconfigPaths: true },
-  // PGlite uses package-relative WASM/data assets. Keep it external to SSR so
-  // the runtime resolves its assets from the real node_modules package path.
+  // PGlite uses package-relative WASM/data assets. Keep it out of Vite's
+  // dependency pre-bundling during local development. Do not externalize it
+  // from SSR because Cloudflare Workers' Vite plugin rejects resolve.external
+  // for the Worker/SSR environment.
   optimizeDeps: {
     exclude: ["@electric-sql/pglite"],
-  },
-  ssr: {
-    external: ["@electric-sql/pglite"],
   },
   plugins: [
     pgliteBootstrapPlugin(),
