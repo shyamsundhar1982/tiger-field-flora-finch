@@ -157,6 +157,16 @@ export default defineConfig(({ command, isPreview }) => ({
     strictPort: true,
   },
   resolve: { tsconfigPaths: true },
+  // PGlite uses package-relative WASM/data assets. Vite's official guidance is
+  // to exclude PGlite from dependency optimization; additionally keep the
+  // server package external so Vercel's Node function tracer sees the package
+  // and its pglite.data asset at its real node_modules-relative location.
+  optimizeDeps: {
+    exclude: ["@electric-sql/pglite"],
+  },
+  ssr: {
+    external: ["@electric-sql/pglite"],
+  },
   plugins: [
     pgliteBootstrapPlugin(),
     // Before tanstackStart so /auth/popup never falls through to the SPA.
