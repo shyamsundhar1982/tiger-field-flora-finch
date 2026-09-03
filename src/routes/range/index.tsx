@@ -35,9 +35,20 @@ function RangePage() {
                   to={`/range/${model.tier}`}
                   className="rounded-xl border border-border p-6 hover:border-accent"
                 >
-                  <h3 className="font-display text-2xl">{model.name}</h3>
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="font-display text-2xl">{model.name}</h3>
+                    <span className="rounded-full border border-border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-green">
+                      {model.brand}
+                    </span>
+                  </div>
 
-                  <p className="mt-2 text-muted">
+                  <p className="mt-3 text-sm font-semibold text-fg">
+                    {model.groupset}
+                  </p>
+                  <p className="mt-1 text-xs text-muted">
+                    {model.wheelset} · {model.tyres}
+                  </p>
+                  <p className="mt-4 text-lg font-bold tabular-nums text-accent">
                     {inr(model.asp)}
                   </p>
                 </Link>
