@@ -17,7 +17,7 @@ export const TIERS = [
     id: "core" as const,
     name: "Core",
     epithet: "Endurance",
-    asp: 129900,
+    asp: 145300,
     cogs: 89900,
     image: "/bikes/core.jpg",
     weight: "890 g frame*",
@@ -29,7 +29,7 @@ export const TIERS = [
     id: "pro" as const,
     name: "Pro",
     epithet: "Race-endurance",
-    asp: 179900,
+    asp: 215000,
     cogs: 124500,
     image: "/bikes/pro.jpg",
     weight: "820 g frame*",
@@ -41,7 +41,7 @@ export const TIERS = [
     id: "apex" as const,
     name: "Apex",
     epithet: "Flagship",
-    asp: 264900,
+    asp: 295000,
     cogs: 184600,
     image: "/bikes/apex.jpg",
     weight: "760 g frame*",
@@ -50,7 +50,6 @@ export const TIERS = [
     highlights: ["T800 primary", "Raw weave option", "Limited allocation"],
   },
 ];
-
 export type TierId = (typeof TIERS)[number]["id"];
 
 export const TRANCHES = [
