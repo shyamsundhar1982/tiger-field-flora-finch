@@ -22,7 +22,6 @@ function Home() {
           <div className="mt-8 flex flex-wrap gap-3">
             <Button asChild size="lg"><Link to="/range">The range <ArrowRight /></Link></Button>
             <Button asChild variant="outline" size="lg"><Link to="/fit-calculator">Bike fit calculator</Link></Button>
-            <Button asChild variant="outline" size="lg"><Link to="/inventory">Inventory</Link></Button>
           </div>
         </div>
       </section>
