@@ -28,7 +28,7 @@ const STAGES = [
 const FINANCE_WORKSPACES = [
   { label: "Balance Sheet", to: "/command/balance-sheet" as const, note: "36-month management position view + CA reconciliation checklist" },
   { label: "CA Verification / Audit", to: "/command/ca-audit" as const, note: "Professional-review queue, evidence and sign-off protocol" },
-  { label: "Investor Pitch", to: "/command/investor-pitch" as const, note: "Controlled investor narrative and 36-month planning snapshot" },
+  { label: "Investor Pitch", to: "/command/investor-pitch" as const, note: "Controlled investor narrative and 24-month operating view" },
 ];
 
 function Board() {
@@ -58,8 +58,8 @@ function Board() {
                 key={stage.n}
                 to={stage.to}
                 activeOptions={{ exact: stage.n === 1 }}
-                className="group flex items-start gap-3 rounded-lg border border-border bg-bg-elevated/95 p-3 transition-colors duration-200 hover:border-accent/45 hover:bg-bg hover:shadow-[0_0_24px_rgb(255_116_23/0.12)]"
-                activeProps={{ className: "bg-bg border-accent shadow-[0_0_0_1px_rgb(255_116_23/0.45),0_0_24px_rgb(255_116_23/0.12)]" }}
+                className="group flex items-start gap-3 rounded-lg border border-border bg-bg-elevated/95 p-3 transition-colors duration-200 hover:border-accent/45 hover:bg-bg"
+                activeProps={{ className: "bg-bg border-accent" }}
               >
                 <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-border text-xs tabular-nums text-accent transition-colors group-hover:border-accent">{stage.n}</span>
                 <span className="min-w-0">
@@ -72,11 +72,11 @@ function Board() {
         </div>
       </Panel>
 
-      <Panel title="Dedicated finance & fundraising workspaces" kicker="New controlled pages">
+      <Panel title="Dedicated finance & fundraising workspaces" kicker="Controlled pages">
         <div className="rounded-xl border border-border bg-bg-elevated/30 p-3">
           <div className="grid gap-3 md:grid-cols-3">
             {FINANCE_WORKSPACES.map((page) => (
-              <Link key={page.to} to={page.to} className="group rounded-lg border border-border bg-bg-elevated/95 p-4 transition-colors duration-200 hover:border-accent/45 hover:bg-bg hover:shadow-[0_0_24px_rgb(255_116_23/0.12)]">
+              <Link key={page.to} to={page.to} className="group rounded-lg border border-border bg-bg-elevated/95 p-4 transition-colors duration-200 hover:border-accent/45 hover:bg-bg">
                 <p className="text-sm font-medium text-fg transition-colors group-hover:text-accent">{page.label}</p>
                 <p className="mt-2 text-xs leading-5 text-muted group-hover:text-fg/80">{page.note}</p>
               </Link>
@@ -97,7 +97,7 @@ function Board() {
       </Panel>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Panel title="Tranches" kicker="Preserved architecture"><ol className="space-y-3">{TRANCHES.map((tr) => <li key={tr.id} className="flex gap-3 text-sm"><span className="w-12 shrink-0 tabular-nums text-accent">{tr.id}</span><span className="flex-1"><span className="text-fg">{tr.name} · {lakh(tr.amount, 0)} · M{tr.month}</span><span className="mt-0.5 block text-xs text-muted">{tr.deliverable}</span></span></li>)}</ol></Panel>
+        <Panel title="Tranches" kicker="Preserved architecture"><ol className="space-y-3"><>{TRANCHES.map((tr) => <li key={tr.id} className="flex gap-3 text-sm"><span className="w-12 shrink-0 tabular-nums text-accent">{tr.id}</span><span className="flex-1"><span className="text-fg">{tr.name} · {lakh(tr.amount, 0)} · M{tr.month}</span><span className="mt-0.5 block text-xs text-muted">{tr.deliverable}</span></span></li>)}</></ol></Panel>
         <Panel title="This fortnight" kicker={`${openActions.length} open`}><ul className="space-y-3 text-sm">{openActions.slice(0, 6).map((a) => <li key={a.id}><p className="text-fg">{a.title}</p><p className="text-xs text-muted">{a.why}</p></li>)}</ul><Link to="/command/actions" className="mt-4 inline-block text-sm text-accent hover:text-fg">Open action log</Link></Panel>
       </div>
     </div>
