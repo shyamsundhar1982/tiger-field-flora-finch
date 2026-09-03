@@ -1,50 +1,12 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { SiteFooter, SiteHeader } from "@/components/site-header";
+import { useMemo,useState } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { SiteFooter,SiteHeader } from "@/components/site-header";
 import { MODELS } from "@/lib/data/models";
+import { BOM,bomTotal } from "@/lib/data/bom";
 import { inr } from "@/lib/format";
-
-export const Route = createFileRoute("/range/")({ component: RangePage });
-
-function RangePage() {
-  const grouped = {
-    core: MODELS.filter((m) => m.tier === "core"),
-    pro: MODELS.filter((m) => m.tier === "pro"),
-    apex: MODELS.filter((m) => m.tier === "apex"),
-  };
-
-  return (
-    <div className="min-h-dvh bg-bg">
-      <SiteHeader />
-      <main className="mx-auto max-w-7xl px-4 py-12">
-        <p className="text-[11px] uppercase tracking-[0.22em] text-green">Platform</p>
-        <h1 className="mt-2 font-display text-5xl text-accent">The VéLOXIS Range</h1>
-        <p className="mt-3 text-muted">Configure your ideal performance bicycle.</p>
-        <section className="mt-8 rounded-2xl border border-border bg-bg-elevated/30 p-5 sm:p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div><p className="text-[10px] uppercase tracking-[0.18em] text-green">Before you configure</p><h2 className="mt-1 font-display text-2xl text-accent">Find your frame size</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-muted">Run the Dynamic Bike Fit Calculator using stature, inseam, stem, bar and crank choices. It uses the supplied VEDM-301 fit logic and returns a size recommendation plus dynamic ride-feel evaluation.</p></div>
-            <Link to="/fit-calculator" className="shrink-0 rounded-lg border border-accent px-5 py-3 text-sm font-semibold text-accent transition-colors hover:bg-accent hover:text-bg">Open Fit Calculator →</Link>
-          </div>
-        </section>
-        {Object.entries(grouped).map(([tier, models]) => (
-          <section key={tier} className="mt-14">
-            <h2 className="font-display text-3xl capitalize text-accent">{tier}</h2>
-            <div className="mt-6 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {models.map((model) => (
-                <Link key={model.id} to="/range/$tier" params={{ tier: model.tier }} className="rounded-xl border border-border p-6 transition-colors hover:border-accent">
-                  <div className="flex items-center justify-between gap-3">
-                    <h3 className="font-display text-2xl text-accent">{model.name}</h3>
-                    <span className="rounded-full border border-border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-green">{model.brand}</span>
-                  </div>
-                  <p className="mt-3 text-sm font-semibold text-fg">{model.groupset}</p>
-                  <p className="mt-1 text-xs text-muted">{model.wheelset} · {model.tyres}</p>
-                  <p className="mt-4 text-lg font-bold tabular-nums text-accent">{inr(model.asp)}</p>
-                </Link>
-              ))}
-            </div>
-          </section>
-        ))}
-      </main>
-      <SiteFooter />
-    </div>
-  );
-}
+export const Route=createFileRoute("/range/")({component:RangePage});
+const tier=(id:string)=>id.startsWith("core")?"core":id.startsWith("pro")?"pro":"apex";
+function RangePage(){const [aId,setA]=useState(MODELS[1].id),[bId,setB]=useState(MODELS[3].id);const a=MODELS.find(x=>x.id===aId)??MODELS[0],b=MODELS.find(x=>x.id===bId)??MODELS[1],at=tier(a.id),bt=tier(b.id),bom=useMemo(()=>BOM.map(x=>[x.item,x[at],x[bt],x.flag]),[at,bt]),ac=bomTotal(at),bc=bomTotal(bt);return <div className="min-h-dvh bg-bg"><SiteHeader/><main className="mx-auto max-w-[1500px] px-4 py-8"><p className="text-[11px] uppercase tracking-[.22em] text-green">Platform · Range selector</p><h1 className="mt-2 font-display text-5xl text-accent">Compare two builds</h1><p className="mt-3 max-w-3xl text-sm text-muted">Two products. One screen. BOM stays on the right so specification, price and landed cost can be compared without page-hopping.</p><div className="mt-7 grid gap-4 lg:grid-cols-[1fr_1fr_360px]"><Card label="PRODUCT A" id={aId} setId={setA} model={a} cost={ac}/><Card label="PRODUCT B" id={bId} setId={setB} model={b} cost={bc}/><section className="rounded-2xl border border-border bg-bg-elevated p-5 lg:sticky lg:top-4 lg:self-start"><p className="text-[10px] uppercase tracking-[.18em] text-green">Right-most · BOM</p><div className="mt-3 grid grid-cols-[1fr_auto_auto] gap-3 text-[10px] uppercase text-subtle"><span>Component</span><span>A</span><span>B</span></div><div className="mt-3 space-y-2">{bom.map(([n,x,y,flag])=><div key={String(n)} className="grid grid-cols-[1fr_auto_auto] gap-3 border-b border-border pb-2 text-xs"><span className="text-muted">{String(n)}{flag==="hs"?<b className="ml-1 text-warn">!</b>:null}</span><span>{inr(Number(x))}</span><span className="text-accent">{inr(Number(y))}</span></div>)}</div><div className="mt-4 grid grid-cols-2 gap-3 border-t border-accent/30 pt-4 text-xs"><div><span className="text-subtle">A total</span><p className="mt-1 text-lg">{inr(ac)}</p></div><div><span className="text-subtle">B total</span><p className="mt-1 text-lg text-accent">{inr(bc)}</p></div></div></section></div></main><SiteFooter/></div>}
+function Card({label,id,setId,model,cost}:{label:string;id:string;setId:(v:string)=>void;model:typeof MODELS[number];cost:number}){const gm=model.asp?((model.asp-cost)/model.asp*100):0;return <section className="rounded-2xl border border-border bg-bg-elevated p-5"><p className="text-[10px] uppercase tracking-[.18em] text-green">{label}</p><div className="mt-1 flex items-center justify-between"><h2 className="text-3xl font-bold text-accent">{model.name}</h2><span className="text-[10px] uppercase text-subtle">{model.tier}</span></div><select value={id} onChange={e=>setId(e.target.value)} className="mt-4 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-fg">{MODELS.map(x=><option key={x.id} value={x.id}>{x.name} · {inr(x.asp)}</option>)}</select><div className="mt-5 grid grid-cols-2 gap-3"><Metric l="Price" v={inr(model.asp)}/><Metric l="Landed COGS" v={inr(cost)}/><Metric l="Gross margin" v={`${gm.toFixed(1)}%`}/><Metric l="Brand" v={model.brand}/></div><div className="mt-5 space-y-3 text-sm"><Row l="Groupset" v={model.groupset}/><Row l="Wheelset" v={model.wheelset}/><Row l="Tyres" v={model.tyres}/></div></section>}
+const Metric=({l,v}:{l:string;v:string})=><div className="rounded-lg border border-border p-3"><span className="text-[10px] uppercase text-subtle">{l}</span><p className="mt-1 text-lg text-fg">{v}</p></div>;
+const Row=({l,v}:{l:string;v:string})=><div className="flex justify-between gap-3 border-b border-border pb-2"><span className="text-subtle">{l}</span><span className="text-right">{v}</span></div>;
