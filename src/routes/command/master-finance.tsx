@@ -32,17 +32,10 @@ function MasterFinance() {
 
   const lines = useMemo(() => LINE_META.map((line) => {
     const units = rows.reduce((s, r) => s + r[`${line.id}Units`], 0);
-    const revenue = rows.reduce((s, r, i) => {
-      const monthUnits = r[`${line.id}Units`];
-      const assumption = DEFAULT_FINANCE_ASSUMPTIONS.productLines.find((p) => p.id === line.id)!;
-      return s + monthUnits * assumption.aspLakh;
-    }, 0);
-    const cogs = rows.reduce((s, r, i) => {
-      const monthUnits = r[`${line.id}Units`];
-      const assumption = DEFAULT_FINANCE_ASSUMPTIONS.productLines.find((p) => p.id === line.id)!;
-      const stressFactor = scenario === "stress" ? 1.2 : 1;
-      return s + monthUnits * assumption.cogsLakh * stressFactor;
-    }, 0);
+    const assumption = DEFAULT_FINANCE_ASSUMPTIONS.productLines.find((p) => p.id === line.id)!;
+    const revenue = units * assumption.aspLakh;
+    const stressFactor = scenario === "stress" ? 1.2 : 1;
+    const cogs = units * assumption.cogsLakh * stressFactor;
     const grossProfit = revenue - cogs;
     return { ...line, units, revenue, cogs, grossProfit, margin: revenue > 0 ? grossProfit / revenue * 100 : 0 };
   }), [rows, scenario]);
