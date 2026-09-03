@@ -36,6 +36,7 @@ function Board() {
   const drawStandby = useVeloxis((s) => s.drawStandby);
   const actionState = useVeloxis((s) => s.actions);
   const rows = useMemo(() => buildModel(scenario, drawStandby), [scenario, drawStandby]);
+  const cashRows = rows.slice(0, 24);
   const t = totals(rows);
   const trough = minCash(rows);
   const openActions = ACTIONS.filter((a) => a.window === "2w" && actionState[a.id] !== "done");
@@ -91,8 +92,8 @@ function Board() {
         <Kpi label="Units by M36" value={String(t.units)} hint={`Revenue ${lakh(t.revenue, 0)}`} />
       </div>
 
-      <Panel title="Cash" kicker="Opening → close, ₹ L · 36 months">
-        <div className="h-56"><ResponsiveContainer width="100%" height="100%"><AreaChart data={rows}><CartesianGrid stroke="rgba(236,234,228,0.06)" vertical={false} /><XAxis dataKey="m" tickFormatter={(v) => `M${v}`} stroke="#8e8b84" fontSize={11} /><YAxis stroke="#8e8b84" fontSize={11} /><Tooltip contentStyle={{ background: "#131316", border: "1px solid #2a2a2e", borderRadius: 8 }} labelFormatter={(v) => `Month ${v}`} formatter={(v) => lakh(Number(v))} /><Area type="monotone" dataKey="closing" stroke="#c9c4b8" fill="rgba(201,196,184,0.15)" /></AreaChart></ResponsiveContainer></div>
+      <Panel title="Cash" kicker="Opening → close, ₹ L · 24 months">
+        <div className="h-56"><ResponsiveContainer width="100%" height="100%"><AreaChart data={cashRows}><CartesianGrid stroke="rgba(236,234,228,0.06)" vertical={false} /><XAxis dataKey="m" tickFormatter={(v) => `M${v}`} stroke="#8e8b84" fontSize={11} /><YAxis stroke="#8e8b84" fontSize={11} /><Tooltip contentStyle={{ background: "#131316", border: "1px solid #2a2a2e", borderRadius: 8 }} labelFormatter={(v) => `Month ${v}`} formatter={(v) => lakh(Number(v))} /><Area type="monotone" dataKey="closing" stroke="#c9c4b8" fill="rgba(201,196,184,0.15)" /></AreaChart></ResponsiveContainer></div>
       </Panel>
 
       <div className="grid gap-4 lg:grid-cols-2">
