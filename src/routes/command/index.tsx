@@ -26,6 +26,7 @@ const STAGES = [
 ];
 
 const FINANCE_WORKSPACES = [
+  { label: "Master Financial Dashboard", to: "/command/master-finance" as const, note: "Consolidated Aluminium + Carbon production, sales, gross profit, funding, capex, inventory and cash implications" },
   { label: "Portfolio Finance", to: "/command/finance-control" as const, note: "Editable 36-month portfolio model across Aluminium, Carbon and Premium Carbon" },
   { label: "Aluminium Financial Vertical", to: "/command/aluminium-finance" as const, note: "Standalone entity: own ASP, COGS, launch, opex, capex, inventory, funding and cash" },
   { label: "Balance Sheet", to: "/command/balance-sheet" as const, note: "36-month management position view + CA reconciliation checklist" },
