@@ -1,10 +1,13 @@
 import { Link, Outlet } from "@tanstack/react-router";
-import { Activity, AlertTriangle, Bike, BookOpen, BrainCircuit, CheckSquare, ClipboardCheck, Factory, Landmark, Presentation, Rocket, Scale, Shield, UserRound, Wallet, Wrench, FileSpreadsheet, BadgeCheck, Ruler, LineChart, Boxes, Layers3 } from "lucide-react";
+import { Activity, AlertTriangle, Bike, BookOpen, BrainCircuit, CheckSquare, ClipboardCheck, Factory, Landmark, Presentation, Rocket, Scale, Shield, UserRound, Wallet, Wrench, FileSpreadsheet, BadgeCheck, Ruler, LineChart, Boxes, Layers3, SlidersHorizontal, GitCompare } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { cn } from "@/lib/utils";
 
-const NAV: Array<{ to: "/command" | "/command/finance" | "/command/product" | "/command/ops" | "/command/legal" | "/command/legal-control" | "/command/gtm" | "/command/risk" | "/command/actions" | "/command/knowledge" | "/command/technical" | "/command/finance-control" | "/command/funding" | "/command/manufacturing" | "/command/founder-command" | "/command/investor-board" | "/command/ai-knowledge" | "/command/qa-verification" | "/command/deployment-readiness" | "/command/balance-sheet" | "/command/ca-audit" | "/command/investor-pitch" | "/command/market-survey" | "/command/design-philosophy" | "/command/aluminium-finance" | "/command/master-finance" | "/inventory"; label: string; icon: typeof Activity; exact?: boolean }> = [
+const NAV: Array<{ to: "/command" | "/command/financial-cockpit" | "/command/finance-assumptions" | "/command/scenarios" | "/command/finance" | "/command/product" | "/command/ops" | "/command/legal" | "/command/legal-control" | "/command/gtm" | "/command/risk" | "/command/actions" | "/command/knowledge" | "/command/technical" | "/command/finance-control" | "/command/funding" | "/command/manufacturing" | "/command/founder-command" | "/command/investor-board" | "/command/ai-knowledge" | "/command/qa-verification" | "/command/deployment-readiness" | "/command/balance-sheet" | "/command/ca-audit" | "/command/investor-pitch" | "/command/market-survey" | "/command/design-philosophy" | "/command/aluminium-finance" | "/command/master-finance" | "/inventory"; label: string; icon: typeof Activity; exact?: boolean }> = [
   { to: "/command", label: "Board", icon: Activity, exact: true },
+  { to: "/command/financial-cockpit", label: "Financial Cockpit", icon: Wallet },
+  { to: "/command/finance-assumptions", label: "Plan & Assumptions", icon: SlidersHorizontal },
+  { to: "/command/scenarios", label: "Scenarios", icon: GitCompare },
   { to: "/command/master-finance", label: "Master Finance", icon: Layers3 },
   { to: "/command/aluminium-finance", label: "Aluminium Vertical", icon: Factory },
   { to: "/inventory", label: "Inventory", icon: Boxes },
