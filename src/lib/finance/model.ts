@@ -24,14 +24,54 @@ export const SCENARIOS: Record<
   },
 };
 
-// Practical blended planning economics. All figures are ₹ lakh per bike.
-// Planning mix remains 25% Core, 60% Pro, 15% Apex. These are management assumptions, not sales history.
+export type ProductLineId = "aluminium" | "carbon" | "premiumCarbon";
+
+export type ProductLineAssumption = {
+  id: ProductLineId;
+  label: string;
+  priceBand: string;
+  aspLakh: number;
+  cogsLakh: number;
+  mixPct: number;
+  launchMonth: number;
+};
+
+// Product-line planning assumptions. Price bands follow the Market Survey positioning;
+// COGS, mix and launch timing are management inputs until supplier/BOM evidence is available.
+export const DEFAULT_PRODUCT_LINES: ProductLineAssumption[] = [
+  {
+    id: "aluminium",
+    label: "VéLOXIS Aluminium",
+    priceBand: "₹30k–₹50k",
+    aspLakh: 0.4,
+    cogsLakh: 0.25,
+    mixPct: 10,
+    launchMonth: 6,
+  },
+  {
+    id: "carbon",
+    label: "VéLOXIS Carbon",
+    priceBand: "₹1L–₹1.5L",
+    aspLakh: 1.55,
+    cogsLakh: 1.13,
+    mixPct: 70,
+    launchMonth: 9,
+  },
+  {
+    id: "premiumCarbon",
+    label: "VéLOXIS Premium Carbon",
+    priceBand: "₹2.5L+",
+    aspLakh: 3.25,
+    cogsLakh: 1.85,
+    mixPct: 20,
+    launchMonth: 15,
+  },
+];
+
+// Legacy blended values are retained as exports for existing pages.
 const ASP = 1.775;
 const COGS = 1.184;
-const PLAN_COGS = 1.184;
 
-// Conservative early-stage production ramp: 282 bikes over 36 months rather than assuming
-// immediate high-volume scale. Change through the Finance Control assumption panel when evidence improves.
 function unitsFor(m: number, s: ScenarioId): number {
   if (s === "base") {
     const ramp = [
@@ -103,8 +143,7 @@ function capexFor(m: number, s: ScenarioId): number {
   if (t === 7) return 5.5;
   if (t === 8) return 4;
   if (m === 8 && s === "base") return 6;
-  if ((s === "base" && m === 10) || (s === "delayed" && m === 12) || (s === "stress" && m === 16))
-    return 28;
+  if ((s === "base" && m === 10) || (s === "delayed" && m === 12) || (s === "stress" && m === 16)) return 28;
   if (m === 5 && s === "base") return 3;
   return 0;
 }
@@ -131,8 +170,7 @@ function inventoryBuy(m: number, s: ScenarioId, units: number, cogs: number): nu
 }
 
 export type FinanceAssumptions = {
-  aspLakh: number;
-  cogsLakh: number;
+  productLines: ProductLineAssumption[];
   unitMultiplier: number;
   opexMultiplier: number;
   capexMultiplier: number;
@@ -142,8 +180,7 @@ export type FinanceAssumptions = {
 };
 
 export const DEFAULT_FINANCE_ASSUMPTIONS: FinanceAssumptions = {
-  aspLakh: ASP,
-  cogsLakh: COGS,
+  productLines: DEFAULT_PRODUCT_LINES,
   unitMultiplier: 1,
   opexMultiplier: 1,
   capexMultiplier: 1,
@@ -152,9 +189,31 @@ export const DEFAULT_FINANCE_ASSUMPTIONS: FinanceAssumptions = {
   openingCashLakh: 1,
 };
 
+function allocateUnits(total: number, lines: ProductLineAssumption[], month: number): Record<ProductLineId, number> {
+  const active = lines.filter((line) => month >= line.launchMonth && line.mixPct > 0);
+  const result: Record<ProductLineId, number> = { aluminium: 0, carbon: 0, premiumCarbon: 0 };
+  if (total <= 0 || active.length === 0) return result;
+  const mixTotal = active.reduce((sum, line) => sum + line.mixPct, 0);
+  const raw = active.map((line) => ({ line, exact: total * line.mixPct / mixTotal }));
+  let assigned = 0;
+  raw.forEach(({ line, exact }) => {
+    const units = Math.floor(exact);
+    result[line.id] = units;
+    assigned += units;
+  });
+  raw
+    .sort((a, b) => (b.exact - Math.floor(b.exact)) - (a.exact - Math.floor(a.exact)))
+    .slice(0, total - assigned)
+    .forEach(({ line }) => { result[line.id] += 1; });
+  return result;
+}
+
 export type MonthRow = {
   m: number;
   units: number;
+  aluminiumUnits: number;
+  carbonUnits: number;
+  premiumCarbonUnits: number;
   revenue: number;
   cogs: number;
   gp: number;
@@ -175,7 +234,7 @@ export function buildModelWithInputs(
   drawStandby: boolean,
   assumptions: FinanceAssumptions = DEFAULT_FINANCE_ASSUMPTIONS,
 ): MonthRow[] {
-  const cogsU = scenario === "stress" ? assumptions.cogsLakh * 1.2 : assumptions.cogsLakh;
+  const lines = assumptions.productLines;
   const rows: MonthRow[] = [];
   let cash = assumptions.openingCashLakh;
   let inventory = 0;
@@ -184,13 +243,15 @@ export function buildModelWithInputs(
 
   for (let m = 1; m <= 36; m++) {
     const units = Math.max(0, Math.round(unitsFor(m, scenario) * assumptions.unitMultiplier));
-    const revenue = units * assumptions.aspLakh;
-    const cogs = units * cogsU;
+    const lineUnits = allocateUnits(units, lines, m);
+    const stressFactor = scenario === "stress" ? 1.2 : 1;
+    const revenue = lines.reduce((sum, line) => sum + lineUnits[line.id] * line.aspLakh, 0);
+    const cogs = lines.reduce((sum, line) => sum + lineUnits[line.id] * line.cogsLakh * stressFactor, 0);
     const gp = revenue - cogs;
     const opex = opexFor(m, scenario) * assumptions.opexMultiplier;
     const ebitda = gp - opex;
     const capex = capexFor(m, scenario) * assumptions.capexMultiplier;
-    const invBuy = inventoryBuy(m, scenario, units, cogsU) * assumptions.inventoryMultiplier;
+    const invBuy = inventoryBuy(m, scenario, units, units > 0 ? cogs / units : 0) * assumptions.inventoryMultiplier;
     const funding = fundingFor(m, scenario, drawStandby) * assumptions.fundingMultiplier;
     const opening = cash;
     cash = opening + funding + revenue - opex - capex - invBuy;
@@ -201,6 +262,9 @@ export function buildModelWithInputs(
     rows.push({
       m,
       units,
+      aluminiumUnits: lineUnits.aluminium,
+      carbonUnits: lineUnits.carbon,
+      premiumCarbonUnits: lineUnits.premiumCarbon,
       revenue,
       cogs,
       gp,
