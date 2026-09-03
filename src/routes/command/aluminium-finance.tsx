@@ -17,6 +17,7 @@ type Assumptions = {
   inventoryCover: number;
   openingCash: number;
   funding: number;
+  progressPct: number;
 };
 
 const DEFAULTS: Assumptions = {
@@ -29,6 +30,7 @@ const DEFAULTS: Assumptions = {
   inventoryCover: 1.15,
   openingCash: 2,
   funding: 60,
+  progressPct: 0,
 };
 
 const RAMP = [0, 0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 10, 10, 12, 12, 14, 14, 16, 16, 18, 18, 20, 20, 22, 22, 24, 24, 26];
@@ -43,6 +45,7 @@ const INPUTS: Array<{ key: keyof Assumptions; label: string; suffix: string; ste
   { key: "inventoryCover", label: "Inventory cover", suffix: "× COGS", step: "0.05", min: 1, max: 2, note: "Procurement buffer applied to monthly production." },
   { key: "openingCash", label: "Opening cash", suffix: "₹ lakh", step: "0.5", min: 0, max: 100, note: "Cash allocated to this vertical before funding." },
   { key: "funding", label: "Dedicated funding", suffix: "₹ lakh", step: "1", min: 0, max: 200, note: "Capital reserved for the Aluminium vertical." },
+  { key: "progressPct", label: "Verticalization progress", suffix: "% complete", step: "1", min: 0, max: 100, note: "Management input for the actual execution progress of this vertical." },
 ];
 
 function AluminiumFinance() {
@@ -94,11 +97,11 @@ function AluminiumFinance() {
     <div className="space-y-6">
       <div>
         <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Command · Product entity</p>
-        <h1 className="font-display text-4xl">VéLOXIS Aluminium</h1>
-        <p className="mt-2 max-w-3xl text-sm text-muted">A separate financial vertical inside Command — not blended into the Carbon / Premium Carbon economics. It has its own commercial assumptions, operating cost, launch capex, inventory logic, funding and cash view.</p>
+        <h1 className="font-display text-4xl">VéLOXIS Aluminium Frame Vertical</h1>
+        <p className="mt-2 max-w-3xl text-sm text-muted">A separate financial vertical inside Command — not blended into the Carbon / Premium Carbon economics. It has its own commercial assumptions, operating cost, launch capex, inventory logic, funding, budget and execution progress.</p>
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
           <Link to="/command" className="rounded-md border border-border px-3 py-2 text-muted hover:bg-surface hover:text-fg">Command Board</Link>
-          <Link to="/command/finance-control" className="rounded-md border border-border px-3 py-2 text-muted hover:bg-surface hover:text-fg">Portfolio Finance</Link>
+          <Link to="/command/master-finance" className="rounded-md border border-accent/50 px-3 py-2 text-accent hover:bg-surface">Master Financial Dashboard</Link>
           <Link to="/command/market-survey" className="rounded-md border border-border px-3 py-2 text-muted hover:bg-surface hover:text-fg">Market Survey</Link>
         </div>
       </div>
@@ -122,6 +125,20 @@ function AluminiumFinance() {
           ))}
         </div>
         <div className="mt-4 flex flex-wrap gap-3"><button type="button" onClick={() => setInputs(DEFAULTS)} className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:bg-surface hover:text-fg">Reset Aluminium assumptions</button><span className="text-xs text-muted">Changes are local to this planning session and recalculate the full 36-month vertical.</span></div>
+      </Panel>
+
+      <Panel title="Verticalization budget & progress" kicker="Dedicated budget envelope and execution tracker">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Kpi label="Launch budget" value={fmt(inputs.capex)} hint="Dedicated capex" />
+          <Kpi label="Funding envelope" value={fmt(inputs.funding)} hint="Reserved for vertical" />
+          <Kpi label="Modeled 36-mo EBITDA" value={fmt(ebitda)} hint="Standalone" tone={ebitda >= 0 ? "ok" : "danger"} />
+          <Kpi label="Execution progress" value={pct(inputs.progressPct)} hint="Management input" />
+        </div>
+        <div className="mt-5">
+          <div className="flex items-center justify-between text-xs"><span className="text-subtle">Aluminium frame verticalization</span><span className="tabular-nums text-fg">{inputs.progressPct}%</span></div>
+          <div className="mt-2 h-3 overflow-hidden rounded-full bg-border"><div className="h-3 rounded-full bg-accent transition-[width]" style={{ width: `${inputs.progressPct}%` }} /></div>
+          <p className="mt-2 text-xs leading-5 text-muted">Progress is deliberately an editable management control rather than an invented operational status. Update it as tooling, supplier qualification, prototype validation, production readiness and launch gates are completed.</p>
+        </div>
       </Panel>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
