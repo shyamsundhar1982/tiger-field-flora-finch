@@ -1,0 +1,79 @@
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { LockKeyhole } from "lucide-react";
+import { useState } from "react";
+import { unlockCommand } from "@/lib/command-access";
+
+export const Route = createFileRoute("/command-login")({ component: CommandLogin });
+
+function CommandLogin() {
+  const navigate = useNavigate();
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setBusy(true);
+    try {
+      const result = await unlockCommand({ data: { password } });
+      if (!result.ok) {
+        setError(result.error ?? "Access denied.");
+        return;
+      }
+      await navigate({ to: "/command" });
+    } catch {
+      setError("Unable to verify access. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <main className="min-h-dvh bg-bg px-4 py-16 text-fg sm:px-6">
+      <div className="mx-auto flex min-h-[70dvh] max-w-md items-center justify-center">
+        <section className="w-full rounded-2xl border border-border bg-bg/90 p-8 shadow-2xl">
+          <div className="mb-7 flex items-center gap-3">
+            <div className="flex size-11 items-center justify-center rounded-xl border border-accent/40 text-accent">
+              <LockKeyhole className="size-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-accent">VYNDI BIKES</p>
+              <h1 className="text-2xl font-semibold tracking-tight">Command Access</h1>
+            </div>
+          </div>
+
+          <p className="mb-6 text-sm leading-6 text-muted">
+            This is the private planning and financial command area. Enter the access password to continue.
+          </p>
+
+          <form onSubmit={submit} className="space-y-4">
+            <label className="block">
+              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-muted">Password</span>
+              <input
+                autoFocus
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="control w-full"
+                placeholder="Enter command password"
+                autoComplete="current-password"
+                disabled={busy}
+              />
+            </label>
+
+            {error ? <p className="text-sm text-red-400" role="alert">{error}</p> : null}
+
+            <button
+              type="submit"
+              disabled={busy || !password}
+              className="w-full rounded-lg border border-accent bg-accent px-4 py-3 text-sm font-semibold text-bg transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {busy ? "Verifying…" : "Enter Command"}
+            </button>
+          </form>
+        </section>
+      </div>
+    </main>
+  );
+}
