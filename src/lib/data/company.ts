@@ -17,7 +17,7 @@ export const TIERS = [
     id: "core" as const,
     name: "Core",
     epithet: "Endurance",
-    asp: 145300,
+    asp: 131000,
     cogs: 89900,
     image: "/bikes/core.jpg",
     weight: "890 g frame*",
@@ -29,7 +29,7 @@ export const TIERS = [
     id: "pro" as const,
     name: "Pro",
     epithet: "Race-endurance",
-    asp: 215000,
+    asp: 175000,
     cogs: 124500,
     image: "/bikes/pro.jpg",
     weight: "820 g frame*",
@@ -41,7 +41,7 @@ export const TIERS = [
     id: "apex" as const,
     name: "Apex",
     epithet: "Flagship",
-    asp: 295000,
+    asp: 325000,
     cogs: 184600,
     image: "/bikes/apex.jpg",
     weight: "760 g frame*",
@@ -49,7 +49,7 @@ export const TIERS = [
       "Exposed weave, fully integrated front end, T800 primary. Built for riders who already know.",
     highlights: ["T800 primary", "Raw weave option", "Limited allocation"],
   },
-];
+] as const;
 export type TierId = (typeof TIERS)[number]["id"];
 
 export const TRANCHES = [
@@ -86,7 +86,7 @@ export const TRANCHES = [
     amount: 25,
     month: 9,
     name: "Standby CN",
-    deliverable: "Closes the M9 trough created by sliding tooling to M10. Cap ₹5 Cr, 20% discount. Drawn only if needed.",
+    deliverable: "Closes the M10–M11 cash gap. Cap ₹5 Cr, 20% discount. Drawn only if needed.",
   },
   {
     id: "T5",
