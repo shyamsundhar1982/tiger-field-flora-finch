@@ -3,29 +3,11 @@ import { useMemo, useState } from "react";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { TIERS } from "@/lib/data/company";
 import { BOM, bomTotal } from "@/lib/data/bom";
+import { GROUPSETS } from "@/lib/data/groupsets";
 import { inr, pct } from "@/lib/format";
 
 export const Route = createFileRoute("/range/$tier")({ component: TierPage });
 
-const GROUPSETS = [   
-  { id: "sora", name: "Shimano Sora R3000", detail: "2x9 mechanical", price: 45000 },
-  
-  { id: "tiagra", name: "Shimano Tiagra 4700", detail: "2x10 mechanical", price: 38000 },
-  
-  { id: "105-mech", name: "Shimano 105 R7120", detail: "2x12 mechanical", price: 90000 },
-  
-  { id: "rival-axs", name: "SRAM Rival AXS", detail: "2x12 wireless electronic", price: 140000 },
-  
-  { id: "105-di2", name: "Shimano 105 R7150 Di2", detail: "2x12 electronic", price: 150000 },
-  
-  { id: "force-axs", name: "SRAM Force AXS", detail: "2x12 wireless electronic", price: 200000 },
-  
-  { id: "ultegra-di2", name: "Shimano Ultegra R8170 Di2", detail: "2x12 electronic", price: 230000 },
-  
-  { id: "duraace-di2", name: "Shimano Dura-Ace R9200 Di2", detail: "2x12 electronic flagship", price: 340000 },
-  
-  { id: "red-axs", name: "SRAM RED AXS", detail: "2x12 wireless electronic flagship", price: 380000 },
-] as const;
 const TYRES = [
   { id: "ultra-sport", name: "Continental Ultra Sport III", detail: "Training / entry race · pair", price: 7590 },
   { id: "rubino-pro", name: "Vittoria Rubino Pro IV G2.0", detail: "Endurance · pair", price: 9800 },
@@ -50,21 +32,15 @@ function TierPage() {
   const gm = ((t.asp - cogs) / t.asp) * 100;
   const defaults = DEFAULTS[t.id];
   const tierGroupsets =
-  t.id === "core"
-    ? GROUPSETS.filter((g) =>
-        ["sora", "tiagra", "105-mech", "105-di2", "ultegra-di2"].includes(g.id)
-      )
-    : t.id === "pro"
-    ? GROUPSETS.filter((g) =>
-        ["105-di2", "rival-axs", "ultegra-di2", "force-axs"].includes(g.id)
-      )
-    : GROUPSETS.filter((g) =>
-        ["ultegra-di2", "force-axs", "duraace-di2", "red-axs"].includes(g.id)
-      );
+    t.id === "core"
+      ? GROUPSETS.filter((g) => ["sora", "tiagra", "105-mech", "105-di2", "ultegra-di2"].includes(g.id))
+      : t.id === "pro"
+      ? GROUPSETS.filter((g) => ["105-di2", "rival-axs", "ultegra-di2", "force-axs"].includes(g.id))
+      : GROUPSETS.filter((g) => ["ultegra-di2", "force-axs", "duraace-di2", "red-axs"].includes(g.id));
   const [groupset, setGroupset] = useState(defaults.groupset);
   const [tyre, setTyre] = useState(defaults.tyre);
   const [wheelset, setWheelset] = useState(defaults.wheelset);
-  const buildAdd = useMemo(() => { const g = GROUPSETS.find((x) => x.id === groupset)!; const ty = TYRES.find((x) => x.id === tyre)!; const w = WHEELSETS.find((x) => x.id === wheelset)!; return { groupset: g, tyre: ty, wheelset: w, groupsetAdj: delta(g, tierGroupsets, defaults.groupset), tyreAdj: delta(ty, TYRES, defaults.tyre), wheelsetAdj: delta(w, WHEELSETS, defaults.wheelset) }; }, [groupset, tyre, wheelset, defaults]);
+  const buildAdd = useMemo(() => { const g = GROUPSETS.find((x) => x.id === groupset)!; const ty = TYRES.find((x) => x.id === tyre)!; const w = WHEELSETS.find((x) => x.id === wheelset)!; return { groupset: g, tyre: ty, wheelset: w, groupsetAdj: delta(g, tierGroupsets, defaults.groupset), tyreAdj: delta(ty, TYRES, defaults.tyre), wheelsetAdj: delta(w, WHEELSETS, defaults.wheelset) }; }, [groupset, tyre, wheelset, defaults, tierGroupsets]);
   const adjustment = buildAdd.groupsetAdj + buildAdd.tyreAdj + buildAdd.wheelsetAdj;
   const buildPrice = t.asp + adjustment;
 
