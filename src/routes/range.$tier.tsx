@@ -8,7 +8,7 @@ import { inr, pct } from "@/lib/format";
 export const Route = createFileRoute("/range/$tier")({ component: TierPage });
 
 const GROUPSETS = [   
-{ id: "sora", name: "Shimano Sora R3000", detail: "2x9 mechanical", price: 45000 },
+  { id: "sora", name: "Shimano Sora R3000", detail: "2x9 mechanical", price: 45000 },
   { id: "tiagra", name: "Shimano Tiagra 4700", detail: "2x10 mechanical", price: 38000 },
   { id: "105-mech", name: "Shimano 105 R7120", detail: "2x12 mechanical", price: 90000 },
   { id: "rival-axs", name: "SRAM Rival AXS", detail: "2x12 wireless electronic", price: 140000 },
