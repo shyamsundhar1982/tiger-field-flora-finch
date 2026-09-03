@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { LockKeyhole } from "lucide-react";
-import { useState } from "react";
+import { type FormEvent, useState } from "react";
 import { unlockCommand } from "@/lib/command-access";
 
 export const Route = createFileRoute("/command-login")({ component: CommandLogin });
@@ -11,7 +11,7 @@ function CommandLogin() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setBusy(true);
