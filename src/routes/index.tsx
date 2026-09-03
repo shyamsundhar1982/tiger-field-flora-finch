@@ -15,7 +15,7 @@ function Home() {
         <img src="/bikes/hero.jpg" alt="VéLOXIS carbon endurance bicycle in studio light" className="media absolute inset-0 size-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/60 to-bg/20" />
         <div className="relative mx-auto flex min-h-[82dvh] max-w-6xl flex-col justify-end px-4 pb-16 sm:px-6">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-accent">VéLOXIS PLATFORM</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-accent">VéLOXIS</p>
           <h1 className="mt-3 max-w-3xl text-5xl font-bold leading-[0.95] tracking-tight text-accent sm:text-7xl">Wind, rendered in carbon.</h1>
           <p className="mt-4 text-xl font-semibold tracking-tight text-fg sm:text-2xl">One geometry. Three altitudes. Core · Pro · Apex.</p>
           <p className="mt-4 max-w-xl text-base text-fg/85 sm:text-lg">VéLOXIS is a carbon endurance road-bike platform by Vāyú Shastr Pvt Ltd — developed in India around T700/T800 carbon architecture and an ISO 4210-6 validation framework.</p>
