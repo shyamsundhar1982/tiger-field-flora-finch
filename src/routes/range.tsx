@@ -5,5 +5,6 @@ export const Route = createFileRoute("/range")({
 });
 
 function RangeLayout() {
+  // Layout owns /range; the index and tier routes render inside this outlet.
   return <Outlet />;
 }
