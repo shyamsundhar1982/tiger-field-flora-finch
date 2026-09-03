@@ -26,6 +26,8 @@ const STAGES = [
 ];
 
 const FINANCE_WORKSPACES = [
+  { label: "Portfolio Finance", to: "/command/finance-control" as const, note: "Editable 36-month portfolio model across Aluminium, Carbon and Premium Carbon" },
+  { label: "Aluminium Financial Vertical", to: "/command/aluminium-finance" as const, note: "Standalone entity: own ASP, COGS, launch, opex, capex, inventory, funding and cash" },
   { label: "Balance Sheet", to: "/command/balance-sheet" as const, note: "36-month management position view + CA reconciliation checklist" },
   { label: "CA Verification / Audit", to: "/command/ca-audit" as const, note: "Professional-review queue, evidence and sign-off protocol" },
   { label: "Investor Pitch", to: "/command/investor-pitch" as const, note: "Controlled investor narrative and 24-month operating view" },
@@ -59,18 +61,9 @@ function Board() {
         <div className="rounded-xl border border-border bg-bg-elevated/30 p-3">
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {STAGES.map((stage) => (
-              <Link
-                key={stage.n}
-                to={stage.to}
-                activeOptions={{ exact: stage.n === 1 }}
-                className="group flex items-start gap-3 rounded-lg border border-border bg-bg-elevated/95 p-3 transition-colors duration-200 hover:border-accent/45 hover:bg-bg"
-                activeProps={{ className: "bg-bg border-accent" }}
-              >
+              <Link key={stage.n} to={stage.to} activeOptions={{ exact: stage.n === 1 }} className="group flex items-start gap-3 rounded-lg border border-border bg-bg-elevated/95 p-3 transition-colors duration-200 hover:border-accent/45 hover:bg-bg" activeProps={{ className: "bg-bg border-accent" }}>
                 <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-border text-xs tabular-nums text-accent transition-colors group-hover:border-accent">{stage.n}</span>
-                <span className="min-w-0">
-                  <span className="block text-[10px] uppercase tracking-[0.14em] text-subtle transition-colors group-hover:text-green">Stage {stage.n}</span>
-                  <span className="mt-0.5 block text-sm font-medium text-fg transition-colors group-hover:text-accent">{stage.label}</span>
-                </span>
+                <span className="min-w-0"><span className="block text-[10px] uppercase tracking-[0.14em] text-subtle transition-colors group-hover:text-green">Stage {stage.n}</span><span className="mt-0.5 block text-sm font-medium text-fg transition-colors group-hover:text-accent">{stage.label}</span></span>
               </Link>
             ))}
           </div>
@@ -79,7 +72,7 @@ function Board() {
 
       <Panel title="Dedicated finance & fundraising workspaces" kicker="Controlled pages">
         <div className="rounded-xl border border-border bg-bg-elevated/30 p-3">
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {FINANCE_WORKSPACES.map((page) => (
               <Link key={page.to} to={page.to} className="group rounded-lg border border-border bg-bg-elevated/95 p-4 transition-colors duration-200 hover:border-accent/45 hover:bg-bg">
                 <p className="text-sm font-medium text-fg transition-colors group-hover:text-accent">{page.label}</p>
