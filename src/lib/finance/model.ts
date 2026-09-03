@@ -24,9 +24,11 @@ export const SCENARIOS: Record<
   },
 };
 
-const ASP = 1.8;
-const COGS = 1.076;
-const PLAN_COGS = 1.1;
+// Blended planning economics derived from the current Core / Pro / Apex range architecture.
+// Planning mix: 25% Core, 60% Pro, 15% Apex. These are management assumptions, not sales history.
+const ASP = 1.775;
+const COGS = 1.184;
+const PLAN_COGS = 1.184;
 
 function unitsFor(m: number, s: ScenarioId): number {
   if (s === "base") {
