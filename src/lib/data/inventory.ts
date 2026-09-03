@@ -1,66 +1,105 @@
 import { useEffect, useState } from "react";
 
+export type InventoryCategory =
+  | "groupset" | "wheelset" | "tyre" | "handlebar" | "stem" | "saddle"
+  | "thruaxle" | "bottom-bracket" | "bottle-cage" | "tool-pouch" | "bracket"
+  | "fastener" | "colour" | "gauge";
+
 export type InventoryItem = {
-  id: string;
-  category: "groupset" | "wheelset" | "tyre";
-  subcategory: string;
-  brand: string;
-  model: string;
-  detail: string;
-  sku: string;
-  priceInr: number;
-  stockQty: number;
-  reorderLevel: number;
-  coreEnabled: boolean;
-  proEnabled: boolean;
-  apexEnabled: boolean;
-  source: string;
-  notes: string;
-  updatedAt: string;
+  id: string; category: InventoryCategory; subcategory: string; brand: string; model: string;
+  detail: string; sku: string; priceInr: number; stockQty: number; reorderLevel: number;
+  coreEnabled: boolean; proEnabled: boolean; apexEnabled: boolean; source: string; notes: string; updatedAt: string;
 };
 
+const item = (x: Omit<InventoryItem, "updatedAt">): InventoryItem => ({ ...x, updatedAt: "" });
+
 export const SEED_INVENTORY: InventoryItem[] = [
-  { id:"gs-tiagra-4700",category:"groupset",subcategory:"Mechanical",brand:"Shimano",model:"Tiagra 4700",detail:"2x10 mechanical",sku:"SHI-TIA-4700",priceInr:45000,stockQty:6,reorderLevel:2,coreEnabled:true,proEnabled:false,apexEnabled:false,source:"India market reference / internal target",notes:"Core entry Shimano option.",updatedAt:"" },
-  { id:"gs-105-r7000",category:"groupset",subcategory:"Mechanical",brand:"Shimano",model:"105 R7000",detail:"2x11 mechanical",sku:"SHI-105-R7000",priceInr:70000,stockQty:8,reorderLevel:2,coreEnabled:true,proEnabled:true,apexEnabled:false,source:"India market reference / internal target",notes:"Core and Pro entry specification.",updatedAt:"" },
-  { id:"gs-105-r7150",category:"groupset",subcategory:"Electronic",brand:"Shimano",model:"105 R7150 Di2",detail:"2x12 electronic",sku:"SHI-105-R7150",priceInr:138000,stockQty:4,reorderLevel:1,coreEnabled:false,proEnabled:true,apexEnabled:false,source:"BUMSONTHESADDLE India reference",notes:"Current retail reference about ₹137,860; verify supplier/OEM quote.",updatedAt:"" },
-  { id:"gs-ultegra-r8170",category:"groupset",subcategory:"Electronic",brand:"Shimano",model:"Ultegra R8170 Di2",detail:"2x12 electronic",sku:"SHI-ULT-R8170",priceInr:210000,stockQty:3,reorderLevel:1,coreEnabled:false,proEnabled:true,apexEnabled:true,source:"Mastermind Bicycle Studio India reference",notes:"Premium Pro / Apex drivetrain.",updatedAt:"" },
-  { id:"gs-duraace-r9270",category:"groupset",subcategory:"Electronic",brand:"Shimano",model:"Dura-Ace R9270 Di2",detail:"2x12 electronic flagship",sku:"SHI-DA-R9270",priceInr:353000,stockQty:1,reorderLevel:1,coreEnabled:false,proEnabled:false,apexEnabled:true,source:"Mastermind Bicycle Studio India reference",notes:"Apex-only flagship.",updatedAt:"" },
-  { id:"gs-rival-axs",category:"groupset",subcategory:"Electronic",brand:"SRAM",model:"Rival AXS",detail:"2x12 wireless electronic",sku:"SRAM-RIV-AXS",priceInr:175000,stockQty:3,reorderLevel:1,coreEnabled:false,proEnabled:true,apexEnabled:false,source:"Internal India target — supplier verify",notes:"Pro alternative.",updatedAt:"" },
-  { id:"gs-force-axs",category:"groupset",subcategory:"Electronic",brand:"SRAM",model:"Force AXS",detail:"2x12 wireless electronic",sku:"SRAM-FORCE-AXS",priceInr:250000,stockQty:2,reorderLevel:1,coreEnabled:false,proEnabled:true,apexEnabled:true,source:"Internal India target — supplier verify",notes:"Premium Pro / Apex alternative.",updatedAt:"" },
-  { id:"gs-red-axs",category:"groupset",subcategory:"Electronic",brand:"SRAM",model:"RED AXS",detail:"2x12 wireless flagship",sku:"SRAM-RED-AXS",priceInr:380000,stockQty:1,reorderLevel:1,coreEnabled:false,proEnabled:false,apexEnabled:true,source:"Internal India target — supplier verify",notes:"Apex-only flagship.",updatedAt:"" },
-  { id:"ws-alloy",category:"wheelset",subcategory:"Alloy",brand:"Performance",model:"Performance Alloy",detail:"Training / everyday",sku:"WH-ALLOY-01",priceInr:30000,stockQty:10,reorderLevel:3,coreEnabled:true,proEnabled:false,apexEnabled:false,source:"Internal estimate",notes:"Core-only entry wheel.",updatedAt:"" },
-  { id:"ws-alloy-plus",category:"wheelset",subcategory:"Alloy",brand:"Light Alloy 30",model:"Light Alloy 30",detail:"Fast endurance / tubeless-ready",sku:"WH-ALLOY-30",priceInr:45000,stockQty:8,reorderLevel:2,coreEnabled:true,proEnabled:true,apexEnabled:false,source:"Internal estimate",notes:"Core and Pro transition option.",updatedAt:"" },
-  { id:"ws-carbon-50",category:"wheelset",subcategory:"Carbon Aero",brand:"3T",model:"Carbon CW-3T2",detail:"50 mm carbon aero",sku:"WH-CARB-50",priceInr:65000,stockQty:5,reorderLevel:1,coreEnabled:false,proEnabled:true,apexEnabled:true,source:"Internal estimate",notes:"Pro/Apex baseline carbon option.",updatedAt:"" },
-  { id:"ws-carbon-58",category:"wheelset",subcategory:"Carbon Aero",brand:"Magene",model:"EXAR Pro DB58",detail:"58 mm carbon aero",sku:"WH-CARB-58",priceInr:78900,stockQty:3,reorderLevel:1,coreEnabled:false,proEnabled:true,apexEnabled:true,source:"Internal estimate",notes:"Apex higher-depth option; supplier verification required.",updatedAt:"" },
-  { id:"ty-ultra-sport",category:"tyre",subcategory:"Performance",brand:"Continental",model:"Ultra Sport III",detail:"Training / entry race · pair",sku:"TY-ULT-SPORT-PAIR",priceInr:7590,stockQty:12,reorderLevel:3,coreEnabled:true,proEnabled:false,apexEnabled:false,source:"Internal India price reference",notes:"Core training tyre.",updatedAt:"" },
-  { id:"ty-rubino-pro",category:"tyre",subcategory:"Endurance",brand:"Vittoria",model:"Rubino Pro IV G2.0",detail:"Endurance · pair",sku:"TY-RUBINO-PRO-PAIR",priceInr:9800,stockQty:10,reorderLevel:3,coreEnabled:true,proEnabled:true,apexEnabled:false,source:"Internal India price reference",notes:"Core/Pro standard.",updatedAt:"" },
-  { id:"ty-gp5000",category:"tyre",subcategory:"Performance",brand:"Continental",model:"Grand Prix 5000",detail:"Performance · pair",sku:"TY-GP5000-PAIR",priceInr:17790,stockQty:7,reorderLevel:2,coreEnabled:false,proEnabled:true,apexEnabled:true,source:"Internal India price reference",notes:"Pro/Apex premium standard.",updatedAt:"" },
-  { id:"ty-corsa-pro",category:"tyre",subcategory:"Race",brand:"Vittoria",model:"Corsa Pro G2.0",detail:"Race · pair",sku:"TY-CORSA-PRO-PAIR",priceInr:19000,stockQty:4,reorderLevel:1,coreEnabled:false,proEnabled:false,apexEnabled:true,source:"Internal India price reference",notes:"Apex race option.",updatedAt:"" },
+  item({id:"gs-tiagra-4700",category:"groupset",subcategory:"Mechanical",brand:"Shimano",model:"Tiagra 4700",detail:"2x10 mechanical",sku:"SHI-TIA-4700",priceInr:45000,stockQty:6,reorderLevel:2,coreEnabled:true,proEnabled:false,apexEnabled:false,source:"India market reference / internal target",notes:"Core entry Shimano option."}),
+  item({id:"gs-105-r7000",category:"groupset",subcategory:"Mechanical",brand:"Shimano",model:"105 R7000",detail:"2x11 mechanical",sku:"SHI-105-R7000",priceInr:70000,stockQty:8,reorderLevel:2,coreEnabled:true,proEnabled:true,apexEnabled:false,source:"India market reference / internal target",notes:"Core and Pro mechanical standard."}),
+  item({id:"gs-105-r7150",category:"groupset",subcategory:"Electronic",brand:"Shimano",model:"105 R7150 Di2",detail:"2x12 electronic",sku:"SHI-105-R7150",priceInr:138000,stockQty:4,reorderLevel:1,coreEnabled:false,proEnabled:true,apexEnabled:false,source:"India market reference",notes:"Pro electronic option; verify supplier quote."}),
+  item({id:"gs-ultegra-r8170",category:"groupset",subcategory:"Electronic",brand:"Shimano",model:"Ultegra R8170 Di2",detail:"2x12 electronic",sku:"SHI-ULT-R8170",priceInr:210000,stockQty:3,reorderLevel:1,coreEnabled:false,proEnabled:true,apexEnabled:true,source:"India market reference",notes:"Premium Pro / Apex drivetrain."}),
+  item({id:"gs-duraace-r9270",category:"groupset",subcategory:"Electronic",brand:"Shimano",model:"Dura-Ace R9270 Di2",detail:"2x12 electronic flagship",sku:"SHI-DA-R9270",priceInr:353000,stockQty:1,reorderLevel:1,coreEnabled:false,proEnabled:false,apexEnabled:true,source:"India market reference",notes:"Apex flagship only."}),
+  item({id:"gs-rival-axs",category:"groupset",subcategory:"Electronic",brand:"SRAM",model:"Rival AXS",detail:"2x12 wireless electronic",sku:"SRAM-RIV-AXS",priceInr:175000,stockQty:3,reorderLevel:1,coreEnabled:false,proEnabled:true,apexEnabled:false,source:"Internal target — supplier verify",notes:"Pro alternative."}),
+  item({id:"gs-force-axs",category:"groupset",subcategory:"Electronic",brand:"SRAM",model:"Force AXS",detail:"2x12 wireless electronic",sku:"SRAM-FORCE-AXS",priceInr:250000,stockQty:2,reorderLevel:1,coreEnabled:false,proEnabled:true,apexEnabled:true,source:"Internal target — supplier verify",notes:"Premium Pro / Apex alternative."}),
+  item({id:"gs-red-axs",category:"groupset",subcategory:"Electronic",brand:"SRAM",model:"RED AXS",detail:"2x12 wireless flagship",sku:"SRAM-RED-AXS",priceInr:380000,stockQty:1,reorderLevel:1,coreEnabled:false,proEnabled:false,apexEnabled:true,source:"Internal target — supplier verify",notes:"Apex flagship only."}),
+
+  item({id:"ws-alloy",category:"wheelset",subcategory:"Aluminium",brand:"Performance",model:"Performance Alloy",detail:"Training / everyday",sku:"WH-ALLOY-01",priceInr:30000,stockQty:10,reorderLevel:3,coreEnabled:true,proEnabled:false,apexEnabled:false,source:"Internal estimate",notes:"Core entry wheel."}),
+  item({id:"ws-alloy-30",category:"wheelset",subcategory:"Aluminium",brand:"Light Alloy",model:"30 Tubeless",detail:"30 mm tubeless-ready",sku:"WH-ALLOY-30",priceInr:45000,stockQty:8,reorderLevel:2,coreEnabled:true,proEnabled:true,apexEnabled:false,source:"Internal estimate",notes:"Core/Pro transition wheel."}),
+  item({id:"ws-alloy-35",category:"wheelset",subcategory:"Aluminium",brand:"Vision",model:"Team 35",detail:"35 mm alloy aero",sku:"WH-VIS-TEAM35",priceInr:55000,stockQty:5,reorderLevel:1,coreEnabled:true,proEnabled:true,apexEnabled:false,source:"India market reference",notes:"Pro upgrade."}),
+  item({id:"ws-carbon-38",category:"wheelset",subcategory:"Carbon Aero",brand:"Zipp",model:"303 S",detail:"40 mm carbon tubeless-ready",sku:"WH-ZIP-303S",priceInr:85000,stockQty:4,reorderLevel:1,coreEnabled:false,proEnabled:true,apexEnabled:false,source:"India market reference",notes:"Pro carbon endurance wheel."}),
+  item({id:"ws-carbon-50",category:"wheelset",subcategory:"Carbon Aero",brand:"3T",model:"Carbon CW-3T2",detail:"50 mm carbon aero",sku:"WH-CARB-50",priceInr:110000,stockQty:5,reorderLevel:1,coreEnabled:false,proEnabled:true,apexEnabled:true,source:"Internal estimate",notes:"Pro/Apex carbon baseline."}),
+  item({id:"ws-carbon-58",category:"wheelset",subcategory:"Carbon Aero",brand:"Magene",model:"EXAR Pro DB58",detail:"58 mm carbon aero",sku:"WH-CARB-58",priceInr:125000,stockQty:3,reorderLevel:1,coreEnabled:false,proEnabled:true,apexEnabled:true,source:"Internal estimate",notes:"Apex higher-depth option."}),
+  item({id:"ws-carbon-premium",category:"wheelset",subcategory:"Carbon Aero",brand:"DT Swiss",model:"ARC 1100",detail:"50/55 mm premium aero",sku:"WH-DTS-ARC1100",priceInr:240000,stockQty:2,reorderLevel:1,coreEnabled:false,proEnabled:false,apexEnabled:true,source:"India market reference / verify",notes:"Apex premium wheel."}),
+  item({id:"ws-carbon-flagship",category:"wheelset",subcategory:"Carbon Aero",brand:"ENVE",model:"SES 4.5",detail:"Premium carbon aero",sku:"WH-ENVE-SES45",priceInr:300000,stockQty:1,reorderLevel:1,coreEnabled:false,proEnabled:false,apexEnabled:true,source:"India market reference / verify",notes:"Apex flagship wheel."}),
+
+  item({id:"ty-ultra-sport",category:"tyre",subcategory:"Training",brand:"Continental",model:"Ultra Sport III",detail:"Training · pair",sku:"TY-ULT-SPORT-PAIR",priceInr:7590,stockQty:12,reorderLevel:3,coreEnabled:true,proEnabled:false,apexEnabled:false,source:"India market reference",notes:"Core training tyre."}),
+  item({id:"ty-rubino-pro",category:"tyre",subcategory:"Endurance",brand:"Vittoria",model:"Rubino Pro IV G2.0",detail:"Endurance · pair",sku:"TY-RUBINO-PRO-PAIR",priceInr:9800,stockQty:10,reorderLevel:3,coreEnabled:true,proEnabled:true,apexEnabled:false,source:"India market reference",notes:"Core/Pro standard."}),
+  item({id:"ty-gp5000",category:"tyre",subcategory:"Performance",brand:"Continental",model:"Grand Prix 5000",detail:"Performance · pair",sku:"TY-GP5000-PAIR",priceInr:17790,stockQty:7,reorderLevel:2,coreEnabled:false,proEnabled:true,apexEnabled:true,source:"India market reference",notes:"Pro/Apex premium."}),
+  item({id:"ty-corsa-pro",category:"tyre",subcategory:"Race",brand:"Vittoria",model:"Corsa Pro G2.0",detail:"Race · pair",sku:"TY-CORSA-PRO-PAIR",priceInr:19000,stockQty:4,reorderLevel:1,coreEnabled:false,proEnabled:false,apexEnabled:true,source:"India market reference",notes:"Apex race tyre."}),
+
+  item({id:"hb-alloy-400",category:"handlebar",subcategory:"Aluminium Drop",brand:"VéLOXIS",model:"Alloy Drop 400",detail:"400 mm · 31.8 clamp",sku:"HB-AL-400",priceInr:4500,stockQty:12,reorderLevel:3,coreEnabled:true,proEnabled:false,apexEnabled:false,source:"Internal target",notes:"Core compact endurance bar."}),
+  item({id:"hb-alloy-420",category:"handlebar",subcategory:"Aluminium Drop",brand:"VéLOXIS",model:"Alloy Drop 420",detail:"420 mm · 31.8 clamp",sku:"HB-AL-420",priceInr:4500,stockQty:12,reorderLevel:3,coreEnabled:true,proEnabled:true,apexEnabled:false,source:"Internal target",notes:"Core/Pro option."}),
+  item({id:"hb-alloy-440",category:"handlebar",subcategory:"Aluminium Drop",brand:"VéLOXIS",model:"Alloy Drop 440",detail:"440 mm · 31.8 clamp",sku:"HB-AL-440",priceInr:4500,stockQty:8,reorderLevel:2,coreEnabled:true,proEnabled:true,apexEnabled:false,source:"Internal target",notes:"Broader fit option."}),
+  item({id:"hb-carbon-400",category:"handlebar",subcategory:"Carbon Drop",brand:"VéLOXIS",model:"Carbon Aero 400",detail:"400 mm · integrated cable-ready",sku:"HB-CB-400",priceInr:18000,stockQty:6,reorderLevel:2,coreEnabled:false,proEnabled:true,apexEnabled:true,source:"Internal target",notes:"Pro/Apex aero bar."}),
+  item({id:"hb-carbon-420",category:"handlebar",subcategory:"Carbon Drop",brand:"VéLOXIS",model:"Carbon Aero 420",detail:"420 mm · integrated cable-ready",sku:"HB-CB-420",priceInr:18000,stockQty:6,reorderLevel:2,coreEnabled:false,proEnabled:true,apexEnabled:true,source:"Internal target",notes:"Pro/Apex aero bar."}),
+  item({id:"hb-carbon-440",category:"handlebar",subcategory:"Carbon Drop",brand:"VéLOXIS",model:"Carbon Aero 440",detail:"440 mm · integrated cable-ready",sku:"HB-CB-440",priceInr:18000,stockQty:4,reorderLevel:1,coreEnabled:false,proEnabled:true,apexEnabled:true,source:"Internal target",notes:"Pro/Apex fit option."}),
+
+  item({id:"stem-80",category:"stem",subcategory:"Aluminium",brand:"VéLOXIS",model:"Alloy Stem 80",detail:"80 mm · ±6°",sku:"ST-AL-080",priceInr:3500,stockQty:10,reorderLevel:2,coreEnabled:true,proEnabled:true,apexEnabled:false,source:"Internal target",notes:"Fit selection."}),
+  item({id:"stem-90",category:"stem",subcategory:"Aluminium",brand:"VéLOXIS",model:"Alloy Stem 90",detail:"90 mm · ±6°",sku:"ST-AL-090",priceInr:3500,stockQty:10,reorderLevel:2,coreEnabled:true,proEnabled:true,apexEnabled:false,source:"Internal target",notes:"Fit selection."}),
+  item({id:"stem-100",category:"stem",subcategory:"Aluminium",brand:"VéLOXIS",model:"Alloy Stem 100",detail:"100 mm · ±6°",sku:"ST-AL-100",priceInr:3500,stockQty:8,reorderLevel:2,coreEnabled:true,proEnabled:true,apexEnabled:false,source:"Internal target",notes:"Fit selection."}),
+  item({id:"stem-110",category:"stem",subcategory:"Aluminium",brand:"VéLOXIS",model:"Alloy Stem 110",detail:"110 mm · ±6°",sku:"ST-AL-110",priceInr:3500,stockQty:6,reorderLevel:1,coreEnabled:true,proEnabled:true,apexEnabled:false,source:"Internal target",notes:"Fit selection."}),
+  item({id:"stem-integrated-100",category:"stem",subcategory:"Integrated Carbon",brand:"VéLOXIS",model:"Aero Integrated 100",detail:"100 mm integrated cockpit",sku:"ST-INT-100",priceInr:28000,stockQty:4,reorderLevel:1,coreEnabled:false,proEnabled:true,apexEnabled:true,source:"Internal target",notes:"Pro/Apex cockpit."}),
+  item({id:"stem-integrated-110",category:"stem",subcategory:"Integrated Carbon",brand:"VéLOXIS",model:"Aero Integrated 110",detail:"110 mm integrated cockpit",sku:"ST-INT-110",priceInr:28000,stockQty:3,reorderLevel:1,coreEnabled:false,proEnabled:true,apexEnabled:true,source:"Internal target",notes:"Pro/Apex cockpit."}),
+
+  item({id:"sad-men-broad-long",category:"saddle",subcategory:"Men · Broad · Long Nose",brand:"VéLOXIS",model:"Endurance M Broad Long",detail:"Broad · long nose",sku:"SD-M-BL",priceInr:6500,stockQty:8,reorderLevel:2,coreEnabled:true,proEnabled:true,apexEnabled:false,source:"Internal target",notes:"Men-specific endurance fit."}),
+  item({id:"sad-men-narrow-long",category:"saddle",subcategory:"Men · Narrow · Long Nose",brand:"VéLOXIS",model:"Race M Narrow Long",detail:"Narrow · long nose",sku:"SD-M-NL",priceInr:7000,stockQty:6,reorderLevel:2,coreEnabled:true,proEnabled:true,apexEnabled:true,source:"Internal target",notes:"Race fit."}),
+  item({id:"sad-men-narrow-short",category:"saddle",subcategory:"Men · Narrow · Short Nose",brand:"VéLOXIS",model:"Race M Narrow Short",detail:"Narrow · short nose",sku:"SD-M-NS",priceInr:7500,stockQty:5,reorderLevel:1,coreEnabled:false,proEnabled:true,apexEnabled:true,source:"Internal target",notes:"Aggressive road fit."}),
+  item({id:"sad-women-broad-short",category:"saddle",subcategory:"Women · Broad · Short Nose",brand:"VéLOXIS",model:"Endurance W Broad Short",detail:"Broad · short nose",sku:"SD-W-BS",priceInr:7000,stockQty:7,reorderLevel:2,coreEnabled:true,proEnabled:true,apexEnabled:false,source:"Internal target",notes:"Women-specific endurance fit."}),
+  item({id:"sad-women-narrow-short",category:"saddle",subcategory:"Women · Narrow · Short Nose",brand:"VéLOXIS",model:"Race W Narrow Short",detail:"Narrow · short nose",sku:"SD-W-NS",priceInr:7500,stockQty:5,reorderLevel:1,coreEnabled:false,proEnabled:true,apexEnabled:true,source:"Internal target",notes:"Women-specific race fit."}),
+  item({id:"sad-tt",category:"saddle",subcategory:"TT",brand:"VéLOXIS",model:"TT Short Nose",detail:"Time-trial / triathlon",sku:"SD-TT-01",priceInr:9500,stockQty:3,reorderLevel:1,coreEnabled:false,proEnabled:true,apexEnabled:true,source:"Internal target",notes:"TT-specific option."}),
+
+  item({id:"ta-core",category:"thruaxle",subcategory:"Standard",brand:"VéLOXIS",model:"Road Thru-Axle Core",detail:"12×100 front / 12×142 rear",sku:"TA-ROAD-CORE",priceInr:4500,stockQty:12,reorderLevel:3,coreEnabled:true,proEnabled:true,apexEnabled:false,source:"Internal target",notes:"Core/Pro axle set."}),
+  item({id:"ta-premium",category:"thruaxle",subcategory:"Lightweight",brand:"VéLOXIS",model:"Road Thru-Axle Titanium",detail:"12×100 / 12×142 lightweight set",sku:"TA-TI-ROAD",priceInr:12000,stockQty:5,reorderLevel:1,coreEnabled:false,proEnabled:true,apexEnabled:true,source:"Internal target",notes:"Premium axle set."}),
+
+  item({id:"bb-t47i-85",category:"bottom-bracket",subcategory:"T47i",brand:"VéLOXIS",model:"T47i 85.5 Internal",detail:"T47 internal · 85.5 mm shell",sku:"BB-T47I-855",priceInr:6500,stockQty:10,reorderLevel:2,coreEnabled:false,proEnabled:true,apexEnabled:true,source:"Internal target",notes:"Primary Pro/Apex standard."}),
+  item({id:"bb-bsa",category:"bottom-bracket",subcategory:"BSA",brand:"Shimano",model:"BSA Road",detail:"68 mm threaded",sku:"BB-BSA-ROAD",priceInr:2500,stockQty:15,reorderLevel:3,coreEnabled:true,proEnabled:false,apexEnabled:false,source:"India market reference",notes:"Lower-range equivalent."}),
+  item({id:"bb-pf",category:"bottom-bracket",subcategory:"Press Fit",brand:"Shimano",model:"PressFit Road",detail:"PF86.5 compatible",sku:"BB-PF-ROAD",priceInr:3000,stockQty:8,reorderLevel:2,coreEnabled:true,proEnabled:false,apexEnabled:false,source:"India market reference",notes:"Lower-range alternative where frame design permits."}),
+  item({id:"bb-t47i-premium",category:"bottom-bracket",subcategory:"T47i",brand:"CeramicSpeed",model:"T47i Internal",detail:"T47 internal ceramic",sku:"BB-T47I-CS",priceInr:55000,stockQty:2,reorderLevel:1,coreEnabled:false,proEnabled:false,apexEnabled:true,source:"Premium market reference / verify",notes:"Apex upgrade."}),
+
+  item({id:"cage-plastic",category:"bottle-cage",subcategory:"Plastic",brand:"VéLOXIS",model:"Composite Bottle Cage",detail:"Light composite",sku:"BC-PLASTIC-01",priceInr:1200,stockQty:20,reorderLevel:5,coreEnabled:true,proEnabled:true,apexEnabled:false,source:"Internal target",notes:"Core/Pro cage."}),
+  item({id:"cage-metal",category:"bottle-cage",subcategory:"Metal",brand:"VéLOXIS",model:"Aluminium Bottle Cage",detail:"Aluminium alloy",sku:"BC-METAL-01",priceInr:2500,stockQty:12,reorderLevel:3,coreEnabled:true,proEnabled:true,apexEnabled:false,source:"Internal target",notes:"Durable cage."}),
+  item({id:"cage-carbon",category:"bottle-cage",subcategory:"Carbon",brand:"VéLOXIS",model:"Carbon Bottle Cage",detail:"UD carbon",sku:"BC-CARBON-01",priceInr:4500,stockQty:8,reorderLevel:2,coreEnabled:false,proEnabled:true,apexEnabled:true,source:"Internal target",notes:"Pro/Apex lightweight cage."}),
+
+  item({id:"tool-pouch",category:"tool-pouch",subcategory:"Integrated",brand:"VéLOXIS",model:"Integrated Tool Pouch",detail:"Frame-mounted storage",sku:"TP-INTEGRATED-01",priceInr:3500,stockQty:10,reorderLevel:2,coreEnabled:true,proEnabled:true,apexEnabled:true,source:"Internal target",notes:"Integrated storage provision."}),
+  item({id:"bracket-computer",category:"bracket",subcategory:"Computer",brand:"VéLOXIS",model:"Integrated Computer Bracket",detail:"Front computer mount",sku:"BR-COMP-01",priceInr:2500,stockQty:10,reorderLevel:2,coreEnabled:true,proEnabled:true,apexEnabled:true,source:"Internal target",notes:"Cockpit accessory."}),
+  item({id:"bracket-light",category:"bracket",subcategory:"Light",brand:"VéLOXIS",model:"Integrated Light Bracket",detail:"Front light mount",sku:"BR-LIGHT-01",priceInr:1800,stockQty:10,reorderLevel:2,coreEnabled:true,proEnabled:true,apexEnabled:true,source:"Internal target",notes:"Accessory."}),
+  item({id:"bracket-bottle",category:"bracket",subcategory:"Bottle",brand:"VéLOXIS",model:"Under-Top-Tube Bottle Bracket",detail:"Accessory mount",sku:"BR-BOTTLE-01",priceInr:1800,stockQty:8,reorderLevel:2,coreEnabled:true,proEnabled:true,apexEnabled:true,source:"Internal target",notes:"Accessory."}),
+  item({id:"fastener-5",category:"fastener",subcategory:"Allen Screw",brand:"VéLOXIS",model:"Allen Fastener M5",detail:"M5 stainless / black finish",sku:"HW-ALLEN-M5",priceInr:600,stockQty:100,reorderLevel:20,coreEnabled:true,proEnabled:true,apexEnabled:true,source:"Internal target",notes:"Bottle cage / accessory fastener."}),
+  item({id:"fastener-6",category:"fastener",subcategory:"Allen Screw",brand:"VéLOXIS",model:"Allen Fastener M6",detail:"M6 stainless / black finish",sku:"HW-ALLEN-M6",priceInr:700,stockQty:100,reorderLevel:20,coreEnabled:true,proEnabled:true,apexEnabled:true,source:"Internal target",notes:"Mounting fastener."}),
+  item({id:"fastener-8",category:"fastener",subcategory:"Allen Screw",brand:"VéLOXIS",model:"Allen Fastener M8",detail:"M8 stainless / black finish",sku:"HW-ALLEN-M8",priceInr:900,stockQty:60,reorderLevel:10,coreEnabled:true,proEnabled:true,apexEnabled:true,source:"Internal target",notes:"High-load mounting fastener."}),
+  item({id:"gauge-torque",category:"gauge",subcategory:"Workshop",brand:"VéLOXIS",model:"Torque / Fit Gauge Set",detail:"Assembly and service gauge set",sku:"GAUGE-TORQUE-01",priceInr:4500,stockQty:5,reorderLevel:1,coreEnabled:true,proEnabled:true,apexEnabled:true,source:"Internal target",notes:"Workshop control item."}),
+
+  item({id:"colour-bright-1",category:"colour",subcategory:"Bright",brand:"VéLOXIS",model:"Solar Yellow",detail:"Bright solid",sku:"CLR-BRT-01",priceInr:0,stockQty:20,reorderLevel:3,coreEnabled:true,proEnabled:true,apexEnabled:true,source:"Internal paint palette",notes:"Standard colour."}),
+  item({id:"colour-bright-2",category:"colour",subcategory:"Bright",brand:"VéLOXIS",model:"Signal Red",detail:"Bright solid",sku:"CLR-BRT-02",priceInr:0,stockQty:20,reorderLevel:3,coreEnabled:true,proEnabled:true,apexEnabled:true,source:"Internal paint palette",notes:"Standard colour."}),
+  item({id:"colour-bright-3",category:"colour",subcategory:"Bright",brand:"VéLOXIS",model:"Electric Blue",detail:"Bright solid",sku:"CLR-BRT-03",priceInr:0,stockQty:20,reorderLevel:3,coreEnabled:true,proEnabled:true,apexEnabled:true,source:"Internal paint palette",notes:"Standard colour."}),
+  item({id:"colour-bright-4",category:"colour",subcategory:"Bright",brand:"VéLOXIS",model:"Lime Green",detail:"Bright solid",sku:"CLR-BRT-04",priceInr:0,stockQty:20,reorderLevel:3,coreEnabled:true,proEnabled:true,apexEnabled:true,source:"Internal paint palette",notes:"Standard colour."}),
+  item({id:"colour-bright-5",category:"colour",subcategory:"Bright",brand:"VéLOXIS",model:"Tangerine Orange",detail:"Bright solid",sku:"CLR-BRT-05",priceInr:0,stockQty:20,reorderLevel:3,coreEnabled:true,proEnabled:true,apexEnabled:true,source:"Internal paint palette",notes:"Standard colour."}),
+  item({id:"colour-metal-1",category:"colour",subcategory:"Metallic",brand:"VéLOXIS",model:"Titanium Silver",detail:"Metallic",sku:"CLR-MET-01",priceInr:0,stockQty:20,reorderLevel:3,coreEnabled:true,proEnabled:true,apexEnabled:true,source:"Internal paint palette",notes:"Standard metallic colour."}),
+  item({id:"colour-metal-2",category:"colour",subcategory:"Metallic",brand:"VéLOXIS",model:"Graphite Metallic",detail:"Metallic",sku:"CLR-MET-02",priceInr:0,stockQty:20,reorderLevel:3,coreEnabled:true,proEnabled:true,apexEnabled:true,source:"Internal paint palette",notes:"Standard metallic colour."}),
+  item({id:"colour-metal-3",category:"colour",subcategory:"Metallic",brand:"VéLOXIS",model:"Copper Metallic",detail:"Metallic",sku:"CLR-MET-03",priceInr:0,stockQty:20,reorderLevel:3,coreEnabled:true,proEnabled:true,apexEnabled:true,source:"Internal paint palette",notes:"Standard metallic colour."}),
+  item({id:"colour-metal-4",category:"colour",subcategory:"Metallic",brand:"VéLOXIS",model:"Deep Green Metallic",detail:"Metallic",sku:"CLR-MET-04",priceInr:0,stockQty:20,reorderLevel:3,coreEnabled:true,proEnabled:true,apexEnabled:true,source:"Internal paint palette",notes:"Standard metallic colour."}),
+  item({id:"colour-metal-5",category:"colour",subcategory:"Metallic",brand:"VéLOXIS",model:"Midnight Blue Metallic",detail:"Metallic",sku:"CLR-MET-05",priceInr:0,stockQty:20,reorderLevel:3,coreEnabled:true,proEnabled:true,apexEnabled:true,source:"Internal paint palette",notes:"Standard metallic colour."}),
+  item({id:"colour-custom",category:"colour",subcategory:"Custom",brand:"VéLOXIS",model:"Custom Colour",detail:"Customer-selected paint",sku:"CLR-CUSTOM",priceInr:5000,stockQty:99,reorderLevel:10,coreEnabled:true,proEnabled:true,apexEnabled:true,source:"Internal pricing rule",notes:"₹5,000 custom colour surcharge; stock represents production capacity."}),
 ];
 
-const KEY = "veloxis-component-inventory-v1";
-
+const KEY = "veloxis-component-inventory-v2";
 export function readInventory(): InventoryItem[] {
   if (typeof window === "undefined") return SEED_INVENTORY;
-  try {
-    const saved = window.localStorage.getItem(KEY);
-    return saved ? JSON.parse(saved) as InventoryItem[] : SEED_INVENTORY;
-  } catch { return SEED_INVENTORY; }
+  try { const saved = window.localStorage.getItem(KEY); return saved ? JSON.parse(saved) as InventoryItem[] : SEED_INVENTORY; } catch { return SEED_INVENTORY; }
 }
-
-export function writeInventory(items: InventoryItem[]) {
-  window.localStorage.setItem(KEY, JSON.stringify(items));
-  window.dispatchEvent(new CustomEvent("veloxis-inventory-updated"));
-}
-
+export function writeInventory(items: InventoryItem[]) { window.localStorage.setItem(KEY, JSON.stringify(items)); window.dispatchEvent(new CustomEvent("veloxis-inventory-updated")); }
 export function useInventory(seed = SEED_INVENTORY) {
   const [items, setItems] = useState<InventoryItem[]>(seed);
-  useEffect(() => {
-    setItems(readInventory());
-    const sync = () => setItems(readInventory());
-    window.addEventListener("storage", sync);
-    window.addEventListener("veloxis-inventory-updated", sync);
-    return () => { window.removeEventListener("storage", sync); window.removeEventListener("veloxis-inventory-updated", sync); };
-  }, []);
+  useEffect(() => { setItems(readInventory()); const sync = () => setItems(readInventory()); window.addEventListener("storage", sync); window.addEventListener("veloxis-inventory-updated", sync); return () => { window.removeEventListener("storage", sync); window.removeEventListener("veloxis-inventory-updated", sync); }; }, []);
   return [items, (next: InventoryItem[]) => { setItems(next); writeInventory(next); }] as const;
 }
