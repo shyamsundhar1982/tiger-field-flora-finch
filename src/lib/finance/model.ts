@@ -24,32 +24,32 @@ export const SCENARIOS: Record<
   },
 };
 
-// Blended planning economics derived from the current Core / Pro / Apex range architecture.
-// Planning mix: 25% Core, 60% Pro, 15% Apex. These are management assumptions, not sales history.
+// Practical blended planning economics. All figures are ₹ lakh per bike.
+// Planning mix remains 25% Core, 60% Pro, 15% Apex. These are management assumptions, not sales history.
 const ASP = 1.775;
 const COGS = 1.184;
 const PLAN_COGS = 1.184;
 
+// Conservative early-stage production ramp: 282 bikes over 36 months rather than assuming
+// immediate high-volume scale. Change through the Finance Control assumption panel when evidence improves.
 function unitsFor(m: number, s: ScenarioId): number {
   if (s === "base") {
     const ramp = [
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26,
-      30, 34, 38, 42, 46, 50, 55, 60, 65, 70, 75, 80,
+      0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5,
+      6, 6, 8, 8, 10, 10, 12, 12, 14, 14, 16, 16, 18, 18, 20, 20, 22, 22,
     ];
-    const u = ramp[m - 1] ?? 0;
-    if (m === 12 || m === 13 || m === 23 || m === 24) return Math.round(u * 1.12);
-    return u;
+    return ramp[m - 1] ?? 0;
   }
   if (s === "delayed") {
     const ramp = [
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 5, 7, 9, 11, 13, 15, 16, 18, 20,
-      23, 26, 29, 32, 35, 38, 41, 44, 47, 50, 53, 56,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 3, 3,
+      4, 4, 5, 5, 6, 6, 8, 8, 10, 10, 12, 12, 14, 14, 16, 16, 18, 18,
     ];
     return ramp[m - 1] ?? 0;
   }
   const ramp = [
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 4, 6, 8, 10, 12, 14,
-    16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9,
   ];
   return ramp[m - 1] ?? 0;
 }
@@ -130,6 +130,28 @@ function inventoryBuy(m: number, s: ScenarioId, units: number, cogs: number): nu
   return 0;
 }
 
+export type FinanceAssumptions = {
+  aspLakh: number;
+  cogsLakh: number;
+  unitMultiplier: number;
+  opexMultiplier: number;
+  capexMultiplier: number;
+  inventoryMultiplier: number;
+  fundingMultiplier: number;
+  openingCashLakh: number;
+};
+
+export const DEFAULT_FINANCE_ASSUMPTIONS: FinanceAssumptions = {
+  aspLakh: ASP,
+  cogsLakh: COGS,
+  unitMultiplier: 1,
+  opexMultiplier: 1,
+  capexMultiplier: 1,
+  inventoryMultiplier: 1,
+  fundingMultiplier: 1,
+  openingCashLakh: 1,
+};
+
 export type MonthRow = {
   m: number;
   units: number;
@@ -148,24 +170,28 @@ export type MonthRow = {
   tooling: number;
 };
 
-export function buildModel(scenario: ScenarioId, drawStandby: boolean): MonthRow[] {
-  const cogsU = scenario === "stress" ? PLAN_COGS * 1.2 : COGS;
+export function buildModelWithInputs(
+  scenario: ScenarioId,
+  drawStandby: boolean,
+  assumptions: FinanceAssumptions = DEFAULT_FINANCE_ASSUMPTIONS,
+): MonthRow[] {
+  const cogsU = scenario === "stress" ? assumptions.cogsLakh * 1.2 : assumptions.cogsLakh;
   const rows: MonthRow[] = [];
-  let cash = 1;
+  let cash = assumptions.openingCashLakh;
   let inventory = 0;
   let iaud = 0;
   let tooling = 0;
 
   for (let m = 1; m <= 36; m++) {
-    const units = unitsFor(m, scenario);
-    const revenue = units * ASP;
+    const units = Math.max(0, Math.round(unitsFor(m, scenario) * assumptions.unitMultiplier));
+    const revenue = units * assumptions.aspLakh;
     const cogs = units * cogsU;
     const gp = revenue - cogs;
-    const opex = opexFor(m, scenario);
+    const opex = opexFor(m, scenario) * assumptions.opexMultiplier;
     const ebitda = gp - opex;
-    const capex = capexFor(m, scenario);
-    const invBuy = inventoryBuy(m, scenario, units, cogsU);
-    const funding = fundingFor(m, scenario, drawStandby);
+    const capex = capexFor(m, scenario) * assumptions.capexMultiplier;
+    const invBuy = inventoryBuy(m, scenario, units, cogsU) * assumptions.inventoryMultiplier;
+    const funding = fundingFor(m, scenario, drawStandby) * assumptions.fundingMultiplier;
     const opening = cash;
     cash = opening + funding + revenue - opex - capex - invBuy;
     inventory = Math.max(0, inventory + invBuy - cogs);
@@ -191,6 +217,10 @@ export function buildModel(scenario: ScenarioId, drawStandby: boolean): MonthRow
     });
   }
   return rows;
+}
+
+export function buildModel(scenario: ScenarioId, drawStandby: boolean): MonthRow[] {
+  return buildModelWithInputs(scenario, drawStandby, DEFAULT_FINANCE_ASSUMPTIONS);
 }
 
 export function runwayMonths(rows: MonthRow[], from: number): number {
