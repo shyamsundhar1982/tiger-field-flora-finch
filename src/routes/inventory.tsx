@@ -1,0 +1,126 @@
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
+import { SiteFooter, SiteHeader } from "@/components/site-header";
+import { deleteInventory, listInventory, upsertInventory, type InventoryItem } from "@/lib/data/inventory.server";
+import { inr } from "@/lib/format";
+
+export const Route = createFileRoute("/inventory")({
+  loader: () => listInventory(),
+  component: InventoryPage,
+});
+
+type Draft = Omit<InventoryItem, "updatedAt">;
+const blank: Draft = {
+  id: "",
+  category: "groupset",
+  subcategory: "",
+  brand: "",
+  model: "",
+  detail: "",
+  sku: "",
+  priceInr: 0,
+  stockQty: 0,
+  reorderLevel: 2,
+  coreEnabled: false,
+  proEnabled: false,
+  apexEnabled: false,
+  source: "Internal estimate — verify with supplier",
+  notes: "",
+};
+
+function InventoryPage() {
+  const items = Route.useLoaderData();
+  const router = useRouter();
+  const [editing, setEditing] = useState<Draft | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [filter, setFilter] = useState<InventoryItem["category"] | "all">("all");
+
+  const visible = useMemo(() => filter === "all" ? items : items.filter((x) => x.category === filter), [items, filter]);
+  const low = items.filter((x) => x.stockQty <= x.reorderLevel).length;
+
+  async function save() {
+    if (!editing?.brand.trim() || !editing.model.trim() || !editing.sku.trim()) return;
+    setSaving(true);
+    try {
+      await upsertInventory({ data: { ...editing, id: editing.id || crypto.randomUUID() } });
+      setEditing(null);
+      await router.invalidate();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function remove(id: string) {
+    if (!window.confirm("Remove this component from inventory and the configurator?")) return;
+    await deleteInventory({ data: { id } });
+    await router.invalidate();
+  }
+
+  return <div className="min-h-dvh bg-bg"><SiteHeader />
+    <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <Link to="/range" className="text-sm text-muted hover:text-accent">Range</Link>
+          <p className="mt-5 text-[11px] uppercase tracking-[0.22em] text-green">Operations · component control</p>
+          <h1 className="mt-2 text-4xl font-bold text-accent">Component inventory</h1>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">This is the stock master behind the configurator. Add a new model here, assign the ranges it is allowed in, set available quantity and price, and it becomes selectable without editing the configuration page.</p>
+        </div>
+        <button type="button" onClick={() => setEditing({ ...blank, id: crypto.randomUUID() })} className="rounded-lg border border-accent bg-accent px-4 py-2.5 text-sm font-semibold text-bg hover:bg-fg">+ Add component</button>
+      </div>
+
+      <div className="mt-8 grid gap-3 sm:grid-cols-3">
+        <Stat label="Component models" value={String(items.length)} />
+        <Stat label="Low / reorder" value={String(low)} />
+        <Stat label="Selectable now" value={String(items.filter((x) => x.stockQty > 0 && (x.coreEnabled || x.proEnabled || x.apexEnabled)).length)} />
+      </div>
+
+      <div className="mt-8 flex flex-wrap gap-2">
+        {(["all", "groupset", "wheelset", "tyre"] as const).map((x) => <button key={x} type="button" onClick={() => setFilter(x)} className={`rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] ${filter === x ? "border-accent bg-accent/10 text-accent" : "border-border text-muted hover:border-accent/50"}`}>{x}</button>)}
+      </div>
+
+      <div className="mt-5 overflow-x-auto rounded-xl border border-border bg-bg-elevated/70">
+        <table className="w-full min-w-[1050px] text-left text-sm">
+          <thead className="bg-green/5 text-[10px] uppercase tracking-[0.14em] text-green"><tr><th className="px-4 py-3">Component</th><th className="px-4 py-3">SKU</th><th className="px-4 py-3">Price</th><th className="px-4 py-3">Stock</th><th className="px-4 py-3">Allowed range</th><th className="px-4 py-3">Source</th><th className="px-4 py-3">Actions</th></tr></thead>
+          <tbody>{visible.map((x) => <tr key={x.id} className="border-t border-border/70">
+            <td className="px-4 py-3"><p className="font-semibold text-fg">{x.brand} {x.model}</p><p className="mt-0.5 text-xs text-muted">{x.category} · {x.detail}</p></td>
+            <td className="px-4 py-3 font-mono text-xs text-muted">{x.sku}</td>
+            <td className="px-4 py-3 tabular-nums text-fg">{inr(x.priceInr)}</td>
+            <td className="px-4 py-3"><span className={x.stockQty <= x.reorderLevel ? "text-warn" : "text-green"}>{x.stockQty}</span><span className="text-xs text-subtle"> / reorder {x.reorderLevel}</span></td>
+            <td className="px-4 py-3"><div className="flex gap-1.5 text-[10px] font-bold uppercase tracking-wider">{x.coreEnabled && <span className="rounded border border-border px-1.5 py-1 text-green">Core</span>}{x.proEnabled && <span className="rounded border border-border px-1.5 py-1 text-green">Pro</span>}{x.apexEnabled && <span className="rounded border border-border px-1.5 py-1 text-green">Apex</span>}</div></td>
+            <td className="max-w-[240px] px-4 py-3 text-xs text-muted">{x.source}</td>
+            <td className="px-4 py-3"><div className="flex gap-3"><button type="button" onClick={() => setEditing({ ...x })} className="text-xs font-semibold text-accent hover:text-fg">Edit</button><button type="button" onClick={() => remove(x.id)} className="text-xs font-semibold text-muted hover:text-warn">Remove</button></div></td>
+          </tr>)}</tbody>
+        </table>
+      </div>
+
+      <div className="mt-6 rounded-xl border border-border bg-bg-elevated/30 p-4 text-xs leading-5 text-muted"><strong className="text-fg">Control rule:</strong> a component is offered in the configurator only when its stock is above zero <em>and</em> the component is enabled for that tier. This prevents an Apex build from silently falling back to an entry wheel, and prevents an out-of-stock model from being offered for sale.</div>
+    </main>
+    <SiteFooter />
+    {editing ? <Editor draft={editing} setDraft={setEditing} onCancel={() => setEditing(null)} onSave={save} saving={saving} /> : null}
+  </div>;
+}
+
+function Editor({ draft, setDraft, onCancel, onSave, saving }: { draft: Draft; setDraft: (v: Draft) => void; onCancel: () => void; onSave: () => void; saving: boolean }) {
+  const patch = (p: Partial<Draft>) => setDraft({ ...draft, ...p });
+  return <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 p-4"><div className="mx-auto my-8 max-w-3xl rounded-2xl border border-border bg-bg p-5 sm:p-7">
+    <div className="flex items-start justify-between gap-4"><div><p className="text-[10px] uppercase tracking-[0.18em] text-green">Inventory master</p><h2 className="mt-1 text-2xl font-bold text-accent">{draft.id ? "Edit component" : "Add component"}</h2></div><button type="button" onClick={onCancel} className="text-muted hover:text-fg">Close</button></div>
+    <div className="mt-6 grid gap-4 sm:grid-cols-2">
+      <Field label="Category"><select value={draft.category} onChange={(e) => patch({ category: e.target.value as Draft["category"] })} className="control"><option value="groupset">Groupset</option><option value="wheelset">Wheelset</option><option value="tyre">Tyre</option></select></Field>
+      <Field label="Sub-category"><input value={draft.subcategory} onChange={(e) => patch({ subcategory: e.target.value })} className="control" placeholder="Mechanical / Carbon Aero / Race" /></Field>
+      <Field label="Brand"><input value={draft.brand} onChange={(e) => patch({ brand: e.target.value })} className="control" /></Field>
+      <Field label="Model"><input value={draft.model} onChange={(e) => patch({ model: e.target.value })} className="control" /></Field>
+      <Field label="Detail"><input value={draft.detail} onChange={(e) => patch({ detail: e.target.value })} className="control" /></Field>
+      <Field label="SKU"><input value={draft.sku} onChange={(e) => patch({ sku: e.target.value })} className="control" /></Field>
+      <Field label="Price (₹)"><input type="number" min="0" value={draft.priceInr} onChange={(e) => patch({ priceInr: Number(e.target.value) })} className="control" /></Field>
+      <Field label="Stock quantity"><input type="number" min="0" value={draft.stockQty} onChange={(e) => patch({ stockQty: Number(e.target.value) })} className="control" /></Field>
+      <Field label="Reorder level"><input type="number" min="0" value={draft.reorderLevel} onChange={(e) => patch({ reorderLevel: Number(e.target.value) })} className="control" /></Field>
+      <Field label="Source"><input value={draft.source} onChange={(e) => patch({ source: e.target.value })} className="control" /></Field>
+      <Field label="Notes"><input value={draft.notes} onChange={(e) => patch({ notes: e.target.value })} className="control" /></Field>
+      <Field label="Configurator eligibility"><div className="flex flex-wrap gap-2">{(["coreEnabled", "proEnabled", "apexEnabled"] as const).map((key) => <label key={key} className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold"><input type="checkbox" checked={draft[key]} onChange={(e) => patch({ [key]: e.target.checked } as Partial<Draft>)} />{key.replace("Enabled", "")}</label>)}</div></Field>
+    </div>
+    <div className="mt-6 flex justify-end gap-2"><button type="button" onClick={onCancel} className="rounded-lg border border-border px-4 py-2 text-sm text-muted">Cancel</button><button type="button" disabled={saving} onClick={onSave} className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-50">{saving ? "Saving…" : "Save component"}</button></div>
+  </div></div>;
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.14em] text-subtle">{label}</span>{children}</label>; }
+function Stat({ label, value }: { label: string; value: string }) { return <div className="rounded-xl border border-border bg-bg-elevated/40 p-4"><p className="text-[10px] uppercase tracking-[0.14em] text-subtle">{label}</p><p className="mt-1 text-2xl font-bold tabular-nums text-accent">{value}</p></div>; }
