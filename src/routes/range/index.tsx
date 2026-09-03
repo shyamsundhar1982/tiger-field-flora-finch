@@ -19,6 +19,12 @@ function RangePage() {
         <p className="text-[11px] uppercase tracking-[0.22em] text-green">Platform</p>
         <h1 className="mt-2 font-display text-5xl text-accent">The VéLOXIS Range</h1>
         <p className="mt-3 text-muted">Configure your ideal performance bicycle.</p>
+        <section className="mt-8 rounded-2xl border border-border bg-bg-elevated/30 p-5 sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div><p className="text-[10px] uppercase tracking-[0.18em] text-green">Before you configure</p><h2 className="mt-1 font-display text-2xl text-accent">Find your frame size</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-muted">Run the Dynamic Bike Fit Calculator using stature, inseam, stem, bar and crank choices. It uses the supplied VEDM-301 fit logic and returns a size recommendation plus dynamic ride-feel evaluation.</p></div>
+            <Link to="/fit-calculator" className="shrink-0 rounded-lg border border-accent px-5 py-3 text-sm font-semibold text-accent transition-colors hover:bg-accent hover:text-bg">Open Fit Calculator →</Link>
+          </div>
+        </section>
         {Object.entries(grouped).map(([tier, models]) => (
           <section key={tier} className="mt-14">
             <h2 className="font-display text-3xl capitalize text-accent">{tier}</h2>
