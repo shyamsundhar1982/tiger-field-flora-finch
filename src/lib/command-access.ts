@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { env } from "cloudflare:workers";
 
 const SESSION_NAME = "__Host-vyndi-command";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
@@ -13,8 +12,8 @@ type CommandEnv = {
   user?: string;
 };
 
-function getCommandEnv() {
-  return env as unknown as CommandEnv;
+function getCommandEnv(): CommandEnv {
+  return process.env as CommandEnv;
 }
 
 async function getCommandSession() {
@@ -82,7 +81,11 @@ export const unlockCommand = createServerFn({ method: "POST" })
     if (data.username === "admin" && data.password === adminPassword) {
       role = "admin";
     }
-    if (data.username === "user" && viewerPassword && data.password === viewerPassword) {
+    if (
+      data.username === "user" &&
+      viewerPassword &&
+      data.password === viewerPassword
+    ) {
       role = "viewer";
     }
 
