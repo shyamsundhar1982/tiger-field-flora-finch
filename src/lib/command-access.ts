@@ -4,7 +4,8 @@ import { z } from "zod";
 const SESSION_NAME = "__Host-vyndi-command";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
 
-type CommandSession = { unlocked?: boolean };
+type CommandRole = "admin" | "viewer";
+type CommandSession = { role?: CommandRole };
 
 async function getCommandSession() {
   const password = process.env.COMMAND_PASSWORD;
@@ -34,28 +35,38 @@ async function getCommandSession() {
   });
 }
 
+export const getCommandRole = createServerFn({ method: "GET" }).handler(
+  async () => {
+    const session = await getCommandSession();
+    return session.data.role ?? null;
+  },
+);
+
 export const getCommandAccess = createServerFn({ method: "GET" }).handler(
   async () => {
     const session = await getCommandSession();
-    return session.data.unlocked === true;
+    return session.data.role != null;
   },
 );
 
 export const unlockCommand = createServerFn({ method: "POST" })
-  .validator(z.object({ password: z.string().min(1).max(200) }))
+  .validator(z.object({ username: z.string().min(1).max(100), password: z.string().min(1).max(200) }))
   .handler(async ({ data }) => {
-    const configuredPassword = process.env.COMMAND_PASSWORD;
-    if (!configuredPassword) {
-      return { ok: false, error: "Command access is not configured." };
+    const adminPassword = process.env.COMMAND_PASSWORD;
+    const viewerPassword = process.env.user;
+    if (!adminPassword) {
+      return { ok: false, role: null, error: "Command access is not configured." };
     }
 
-    if (data.password !== configuredPassword) {
-      return { ok: false, error: "Incorrect password." };
-    }
+    let role: CommandRole | null = null;
+    if (data.username === "admin" && data.password === adminPassword) role = "admin";
+    if (data.username === "user" && viewerPassword && data.password === viewerPassword) role = "viewer";
+
+    if (!role) return { ok: false, role: null, error: "Incorrect username or password." };
 
     const session = await getCommandSession();
-    await session.update({ unlocked: true }, { maxAge: SESSION_MAX_AGE });
-    return { ok: true, error: null };
+    await session.update({ role }, { maxAge: SESSION_MAX_AGE });
+    return { ok: true, role, error: null };
   });
 
 export const lockCommand = createServerFn({ method: "POST" }).handler(
