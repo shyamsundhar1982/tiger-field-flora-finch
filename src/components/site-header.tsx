@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import { Menu, X } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ const LINKS = [
 ] as const;
 
 export function SiteHeader({ ghost = false }: { ghost?: boolean }) {
+  const location = useLocation();
   const [open, setOpen] = useState(false);
   return (
     <header className={cn("sticky top-0 z-40 border-b border-border/80", ghost ? "bg-bg/95" : "bg-bg")}>
@@ -22,12 +23,12 @@ export function SiteHeader({ ghost = false }: { ghost?: boolean }) {
             <span className="hidden text-[9px] font-semibold uppercase tracking-[0.2em] text-green sm:block">{BRAND.parent}</span>
           </span>
         </Link>
-        <nav className="hidden items-center gap-8 md:flex">
-          {LINKS.map((l) => <Link key={l.to} to={l.to} className="text-sm text-muted transition-colors duration-150 hover:text-accent" activeProps={{ className: "text-accent" }}>{l.label}</Link>)}
+        <nav aria-label="Primary navigation" className="hidden items-center gap-8 md:flex">
+          {LINKS.map((l) => <Link key={l.to} to={l.to} activeOptions={l.to === "/" ? { exact: true } : undefined} aria-current={location.pathname === l.to ? "page" : undefined} className="rounded-sm text-sm text-muted outline-none transition-colors duration-150 hover:text-accent focus-visible:ring-1 focus-visible:ring-accent" activeProps={{ className: "text-accent" }}>{l.label}</Link>)}
         </nav>
-        <button type="button" className="inline-flex size-11 items-center justify-center rounded-md md:hidden" aria-label={open ? "Close menu" : "Open menu"} onClick={() => setOpen((v) => !v)}>{open ? <X className="size-5" /> : <Menu className="size-5" />}</button>
+        <button type="button" className="inline-flex size-11 items-center justify-center rounded-md outline-none focus-visible:ring-1 focus-visible:ring-accent md:hidden" aria-label={open ? "Close menu" : "Open menu"} aria-expanded={open} aria-controls="primary-mobile-navigation" onClick={() => setOpen((v) => !v)}>{open ? <X className="size-5" /> : <Menu className="size-5" />}</button>
       </div>
-      {open ? <nav className="border-t border-border px-4 py-3 md:hidden">{LINKS.map((l) => <Link key={l.to} to={l.to} className="block py-3 text-base text-fg" onClick={() => setOpen(false)}>{l.label}</Link>)}</nav> : null}
+      {open ? <nav id="primary-mobile-navigation" aria-label="Primary mobile navigation" className="border-t border-border px-4 py-3 md:hidden">{LINKS.map((l) => <Link key={l.to} to={l.to} activeOptions={l.to === "/" ? { exact: true } : undefined} aria-current={location.pathname === l.to ? "page" : undefined} className="block rounded-md py-3 text-base text-fg outline-none focus-visible:ring-1 focus-visible:ring-accent" onClick={() => setOpen(false)}>{l.label}</Link>)}</nav> : null}
     </header>
   );
 }
