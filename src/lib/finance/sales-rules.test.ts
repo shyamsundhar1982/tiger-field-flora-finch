@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isOrderBookStatus, isRevenueStatus } from "./sales-rules.ts";
+import { isOrderBookStatus, isRevenueStatus } from "./sales-rules";
 
 test("sales lifecycle keeps leads out of booked orders and revenue", () => {
   assert.equal(isOrderBookStatus("lead"), false);
