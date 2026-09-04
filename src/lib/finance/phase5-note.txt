@@ -1,0 +1,2 @@
+Phase 5 — Quality + Engineering Control
+Engineering revisions, ECR impact traceability, QC gates, NCR/CAPA, warranty and failure analysis.
