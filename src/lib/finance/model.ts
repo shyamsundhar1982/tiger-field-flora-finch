@@ -30,7 +30,7 @@ function opexFor(m: number, s: ScenarioId): number {
 }
 function fundingFor(m: number, s: ScenarioId, drawStandby: boolean): number {
   if (s === "base") { if (m === 1) return 15; if (m === 3) return 35; if (m === 6) return 35; if (m === 9 && drawStandby) return 25; if (m === 10) return 50; if (m === 14) return 65; return 0; }
-  if (s === "delayed") { if (m === 1) return 15; if (m === 6) return 25; if (m === 7) return 35; if (m === 10) return 35; if (m === 12) return 50; if (m === 17) return 65; return 0; }
+  if (s === "delayed") { if (m === 1) return 15; if (m === 6) return 25; if (m === 7) return 35; if (m === 9 && drawStandby) return 25; if (m === 10) return 35; if (m === 12) return 50; if (m === 17) return 65; return 0; }
   if (m === 1) return 15; if (m === 3) return 20; if (m === 6) return 40; if (m === 10) return 50; if (m === 18) return 65; return 0;
 }
 function capexFor(m: number, s: ScenarioId): number {
@@ -99,7 +99,8 @@ export function buildModelWithInputs(scenario: ScenarioId, drawStandby: boolean,
   let inventory = 0; let iaud = 0; let tooling = 0;
   for (let m = 1; m <= 36; m++) {
     const baseUnits = Math.max(0, Math.round(unitsFor(m, scenario) * assumptions.unitMultiplier));
-    const allocated = allocateUnits(baseUnits, lines, m);
+    const allocationLines = scenario === "stress" ? lines.filter((line) => line.id === "carbon") : lines;
+    const allocated = allocateUnits(baseUnits, allocationLines, m);
     allocated.aluminium = Math.max(0, Math.round(allocated.aluminium * assumptions.aluminiumVertical.volumeMultiplier));
     const units = allocated.aluminium + allocated.carbon + allocated.premiumCarbon;
     const stressFactor = scenario === "stress" ? 1.2 : 1;
@@ -108,14 +109,15 @@ export function buildModelWithInputs(scenario: ScenarioId, drawStandby: boolean,
     const nonAlUnits = allocated.carbon + allocated.premiumCarbon;
     const nonAlCogsPerUnit = nonAlUnits > 0 ? (allocated.carbon * (lines.find(x=>x.id === "carbon")?.cogsLakh ?? 0) + allocated.premiumCarbon * (lines.find(x=>x.id === "premiumCarbon")?.cogsLakh ?? 0)) / nonAlUnits * stressFactor : 0;
     const baseInv = inventoryBuy(m, scenario, nonAlUnits, nonAlCogsPerUnit) * assumptions.inventoryMultiplier;
-    const alInv = m >= (lines.find(x=>x.id === "aluminium")?.launchMonth ?? 999) && allocated.aluminium > 0 ? allocated.aluminium * (lines.find(x=>x.id === "aluminium")?.cogsLakh ?? 0) * Math.max(0, assumptions.aluminiumVertical.inventoryCover - 1) * assumptions.inventoryMultiplier : 0;
+    const alEnabled = scenario !== "stress";
+    const alInv = alEnabled && m >= (lines.find(x=>x.id === "aluminium")?.launchMonth ?? 999) && allocated.aluminium > 0 ? allocated.aluminium * (lines.find(x=>x.id === "aluminium")?.cogsLakh ?? 0) * Math.max(0, assumptions.aluminiumVertical.inventoryCover - 1) * assumptions.inventoryMultiplier : 0;
     const invBuy = baseInv + alInv;
     const baseOpex = opexFor(m, scenario) * assumptions.opexMultiplier;
-    const alOpex = m >= (lines.find(x=>x.id === "aluminium")?.launchMonth ?? 999) ? assumptions.aluminiumVertical.opexLakh : assumptions.aluminiumVertical.opexLakh * 0.35;
+    const alOpex = alEnabled ? (m >= (lines.find(x=>x.id === "aluminium")?.launchMonth ?? 999) ? assumptions.aluminiumVertical.opexLakh : assumptions.aluminiumVertical.opexLakh * 0.35) : 0;
     const opex = baseOpex + alOpex;
     const grossProfit = revenue - cogs; const ebitda = grossProfit - opex;
     const baseCapex = capexFor(m, scenario) * assumptions.capexMultiplier;
-    const alLaunch = m === (lines.find(x=>x.id === "aluminium")?.launchMonth ?? -1);
+    const alLaunch = alEnabled && m === (lines.find(x=>x.id === "aluminium")?.launchMonth ?? -1);
     const capex = baseCapex + (alLaunch ? assumptions.aluminiumVertical.capexLakh : 0);
     const baseFunding = fundingFor(m, scenario, drawStandby) * assumptions.fundingMultiplier;
     const funding = baseFunding + (alLaunch ? assumptions.aluminiumVertical.fundingLakh : 0);
