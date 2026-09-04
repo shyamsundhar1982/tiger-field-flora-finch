@@ -1,0 +1,16 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
+import { Panel } from "@/components/kpi";
+import { DEFAULT_ERP_WORK, type ErpWorkStatus } from "@/lib/finance/erp-engine";
+
+export const Route=createFileRoute("/command/erp-workflow")({component:ErpWorkflow});
+const statuses:ErpWorkStatus[]=["open","doing","blocked","done"];
+function ErpWorkflow(){
+ const [items,setItems]=useState(DEFAULT_ERP_WORK);
+ const counts=useMemo(()=>statuses.map(status=>[status,items.filter(i=>i.status===status).length] as const),[items]);
+ function setStatus(id:string,status:ErpWorkStatus){setItems(current=>current.map(item=>item.id===id?{...item,status}:item));}
+ return <div className="space-y-6"><header><p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Phase 10 · ERP / workflow control</p><h1 className="font-display text-4xl">ERP Workflow</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-muted">A lightweight execution board connecting commercial, procurement, production, engineering, quality, finance and compliance work to the existing command modules.</p></header>
+ <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{counts.map(([status,count])=><div key={status} className="rounded-xl border border-border bg-surface p-4"><p className="text-[10px] uppercase tracking-wider text-subtle">{status}</p><p className="mt-2 font-display text-3xl">{count}</p></div>)}</div>
+ <Panel title="Execution queue" kicker="Change status here; detailed records remain in the linked module"><div className="space-y-2">{items.map(item=><div key={item.id} className="grid gap-3 rounded-lg border border-border p-4 md:grid-cols-[1fr_auto_auto]"><div><div className="flex flex-wrap items-center gap-2"><span className="text-[10px] uppercase tracking-wider text-subtle">{item.area}</span><span className="text-sm font-medium">{item.title}</span></div><p className="mt-1 text-xs text-muted">Owner: {item.owner} · Priority: {item.priority} · Due M{item.dueMonth}</p></div><select value={item.status} onChange={e=>setStatus(item.id,e.target.value as ErpWorkStatus)} aria-label={`Status for ${item.title}`} className="rounded-md border border-border bg-bg px-3 py-2 text-xs"><option value="open">Open</option><option value="doing">Doing</option><option value="blocked">Blocked</option><option value="done">Done</option></select><Link to={item.linkedRoute as never} className="rounded-md border border-border px-3 py-2 text-xs text-accent">Open module →</Link></div>)}</div></Panel>
+ <div className="grid gap-4 lg:grid-cols-2"><Panel title="ERP boundary" kicker="Keep accounting and operating truth intact"><p className="text-sm leading-6 text-muted">This first workflow layer does not replace the finance engine, inventory records, quality records or engineering controls. It coordinates work and points each action to its system of record.</p></Panel><Panel title="Next ERP layers" kicker="Build only when the control layer is stable"><ul className="space-y-2 text-sm text-muted"><li>• persistent work orders and owners</li><li>• procurement → receipt → inventory transaction flow</li><li>• sales order → fulfilment → collection status</li><li>• production batch and quality gate linkage</li></ul></Panel></div></div>;
+}
