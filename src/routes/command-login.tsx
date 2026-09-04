@@ -7,6 +7,7 @@ export const Route = createFileRoute("/command-login")({ component: CommandLogin
 
 function CommandLogin() {
   const navigate = useNavigate();
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -16,7 +17,7 @@ function CommandLogin() {
     setError("");
     setBusy(true);
     try {
-      const result = await unlockCommand({ data: { password } });
+      const result = await unlockCommand({ data: { username, password } });
       if (!result.ok) {
         setError(result.error ?? "Access denied.");
         return;
@@ -44,31 +45,22 @@ function CommandLogin() {
           </div>
 
           <p className="mb-6 text-sm leading-6 text-muted">
-            This is the private planning and financial command area. Enter the access password to continue.
+            Admin has full control. User access is view-only and cannot change Command data.
           </p>
 
           <form onSubmit={submit} className="space-y-4">
             <label className="block">
+              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-muted">Username</span>
+              <input autoFocus type="text" value={username} onChange={(event) => setUsername(event.target.value)} className="control w-full" placeholder="admin or user" autoComplete="username" disabled={busy} />
+            </label>
+            <label className="block">
               <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-muted">Password</span>
-              <input
-                autoFocus
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                className="control w-full"
-                placeholder="Enter command password"
-                autoComplete="current-password"
-                disabled={busy}
-              />
+              <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="control w-full" placeholder="Enter password" autoComplete="current-password" disabled={busy} />
             </label>
 
             {error ? <p className="text-sm text-red-400" role="alert">{error}</p> : null}
 
-            <button
-              type="submit"
-              disabled={busy || !password}
-              className="w-full rounded-lg border border-accent bg-accent px-4 py-3 text-sm font-semibold text-bg transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
-            >
+            <button type="submit" disabled={busy || !username || !password} className="w-full rounded-lg border border-accent bg-accent px-4 py-3 text-sm font-semibold text-bg transition-opacity disabled:cursor-not-allowed disabled:opacity-50">
               {busy ? "Verifying…" : "Enter Command"}
             </button>
           </form>
