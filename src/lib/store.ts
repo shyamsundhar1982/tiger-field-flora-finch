@@ -6,13 +6,13 @@ import { DEFAULT_ACCOUNTING_ASSUMPTIONS, type AccountingAssumptions, type Fundin
 import type { BomCostSource, BomTier } from "@/lib/finance/bom-engine";
 import type { CompanyOpex, PeopleRole } from "@/lib/finance/people-opex-engine";
 import { DEFAULT_COMPLIANCE_ASSUMPTIONS, type ComplianceAssumptions } from "@/lib/finance/compliance-engine";
+import type { DecisionRecord } from "@/lib/finance/decision-engine";
 import { ACTIONS } from "@/lib/data/actions";
 
 type ActionState = Record<string, "open" | "doing" | "done">;
 type NumericAccountingKey = Exclude<keyof AccountingAssumptions, "fundingTypeByMonth">;
-const initialActions: ActionState = Object.fromEntries(ACTIONS.map((a) => [a.id, "open"]));
 type Store = {
-  scenario: ScenarioId; drawStandby: boolean; actions: ActionState; finance: FinanceAssumptions; accounting: AccountingAssumptions; compliance: ComplianceAssumptions;
+  scenario: ScenarioId; drawStandby: boolean; actions: ActionState; finance: FinanceAssumptions; accounting: AccountingAssumptions; compliance: ComplianceAssumptions; decisionRegister: DecisionRecord[];
   setScenario: (s: ScenarioId) => void; setDrawStandby: (v: boolean) => void; setAction: (id: string, s: "open" | "doing" | "done") => void; setFinance: (finance: FinanceAssumptions) => void;
   updateGlobalFinance: (key: keyof Omit<FinanceAssumptions, "productLines" | "aluminiumVertical" | "bomOverrides" | "bomCostSource" | "bomTierByProduct" | "peopleOpex">, value: number) => void;
   updateProductLine: (id: ProductLineId, key: "aspLakh" | "cogsLakh" | "mixPct" | "launchMonth", value: number) => void;
@@ -23,10 +23,12 @@ type Store = {
   updatePeopleOpexMultiplier: (value: number) => void;
   updateAccounting: (key: NumericAccountingKey, value: number) => void; setFundingType: (month: number, value: FundingType) => void;
   updateCompliance: (key: keyof ComplianceAssumptions, value: boolean | number) => void;
+  addDecisionRecord: (record: DecisionRecord) => void; clearDecisionRegister: () => void;
   resetFinance: () => void;
 };
+const initialActions: ActionState = Object.fromEntries(ACTIONS.map((a) => [a.id, "open"]));
 export const useVeloxis = create<Store>()(persist((set) => ({
-  scenario: "base", drawStandby: true, actions: initialActions, finance: DEFAULT_FINANCE_ASSUMPTIONS, accounting: DEFAULT_ACCOUNTING_ASSUMPTIONS, compliance: DEFAULT_COMPLIANCE_ASSUMPTIONS,
+  scenario: "base", drawStandby: true, actions: initialActions, finance: DEFAULT_FINANCE_ASSUMPTIONS, accounting: DEFAULT_ACCOUNTING_ASSUMPTIONS, compliance: DEFAULT_COMPLIANCE_ASSUMPTIONS, decisionRegister: [],
   setScenario: (scenario) => set({ scenario }), setDrawStandby: (drawStandby) => set({ drawStandby }), setAction: (id, status) => set((state) => ({ actions: { ...state.actions, [id]: status } })), setFinance: (finance) => set({ finance }),
   updateGlobalFinance: (key, value) => set((state) => ({ finance: { ...state.finance, [key]: value } })),
   updateProductLine: (id, key, value) => set((state) => ({ finance: { ...state.finance, productLines: state.finance.productLines.map((line) => line.id === id ? { ...line, [key]: value } : line) } })),
@@ -38,5 +40,7 @@ export const useVeloxis = create<Store>()(persist((set) => ({
   updatePeopleOpexMultiplier: (value) => set((state) => ({ finance: { ...state.finance, peopleOpex: { ...(state.finance.peopleOpex ?? DEFAULT_FINANCE_ASSUMPTIONS.peopleOpex!), opexMultiplier: value } } })),
   updateAccounting: (key, value) => set((state) => ({ accounting: { ...state.accounting, [key]: value } })), setFundingType: (month, value) => set((state) => ({ accounting: { ...state.accounting, fundingTypeByMonth: { ...(state.accounting.fundingTypeByMonth ?? {}), [month]: value } } })),
   updateCompliance: (key, value) => set((state) => ({ compliance: { ...state.compliance, [key]: value } })),
+  addDecisionRecord: (record) => set((state) => ({ decisionRegister: [record, ...state.decisionRegister].slice(0, 100) })),
+  clearDecisionRegister: () => set({ decisionRegister: [] }),
   resetFinance: () => set({ finance: DEFAULT_FINANCE_ASSUMPTIONS, accounting: DEFAULT_ACCOUNTING_ASSUMPTIONS, compliance: DEFAULT_COMPLIANCE_ASSUMPTIONS }),
-}), { name: "veloxis-planning-state", partialize: (state) => ({ scenario: state.scenario, drawStandby: state.drawStandby, actions: state.actions, finance: state.finance, accounting: state.accounting, compliance: state.compliance }) }));
+}), { name: "veloxis-planning-state", partialize: (state) => ({ scenario: state.scenario, drawStandby: state.drawStandby, actions: state.actions, finance: state.finance, accounting: state.accounting, compliance: state.compliance, decisionRegister: state.decisionRegister }) }));
