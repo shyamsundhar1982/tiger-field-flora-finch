@@ -1,5 +1,7 @@
 import type { AccountingAssumptions } from "@/lib/finance/accounting";
 import type { FinanceAssumptions, MonthRow, ProductLineId } from "@/lib/finance/model";
+import { isOrderBookStatus, isRevenueStatus } from "./sales-rules";
+export { isOrderBookStatus, isRevenueStatus } from "./sales-rules";
 
 export type SalesOrderStatus = "lead" | "confirmed" | "delivered" | "cancelled";
 export type SalesChannel = "direct" | "dealer" | "online";
@@ -18,9 +20,6 @@ export function salesPlan(rows:MonthRow[], finance:FinanceAssumptions): SalesMon
  * - delivered = order book + collectible revenue.
  * - cancelled = excluded.
  */
-export function isOrderBookStatus(status: SalesOrderStatus){ return status === "confirmed" || status === "delivered"; }
-export function isRevenueStatus(status: SalesOrderStatus){ return status === "delivered"; }
-
 export function buildSalesMonths(rows:MonthRow[], finance:FinanceAssumptions, orders:SalesOrder[], actuals:Record<number,{units?:number|null;revenue?:number|null}> = {}, accounting?:AccountingAssumptions):SalesMonth[]{
   const collectionDays=accounting?.collectionDays ?? ((accounting?.collectionMonths ?? 1)*30);
   const orderBookByMonth=new Map<number,SalesOrder[]>();
@@ -30,7 +29,7 @@ export function buildSalesMonths(rows:MonthRow[], finance:FinanceAssumptions, or
     if(isRevenueStatus(o.status)){const list=deliveredByMonth.get(o.month)??[];list.push(o);deliveredByMonth.set(o.month,list)}
   }
   let receivables=accounting?.openingReceivablesLakh??0;
-  return rows.map((r,i)=>{
+  return rows.map((r)=>{
     const m=r.m, entered=actuals[m]??{}, actualUnits=entered.units??0,actualRevenue=entered.revenue??0;
     const os=orderBookByMonth.get(m)??[], delivered=deliveredByMonth.get(m)??[];
     const ordersUnits=os.reduce((s,o)=>s+o.units,0), ordersRevenue=os.reduce((s,o)=>s+o.units*o.aspLakh,0);
