@@ -1,10 +1,6 @@
 import type { ModelRow } from "@/lib/finance/model";
 
-/**
- * Accounting layer over the founder planning model.
- * Values are ₹ lakh. This deliberately does not alter the planning engine.
- * Defaults are management assumptions and must be replaced/reconciled by the CA.
- */
+/** Accrual accounting layer over the founder planning model. Values are ₹ lakh. */
 export type AccountingAssumptions = {
   collectionMonths: number;
   supplierCreditMonths: number;
@@ -34,41 +30,21 @@ export const DEFAULT_ACCOUNTING_ASSUMPTIONS: AccountingAssumptions = {
 };
 
 export type AccountingRow = {
-  m: number;
-  revenue: number;
-  cogs: number;
-  grossProfit: number;
-  opex: number;
-  depreciation: number;
-  ebitda: number;
-  ebit: number;
-  tax: number;
-  netProfit: number;
-  salesCollections: number;
-  supplierPayments: number;
-  operatingCashFlow: number;
-  capex: number;
-  investingCashFlow: number;
-  funding: number;
-  financingCashFlow: number;
-  openingCash: number;
-  closingCash: number;
-  receivables: number;
-  inventory: number;
-  fixedAssetsNet: number;
-  payables: number;
-  debt: number;
-  equity: number;
-  retainedEarnings: number;
-  totalAssets: number;
-  totalLiabilitiesEquity: number;
+  m: number; revenue: number; cogs: number; grossProfit: number; opex: number;
+  depreciation: number; ebitda: number; ebit: number; tax: number; netProfit: number;
+  salesCollections: number; supplierPayments: number; operatingCashFlow: number;
+  capex: number; investingCashFlow: number; funding: number; financingCashFlow: number;
+  openingCash: number; closingCash: number; receivables: number; inventory: number;
+  fixedAssetsNet: number; payables: number; debt: number; equity: number;
+  retainedEarnings: number; totalAssets: number; totalLiabilitiesEquity: number;
   balanceCheck: number;
 };
 
-const lagged = (rows: ModelRow[], month: number, lag: number, key: keyof ModelRow) => {
-  if (lag <= 0) return Number(rows[month - 1]?.[key] ?? 0);
-  return Number(rows[month - lag - 1]?.[key] ?? 0);
-};
+function purchasesFor(rows: ModelRow[], index: number) {
+  const row = rows[index];
+  const openingInventory = index === 0 ? 0 : rows[index - 1].inventory;
+  return Math.max(0, row.cogs + row.inventory - openingInventory);
+}
 
 export function buildAccountingModel(
   planningRows: ModelRow[],
@@ -85,17 +61,15 @@ export function buildAccountingModel(
   let retainedEarnings = assumptions.openingRetainedEarningsLakh;
   const depreciationRate = assumptions.depreciationMonths > 0 ? 1 / assumptions.depreciationMonths : 0;
 
-  for (const row of planningRows) {
-    // Accrual revenue: cash collection is deliberately separated from sales.
-    const priorRevenue = lagged(planningRows, row.m, assumptions.collectionMonths, "revenue");
-    const collections = row.m <= assumptions.collectionMonths ? 0 : priorRevenue;
+  for (let index = 0; index < planningRows.length; index++) {
+    const row = planningRows[index];
+    const collectionIndex = index - assumptions.collectionMonths;
+    const collections = collectionIndex >= 0 ? planningRows[collectionIndex].revenue : 0;
     receivables = Math.max(0, receivables + row.revenue - collections);
 
-    // Purchases = COGS + closing inventory - opening inventory.
-    const openingInventory = row.m === 1 ? 0 : Number(planningRows[row.m - 2]?.inventory ?? 0);
-    const purchases = Math.max(0, row.cogs + row.inventory - openingInventory);
-    const priorPurchases = lagged(planningRows, row.m, assumptions.supplierCreditMonths, "inventoryBuy");
-    const supplierPayments = row.m <= assumptions.supplierCreditMonths ? 0 : Math.max(0, priorPurchases);
+    const purchases = purchasesFor(planningRows, index);
+    const paymentIndex = index - assumptions.supplierCreditMonths;
+    const supplierPayments = paymentIndex >= 0 ? purchasesFor(planningRows, paymentIndex) : 0;
     payables = Math.max(0, payables + purchases - supplierPayments);
 
     fixedAssetsGross += row.capex;
@@ -113,41 +87,21 @@ export function buildAccountingModel(
     const financingCashFlow = row.funding;
     const openingCash = cash;
     cash = openingCash + operatingCashFlow + investingCashFlow + financingCashFlow;
+
+    // Default management treatment: funding is equity until source documents say otherwise.
+    equity += row.funding;
     retainedEarnings += netProfit;
-    equity += row.m === 1 ? 0 : 0;
 
     const totalAssets = cash + receivables + row.inventory + fixedAssetsNet;
     const totalLiabilitiesEquity = payables + debt + equity + retainedEarnings;
 
     out.push({
-      m: row.m,
-      revenue: row.revenue,
-      cogs: row.cogs,
-      grossProfit: row.gp,
-      opex: row.opex,
-      depreciation,
-      ebitda,
-      ebit,
-      tax,
-      netProfit,
-      salesCollections: collections,
-      supplierPayments,
-      operatingCashFlow,
-      capex: row.capex,
-      investingCashFlow,
-      funding: row.funding,
-      financingCashFlow,
-      openingCash,
-      closingCash: cash,
-      receivables,
-      inventory: row.inventory,
-      fixedAssetsNet,
-      payables,
-      debt,
-      equity,
-      retainedEarnings,
-      totalAssets,
-      totalLiabilitiesEquity,
+      m: row.m, revenue: row.revenue, cogs: row.cogs, grossProfit: row.gp, opex: row.opex,
+      depreciation, ebitda, ebit, tax, netProfit, salesCollections: collections,
+      supplierPayments, operatingCashFlow, capex: row.capex, investingCashFlow,
+      funding: row.funding, financingCashFlow, openingCash, closingCash: cash,
+      receivables, inventory: row.inventory, fixedAssetsNet, payables, debt, equity,
+      retainedEarnings, totalAssets, totalLiabilitiesEquity,
       balanceCheck: totalAssets - totalLiabilitiesEquity,
     });
   }
@@ -155,21 +109,18 @@ export function buildAccountingModel(
 }
 
 export function accountingTotals(rows: AccountingRow[]) {
-  return rows.reduce(
-    (a, r) => ({
-      revenue: a.revenue + r.revenue,
-      cogs: a.cogs + r.cogs,
-      grossProfit: a.grossProfit + r.grossProfit,
-      opex: a.opex + r.opex,
-      depreciation: a.depreciation + r.depreciation,
-      ebitda: a.ebitda + r.ebitda,
-      netProfit: a.netProfit + r.netProfit,
-      operatingCashFlow: a.operatingCashFlow + r.operatingCashFlow,
-      investingCashFlow: a.investingCashFlow + r.investingCashFlow,
-      financingCashFlow: a.financingCashFlow + r.financingCashFlow,
-    }),
-    { revenue: 0, cogs: 0, grossProfit: 0, opex: 0, depreciation: 0, ebitda: 0, netProfit: 0, operatingCashFlow: 0, investingCashFlow: 0, financingCashFlow: 0 },
-  );
+  return rows.reduce((a, r) => ({
+    revenue: a.revenue + r.revenue,
+    cogs: a.cogs + r.cogs,
+    grossProfit: a.grossProfit + r.grossProfit,
+    opex: a.opex + r.opex,
+    depreciation: a.depreciation + r.depreciation,
+    ebitda: a.ebitda + r.ebitda,
+    netProfit: a.netProfit + r.netProfit,
+    operatingCashFlow: a.operatingCashFlow + r.operatingCashFlow,
+    investingCashFlow: a.investingCashFlow + r.investingCashFlow,
+    financingCashFlow: a.financingCashFlow + r.financingCashFlow,
+  }), { revenue:0, cogs:0, grossProfit:0, opex:0, depreciation:0, ebitda:0, netProfit:0, operatingCashFlow:0, investingCashFlow:0, financingCashFlow:0 });
 }
 
 export function maxBalanceSheetError(rows: AccountingRow[]) {
