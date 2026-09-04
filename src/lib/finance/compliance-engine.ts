@@ -1,42 +1,7 @@
 import type { AccountingRow } from "@/lib/finance/accounting";
 import type { PeopleOpexAssumptions } from "@/lib/finance/people-opex-engine";
-
-export type ComplianceAssumptions={
-  gstRegistered:boolean;
-  gstRatePct:number;
-  salaryTdsRatePct:number;
-  professionalTdsRatePct:number;
-  contractorTdsRatePct:number;
-  rentTdsRatePct:number;
-  pfEmployeeRatePct:number;
-  pfEmployerRatePct:number;
-  esiEmployeeRatePct:number;
-  esiEmployerRatePct:number;
-  advanceTaxRatePct:number;
-  annualReturnMonth:number;
-};
+export type ComplianceAssumptions={gstRegistered:boolean;gstRatePct:number;salaryTdsRatePct:number;professionalTdsRatePct:number;contractorTdsRatePct:number;rentTdsRatePct:number;pfEmployeeRatePct:number;pfEmployerRatePct:number;esiEmployeeRatePct:number;esiEmployerRatePct:number;advanceTaxRatePct:number;annualReturnMonth:number};
 export const DEFAULT_COMPLIANCE_ASSUMPTIONS:ComplianceAssumptions={gstRegistered:true,gstRatePct:18,salaryTdsRatePct:0,professionalTdsRatePct:10,contractorTdsRatePct:1,rentTdsRatePct:10,pfEmployeeRatePct:12,pfEmployerRatePct:12,esiEmployeeRatePct:0.75,esiEmployerRatePct:3.25,advanceTaxRatePct:0,annualReturnMonth:12};
 export type ComplianceMonth={m:number;gstOutput:number;gstInput:number;gstNet:number;salaryTds:number;otherTds:number;pfEmployee:number;pfEmployer:number;esiEmployee:number;esiEmployer:number;advanceTax:number;totalWithholding:number;statutoryCost:number;complianceFlag:string};
-export function buildComplianceMonths(accounting:AccountingRow[],people:PeopleOpexAssumptions, a:ComplianceAssumptions=DEFAULT_COMPLIANCE_ASSUMPTIONS):ComplianceMonth[]{
-  return accounting.map((r,i)=>{
-    const salaryBase=Math.max(0,people.people?.reduce((s,p)=>{const active=r.m>=p.startMonth?1:0;return s+active*p.headcount*p.monthlyCostLakh},0)??0);
-    const salaryTds=salaryBase*a.salaryTdsRatePct/100;
-    const professionalTds=0;
-    const contractorTds=Math.max(0,r.purchases)*a.contractorTdsRatePct/100;
-    const rentTds=0;
-    const otherTds=professionalTds+contractorTds+rentTds;
-    const pfEmployee=salaryBase*a.pfEmployeeRatePct/100;
-    const pfEmployer=salaryBase*a.pfEmployerRatePct/100;
-    const esiEmployee=salaryBase*a.esiEmployeeRatePct/100;
-    const esiEmployer=salaryBase*a.esiEmployerRatePct/100;
-    const advanceTax=Math.max(0,r.ebit)*a.advanceTaxRatePct/100;
-    const gstOutput=a.gstRegistered?r.gstOutput:0;
-    const gstInput=a.gstRegistered?r.gstInput:0;
-    const gstNet=Math.max(0,gstOutput-gstInput);
-    const totalWithholding=salaryTds+otherTds+pfEmployee+esiEmployee;
-    const statutoryCost=pfEmployer+esiEmployer+advanceTax;
-    const complianceFlag=[a.gstRegistered&&gstNet>0?"GST payable":"",salaryTds>0?"Salary TDS":"",otherTds>0?"Other TDS":"",(pfEmployer+esiEmployer)>0?"Payroll statutory":"",advanceTax>0?"Advance tax":""].filter(Boolean).join(" · ")||"No configured liability";
-    return {m:r.m,gstOutput,gstInput,gstNet,salaryTds,otherTds,pfEmployee,pfEmployer,esiEmployee,esiEmployer,advanceTax,totalWithholding,statutoryCost,complianceFlag};
-  });
-}
-export function complianceTotals(rows:ComplianceMonth[]){return rows.reduce((a,r)=>({...a,gstNet:a.gstNet+r.gstNet,salaryTds:a.salaryTds+r.salaryTds,otherTds:a.otherTds+r.otherTds,pfEmployee:a.pfEmployee+r.pfEmployee,pfEmployer:a.pfEmployer+r.pfEmployer,esiEmployee:a.esiEmployee+r.esiEmployee,esiEmployer:a.esiEmployer+r.esiEmployer,advanceTax:a.advanceTax+r.advanceTax,totalWithholding:a.totalWithholding+r.totalWithholding,statutoryCost:a.statutoryCost+r.statutoryCost}),{gstNet:0,salaryTds:0,otherTds:0,pfEmployee:0,pfEmployer:0,esiEmployee:0,esiEmployer:0,advanceTax:0,totalWithholding:0,statutoryCost:0});}
+export function buildComplianceMonths(accounting:AccountingRow[],people:PeopleOpexAssumptions,a:ComplianceAssumptions=DEFAULT_COMPLIANCE_ASSUMPTIONS):ComplianceMonth[]{return accounting.map(r=>{const salaryBase=Math.max(0,people.people.reduce((s,p)=>s+(r.m>=p.startMonth?p.headcount*p.monthlyCostLakh:0),0));const professionalBase=people.companyOpex.filter(c=>/professional|ca|legal/i.test(c.category)&&r.m>=c.startMonth).reduce((s,c)=>s+c.monthlyCostLakh*Math.pow(1+c.annualEscalationPct/100,Math.floor((r.m-c.startMonth)/12)),0);const rentBase=people.companyOpex.filter(c=>/rent|facility/i.test(c.category)&&r.m>=c.startMonth).reduce((s,c)=>s+c.monthlyCostLakh*Math.pow(1+c.annualEscalationPct/100,Math.floor((r.m-c.startMonth)/12)),0);const salaryTds=salaryBase*a.salaryTdsRatePct/100;const professionalTds=professionalBase*a.professionalTdsRatePct/100;const contractorTds=Math.max(0,r.purchases)*a.contractorTdsRatePct/100;const rentTds=rentBase*a.rentTdsRatePct/100;const otherTds=professionalTds+contractorTds+rentTds;const pfEmployee=salaryBase*a.pfEmployeeRatePct/100;const pfEmployer=salaryBase*a.pfEmployerRatePct/100;const esiEmployee=salaryBase*a.esiEmployeeRatePct/100;const esiEmployer=salaryBase*a.esiEmployerRatePct/100;const advanceTax=Math.max(0,r.ebit)*a.advanceTaxRatePct/100;const gstOutput=a.gstRegistered?r.gstOutput:0;const gstInput=a.gstRegistered?r.gstInput:0;const gstNet=Math.max(0,gstOutput-gstInput);const totalWithholding=salaryTds+otherTds+pfEmployee+esiEmployee;const statutoryCost=pfEmployer+esiEmployer+advanceTax;const complianceFlag=[a.gstRegistered&&gstNet>0?"GST payable":"",salaryTds>0?"Salary TDS":"",otherTds>0?"Other TDS":"",pfEmployer+esiEmployer>0?"Payroll statutory":"",advanceTax>0?"Advance tax":""].filter(Boolean).join(" · ")||"No configured liability";return{m:r.m,gstOutput,gstInput,gstNet,salaryTds,otherTds,pfEmployee,pfEmployer,esiEmployee,esiEmployer,advanceTax,totalWithholding,statutoryCost,complianceFlag}})}
+export function complianceTotals(rows:ComplianceMonth[]){return rows.reduce((a,r)=>({...a,gstNet:a.gstNet+r.gstNet,salaryTds:a.salaryTds+r.salaryTds,otherTds:a.otherTds+r.otherTds,pfEmployee:a.pfEmployee+r.pfEmployee,pfEmployer:a.pfEmployer+r.pfEmployer,esiEmployee:a.esiEmployee+r.esiEmployee,esiEmployer:a.esiEmployer+r.esiEmployer,advanceTax:a.advanceTax+r.advanceTax,totalWithholding:a.totalWithholding+r.totalWithholding,statutoryCost:a.statutoryCost+r.statutoryCost}),{gstNet:0,salaryTds:0,otherTds:0,pfEmployee:0,pfEmployer:0,esiEmployee:0,esiEmployer:0,advanceTax:0,totalWithholding:0,statutoryCost:0})}
