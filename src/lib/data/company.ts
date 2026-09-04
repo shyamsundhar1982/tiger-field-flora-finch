@@ -1,6 +1,6 @@
 export const COMPANY = {
   legal: "Vayu Shastr Pvt. Ltd.",
-  brand: "VYNDI BIKES",
+  brand: "Vyndi",
   tagline: "Wind, rendered in carbon.",
   city: "Coimbatore, Tamil Nadu",
   founder: "S. Shyam Sundhar",
