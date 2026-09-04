@@ -1,23 +1,8 @@
 import type { AccountingRow } from "@/lib/finance/accounting";
-import type { PeopleOpexMonth } from "@/lib/finance/people-opex-engine";
 
 export type BoardStatus = "ahead" | "on-track" | "watch" | "critical";
-
-export type BoardKpi = {
-  label: string;
-  value: number;
-  plan: number;
-  variancePct: number;
-  status: BoardStatus;
-};
-
-export type BoardRisk = {
-  id: string;
-  title: string;
-  impact: string;
-  owner: string;
-  status: "open" | "mitigating" | "closed";
-};
+export type BoardKpi = { label: string; value: number; plan: number; variancePct: number; status: BoardStatus };
+export type BoardRisk = { id: string; title: string; impact: string; owner: string; status: "open" | "mitigating" | "closed" };
 
 export const DEFAULT_BOARD_RISKS: BoardRisk[] = [
   { id: "R1", title: "Cash runway / funding timing", impact: "Liquidity", owner: "Founder", status: "mitigating" },
@@ -35,7 +20,7 @@ const status = (variancePct: number, favorable: "higher" | "lower" = "higher"): 
   return "critical";
 };
 
-export function buildBoardKpis(accounting: AccountingRow[], planAccounting: AccountingRow[], people: PeopleOpexMonth[]): BoardKpi[] {
+export function buildBoardKpis(accounting: AccountingRow[], planAccounting: AccountingRow[], headcount: number, planHeadcount: number): BoardKpi[] {
   const current = accounting.at(-1)!;
   const plan = planAccounting.at(-1)!;
   const revenueVariance = pct(current.revenue, plan.revenue);
@@ -44,14 +29,13 @@ export function buildBoardKpis(accounting: AccountingRow[], planAccounting: Acco
   const cashVariance = pct(current.closingCash, plan.closingCash);
   const burn = Math.max(0, current.opex - current.grossProfit);
   const planBurn = Math.max(0, plan.opex - plan.grossProfit);
-  const headcount = people.at(-1)?.headcount ?? 0;
-  const planHeadcount = people.at(-1)?.headcount ?? 0;
+  const hcVariance = pct(headcount, planHeadcount);
   return [
     { label: "M36 revenue", value: current.revenue, plan: plan.revenue, variancePct: revenueVariance, status: status(revenueVariance) },
     { label: "Gross margin %", value: grossMargin, plan: planGrossMargin, variancePct: grossMargin - planGrossMargin, status: status(grossMargin - planGrossMargin) },
     { label: "Closing cash", value: current.closingCash, plan: plan.closingCash, variancePct: cashVariance, status: status(cashVariance) },
     { label: "Net operating burn", value: burn, plan: planBurn, variancePct: pct(burn, planBurn), status: status(pct(burn, planBurn), "lower") },
-    { label: "Headcount", value: headcount, plan: planHeadcount, variancePct: pct(headcount, planHeadcount), status: status(pct(headcount, planHeadcount), "lower") },
+    { label: "Headcount", value: headcount, plan: planHeadcount, variancePct: hcVariance, status: status(hcVariance, "lower") },
   ];
 }
 
