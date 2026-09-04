@@ -1,9 +1,9 @@
-import { Link, Outlet, useLocation } from "@tanstack/react-router";
-import { Activity, AlertTriangle, Bike, BookOpen, BrainCircuit, CheckSquare, ChevronDown, ClipboardCheck, Factory, Landmark, Presentation, Rocket, Scale, UserRound, Wallet, Wrench, FileSpreadsheet, BadgeCheck, Ruler, LineChart, Boxes, Layers3, SlidersHorizontal, GitCompare, Cog, Shield } from "lucide-react";
+import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
+import { Activity, AlertTriangle, Bike, BookOpen, BrainCircuit, CheckSquare, ChevronDown, ClipboardCheck, Factory, Landmark, Presentation, Rocket, Scale, UserRound, Wallet, Wrench, FileSpreadsheet, BadgeCheck, Ruler, LineChart, Boxes, Layers3, SlidersHorizontal, GitCompare, Cog, Shield, LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { cn } from "@/lib/utils";
-import { getCommandRole } from "@/lib/command-access";
+import { getCommandRole, lockCommand } from "@/lib/command-access";
 
 type NavItem = {
   to: "/command" | "/command/financial-cockpit" | "/command/finance-assumptions" | "/command/scenarios" | "/command/finance" | "/command/product" | "/command/ops" | "/command/legal" | "/command/legal-control" | "/command/gtm" | "/command/risk" | "/command/actions" | "/command/knowledge" | "/command/technical" | "/command/finance-control" | "/command/funding" | "/command/manufacturing" | "/command/production" | "/command/sales" | "/command/cash" | "/command/founder-command" | "/command/investor-board" | "/command/ai-knowledge" | "/command/qa-verification" | "/command/deployment-readiness" | "/command/balance-sheet" | "/command/ca-audit" | "/command/investor-pitch" | "/command/market-survey" | "/command/design-philosophy" | "/command/aluminium-finance" | "/command/master-finance" | "/command/inventory" | "/inventory";
@@ -79,13 +79,27 @@ function Group({ group }: { group: NavGroup }) {
 }
 
 export function CommandShell() {
+  const navigate = useNavigate();
   const [role, setRole] = useState<"admin" | "viewer" | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
   useEffect(() => { getCommandRole().then(setRole).catch(() => setRole(null)); }, []);
   const viewer = role === "viewer";
 
+  async function logout() {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await lockCommand();
+      setRole(null);
+      await navigate({ to: "/command-login" });
+    } finally {
+      setLoggingOut(false);
+    }
+  }
+
   return <div className="min-h-dvh bg-bg"><SiteHeader /><div className="mx-auto flex max-w-7xl">
-    <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-56 shrink-0 flex-col border-r border-border py-6 lg:flex"><p className="px-5 pb-3 text-[10px] uppercase tracking-[0.2em] text-subtle">Command</p><nav className="min-h-0 flex-1 space-y-2 overflow-y-auto px-2 pb-4 pr-1 [scrollbar-width:thin]">{GROUPS.map((group) => <Group key={group.label} group={group} />)}</nav></aside>
-    <div className="min-w-0 flex-1"><div className="flex gap-1 overflow-x-auto border-b border-border px-3 py-2 lg:hidden [scrollbar-width:thin]">{GROUPS.flatMap((group) => group.items).map((item) => <Link key={item.to} to={item.to} activeOptions={item.exact ? { exact: true } : undefined} className={cn("shrink-0 rounded-md px-3 py-2 text-xs text-muted")} activeProps={{ className: "bg-surface text-fg" }}>{item.label}</Link>)}</div>
+    <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-56 shrink-0 flex-col border-r border-border py-6 lg:flex"><p className="px-5 pb-3 text-[10px] uppercase tracking-[0.2em] text-subtle">Command</p><nav className="min-h-0 flex-1 space-y-2 overflow-y-auto px-2 pb-4 pr-1 [scrollbar-width:thin]">{GROUPS.map((group) => <Group key={group.label} group={group} />)}</nav><div className="px-3 pt-3"><button type="button" onClick={logout} disabled={loggingOut} className="flex w-full items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted hover:bg-surface hover:text-fg disabled:opacity-50"><LogOut className="size-4" />{loggingOut ? "Logging out…" : `Log out${viewer ? " · User" : role === "admin" ? " · Admin" : ""}`}</button></div></aside>
+    <div className="min-w-0 flex-1"><div className="flex gap-1 overflow-x-auto border-b border-border px-3 py-2 lg:hidden [scrollbar-width:thin]">{GROUPS.flatMap((group) => group.items).map((item) => <Link key={item.to} to={item.to} activeOptions={item.exact ? { exact: true } : undefined} className={cn("shrink-0 rounded-md px-3 py-2 text-xs text-muted")} activeProps={{ className: "bg-surface text-fg" }}>{item.label}</Link>)}<button type="button" onClick={logout} disabled={loggingOut} className="shrink-0 rounded-md border border-border px-3 py-2 text-xs text-muted disabled:opacity-50">{loggingOut ? "Logging out…" : "Log out"}</button></div>
       <div className="px-4 py-6 sm:px-6 lg:px-8"><div className={cn(viewer && "pointer-events-none select-none opacity-95")}><fieldset disabled={viewer} className="min-w-0 border-0 p-0 m-0"><Outlet /></fieldset></div></div>
     </div>
   </div></div>;
