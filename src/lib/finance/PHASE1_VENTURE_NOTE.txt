@@ -1,0 +1,7 @@
+Phase 1: Financial Architecture + Integrity
+- Vyndi · Carbon Venture and Aluminium Bicycle Venture are independent financial ledgers.
+- Parent shared costs remain in a parent ledger and are not silently blended into either venture.
+- Consolidated reporting reconciles Carbon + Aluminium + Parent.
+- Aluminium volume multiplier is treated as additional Aluminium venture capacity, not a redistribution of Carbon demand.
+- Dedicated Aluminium opening cash, launch capex, inventory and funding remain venture-owned.
+- Existing management accounting remains planning-grade and requires CA/source-record reconciliation for statutory use.
