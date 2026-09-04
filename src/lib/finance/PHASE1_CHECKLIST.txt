@@ -1,0 +1,13 @@
+Phase 1 finance completion criteria
+- Single source of truth for operating and accounting assumptions
+- 36-month Plan / Forecast / Actual management view
+- Timed AR/AP cash conversion
+- Inventory, purchases, COGS and cash linkage
+- P&L, Balance Sheet and Operating / Investing / Financing cash flow
+- Funding classification support: equity / debt / grant
+- GST and tax planning controls with CA-reconciliation warnings
+- Automated balance-sheet and cash-flow integrity checks
+- Scenario planning and cash-floor / runway controls
+- Admin edit / viewer read-only command controls
+
+Phase 2 intentionally remains outside this release: statutory ledger, invoice-level GST/tax, bank reconciliation, payroll/TDS, full loan amortisation and multi-user cloud actuals.
