@@ -1,4 +1,4 @@
-import type { ModelRow } from "@/lib/finance/model";
+import type { MonthRow } from "@/lib/finance/model";
 
 /** Accrual accounting layer over the founder planning model. Values are ₹ lakh. */
 export type AccountingAssumptions = {
@@ -42,7 +42,7 @@ export type AccountingRow = {
   totalAssets: number; totalLiabilitiesEquity: number; balanceCheck: number;
 };
 
-function purchasesFor(rows: ModelRow[], index: number) {
+function purchasesFor(rows: MonthRow[], index: number) {
   const row = rows[index];
   const openingInventory = index === 0 ? 0 : rows[index - 1].inventory;
   return Math.max(0, row.cogs + row.inventory - openingInventory);
@@ -54,7 +54,7 @@ function lagged<T>(values: T[], index: number, months: number, fallback: T) {
 }
 
 export function buildAccountingModel(
-  planningRows: ModelRow[],
+  planningRows: MonthRow[],
   assumptions: AccountingAssumptions = DEFAULT_ACCOUNTING_ASSUMPTIONS,
 ): AccountingRow[] {
   const out: AccountingRow[] = [];
@@ -75,31 +75,32 @@ export function buildAccountingModel(
   const purchases = planningRows.map((_, index) => purchasesFor(planningRows, index));
   const depreciationRate = assumptions.depreciationMonths > 0 ? 1 / assumptions.depreciationMonths : 0;
   const gstRate = Math.max(0, assumptions.gstRatePct) / 100;
+  const grossSalesValues = planningRows.map((r) => r.revenue * (1 + gstRate));
+  const grossPurchaseValues = purchases.map((p) => p * (1 + gstRate));
+  const gstNetMovements: number[] = [];
 
   for (let index = 0; index < planningRows.length; index++) {
     const row = planningRows[index];
 
-    // Revenue is accrued in the sale month; customer cash follows the collection assumption.
-    const grossSales = row.revenue * (1 + gstRate);
+    const grossSales = grossSalesValues[index];
     const collections = lagged(
-      planningRows.map((r) => r.revenue * (1 + gstRate)),
+      grossSalesValues,
       index,
       assumptions.collectionMonths,
       index === 0 ? assumptions.openingReceivablesLakh : 0,
     );
     receivables = Math.max(0, receivables + grossSales - collections);
 
-    // Purchases are the amount required to explain COGS and the movement in inventory.
-    const grossPurchaseValues = purchases.map((p) => p * (1 + gstRate));
+    const grossPurchases = grossPurchaseValues[index];
     const supplierPayments = lagged(
       grossPurchaseValues,
       index,
       assumptions.supplierCreditMonths,
       index === 0 ? assumptions.openingPayablesLakh : 0,
     );
-    payables = Math.max(0, payables + grossPurchaseValues[index] - supplierPayments);
+    payables = Math.max(0, payables + grossPurchases - supplierPayments);
 
-    // Depreciation is cohort based: each month's capex depreciates only from that month onward.
+    // Each capex month is a separate depreciation cohort; opening assets start depreciating in M1.
     fixedAssetsGross += row.capex;
     const openingAssetDep = assumptions.openingFixedAssetsLakh * depreciationRate;
     const currentCohortDep = planningRows.slice(0, index + 1).reduce((sum, r) => sum + r.capex * depreciationRate, 0);
@@ -115,14 +116,14 @@ export function buildAccountingModel(
     cumulativeTaxExpense += tax;
     const netProfit = ebit - tax;
 
-    // GST is a balance-sheet tax flow, not P&L revenue/expense. Input GST is modelled on
-    // inventory purchases and capex; settlement follows the configured filing/payment lag.
+    // GST is a balance-sheet tax flow, not P&L revenue/expense. This management layer
+    // models output tax on sales and eligible input tax on inventory purchases + capex.
     const gstOutput = row.revenue * gstRate;
     const gstInput = (purchases[index] + row.capex) * gstRate;
-    const gstBeforeSettlement = gstNetPayable + gstOutput - gstInput;
-    const historicalGst = out.map((r) => Math.max(0, r.gstOutput - r.gstInput));
-    const gstSettlement = Math.max(0, lagged(historicalGst, index, assumptions.gstSettlementMonths, 0));
-    gstNetPayable = gstBeforeSettlement - gstSettlement;
+    const gstMovement = gstOutput - gstInput;
+    gstNetMovements.push(gstMovement);
+    const gstSettlement = Math.max(0, lagged(gstNetMovements, index, assumptions.gstSettlementMonths, 0));
+    gstNetPayable = gstNetPayable + gstMovement - gstSettlement;
 
     const openingCash = cash;
     const operatingCashFlow = collections - supplierPayments - row.opex - tax - gstSettlement;
@@ -134,7 +135,6 @@ export function buildAccountingModel(
     equity += row.funding;
     retainedEarnings += netProfit;
 
-    // A negative GST balance is an input-credit receivable; a positive balance is a tax payable.
     const gstAsset = Math.max(0, -gstNetPayable);
     const gstLiability = Math.max(0, gstNetPayable);
     const totalAssets = cash + receivables + row.inventory + fixedAssetsNet + gstAsset;
