@@ -1,9 +1,12 @@
 import type { MonthRow } from "@/lib/finance/model";
 
-/** Accrual accounting layer over the founder planning model. Values are ₹ lakh. */
+/** Downstream accrual/accounting layer over the founder planning model. Values are ₹ lakh. */
+export type FundingType = "equity" | "debt" | "grant";
 export type AccountingAssumptions = {
   collectionMonths: number;
   supplierCreditMonths: number;
+  collectionDays?: number;
+  supplierPaymentDays?: number;
   depreciationMonths: number;
   openingReceivablesLakh: number;
   openingPayablesLakh: number;
@@ -14,165 +17,14 @@ export type AccountingAssumptions = {
   taxRatePct: number;
   gstRatePct: number;
   gstSettlementMonths: number;
+  fundingTypeByMonth?: Record<number, FundingType>;
 };
-
-export const DEFAULT_ACCOUNTING_ASSUMPTIONS: AccountingAssumptions = {
-  collectionMonths: 1,
-  supplierCreditMonths: 1,
-  depreciationMonths: 60,
-  openingReceivablesLakh: 0,
-  openingPayablesLakh: 0,
-  openingFixedAssetsLakh: 0,
-  openingEquityLakh: 3,
-  openingDebtLakh: 0,
-  openingRetainedEarningsLakh: 0,
-  taxRatePct: 0,
-  gstRatePct: 0,
-  gstSettlementMonths: 1,
-};
-
-export type AccountingRow = {
-  m: number; revenue: number; cogs: number; grossProfit: number; opex: number;
-  purchases: number; depreciation: number; ebitda: number; ebit: number; tax: number; netProfit: number;
-  salesCollections: number; supplierPayments: number; operatingCashFlow: number;
-  capex: number; investingCashFlow: number; funding: number; financingCashFlow: number;
-  openingCash: number; closingCash: number; receivables: number; inventory: number;
-  fixedAssetsNet: number; payables: number; debt: number; equity: number;
-  retainedEarnings: number; gstOutput: number; gstInput: number; gstSettlement: number; gstNetPayable: number;
-  totalAssets: number; totalLiabilitiesEquity: number; balanceCheck: number;
-};
-
-function purchasesFor(rows: MonthRow[], index: number) {
-  const row = rows[index];
-  const openingInventory = index === 0 ? 0 : rows[index - 1].inventory;
-  return Math.max(0, row.cogs + row.inventory - openingInventory);
-}
-
-function lagged<T>(values: T[], index: number, months: number, fallback: T) {
-  const source = index - Math.max(0, Math.floor(months));
-  return source >= 0 ? values[source] : fallback;
-}
-
-export function buildAccountingModel(
-  planningRows: MonthRow[],
-  assumptions: AccountingAssumptions = DEFAULT_ACCOUNTING_ASSUMPTIONS,
-): AccountingRow[] {
-  const out: AccountingRow[] = [];
-  if (!planningRows.length) return out;
-
-  let cash = planningRows[0].opening;
-  let receivables = assumptions.openingReceivablesLakh;
-  let payables = assumptions.openingPayablesLakh;
-  let fixedAssetsGross = assumptions.openingFixedAssetsLakh;
-  let accumulatedDepreciation = 0;
-  let debt = assumptions.openingDebtLakh;
-  let equity = assumptions.openingEquityLakh;
-  let retainedEarnings = assumptions.openingRetainedEarningsLakh;
-  let gstNetPayable = 0;
-  let cumulativeTaxableProfit = 0;
-  let cumulativeTaxExpense = 0;
-
-  const purchases = planningRows.map((_, index) => purchasesFor(planningRows, index));
-  const depreciationRate = assumptions.depreciationMonths > 0 ? 1 / assumptions.depreciationMonths : 0;
-  const gstRate = Math.max(0, assumptions.gstRatePct) / 100;
-  const grossSalesValues = planningRows.map((r) => r.revenue * (1 + gstRate));
-  const grossPurchaseValues = purchases.map((p) => p * (1 + gstRate));
-  const gstNetMovements: number[] = [];
-
-  for (let index = 0; index < planningRows.length; index++) {
-    const row = planningRows[index];
-
-    const grossSales = grossSalesValues[index];
-    const collections = lagged(
-      grossSalesValues,
-      index,
-      assumptions.collectionMonths,
-      index === 0 ? assumptions.openingReceivablesLakh : 0,
-    );
-    receivables = Math.max(0, receivables + grossSales - collections);
-
-    const grossPurchases = grossPurchaseValues[index];
-    const supplierPayments = lagged(
-      grossPurchaseValues,
-      index,
-      assumptions.supplierCreditMonths,
-      index === 0 ? assumptions.openingPayablesLakh : 0,
-    );
-    payables = Math.max(0, payables + grossPurchases - supplierPayments);
-
-    // Each capex month is a separate depreciation cohort; opening assets start depreciating in M1.
-    fixedAssetsGross += row.capex;
-    const openingAssetDep = assumptions.openingFixedAssetsLakh * depreciationRate;
-    const currentCohortDep = planningRows.slice(0, index + 1).reduce((sum, r) => sum + r.capex * depreciationRate, 0);
-    const depreciation = Math.max(0, openingAssetDep + currentCohortDep);
-    accumulatedDepreciation += depreciation;
-    const fixedAssetsNet = Math.max(0, fixedAssetsGross - accumulatedDepreciation);
-
-    const ebitda = row.ebitda;
-    const ebit = ebitda - depreciation;
-    cumulativeTaxableProfit = Math.max(0, cumulativeTaxableProfit + ebit);
-    const cumulativeTaxLiability = cumulativeTaxableProfit * Math.max(0, assumptions.taxRatePct) / 100;
-    const tax = Math.max(0, cumulativeTaxLiability - cumulativeTaxExpense);
-    cumulativeTaxExpense += tax;
-    const netProfit = ebit - tax;
-
-    // GST is a balance-sheet tax flow, not P&L revenue/expense. This management layer
-    // models output tax on sales and eligible input tax on inventory purchases + capex.
-    const gstOutput = row.revenue * gstRate;
-    const gstInput = (purchases[index] + row.capex) * gstRate;
-    const gstMovement = gstOutput - gstInput;
-    gstNetMovements.push(gstMovement);
-    const gstSettlement = Math.max(0, lagged(gstNetMovements, index, assumptions.gstSettlementMonths, 0));
-    gstNetPayable = gstNetPayable + gstMovement - gstSettlement;
-
-    const openingCash = cash;
-    const operatingCashFlow = collections - supplierPayments - row.opex - tax - gstSettlement;
-    const investingCashFlow = -row.capex;
-    const financingCashFlow = row.funding;
-    cash = openingCash + operatingCashFlow + investingCashFlow + financingCashFlow;
-
-    // Default management treatment: funding is equity until source documents say otherwise.
-    equity += row.funding;
-    retainedEarnings += netProfit;
-
-    const gstAsset = Math.max(0, -gstNetPayable);
-    const gstLiability = Math.max(0, gstNetPayable);
-    const totalAssets = cash + receivables + row.inventory + fixedAssetsNet + gstAsset;
-    const totalLiabilitiesEquity = payables + debt + gstLiability + equity + retainedEarnings;
-
-    out.push({
-      m: row.m, revenue: row.revenue, cogs: row.cogs, grossProfit: row.gp, opex: row.opex,
-      purchases: purchases[index], depreciation, ebitda, ebit, tax, netProfit,
-      salesCollections: collections, supplierPayments, operatingCashFlow,
-      capex: row.capex, investingCashFlow, funding: row.funding, financingCashFlow,
-      openingCash, closingCash: cash, receivables, inventory: row.inventory,
-      fixedAssetsNet, payables, debt, equity, retainedEarnings,
-      gstOutput, gstInput, gstSettlement, gstNetPayable,
-      totalAssets, totalLiabilitiesEquity, balanceCheck: totalAssets - totalLiabilitiesEquity,
-    });
-  }
-  return out;
-}
-
-export function accountingTotals(rows: AccountingRow[]) {
-  return rows.reduce((a, r) => ({
-    revenue: a.revenue + r.revenue,
-    cogs: a.cogs + r.cogs,
-    grossProfit: a.grossProfit + r.grossProfit,
-    opex: a.opex + r.opex,
-    purchases: a.purchases + r.purchases,
-    depreciation: a.depreciation + r.depreciation,
-    ebitda: a.ebitda + r.ebitda,
-    netProfit: a.netProfit + r.netProfit,
-    operatingCashFlow: a.operatingCashFlow + r.operatingCashFlow,
-    investingCashFlow: a.investingCashFlow + r.investingCashFlow,
-    financingCashFlow: a.financingCashFlow + r.financingCashFlow,
-    gstOutput: a.gstOutput + r.gstOutput,
-    gstInput: a.gstInput + r.gstInput,
-    gstSettlement: a.gstSettlement + r.gstSettlement,
-  }), { revenue:0, cogs:0, grossProfit:0, opex:0, purchases:0, depreciation:0, ebitda:0, netProfit:0, operatingCashFlow:0, investingCashFlow:0, financingCashFlow:0, gstOutput:0, gstInput:0, gstSettlement:0 });
-}
-
-export function maxBalanceSheetError(rows: AccountingRow[]) {
-  return rows.reduce((max, row) => Math.max(max, Math.abs(row.balanceCheck)), 0);
-}
+export const DEFAULT_ACCOUNTING_ASSUMPTIONS: AccountingAssumptions={collectionMonths:1,supplierCreditMonths:1,collectionDays:30,supplierPaymentDays:30,depreciationMonths:60,openingReceivablesLakh:0,openingPayablesLakh:0,openingFixedAssetsLakh:0,openingEquityLakh:3,openingDebtLakh:0,openingRetainedEarningsLakh:0,taxRatePct:0,gstRatePct:0,gstSettlementMonths:1,fundingTypeByMonth:{}};
+export type AccountingRow={m:number;revenue:number;cogs:number;grossProfit:number;opex:number;purchases:number;depreciation:number;ebitda:number;ebit:number;tax:number;netProfit:number;salesCollections:number;supplierPayments:number;operatingCashFlow:number;capex:number;investingCashFlow:number;funding:number;equityFunding:number;debtDraw:number;grantFunding:number;financingCashFlow:number;openingCash:number;closingCash:number;receivables:number;inventory:number;fixedAssetsNet:number;payables:number;debt:number;equity:number;retainedEarnings:number;gstOutput:number;gstInput:number;gstSettlement:number;gstNetPayable:number;totalAssets:number;totalLiabilitiesEquity:number;balanceCheck:number};
+function purchasesFor(rows:MonthRow[],index:number){const row=rows[index];const openingInventory=index===0?0:rows[index-1].inventory;return Math.max(0,row.cogs+row.inventory-openingInventory);}
+function laggedByDays(values:number[],index:number,days:number){const d=Math.max(0,days);if(d===0)return values[index]??0;const months=d/30;const whole=Math.floor(months);const fraction=months-whole;const a=index-whole;const b=a-1;const current=a>=0?(values[a]??0):0;const older=b>=0?(values[b]??0):0;return current*(1-fraction)+older*fraction;}
+function fundingType(a:AccountingAssumptions,m:number):FundingType{return a.fundingTypeByMonth?.[m]??"equity";}
+export function buildAccountingModel(planningRows:MonthRow[],a:AccountingAssumptions=DEFAULT_ACCOUNTING_ASSUMPTIONS):AccountingRow[]{const out:AccountingRow[]=[];if(!planningRows.length)return out;let cash=planningRows[0].opening,receivables=a.openingReceivablesLakh,payables=a.openingPayablesLakh,fixedAssetsGross=a.openingFixedAssetsLakh,accumulatedDepreciation=0,debt=a.openingDebtLakh,equity=a.openingEquityLakh,retainedEarnings=a.openingRetainedEarningsLakh,gstNetPayable=0,cumulativeTaxableProfit=0,cumulativeTaxExpense=0;const purchases=planningRows.map((_,i)=>purchasesFor(planningRows,i));const depreciationRate=a.depreciationMonths>0?1/a.depreciationMonths:0;const gstRate=Math.max(0,a.gstRatePct)/100;const grossSales=planningRows.map(r=>r.revenue*(1+gstRate));const grossPurchases=purchases.map(p=>p*(1+gstRate));const gstMovements:number[]=[];const collectionDays=a.collectionDays??Math.max(0,a.collectionMonths*30);const supplierDays=a.supplierPaymentDays??Math.max(0,a.supplierCreditMonths*30);
+for(let i=0;i<planningRows.length;i++){const row=planningRows[i];const collections=laggedByDays(grossSales,i,collectionDays)||(i===0?a.openingReceivablesLakh:0);receivables=Math.max(0,receivables+grossSales[i]-collections);const supplierPayments=laggedByDays(grossPurchases,i,supplierDays)||(i===0?a.openingPayablesLakh:0);payables=Math.max(0,payables+grossPurchases[i]-supplierPayments);fixedAssetsGross+=row.capex;const depreciation=Math.max(0,a.openingFixedAssetsLakh*depreciationRate+planningRows.slice(0,i+1).reduce((s,r)=>s+r.capex*depreciationRate,0));accumulatedDepreciation+=depreciation;const fixedAssetsNet=Math.max(0,fixedAssetsGross-accumulatedDepreciation);const ebitda=row.ebitda,ebit=ebitda-depreciation;cumulativeTaxableProfit=Math.max(0,cumulativeTaxableProfit+ebit);const cumulativeTaxLiability=cumulativeTaxableProfit*Math.max(0,a.taxRatePct)/100;const tax=Math.max(0,cumulativeTaxLiability-cumulativeTaxExpense);cumulativeTaxExpense+=tax;const netProfit=ebit-tax;const gstOutput=row.revenue*gstRate,gstInput=(purchases[i]+row.capex)*gstRate,gstMovement=gstOutput-gstInput;gstMovements.push(gstMovement);const gstSettlement=Math.max(0,i-a.gstSettlementMonths>=0?gstMovements[i-a.gstSettlementMonths]:0);gstNetPayable+=gstMovement-gstSettlement;const type=fundingType(a,row.m),equityFunding=type==="equity"?row.funding:0,debtDraw=type==="debt"?row.funding:0,grantFunding=type==="grant"?row.funding:0;const openingCash=cash,operatingCashFlow=collections-supplierPayments-row.opex-tax-gstSettlement,investingCashFlow=-row.capex,financingCashFlow=row.funding;cash=openingCash+operatingCashFlow+investingCashFlow+financingCashFlow;equity+=equityFunding+grantFunding;debt+=debtDraw;retainedEarnings+=netProfit;const gstAsset=Math.max(0,-gstNetPayable),gstLiability=Math.max(0,gstNetPayable),totalAssets=cash+receivables+row.inventory+fixedAssetsNet+gstAsset,totalLiabilitiesEquity=payables+debt+gstLiability+equity+retainedEarnings;out.push({m:row.m,revenue:row.revenue,cogs:row.cogs,grossProfit:row.gp,opex:row.opex,purchases:purchases[i],depreciation,ebitda,ebit,tax,netProfit,salesCollections:collections,supplierPayments,operatingCashFlow,capex:row.capex,investingCashFlow,funding:row.funding,equityFunding,debtDraw,grantFunding,financingCashFlow,openingCash,closingCash:cash,receivables,inventory:row.inventory,fixedAssetsNet,payables,debt,equity,retainedEarnings,gstOutput,gstInput,gstSettlement,gstNetPayable,totalAssets,totalLiabilitiesEquity,balanceCheck:totalAssets-totalLiabilitiesEquity});}return out;}
+export function accountingTotals(rows:AccountingRow[]){return rows.reduce((a,r)=>({...a,revenue:a.revenue+r.revenue,cogs:a.cogs+r.cogs,grossProfit:a.grossProfit+r.grossProfit,opex:a.opex+r.opex,purchases:a.purchases+r.purchases,depreciation:a.depreciation+r.depreciation,ebitda:a.ebitda+r.ebitda,netProfit:a.netProfit+r.netProfit,operatingCashFlow:a.operatingCashFlow+r.operatingCashFlow,investingCashFlow:a.investingCashFlow+r.investingCashFlow,financingCashFlow:a.financingCashFlow+r.financingCashFlow,equityFunding:a.equityFunding+r.equityFunding,debtDraw:a.debtDraw+r.debtDraw,grantFunding:a.grantFunding+r.grantFunding,gstOutput:a.gstOutput+r.gstOutput,gstInput:a.gstInput+r.gstInput,gstSettlement:a.gstSettlement+r.gstSettlement}),{revenue:0,cogs:0,grossProfit:0,opex:0,purchases:0,depreciation:0,ebitda:0,netProfit:0,operatingCashFlow:0,investingCashFlow:0,financingCashFlow:0,equityFunding:0,debtDraw:0,grantFunding:0,gstOutput:0,gstInput:0,gstSettlement:0});}
+export function maxBalanceSheetError(rows:AccountingRow[]){return rows.reduce((max,row)=>Math.max(max,Math.abs(row.balanceCheck)),0);}
