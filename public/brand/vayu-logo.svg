@@ -1,10 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 120" role="img" aria-labelledby="title desc">
-  <title id="title">Vāyú Shastr</title>
-  <desc id="desc">Vāyú Shastr brand mark with stylised airflow symbol</desc>
-  <g fill="none" stroke="#f97316" stroke-linecap="round">
-    <path d="M24 76 C55 39 89 39 121 61 C145 77 165 76 184 61" stroke-width="9"/>
-    <path d="M40 91 C67 63 94 64 120 80 C141 93 158 93 175 82" stroke-width="6"/>
-  </g>
-  <text x="205" y="67" font-family="Arial, Helvetica, sans-serif" font-size="38" font-weight="700" letter-spacing="3" fill="#f97316">VĀYÚ</text>
-  <text x="207" y="94" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="600" letter-spacing="5" fill="#f97316">SHASTR</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" role="img" aria-labelledby="title desc">
+  <title id="title">Vāyú Shastr Pvt. Ltd.</title>
+  <desc id="desc">Official Vāyú Shastr emblem: dark blue-grey hexagonal mark with a gold inner border and cream and gold Vāyú lettering.</desc>
+  <image href="data:image/png;base64,REPLACEME" x="0" y="0" width="320" height="320" preserveAspectRatio="xMidYMid meet"/>
 </svg>
