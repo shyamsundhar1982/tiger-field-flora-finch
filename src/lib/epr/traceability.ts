@@ -6,6 +6,8 @@ import { getSql } from "@/lib/db";
 const venture = z.enum(["carbon", "aluminium"]);
 const id = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
 
+type Sql = Awaited<ReturnType<typeof getSql>>;
+
 async function admin() {
   const role = await getCommandRole();
   if (!role) throw new Error("Command access is required.");
@@ -13,10 +15,17 @@ async function admin() {
   return role;
 }
 
-async function traveller(sql: Awaited<ReturnType<typeof getSql>>, travellerId: string, v: "carbon" | "aluminium") {
+async function traveller(sql: Sql, travellerId: string, v: "carbon" | "aluminium") {
   const rows = await sql.query<{ id: string; venture: string }>("select id, venture from epr_travellers where id=$1", [travellerId]);
   if (!rows[0]) throw new Error("Traveller not found.");
   if (rows[0].venture !== v) throw new Error("Venture scope mismatch.");
+}
+
+async function audit(sql: Sql, ventureName: "carbon" | "aluminium", entityType: string, entityId: string, action: string, actor: string, payload: Record<string, unknown> = {}) {
+  await sql.query(
+    `insert into epr_audit_events (id, venture, entity_type, entity_id, action, actor, payload_json) values ($1,$2,$3,$4,$5,$6,$7)`,
+    [id("AUD"), ventureName, entityType, entityId, action, actor, JSON.stringify(payload)],
+  );
 }
 
 export const getEprExecutionChain = createServerFn({ method: "GET" }).handler(async () => {
@@ -38,6 +47,7 @@ export const recordMaterialLot = createServerFn({ method: "POST" }).validator(z.
   const actor = await admin(); const sql = await getSql(); await traveller(sql, data.travellerId, data.venture);
   const recordId = id("LOT");
   await sql.query(`insert into epr_material_lots (id,traveller_id,venture,material_code,material_description,lot_number,supplier,certificate_reference,quantity,unit,disposition,recorded_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, [recordId,data.travellerId,data.venture,data.materialCode,data.materialDescription,data.lotNumber,data.supplier,data.certificateReference,data.quantity,data.unit,data.disposition,actor]);
+  await audit(sql, data.venture, "material_lot", recordId, "recorded", actor, data);
   return { ok: true, recordId };
 });
 
@@ -47,6 +57,7 @@ export const recordProcessOperation = createServerFn({ method: "POST" }).validat
   const actor = await admin(); const sql = await getSql(); await traveller(sql, data.travellerId, data.venture);
   const recordId = id("OP");
   await sql.query(`insert into epr_process_operations (id,traveller_id,venture,operation_code,operation_name,workstation,operator_name,status,record_reference,notes,recorded_by,started_at,completed_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,case when $8='in_progress' then now() else null end,case when $8='completed' then now() else null end)`, [recordId,data.travellerId,data.venture,data.operationCode,data.operationName,data.workstation,data.operatorName,data.status,data.recordReference,data.notes,actor]);
+  await audit(sql, data.venture, "process_operation", recordId, "recorded", actor, data);
   return { ok: true, recordId };
 });
 
@@ -56,6 +67,7 @@ export const recordEprInspection = createServerFn({ method: "POST" }).validator(
   const actor = await admin(); const sql = await getSql(); await traveller(sql, data.travellerId, data.venture);
   const recordId = id("INS");
   await sql.query(`insert into epr_inspections (id,traveller_id,venture,inspection_type,characteristic,nominal_value,measured_value,acceptance_criteria,result,evidence_reference,notes,inspected_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, [recordId,data.travellerId,data.venture,data.inspectionType,data.characteristic,data.nominalValue,data.measuredValue,data.acceptanceCriteria,data.result,data.evidenceReference,data.notes,actor]);
+  await audit(sql, data.venture, "inspection", recordId, "recorded", actor, data);
   return { ok: true, recordId };
 });
 
@@ -65,6 +77,7 @@ export const recordNcrCapa = createServerFn({ method: "POST" }).validator(z.obje
   const actor = await admin(); const sql = await getSql(); await traveller(sql, data.travellerId, data.venture);
   const recordId = id(data.recordType.toUpperCase());
   await sql.query(`insert into epr_ncr_capa (id,traveller_id,venture,record_type,severity,title,description,containment,root_cause,corrective_action,owner,status,closure_reference,created_by,closed_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,case when $12='closed' then now() else null end)`, [recordId,data.travellerId,data.venture,data.recordType,data.severity,data.title,data.description,data.containment,data.rootCause,data.correctiveAction,data.owner,data.status,data.closureReference,actor]);
+  await audit(sql, data.venture, "ncr_capa", recordId, "recorded", actor, data);
   return { ok: true, recordId };
 });
 
@@ -74,5 +87,6 @@ export const recordInventoryMovement = createServerFn({ method: "POST" }).valida
   const actor = await admin(); const sql = await getSql(); await traveller(sql, data.travellerId, data.venture);
   const recordId = id("MOV");
   await sql.query(`insert into epr_inventory_movements (id,traveller_id,venture,sku,movement_type,quantity,unit,reference,notes,recorded_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [recordId,data.travellerId,data.venture,data.sku,data.movementType,data.quantity,data.unit,data.reference,data.notes,actor]);
+  await audit(sql, data.venture, "inventory_movement", recordId, "recorded", actor, data);
   return { ok: true, recordId };
 });
