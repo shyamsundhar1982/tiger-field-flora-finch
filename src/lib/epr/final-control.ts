@@ -115,13 +115,14 @@ export const getEprReleaseReadiness = createServerFn({ method: "GET" }).validato
   await admin(); const sql=await getSql();
   const traveller=await sql.query<{id:string;venture:"carbon"|"aluminium";status:string;model_id:string;model_name:string;serial_number:string;bom_revision:string}>(`select id,venture,status,model_id,model_name,serial_number,bom_revision from epr_travellers where id=$1`,[data.travellerId]);
   if(!traveller[0]) throw new Error("Traveller not found.");
-  const [gates,evidence,failedInspections,openNcr,balances,cogs]=await Promise.all([
+  const [gates,evidence,failedInspections,openNcr,balances,cogs,containmentBlocks]=await Promise.all([
     sql.query<{gate_id:string;status:string}>(`select distinct on (gate_id) gate_id,status from epr_gate_events where traveller_id=$1 order by gate_id,created_at desc`,[data.travellerId]),
     sql.query<{gate_id:string;count:number;accepted:number}>(`select gate_id,count(*)::int,count(*) filter(where disposition='accepted')::int as accepted from epr_evidence where traveller_id=$1 group by gate_id`,[data.travellerId]),
     sql.query(`select id,inspection_type,characteristic,result from epr_inspections where traveller_id=$1 and result in ('fail','conditional')`,[data.travellerId]),
     sql.query(`select id,record_type,severity,title,status from epr_ncr_capa where traveller_id=$1 and status not in ('closed','rejected')`,[data.travellerId]),
     sql.query(`select * from epr_authoritative_inventory_balance where venture=$1`,[traveller[0].venture]),
     sql.query(`select coalesce(sum(cogs_inr),0) as total_cogs_inr from epr_cogs_entries where traveller_id=$1`,[data.travellerId]),
+    sql.query(`select containment_case_id,case_type,severity,title,reason,disposition from epr_active_release_blocks where traveller_id=$1`,[data.travellerId]),
   ]);
   const gateMap=new Map(gates.map(g=>[g.gate_id,g.status]));
   const evidenceMap=new Map(evidence.map(e=>[e.gate_id,e]));
@@ -129,7 +130,8 @@ export const getEprReleaseReadiness = createServerFn({ method: "GET" }).validato
   for(const gate of gateIds){ if(gateMap.get(gate)!=="passed") blockers.push(`${gate} is not passed.`); const ev=evidenceMap.get(gate); if(!ev || ev.accepted<1) blockers.push(`${gate} has no accepted evidence.`); }
   if(failedInspections.length) blockers.push(`${failedInspections.length} inspection/test result(s) are fail or conditional.`);
   if(openNcr.length) blockers.push(`${openNcr.length} NCR/CAPA record(s) remain open.`);
-  return {ready:blockers.length===0,blockers,traveller:traveller[0],gates,evidence,failedInspections,openNcr,inventoryBalances:balances,cogsTotalInr:Number(cogs[0]?.total_cogs_inr ?? 0)};
+  if(containmentBlocks.length) blockers.push(`${containmentBlocks.length} active containment/recall block(s) prevent release.`);
+  return {ready:blockers.length===0,blockers,traveller:traveller[0],gates,evidence,failedInspections,openNcr,containmentBlocks,inventoryBalances:balances,cogsTotalInr:Number(cogs[0]?.total_cogs_inr ?? 0)};
 });
 
 export const releaseEprTraveller = createServerFn({ method: "POST" }).validator(z.object({ travellerId:z.string().min(1) })).handler(async ({data})=>{
