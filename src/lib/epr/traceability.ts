@@ -8,6 +8,15 @@ const id = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${crypto.ra
 
 type Sql = Awaited<ReturnType<typeof getSql>>;
 
+type TravellerIdentity = {
+  id: string;
+  venture: "carbon" | "aluminium";
+  model_id: "core" | "pro" | "apex";
+  model_name: string;
+  bom_revision: string;
+  serial_number: string;
+};
+
 async function admin() {
   const role = await getCommandRole();
   if (!role) throw new Error("Command access is required.");
@@ -15,10 +24,15 @@ async function admin() {
   return role;
 }
 
-async function traveller(sql: Sql, travellerId: string, v: "carbon" | "aluminium") {
-  const rows = await sql.query<{ id: string; venture: string }>("select id, venture from epr_travellers where id=$1", [travellerId]);
-  if (!rows[0]) throw new Error("Traveller not found.");
-  if (rows[0].venture !== v) throw new Error("Venture scope mismatch.");
+async function traveller(sql: Sql, travellerId: string, v: "carbon" | "aluminium"): Promise<TravellerIdentity> {
+  const rows = await sql.query<TravellerIdentity>(
+    "select id, venture, model_id, model_name, bom_revision, serial_number from epr_travellers where id=$1",
+    [travellerId],
+  );
+  const record = rows[0];
+  if (!record) throw new Error("Traveller not found.");
+  if (record.venture !== v) throw new Error("Venture scope mismatch.");
+  return record;
 }
 
 async function audit(sql: Sql, ventureName: "carbon" | "aluminium", entityType: string, entityId: string, action: string, actor: string, payload: Record<string, unknown> = {}) {
@@ -26,6 +40,34 @@ async function audit(sql: Sql, ventureName: "carbon" | "aluminium", entityType: 
     `insert into epr_audit_events (id, venture, entity_type, entity_id, action, actor, payload_json) values ($1,$2,$3,$4,$5,$6,$7)`,
     [id("AUD"), ventureName, entityType, entityId, action, actor, JSON.stringify(payload)],
   );
+}
+
+async function validateMappedInventorySku(
+  sql: Sql,
+  identity: TravellerIdentity,
+  sku: string,
+  unit: string,
+) {
+  const mappings = await sql.query<{ id: string }>(
+    `select id
+       from epr_bom_inventory_mappings
+      where venture=$1
+        and model_id=$2
+        and bom_revision=$3
+        and sku=$4
+        and unit=$5
+        and status='active'
+        and effective_from <= now()
+        and (effective_to is null or effective_to > now())
+      limit 1`,
+    [identity.venture, identity.model_id, identity.bom_revision, sku, unit],
+  );
+  if (!mappings[0]) {
+    throw new Error(
+      `Inventory SKU ${sku} is not approved for ${identity.model_name} / BOM ${identity.bom_revision} / unit ${unit}. Add an active BOM-SKU mapping before issue or consume.`,
+    );
+  }
+  return mappings[0].id;
 }
 
 export const getEprExecutionChain = createServerFn({ method: "GET" }).handler(async () => {
@@ -84,9 +126,20 @@ export const recordNcrCapa = createServerFn({ method: "POST" }).validator(z.obje
 export const recordInventoryMovement = createServerFn({ method: "POST" }).validator(z.object({
   travellerId: z.string().min(1), venture, sku: z.string().min(1).max(120), movementType: z.enum(["reserve","issue","return","consume","adjust"]), quantity: z.number().positive(), unit: z.string().max(30).default("unit"), reference: z.string().max(300).default(""), notes: z.string().max(2000).default(""),
 })).handler(async ({ data }) => {
-  const actor = await admin(); const sql = await getSql(); await traveller(sql, data.travellerId, data.venture);
+  const actor = await admin();
+  const sql = await getSql();
+  const identity = await traveller(sql, data.travellerId, data.venture);
+
+  let mappingId: string | undefined;
+  if (data.movementType === "issue" || data.movementType === "consume") {
+    mappingId = await validateMappedInventorySku(sql, identity, data.sku, data.unit);
+  }
+
   const recordId = id("MOV");
-  await sql.query(`insert into epr_inventory_movements (id,traveller_id,venture,sku,movement_type,quantity,unit,reference,notes,recorded_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [recordId,data.travellerId,data.venture,data.sku,data.movementType,data.quantity,data.unit,data.reference,data.notes,actor]);
-  await audit(sql, data.venture, "inventory_movement", recordId, "recorded", actor, data);
-  return { ok: true, recordId };
+  const notes = mappingId
+    ? `${data.notes}${data.notes ? " · " : ""}BOM-SKU mapping: ${mappingId}`
+    : data.notes;
+  await sql.query(`insert into epr_inventory_movements (id,traveller_id,venture,sku,movement_type,quantity,unit,reference,notes,recorded_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [recordId,data.travellerId,data.venture,data.sku,data.movementType,data.quantity,data.unit,data.reference,notes,actor]);
+  await audit(sql, data.venture, "inventory_movement", recordId, "recorded", actor, { ...data, mappingId: mappingId ?? null, serialNumber: identity.serial_number, modelId: identity.model_id, bomRevision: identity.bom_revision });
+  return { ok: true, recordId, mappingId: mappingId ?? null };
 });
