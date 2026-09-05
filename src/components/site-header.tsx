@@ -9,13 +9,17 @@ const LINKS = [
   { to: "/command", label: "Command" },
 ] as const;
 
+const VAYU_LOGO = "/brand/vayu-logo.svg?v=3";
+
 export function SiteHeader({ ghost = false }: { ghost?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <header className={cn("sticky top-0 z-40 border-b border-border/80", ghost ? "bg-bg/95" : "bg-bg")}>
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:h-16 sm:px-6">
         <Link to="/" className="flex items-center gap-3" aria-label="VINDY by Vāyú Shastr Pvt Ltd">
-          <img src="/brand/vayu-logo.svg" alt="Vāyú Shastr" className="h-8 w-auto text-accent sm:h-9" />
+          <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-black sm:size-11">
+            <img src={VAYU_LOGO} alt="Vāyú Shastr" className="size-full object-contain" />
+          </span>
           <span className="h-6 w-px bg-border" aria-hidden="true" />
           <span className="text-xl font-bold tracking-tight text-accent sm:text-2xl">VINDY</span>
         </Link>
