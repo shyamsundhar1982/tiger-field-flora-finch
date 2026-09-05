@@ -13,10 +13,11 @@ export function SiteHeader({ ghost = false }: { ghost?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <header className={cn("sticky top-0 z-40 border-b border-border/80", ghost ? "bg-bg/95" : "bg-bg")}>
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:h-16 sm:px-6">
-        <Link to="/" className="flex items-baseline gap-2">
-          <span className="text-xl font-bold tracking-tight text-accent sm:text-2xl">VéLOXIS</span>
-          <span className="hidden text-[10px] font-semibold uppercase tracking-[0.22em] text-green sm:inline">Vāyú Shastr Pvt Ltd</span>
+      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:h-16 sm:px-6">
+        <Link to="/" className="flex items-center gap-3" aria-label="VINDY by Vāyú Shastr Pvt Ltd">
+          <img src="/brand/vayu-logo.svg" alt="Vāyú Shastr" className="h-8 w-auto text-accent sm:h-9" />
+          <span className="h-6 w-px bg-border" aria-hidden="true" />
+          <span className="text-xl font-bold tracking-tight text-accent sm:text-2xl">VINDY</span>
         </Link>
         <nav className="hidden items-center gap-8 md:flex">
           {LINKS.map((l) => (
@@ -43,9 +44,9 @@ export function SiteHeader({ ghost = false }: { ghost?: boolean }) {
 export function SiteFooter() {
   return (
     <footer className="border-t border-border">
-      <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-8 text-sm text-muted sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <p className="font-semibold text-accent">Vāyú Shastr Pvt Ltd · Coimbatore</p>
-        <p>Designed and manufactured in India, for Indians.</p>
+      <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-8 text-sm text-muted sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <p className="font-semibold text-accent">Vāyú Shastr Pvt Ltd · VINDY</p>
+        <p>Designed and developed in India, for Indian riders.</p>
       </div>
     </footer>
   );
