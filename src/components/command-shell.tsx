@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
-import { Activity, AlertTriangle, Bike, BookOpen, BrainCircuit, CheckSquare, ChevronDown, ClipboardCheck, Factory, Landmark, Presentation, Rocket, Scale, UserRound, Wallet, Wrench, FileSpreadsheet, BadgeCheck, Ruler, LineChart, Boxes, Layers3, SlidersHorizontal, GitCompare, Cog, Shield, LogOut, FlaskConical, DraftingCompass, Radar, Workflow, Database } from "lucide-react";
+import { Activity, AlertTriangle, Bike, BookOpen, BrainCircuit, CheckSquare, ChevronDown, ClipboardCheck, Factory, Landmark, Lightbulb, Presentation, Rocket, Scale, UserRound, Wallet, Wrench, FileSpreadsheet, BadgeCheck, Ruler, LineChart, Boxes, Layers3, SlidersHorizontal, GitCompare, Cog, Shield, LogOut, FlaskConical, DraftingCompass, Radar, Workflow, Database } from "lucide-react";
 import { useEffect, useState } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { cn } from "@/lib/utils";
