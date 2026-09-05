@@ -6,7 +6,7 @@ import { TIERS } from "@/lib/data/company";
 import { inr } from "@/lib/format";
 
 export const Route = createFileRoute("/")({ component: Home });
-const VAYU_LOGO = "/brand/vayu-logo.svg?v=3";
+const VAYU_LOGO = "/brand/vayu-official.svg";
 
 function Home() {
   return (
