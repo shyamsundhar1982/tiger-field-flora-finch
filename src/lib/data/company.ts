@@ -1,6 +1,7 @@
 export const COMPANY = {
   legal: "Vāyú Shastr Private Limited",
-  brand: "VéLOXIS",
+  brand: "VINDY",
+  legacyBrand: "VéLOXIS",
   tagline: "Wind, rendered in carbon.",
   city: "Coimbatore, Tamil Nadu",
   founder: "S. Shyam Sundhar",
