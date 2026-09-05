@@ -1,16 +1,33 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import type { CommandRole } from "@/lib/page-access";
 
 const SESSION_NAME = "__Host-vyndi-command";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
 
-type CommandRole = "admin" | "viewer";
 type CommandSession = { role?: CommandRole };
 
 type CommandEnv = {
   COMMAND_PASSWORD?: string;
+  COMMAND_MANAGEMENT_PASSWORD?: string;
+  COMMAND_BOARD_PASSWORD?: string;
+  COMMAND_FINANCE_PASSWORD?: string;
+  COMMAND_OPERATIONS_PASSWORD?: string;
+  COMMAND_ENGINEERING_PASSWORD?: string;
+  COMMAND_QA_PASSWORD?: string;
+  COMMAND_COMPLIANCE_PASSWORD?: string;
   user?: string;
 };
+
+const roleCredentials: Array<{ username: string; role: Exclude<CommandRole, "admin" | "viewer">; envKey: keyof CommandEnv }> = [
+  { username: "management", role: "management", envKey: "COMMAND_MANAGEMENT_PASSWORD" },
+  { username: "board", role: "board", envKey: "COMMAND_BOARD_PASSWORD" },
+  { username: "finance", role: "finance", envKey: "COMMAND_FINANCE_PASSWORD" },
+  { username: "operations", role: "operations", envKey: "COMMAND_OPERATIONS_PASSWORD" },
+  { username: "engineering", role: "engineering", envKey: "COMMAND_ENGINEERING_PASSWORD" },
+  { username: "qa", role: "qa", envKey: "COMMAND_QA_PASSWORD" },
+  { username: "compliance", role: "compliance", envKey: "COMMAND_COMPLIANCE_PASSWORD" },
+];
 
 function getCommandEnv(): CommandEnv {
   return process.env as CommandEnv;
@@ -66,10 +83,9 @@ export const unlockCommand = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    const { COMMAND_PASSWORD: adminPassword, user: viewerPassword } =
-      getCommandEnv();
+    const env = getCommandEnv();
 
-    if (!adminPassword) {
+    if (!env.COMMAND_PASSWORD) {
       return {
         ok: false,
         role: null,
@@ -78,15 +94,16 @@ export const unlockCommand = createServerFn({ method: "POST" })
     }
 
     let role: CommandRole | null = null;
-    if (data.username === "admin" && data.password === adminPassword) {
+
+    if (data.username === "admin" && data.password === env.COMMAND_PASSWORD) {
       role = "admin";
-    }
-    if (
-      data.username === "user" &&
-      viewerPassword &&
-      data.password === viewerPassword
-    ) {
+    } else if (data.username === "user" && env.user && data.password === env.user) {
       role = "viewer";
+    } else {
+      const credential = roleCredentials.find((item) => item.username === data.username);
+      if (credential && env[credential.envKey] && data.password === env[credential.envKey]) {
+        role = credential.role;
+      }
     }
 
     if (!role) {
