@@ -4,17 +4,17 @@ import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import appCss from "../styles.css?url";
 
-const APP_NAME = "VéLOXIS";
+const APP_NAME = "VINDY";
 
 export const Route = createRootRoute({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: APP_NAME },
+      { title: `${APP_NAME} · Vāyú Shastr Pvt Ltd` },
       {
         name: "description",
-        content: "VéLOXIS by Vāyú Shastr — aerospace-grade carbon bicycles, designed in Coimbatore.",
+        content: "VINDY by Vāyú Shastr Pvt Ltd — aerospace-grade carbon bicycles, designed in Coimbatore.",
       },
       { name: "theme-color", content: "#0c0c0e" },
     ],
