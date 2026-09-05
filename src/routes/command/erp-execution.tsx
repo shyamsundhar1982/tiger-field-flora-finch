@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { AuthoritativeErp } from "@/components/authoritative-erp";
+import { Phase6AAuthGate } from "@/components/phase6a-auth-gate";
 
 export const Route = createFileRoute("/command/erp-execution")({ component: ErpExecution });
 
@@ -11,7 +11,7 @@ function ErpExecution() {
           Control Tower →
         </Link>
       </div>
-      <AuthoritativeErp />
+      <Phase6AAuthGate />
     </>
   );
 }

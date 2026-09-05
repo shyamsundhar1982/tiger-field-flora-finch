@@ -47,17 +47,26 @@ const auditId = () => crypto.randomUUID();
 
 export const getPhase6AContext = createServerFn({ method: "GET" }).middleware([authMiddleware]).handler(async ({ context }) => ({ userId: context.userId, role: await currentRole(context.userId) }));
 
-export const listPhase6AOrders = createServerFn({ method: "GET" }).middleware([authMiddleware]).handler(async ({ context }) => {
-  await requirePermission(context.userId, "read");
+export const bootstrapPhase6AFounder = createServerFn({ method: "POST" }).middleware([authMiddleware]).handler(async ({ context }) => {
   const sql = await getSql();
-  const [sales, purchases, production, inventory, decisions] = await Promise.all([
-    sql.query("select * from phase6a_sales_orders order by created_at desc"),
-    sql.query("select * from phase6a_purchase_orders order by created_at desc"),
-    sql.query("select * from phase6a_production_orders order by created_at desc"),
-    sql.query("select * from phase6a_inventory_movements order by created_at desc"),
-    sql.query("select * from phase6a_decisions order by created_at desc"),
-  ]);
-  return { sales, purchases, production, inventory, decisions };
+  const audit = auditId();
+  const rows = await sql.query<{ user_id: string }>(`
+    with lock as (select pg_advisory_xact_lock(hashtext('phase6a:first-founder'))),
+    inserted as (
+      insert into phase6a_user_roles (user_id, role, assigned_by)
+      select $1, 'founder', $1 from lock
+      where not exists (select 1 from phase6a_user_roles)
+      returning user_id
+    ),
+    audited as (
+      insert into phase6a_audit_events (id,actor_user_id,actor_role,entity_type,entity_id,action,after_data)
+      select $2,$1,'founder','user_role',user_id,'bootstrap',to_jsonb(inserted)
+      from inserted
+    )
+    select user_id from inserted
+  `, [context.userId, audit]);
+  if (rows[0]?.user_id) return { role: "founder" as const, bootstrapped: true };
+  return { role: await currentRole(context.userId), bootstrapped: false };
 });
 
 const salesInput = z.object({ ventureId: ventureSchema, customer: z.string().trim().min(1).max(200), product: z.string().trim().min(1).max(200), units: z.number().int().positive(), valueInr: z.number().int().positive(), month: z.number().int().min(1).max(36) });
@@ -112,6 +121,19 @@ export const createProductionOrder = createServerFn({ method: "POST" }).middlewa
   const role = await requirePermission(context.userId, "production:create"); const sql = await getSql(); const id = `MO-${crypto.randomUUID()}`;
   await sql.query("with inserted as (insert into phase6a_production_orders (id,venture_id,sales_order_id,product,units,status,qc_passed,created_by,updated_at) values ($1,$2,$3,$4,$5,'planned',false,$6,now()) returning *) insert into phase6a_audit_events (id,actor_user_id,actor_role,entity_type,entity_id,action,after_data) select $7,$6,$8,'production_order',id,'create',to_jsonb(inserted) from inserted", [id,data.ventureId,data.salesOrderId,data.product,data.units,context.userId,auditId(),role]);
   return { id };
+});
+
+export const listPhase6AOrders = createServerFn({ method: "GET" }).middleware([authMiddleware]).handler(async ({ context }) => {
+  await requirePermission(context.userId, "read");
+  const sql = await getSql();
+  const [sales, purchases, production, inventory, decisions] = await Promise.all([
+    sql.query("select * from phase6a_sales_orders order by created_at desc"),
+    sql.query("select * from phase6a_purchase_orders order by created_at desc"),
+    sql.query("select * from phase6a_production_orders order by created_at desc"),
+    sql.query("select * from phase6a_inventory_movements order by created_at desc"),
+    sql.query("select * from phase6a_decisions order by created_at desc"),
+  ]);
+  return { sales, purchases, production, inventory, decisions };
 });
 
 export const listInventoryPosition = createServerFn({ method: "GET" }).middleware([authMiddleware]).validator((x: unknown) => z.object({ ventureId: ventureSchema.optional() }).parse(x)).handler(async ({ context, data }) => {
