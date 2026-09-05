@@ -7,7 +7,7 @@ export const FIRST_100 = [
 
 export const LAUNCH = [
   { phase: "Pre-launch (M9–M11)", items: ["Waitlist", "Geometry published", "ISO badge (if passed)", "Hero rider films", "PSG-STEP / club rides"] },
-  { phase: "Launch (M12–M13)", items: ["Core + Pro only", "Apex as allocation", "D2C checkout", "Crash-replacement policy live"] },
+  { phase: "Launch (M12–M13)", items: ["Longitude + Latitude only", "Altitude as allocation", "D2C checkout", "Crash-replacement policy live"] },
   { phase: "First 100 (M13–M18)", items: ["Stagger 4–6 months", "Failure log after every 100 km", "Iterate cockpit/fit, not geometry"] },
 ] as const;
 
