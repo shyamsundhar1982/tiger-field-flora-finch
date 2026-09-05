@@ -1,245 +1,26 @@
-export type KnowledgeStatus =
-  | "confirmed"
-  | "planned"
-  | "pending"
-  | "conflict"
-  | "superseded";
-
+export type KnowledgeStatus = "confirmed" | "planned" | "pending" | "conflict" | "superseded";
 export type KnowledgeSensitivity = "workspace" | "founder-only";
-
-export type KnowledgeDomain =
-  | "company"
-  | "product"
-  | "engineering"
-  | "finance"
-  | "funding"
-  | "legal"
-  | "manufacturing"
-  | "quality"
-  | "gtm";
-
-export type KnowledgeRecord = {
-  id: string;
-  domain: KnowledgeDomain;
-  title: string;
-  value: string;
-  status: KnowledgeStatus;
-  sensitivity: KnowledgeSensitivity;
-  source: string;
-  owner: string;
-  review: string;
-  notes?: string;
-};
-
-/**
- * Stage 2 master layer.
- *
- * Evidence-oriented: records distinguish known facts, planning assumptions
- * and unresolved engineering decisions instead of presenting every value as
- * equally authoritative.
- */
+export type KnowledgeDomain = "company" | "product" | "engineering" | "finance" | "funding" | "legal" | "manufacturing" | "quality" | "gtm";
+export type KnowledgeRecord = { id:string; domain:KnowledgeDomain; title:string; value:string; status:KnowledgeStatus; sensitivity:KnowledgeSensitivity; source:string; owner:string; review:string; notes?:string };
 export const MASTER_KNOWLEDGE: KnowledgeRecord[] = [
-  {
-    id: "company.legal-name",
-    domain: "company",
-    title: "Legal entity",
-    value: "Vāyú Shastr Private Limited",
-    status: "confirmed",
-    sensitivity: "workspace",
-    source: "src/lib/data/company.ts",
-    owner: "Founder / CA-CS",
-    review: "Before incorporation filing",
-  },
-  {
-    id: "company.brand",
-    domain: "company",
-    title: "Consumer brand",
-    value: "VéLOXIS",
-    status: "planned",
-    sensitivity: "workspace",
-    source: "src/lib/data/company.ts",
-    owner: "Founder",
-    review: "Trademark clearance",
-  },
-  {
-    id: "company.model",
-    domain: "company",
-    title: "Business model",
-    value: "Asset-light, IP-led bicycle technology company using qualified contract OEMs",
-    status: "confirmed",
-    sensitivity: "workspace",
-    source: "src/lib/data/company.ts + project baseline",
-    owner: "Founder",
-    review: "At funding/business-plan revision",
-  },
-  {
-    id: "product.range",
-    domain: "product",
-    title: "Product architecture",
-    value: "Core / Pro / Apex carbon bicycle range",
-    status: "planned",
-    sensitivity: "workspace",
-    source: "src/lib/data/company.ts",
-    owner: "Founder + engineering",
-    review: "After prototype and validation",
-  },
-  {
-    id: "product.iso-path",
-    domain: "quality",
-    title: "Validation path",
-    value: "ISO 4210 test and validation programme",
-    status: "planned",
-    sensitivity: "workspace",
-    source: "src/lib/data/iso.ts",
-    owner: "Founder + test lab",
-    review: "On external lab confirmation",
-  },
-  {
-    id: "engineering.vedm",
-    domain: "engineering",
-    title: "Engineering master reference",
-    value: "VEDM-301 Rev 5.3.8",
-    status: "pending",
-    sensitivity: "founder-only",
-    source: "External project master; not yet represented in repository",
-    owner: "Founder + engineering",
-    review: "Import after source-document verification",
-    notes: "Do not infer geometry from earlier repository values until the VEDM baseline is loaded.",
-  },
-  {
-    id: "engineering.700x40",
-    domain: "engineering",
-    title: "Tyre clearance requirement",
-    value: "700×40 mm inflated tyre clearance",
-    status: "pending",
-    sensitivity: "founder-only",
-    source: "Engineering decision required; not yet represented in repository",
-    owner: "Founder + engineering",
-    review: "Geometry/clearance validation",
-    notes: "Front and rear clearance must be verified before calling the geometry production-ready.",
-  },
-  {
-    id: "engineering.t47i",
-    domain: "engineering",
-    title: "Bottom bracket standard",
-    value: "T47i, 85.5 mm shell width",
-    status: "pending",
-    sensitivity: "founder-only",
-    source: "Latest project baseline; not yet represented in repository",
-    owner: "Founder + engineering",
-    review: "CAD master reconciliation",
-    notes: "Supersedes the earlier 68 mm T47 assumption in project history.",
-  },
-  {
-    id: "finance.seed-ladder",
-    domain: "finance",
-    title: "Funding ladder",
-    value: "₹15 L → ₹50 L → ₹85 L → ₹1.35 Cr → ₹2 Cr",
-    status: "planned",
-    sensitivity: "workspace",
-    source: "src/lib/data/company.ts + src/lib/finance/model.ts",
-    owner: "Founder + CA",
-    review: "Monthly cash-plan review",
-  },
-  {
-    id: "funding.grants-first",
-    domain: "funding",
-    title: "Funding principle",
-    value: "Grants first; equity last",
-    status: "confirmed",
-    sensitivity: "workspace",
-    source: "src/lib/data/company.ts + src/lib/data/gtm.ts",
-    owner: "Founder",
-    review: "At every funding decision",
-  },
-  {
-    id: "manufacturing.oem-controls",
-    domain: "manufacturing",
-    title: "OEM controls",
-    value: "NDA, buyer-owned tooling, no unauthorised subcontracting, QC gates and tool retrieval rights",
-    status: "planned",
-    sensitivity: "workspace",
-    source: "src/lib/data/ops.ts",
-    owner: "Founder + counsel",
-    review: "Before OEM agreement",
-  },
-  {
-    id: "quality.iso-gate",
-    domain: "quality",
-    title: "Tooling release gate",
-    value: "Design freeze only after validation pass; tooling planned for M10",
-    status: "planned",
-    sensitivity: "workspace",
-    source: "src/lib/data/iso.ts + src/lib/data/actions.ts",
-    owner: "Founder + lab",
-    review: "After ISO results",
-  },
-  {
-    id: "gtm.first-100",
-    domain: "gtm",
-    title: "First 100 customer plan",
-    value: "Founder/randonneur network → hero riders → D2C waitlist → selective dealers",
-    status: "planned",
-    sensitivity: "workspace",
-    source: "src/lib/data/gtm.ts",
-    owner: "Founder",
-    review: "Monthly launch review",
-  },
-  {
-    id: "legal.ip-sequence",
-    domain: "legal",
-    title: "IP filing sequence",
-    value: "Provisional geometry/process filings around CAD lock, plus design and trademark filings",
-    status: "planned",
-    sensitivity: "founder-only",
-    source: "src/lib/data/legal.ts + src/lib/data/actions.ts",
-    owner: "Founder + IP counsel",
-    review: "Before disclosure to OEM",
-  },
+{id:"company.legal-name",domain:"company",title:"Legal entity",value:"Vāyú Shastr Private Limited",status:"confirmed",sensitivity:"workspace",source:"src/lib/data/company.ts",owner:"Founder / CA-CS",review:"Before incorporation filing"},
+{id:"company.brand",domain:"company",title:"Consumer brand",value:"VINDY",status:"confirmed",sensitivity:"workspace",source:"src/lib/data/company.ts",owner:"Founder",review:"Trademark clearance"},
+{id:"company.legacy-brand",domain:"company",title:"Legacy identity",value:"VéLOXIS — historical/superseded customer-facing identity",status:"superseded",sensitivity:"founder-only",source:"Brand migration decision",owner:"Founder",review:"Do not use in current customer-facing UI"},
+{id:"company.model",domain:"company",title:"Business model",value:"Asset-light, IP-led bicycle technology company using qualified contract OEMs",status:"confirmed",sensitivity:"workspace",source:"src/lib/data/company.ts + project baseline",owner:"Founder",review:"At funding/business-plan revision"},
+{id:"product.range",domain:"product",title:"Product architecture",value:"VINDY Core / Pro / Apex carbon bicycle range",status:"planned",sensitivity:"workspace",source:"src/lib/data/company.ts",owner:"Founder + engineering",review:"After prototype and validation"},
+{id:"product.iso-path",domain:"quality",title:"Validation path",value:"ISO 4210 test and validation programme",status:"planned",sensitivity:"workspace",source:"src/lib/data/iso.ts",owner:"Founder + test lab",review:"On external lab confirmation"},
+{id:"engineering.vedm",domain:"engineering",title:"Engineering master reference",value:"VEDM-301 Rev 5.3.8",status:"pending",sensitivity:"founder-only",source:"External project master; not yet represented in repository",owner:"Founder + engineering",review:"Import after source-document verification",notes:"Do not infer geometry from earlier repository values until the VEDM baseline is loaded."},
+{id:"engineering.700x40",domain:"engineering",title:"Tyre clearance requirement",value:"700×40 mm inflated tyre clearance",status:"pending",sensitivity:"founder-only",source:"Engineering decision required",owner:"Founder + engineering",review:"Geometry/clearance validation"},
+{id:"engineering.t47i",domain:"engineering",title:"Bottom bracket standard",value:"T47i, 85.5 mm shell width",status:"pending",sensitivity:"founder-only",source:"Latest project baseline",owner:"Founder + engineering",review:"CAD master reconciliation",notes:"Supersedes earlier 68 mm assumption."},
+{id:"finance.seed-ladder",domain:"finance",title:"Funding ladder",value:"₹15 L → ₹50 L → ₹85 L → ₹1.35 Cr → ₹2 Cr",status:"planned",sensitivity:"workspace",source:"src/lib/data/company.ts + src/lib/finance/model.ts",owner:"Founder + CA",review:"Monthly cash-plan review"},
+{id:"funding.grants-first",domain:"funding",title:"Funding principle",value:"Grants first; equity last",status:"confirmed",sensitivity:"workspace",source:"Funding control",owner:"Founder",review:"At every funding decision"},
+{id:"manufacturing.oem-controls",domain:"manufacturing",title:"OEM controls",value:"NDA, buyer-owned tooling, no unauthorised subcontracting, QC gates and tool retrieval rights",status:"planned",sensitivity:"workspace",source:"src/lib/data/ops.ts",owner:"Founder + counsel",review:"Before OEM agreement"},
+{id:"quality.iso-gate",domain:"quality",title:"Tooling release gate",value:"Design freeze only after validation pass; tooling planned for M10",status:"planned",sensitivity:"workspace",source:"src/lib/data/iso.ts + src/lib/data/actions.ts",owner:"Founder + lab",review:"After ISO results"},
+{id:"gtm.first-100",domain:"gtm",title:"First 100 customer plan",value:"Founder/randonneur network → hero riders → D2C waitlist → selective dealers",status:"planned",sensitivity:"workspace",source:"src/lib/data/gtm.ts",owner:"Founder",review:"Monthly launch review"},
+{id:"legal.ip-sequence",domain:"legal",title:"IP filing sequence",value:"Provisional geometry/process filings around CAD lock, plus design and trademark filings",status:"planned",sensitivity:"founder-only",source:"src/lib/data/legal.ts + src/lib/data/actions.ts",owner:"Founder + IP counsel",review:"Before disclosure to OEM"},
 ];
-
 import { EXECUTION_PACKAGE_30 } from "./execution-package";
-
-/** The 45-point expanded execution register. */
-export const ALL_KNOWLEDGE: KnowledgeRecord[] = [
-  ...MASTER_KNOWLEDGE,
-  ...EXECUTION_PACKAGE_30,
-];
-
-export const KNOWLEDGE_STATUS_LABELS: Record<KnowledgeStatus, string> = {
-  confirmed: "Confirmed",
-  planned: "Planned",
-  pending: "Pending evidence",
-  conflict: "Conflict",
-  superseded: "Superseded",
-};
-
-export const KNOWLEDGE_DOMAINS: KnowledgeDomain[] = [
-  "company",
-  "product",
-  "engineering",
-  "finance",
-  "funding",
-  "legal",
-  "manufacturing",
-  "quality",
-  "gtm",
-];
-
-export function knowledgeSummary(records = ALL_KNOWLEDGE) {
-  return records.reduce(
-    (summary, record) => {
-      summary.total += 1;
-      summary[record.status] += 1;
-      return summary;
-    },
-    {
-      total: 0,
-      confirmed: 0,
-      planned: 0,
-      pending: 0,
-      conflict: 0,
-      superseded: 0,
-    } as Record<"total" | KnowledgeStatus, number>,
-  );
-}
+export const ALL_KNOWLEDGE: KnowledgeRecord[] = [...MASTER_KNOWLEDGE,...EXECUTION_PACKAGE_30];
+export const KNOWLEDGE_STATUS_LABELS: Record<KnowledgeStatus,string>={confirmed:"Confirmed",planned:"Planned",pending:"Pending evidence",conflict:"Conflict",superseded:"Superseded"};
+export const KNOWLEDGE_DOMAINS: KnowledgeDomain[]=["company","product","engineering","finance","funding","legal","manufacturing","quality","gtm"];
+export function knowledgeSummary(records=ALL_KNOWLEDGE){return records.reduce((s,r)=>{s.total+=1;s[r.status]+=1;return s},{total:0,confirmed:0,planned:0,pending:0,conflict:0,superseded:0} as Record<"total"|KnowledgeStatus,number>);}
