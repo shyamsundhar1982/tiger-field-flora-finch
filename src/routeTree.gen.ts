@@ -17,6 +17,7 @@ import { Route as CommandFinanceControlRouteImport } from './routes/command/fina
 import { Route as CommandFounderCommandRouteImport } from './routes/command/founder-command'
 import { Route as CommandFundingRouteImport } from './routes/command/funding'
 import { Route as CommandGtmRouteImport } from './routes/command/gtm'
+import { Route as CommandIntelligenceRouteImport } from './routes/command/intelligence'
 import { Route as CommandInvestorBoardRouteImport } from './routes/command/investor-board'
 import { Route as CommandKnowledgeRouteImport } from './routes/command/knowledge'
 import { Route as CommandLegalRouteImport } from './routes/command/legal'
@@ -42,6 +43,7 @@ const CommandFinanceControlRoute = CommandFinanceControlRouteImport.update({ id:
 const CommandFounderCommandRoute = CommandFounderCommandRouteImport.update({ id: '/founder-command', path: '/founder-command', getParentRoute: () => CommandRouteRoute } as any)
 const CommandFundingRoute = CommandFundingRouteImport.update({ id: '/funding', path: '/funding', getParentRoute: () => CommandRouteRoute } as any)
 const CommandGtmRoute = CommandGtmRouteImport.update({ id: '/gtm', path: '/gtm', getParentRoute: () => CommandRouteRoute } as any)
+const CommandIntelligenceRoute = CommandIntelligenceRouteImport.update({ id: '/intelligence', path: '/intelligence', getParentRoute: () => CommandRouteRoute } as any)
 const CommandInvestorBoardRoute = CommandInvestorBoardRouteImport.update({ id: '/investor-board', path: '/investor-board', getParentRoute: () => CommandRouteRoute } as any)
 const CommandKnowledgeRoute = CommandKnowledgeRouteImport.update({ id: '/knowledge', path: '/knowledge', getParentRoute: () => CommandRouteRoute } as any)
 const CommandLegalRoute = CommandLegalRouteImport.update({ id: '/legal', path: '/legal', getParentRoute: () => CommandRouteRoute } as any)
@@ -66,6 +68,7 @@ export interface FileRoutesByFullPath {
   '/command/founder-command': typeof CommandFounderCommandRoute
   '/command/funding': typeof CommandFundingRoute
   '/command/gtm': typeof CommandGtmRoute
+  '/command/intelligence': typeof CommandIntelligenceRoute
   '/command/investor-board': typeof CommandInvestorBoardRoute
   '/command/knowledge': typeof CommandKnowledgeRoute
   '/command/legal': typeof CommandLegalRoute
@@ -90,6 +93,7 @@ export interface FileRoutesByTo {
   '/command/founder-command': typeof CommandFounderCommandRoute
   '/command/funding': typeof CommandFundingRoute
   '/command/gtm': typeof CommandGtmRoute
+  '/command/intelligence': typeof CommandIntelligenceRoute
   '/command/investor-board': typeof CommandInvestorBoardRoute
   '/command/knowledge': typeof CommandKnowledgeRoute
   '/command/legal': typeof CommandLegalRoute
@@ -116,6 +120,7 @@ export interface FileRoutesById {
   '/command/founder-command': typeof CommandFounderCommandRoute
   '/command/funding': typeof CommandFundingRoute
   '/command/gtm': typeof CommandGtmRoute
+  '/command/intelligence': typeof CommandIntelligenceRoute
   '/command/investor-board': typeof CommandInvestorBoardRoute
   '/command/knowledge': typeof CommandKnowledgeRoute
   '/command/legal': typeof CommandLegalRoute
@@ -133,7 +138,6 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths: keyof FileRoutesByFullPath
   fileRoutesByTo: FileRoutesByTo
-  to: keyof FileRoutesByTo
   id: keyof FileRoutesById
   fileRoutesById: FileRoutesById
 }
@@ -157,6 +161,7 @@ declare module '@tanstack/react-router' {
     '/command/founder-command': { id: '/command/founder-command'; path: '/founder-command'; fullPath: '/command/founder-command'; preLoaderRoute: typeof CommandFounderCommandRouteImport; parentRoute: typeof CommandRouteRoute }
     '/command/funding': { id: '/command/funding'; path: '/funding'; fullPath: '/command/funding'; preLoaderRoute: typeof CommandFundingRouteImport; parentRoute: typeof CommandRouteRoute }
     '/command/gtm': { id: '/command/gtm'; path: '/gtm'; fullPath: '/command/gtm'; preLoaderRoute: typeof CommandGtmRouteImport; parentRoute: typeof CommandRouteRoute }
+    '/command/intelligence': { id: '/command/intelligence'; path: '/intelligence'; fullPath: '/command/intelligence'; preLoaderRoute: typeof CommandIntelligenceRouteImport; parentRoute: typeof CommandRouteRoute }
     '/command/investor-board': { id: '/command/investor-board'; path: '/investor-board'; fullPath: '/command/investor-board'; preLoaderRoute: typeof CommandInvestorBoardRouteImport; parentRoute: typeof CommandRouteRoute }
     '/command/knowledge': { id: '/command/knowledge'; path: '/knowledge'; fullPath: '/command/knowledge'; preLoaderRoute: typeof CommandKnowledgeRouteImport; parentRoute: typeof CommandRouteRoute }
     '/command/legal': { id: '/command/legal'; path: '/legal'; fullPath: '/command/legal'; preLoaderRoute: typeof CommandLegalRouteImport; parentRoute: typeof CommandRouteRoute }
@@ -180,6 +185,7 @@ interface CommandRouteRouteChildren {
   CommandFounderCommandRoute: typeof CommandFounderCommandRoute
   CommandFundingRoute: typeof CommandFundingRoute
   CommandGtmRoute: typeof CommandGtmRoute
+  CommandIntelligenceRoute: typeof CommandIntelligenceRoute
   CommandInvestorBoardRoute: typeof CommandInvestorBoardRoute
   CommandKnowledgeRoute: typeof CommandKnowledgeRoute
   CommandLegalRoute: typeof CommandLegalRoute
@@ -201,6 +207,7 @@ const CommandRouteRouteChildren: CommandRouteRouteChildren = {
   CommandFounderCommandRoute,
   CommandFundingRoute,
   CommandGtmRoute,
+  CommandIntelligenceRoute,
   CommandInvestorBoardRoute,
   CommandKnowledgeRoute,
   CommandLegalRoute,
