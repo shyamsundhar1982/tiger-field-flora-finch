@@ -5,5 +5,5 @@ export const BRAND = {
   carbonVenture: "Vyndi · Carbon Venture",
   aluminiumVenture: "Aluminium Bicycle Venture",
   tagline: "Wind, rendered in carbon.",
-  logo: "/vayu-mark.svg",
+  logo: "/vayu-mark.png",
 } as const;
