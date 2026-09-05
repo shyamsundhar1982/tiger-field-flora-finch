@@ -1,11 +1,20 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { SEED_INVENTORY, useInventory, type InventoryCategory, type InventoryItem } from "@/lib/data/inventory";
-import { getCommandRole } from "@/lib/command-access";
+import { getCommandAccess, getCommandRole } from "@/lib/command-access";
+import { canAccessRoute } from "@/lib/page-access";
 import { inr } from "@/lib/format";
 
-export const Route = createFileRoute("/inventory")({ component: InventoryPage });
+export const Route = createFileRoute("/inventory")({
+  beforeLoad: async () => {
+    const access = await getCommandAccess();
+    if (!access) throw redirect({ to: "/command-login" });
+    const role = await getCommandRole();
+    if (!canAccessRoute(role, "/inventory")) throw redirect({ to: "/command" });
+  },
+  component: InventoryPage,
+});
 type Draft = Omit<InventoryItem, "updatedAt">;
 const BASE_CATEGORIES: InventoryCategory[] = ["groupset","wheelset","tyre","handlebar","stem","saddle","thruaxle","bottom-bracket","bottle-cage","tool-pouch","bracket","fastener","colour","gauge"];
 const CATEGORY_KEY = "veloxis-inventory-categories-v1";
@@ -16,7 +25,8 @@ const slug = (x: string) => x.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").r
 function readCategories() {
   if (typeof window === "undefined") return BASE_CATEGORIES;
   try { const saved = JSON.parse(window.localStorage.getItem(CATEGORY_KEY) || "[]") as string[]; return Array.from(new Set([...BASE_CATEGORIES, ...saved.filter(Boolean)])); }
-  catch { return BASE_CATEGORIES; }
+  catch { return BASE_CATEGORIES;
+  }
 }
 
 function InventoryPage() {
