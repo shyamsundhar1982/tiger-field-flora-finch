@@ -14,7 +14,7 @@
     "preview:stop": "node scripts/preview.mjs stop",
     "typecheck": "tsc --noEmit",
     "check:auth": "node scripts/check-auth-invariant.mjs",
-    "test": "node --test scripts/phase-3-regression.test.mjs scripts/phase-4-regression.test.mjs scripts/phase-5-regression.test.mjs && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/auth/gate-identity.test.ts",
+    "test": "node --test scripts/phase-3-regression.test.mjs scripts/phase-4-regression.test.mjs scripts/phase-5-regression.test.mjs scripts/phase-6a-regression.test.mjs && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/auth/gate-identity.test.ts",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
