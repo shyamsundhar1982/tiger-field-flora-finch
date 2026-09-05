@@ -1,15 +1,16 @@
 # VINDY / Vāyú Shastr — Master Phase 1–6A Audit & Release Reconciliation
 
 **Repository:** `shyamsundhar1982/tiger-field-flora-finch`  
-**Audit date:** 2026-09-05  
+**Audit date:** 2026-09-06  
 **Source of truth:** GitHub `main`  
+**Declared production deployer:** Cloudflare Workers  
 **Scope:** Phase 1 through Phase 6A, product identity, homepage/brand evolution, Carbon/Aluminium venture architecture, deployment state, and release blockers.
 
 ## 1. Executive conclusion
 
 The repository contains a broad and substantially implemented Phase 1–6A **control-plane / operating-system framework**. The project is not, however, equivalent to a fully physically validated production bicycle program. The remaining gaps are concentrated in four areas:
 
-1. **Release/deployment reconciliation:** Vercel production is stale and its recent production deployments were cancelled; the current live Cloudflare Workers surface shown in the supplied screenshots is materially newer and exposes the Phase 6A ERP Execution Control and Inventory Master surfaces.
+1. **Release/deployment reconciliation:** Cloudflare Workers is the declared current production surface. Vercel has been disconnected and is not a release target.
 2. **Evidence closure:** engineering, supplier, tooling, physical pilot, NDT, structural/ISO and serial-genealogy evidence must be tied to actual records before claiming production release.
 3. **Identity reconciliation:** the current repository still contains Core / Pro / Apex in the product catalogue, while the agreed naming direction is Core → Longitude, Pro → Latitude, Apex → Altitude. Exact Git commit evidence for that rename was not located; it must therefore be treated as an historical agreement requiring controlled reconciliation rather than as proven repository history.
 4. **Execution vs framework:** the software has advanced faster than the real-world evidence and deployment closure. Phase 7+ should not be treated as released until these blockers are closed.
@@ -18,12 +19,12 @@ The repository contains a broad and substantially implemented Phase 1–6A **con
 
 | Surface | Current assessment |
 |---|---|
-| GitHub `main` | **Authoritative source code / documentation**; latest known marker `1f209e2dbcfd1b6645eb0699cc77cb971be7e717` |
-| Cloudflare Workers | **Current live application surface evidenced by supplied screenshots**; includes Inventory Master and Phase 6A ERP Execution Control |
-| Vercel production | **STALE / NOT RELEASE-READY**; production alias was serving an older Phase-1-era VéLOXIS revision; latest production attempt was cancelled |
+| GitHub `main` | **Authoritative source code / documentation**; latest audited fix marker `8f410c631e89e3f25338e9cc52b3974e88383652` |
+| Cloudflare Workers | **Declared current production deployer / live application surface**; supplied screenshots evidence current Inventory Master and Phase 6A ERP Execution Control |
+| Vercel | **DISCONNECTED / NOT A DEPLOYMENT TARGET**; excluded from release acceptance |
 | Physical product validation | **NOT PROVEN CLOSED** from repository evidence |
 
-The Cloudflare screenshot evidence changes the earlier deployment conclusion: it is incorrect to describe the whole project as merely Phase-1 production. The accurate statement is that **Cloudflare currently exposes the newer Phase 6A operating application while Vercel remains stale/cancelled**.
+The deployment decision is now explicit: **GitHub `main` is the source of truth and Cloudflare Workers is the production deployment path. Vercel is legacy/disconnected and is not part of release acceptance.**
 
 ## 3. Phase-by-phase reconciliation
 
@@ -37,9 +38,9 @@ The Cloudflare screenshot evidence changes the earlier deployment conclusion: it
 
 **Finding**
 - Financial foundation is substantially implemented in the repository.
-- Finance integration exists, but deployment history means the Vercel production alias does not represent the latest repository state.
+- Finance integration exists; the authoritative release path is now GitHub `main` → Cloudflare Workers.
 
-**Status:** AMBER — software framework implemented; release surface needs reconciliation.
+**Status:** AMBER — software framework implemented; evidence/release surface needs continued reconciliation.
 
 ### Phase 2 — Product / BOM / COGS engine
 
@@ -236,22 +237,17 @@ The supplied screenshots visibly establish the intended presentation hierarchy:
 
 ## 8. Deployment audit
 
+### Cloudflare Workers — declared production path
+
+GitHub `main` is the source of truth and Cloudflare Workers is the **declared production deployer** for this project.
+
+The supplied screenshots show the current Cloudflare Workers application at the `tiger-field-flora-finch...workers.dev` surface with current Phase 6A ERP Execution and Inventory Master functionality.
+
+**Release decision:** commits to GitHub `main` are intended to flow through the configured Cloudflare deployment integration. Cloudflare remains the production release path. Backend health, authentication, database persistence, append-only audit persistence and production configuration must still be independently validated before calling the system fully production-authoritative.
+
 ### Vercel
 
-The Vercel project `tiger-field-flora-finch` is connected to the repository but is currently not a reliable production representation of `main`.
-
-- Production alias historically served deployment `dpl_86chwL8eheyxRPH3o9DdVH5CFsGB`, an older Phase-1-era revision.
-- `main` subsequently advanced substantially.
-- Latest production marker deployment `dpl_59SBF1mhbF2tncpR6SpKJpdXMm4t` was **CANCELED** and exposed no build-log events.
-- Earlier Phase 6 / Phase 6A production attempts were also cancelled.
-
-**Release decision:** do not describe Vercel as the current production source until a successful deployment and route verification are completed.
-
-### Cloudflare
-
-The supplied screenshots show a live Cloudflare Workers application at the `tiger-field-flora-finch...workers.dev` surface with current Phase 6A ERP Execution and Inventory Master functionality.
-
-**Release decision:** treat Cloudflare as the current live application surface for this audit, while separately validating backend health, authentication, database persistence and production configuration before calling it fully production-authoritative.
+Vercel is **disconnected and excluded from release acceptance**. Historical Vercel deployments, including stale/cancelled production attempts, are retained only as deployment history and must not be treated as the current production path.
 
 ## 9. What is implemented vs what is proven
 
@@ -272,38 +268,38 @@ The supplied screenshots show a live Cloudflare Workers application at the `tige
 | Supplier/tooling qualification evidence | **Not proven closed** |
 | NDT / structural / ISO evidence | **Not proven closed** |
 | Real pilot release evidence | **Not proven closed** |
-| Vercel production | **Stale / cancelled deployment path** |
+| Cloudflare production path | **Declared current deployment path; independent deployment/backend verification remains** |
+| Vercel | **Disconnected / excluded from release acceptance** |
 
 ## 10. Priority corrective-action register
 
 ### P0 — Release recovery
-1. Establish one declared production surface.
+1. **Declare GitHub `main` → Cloudflare Workers as the single production deployment path. — CLOSED by this audit decision.**
 2. Verify Cloudflare backend health, authentication boundary, database persistence and append-only audit persistence.
-3. Either repair Vercel Git deployment integration or formally declare Cloudflare the production application and remove ambiguity.
-4. Perform route-by-route smoke verification after deployment.
+3. Perform route-by-route smoke verification after each production deployment.
 
 ### P0 — Product identity
-5. Reconcile **Longitude / Latitude / Altitude** into the canonical model catalogue.
-6. Preserve historical Core / Pro / Apex only as migration aliases where required.
-7. Search the entire application for stale VéLOXIS and obsolete model labels.
+4. Reconcile **Longitude / Latitude / Altitude** into the canonical model catalogue.
+5. Preserve historical Core / Pro / Apex only as migration aliases where required.
+6. Search the entire application for stale VéLOXIS and obsolete model labels.
 
 ### P0 — Evidence closure
-8. Convert Phase 5/6/6A gates from framework status to evidence-backed status.
-9. Attach serial-linked engineering, dimensional, NDT, cosmetic, material/process, supplier and structural/ISO evidence.
-10. Close NCR/CAPA or formally disposition every deviation before pilot release.
+7. Convert Phase 5/6/6A gates from framework status to evidence-backed status.
+8. Attach serial-linked engineering, dimensional, NDT, cosmetic, material/process, supplier and structural/ISO evidence.
+9. Close NCR/CAPA or formally disposition every deviation before pilot release.
 
 ### P1 — Operational integrity
-11. Verify Carbon vs Aluminium transaction isolation.
-12. Verify consolidated reporting preserves venture attribution.
-13. Verify inventory, BOM, sales, finance and ERP use one canonical model/product identity.
-14. Add regression tests for naming, venture scope and authorization.
+10. Verify Carbon vs Aluminium transaction isolation.
+11. Verify consolidated reporting preserves venture attribution.
+12. Verify inventory, BOM, sales, finance and ERP use one canonical model/product identity.
+13. Add regression tests for naming, venture scope and authorization.
 
 ## 11. Release rule
 
-**Do not promote Phase 7+ as released product capability until P0 deployment, identity and evidence gates are closed.**
+**Do not promote Phase 7+ as released product capability until P0 identity and evidence gates are closed.**
 
 The project is best described today as:
 
-> **A substantially implemented VINDY / Vāyú Shastr operating-control platform with a live Phase 6A Cloudflare surface, a stale/cancelled Vercel production path, and outstanding physical-evidence and product-identity reconciliation gates.**
+> **A substantially implemented VINDY / Vāyú Shastr operating-control platform with GitHub `main` as source of truth, Cloudflare Workers as the declared production deployment path, Vercel disconnected/excluded, and outstanding physical-evidence and product-identity reconciliation gates.**
 
 This wording separates software implementation from real-world product validation and avoids unsupported production claims.
