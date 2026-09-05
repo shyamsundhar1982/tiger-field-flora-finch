@@ -8,10 +8,12 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CommandRouteRouteImport } from './routes/command/route'
 import { Route as RangeRouteImport } from './routes/range'
+import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as CommandIndexRouteImport } from './routes/command/index'
 import { Route as CommandActionsRouteImport } from './routes/command/actions'
 import { Route as CommandAiKnowledgeRouteImport } from './routes/command/ai-knowledge'
 import { Route as CommandDeploymentReadinessRouteImport } from './routes/command/deployment-readiness'
+import { Route as CommandErpExecutionRouteImport } from './routes/command/erp-execution'
 import { Route as CommandFinanceRouteImport } from './routes/command/finance'
 import { Route as CommandFinanceControlRouteImport } from './routes/command/finance-control'
 import { Route as CommandFounderCommandRouteImport } from './routes/command/founder-command'
@@ -33,11 +35,13 @@ import { Route as RangeTierRouteImport } from './routes/range.$tier'
 const IndexRoute = IndexRouteImport.update({ id: '/', path: '/', getParentRoute: () => rootRouteImport } as any)
 const CommandRouteRoute = CommandRouteRouteImport.update({ id: '/command', path: '/command', getParentRoute: () => rootRouteImport } as any)
 const RangeRoute = RangeRouteImport.update({ id: '/range', path: '/range', getParentRoute: () => rootRouteImport } as any)
+const ApiHealthRoute = ApiHealthRouteImport.update({ id: '/api/health', path: '/api/health', getParentRoute: () => rootRouteImport } as any)
 
 const CommandIndexRoute = CommandIndexRouteImport.update({ id: '/', path: '/', getParentRoute: () => CommandRouteRoute } as any)
 const CommandActionsRoute = CommandActionsRouteImport.update({ id: '/actions', path: '/actions', getParentRoute: () => CommandRouteRoute } as any)
 const CommandAiKnowledgeRoute = CommandAiKnowledgeRouteImport.update({ id: '/ai-knowledge', path: '/ai-knowledge', getParentRoute: () => CommandRouteRoute } as any)
 const CommandDeploymentReadinessRoute = CommandDeploymentReadinessRouteImport.update({ id: '/deployment-readiness', path: '/deployment-readiness', getParentRoute: () => CommandRouteRoute } as any)
+const CommandErpExecutionRoute = CommandErpExecutionRouteImport.update({ id: '/erp-execution', path: '/erp-execution', getParentRoute: () => CommandRouteRoute } as any)
 const CommandFinanceRoute = CommandFinanceRouteImport.update({ id: '/finance', path: '/finance', getParentRoute: () => CommandRouteRoute } as any)
 const CommandFinanceControlRoute = CommandFinanceControlRouteImport.update({ id: '/finance-control', path: '/finance-control', getParentRoute: () => CommandRouteRoute } as any)
 const CommandFounderCommandRoute = CommandFounderCommandRouteImport.update({ id: '/founder-command', path: '/founder-command', getParentRoute: () => CommandRouteRoute } as any)
@@ -58,11 +62,13 @@ const RangeTierRoute = RangeTierRouteImport.update({ id: '/$tier', path: '/$tier
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/health': typeof ApiHealthRoute
   '/command': typeof CommandRouteRouteWithChildren
   '/range': typeof RangeRouteWithChildren
   '/command/actions': typeof CommandActionsRoute
   '/command/ai-knowledge': typeof CommandAiKnowledgeRoute
   '/command/deployment-readiness': typeof CommandDeploymentReadinessRoute
+  '/command/erp-execution': typeof CommandErpExecutionRoute
   '/command/finance': typeof CommandFinanceRoute
   '/command/finance-control': typeof CommandFinanceControlRoute
   '/command/founder-command': typeof CommandFounderCommandRoute
@@ -84,10 +90,12 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/health': typeof ApiHealthRoute
   '/range': typeof RangeRouteWithChildren
   '/command/actions': typeof CommandActionsRoute
   '/command/ai-knowledge': typeof CommandAiKnowledgeRoute
   '/command/deployment-readiness': typeof CommandDeploymentReadinessRoute
+  '/command/erp-execution': typeof CommandErpExecutionRoute
   '/command/finance': typeof CommandFinanceRoute
   '/command/finance-control': typeof CommandFinanceControlRoute
   '/command/founder-command': typeof CommandFounderCommandRoute
@@ -110,11 +118,13 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/health': typeof ApiHealthRoute
   '/command': typeof CommandRouteRouteWithChildren
   '/range': typeof RangeRouteWithChildren
   '/command/actions': typeof CommandActionsRoute
   '/command/ai-knowledge': typeof CommandAiKnowledgeRoute
   '/command/deployment-readiness': typeof CommandDeploymentReadinessRoute
+  '/command/erp-execution': typeof CommandErpExecutionRoute
   '/command/finance': typeof CommandFinanceRoute
   '/command/finance-control': typeof CommandFinanceControlRoute
   '/command/founder-command': typeof CommandFounderCommandRoute
@@ -143,6 +153,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiHealthRoute: typeof ApiHealthRoute
   CommandRouteRoute: typeof CommandRouteRouteWithChildren
   RangeRoute: typeof RangeRouteWithChildren
 }
@@ -150,12 +161,14 @@ export interface RootRouteChildren {
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
     '/': { id: '/'; path: '/'; fullPath: '/'; preLoaderRoute: typeof IndexRouteImport; parentRoute: typeof rootRouteImport }
+    '/api/health': { id: '/api/health'; path: '/api/health'; fullPath: '/api/health'; preLoaderRoute: typeof ApiHealthRouteImport; parentRoute: typeof rootRouteImport }
     '/command': { id: '/command'; path: '/command'; fullPath: '/command'; preLoaderRoute: typeof CommandRouteRouteImport; parentRoute: typeof rootRouteImport }
     '/range': { id: '/range'; path: '/range'; fullPath: '/range'; preLoaderRoute: typeof RangeRouteImport; parentRoute: typeof rootRouteImport }
     '/command/': { id: '/command/'; path: '/'; fullPath: '/command/'; preLoaderRoute: typeof CommandIndexRouteImport; parentRoute: typeof CommandRouteRoute }
     '/command/actions': { id: '/command/actions'; path: '/actions'; fullPath: '/command/actions'; preLoaderRoute: typeof CommandActionsRouteImport; parentRoute: typeof CommandRouteRoute }
     '/command/ai-knowledge': { id: '/command/ai-knowledge'; path: '/ai-knowledge'; fullPath: '/command/ai-knowledge'; preLoaderRoute: typeof CommandAiKnowledgeRouteImport; parentRoute: typeof CommandRouteRoute }
     '/command/deployment-readiness': { id: '/command/deployment-readiness'; path: '/deployment-readiness'; fullPath: '/command/deployment-readiness'; preLoaderRoute: typeof CommandDeploymentReadinessRouteImport; parentRoute: typeof CommandRouteRoute }
+    '/command/erp-execution': { id: '/command/erp-execution'; path: '/erp-execution'; fullPath: '/command/erp-execution'; preLoaderRoute: typeof CommandErpExecutionRouteImport; parentRoute: typeof CommandRouteRoute }
     '/command/finance': { id: '/command/finance'; path: '/finance'; fullPath: '/command/finance'; preLoaderRoute: typeof CommandFinanceRouteImport; parentRoute: typeof CommandRouteRoute }
     '/command/finance-control': { id: '/command/finance-control'; path: '/finance-control'; fullPath: '/command/finance-control'; preLoaderRoute: typeof CommandFinanceControlRouteImport; parentRoute: typeof CommandRouteRoute }
     '/command/founder-command': { id: '/command/founder-command'; path: '/founder-command'; fullPath: '/command/founder-command'; preLoaderRoute: typeof CommandFounderCommandRouteImport; parentRoute: typeof CommandRouteRoute }
@@ -180,6 +193,7 @@ interface CommandRouteRouteChildren {
   CommandActionsRoute: typeof CommandActionsRoute
   CommandAiKnowledgeRoute: typeof CommandAiKnowledgeRoute
   CommandDeploymentReadinessRoute: typeof CommandDeploymentReadinessRoute
+  CommandErpExecutionRoute: typeof CommandErpExecutionRoute
   CommandFinanceRoute: typeof CommandFinanceRoute
   CommandFinanceControlRoute: typeof CommandFinanceControlRoute
   CommandFounderCommandRoute: typeof CommandFounderCommandRoute
@@ -202,6 +216,7 @@ const CommandRouteRouteChildren: CommandRouteRouteChildren = {
   CommandActionsRoute,
   CommandAiKnowledgeRoute,
   CommandDeploymentReadinessRoute,
+  CommandErpExecutionRoute,
   CommandFinanceRoute,
   CommandFinanceControlRoute,
   CommandFounderCommandRoute,
@@ -228,6 +243,7 @@ const RangeRouteWithChildren = RangeRoute._addFileChildren(RangeRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute,
+  ApiHealthRoute,
   CommandRouteRoute: CommandRouteRouteWithChildren,
   RangeRoute: RangeRouteWithChildren,
 }
