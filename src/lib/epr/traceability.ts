@@ -42,30 +42,17 @@ async function audit(sql: Sql, ventureName: "carbon" | "aluminium", entityType: 
   );
 }
 
-async function validateMappedInventorySku(
-  sql: Sql,
-  identity: TravellerIdentity,
-  sku: string,
-  unit: string,
-) {
+async function validateMappedInventorySku(sql: Sql, identity: TravellerIdentity, sku: string, unit: string) {
   const mappings = await sql.query<{ id: string }>(
-    `select id
-       from epr_bom_inventory_mappings
-      where venture=$1
-        and model_id=$2
-        and bom_revision=$3
-        and sku=$4
-        and unit=$5
-        and status='active'
-        and effective_from <= now()
+    `select id from epr_bom_inventory_mappings
+      where venture=$1 and model_id=$2 and bom_revision=$3 and sku=$4 and unit=$5
+        and status='active' and effective_from <= now()
         and (effective_to is null or effective_to > now())
       limit 1`,
     [identity.venture, identity.model_id, identity.bom_revision, sku, unit],
   );
   if (!mappings[0]) {
-    throw new Error(
-      `Inventory SKU ${sku} is not approved for ${identity.model_name} / BOM ${identity.bom_revision} / unit ${unit}. Add an active BOM-SKU mapping before issue or consume.`,
-    );
+    throw new Error(`Inventory SKU ${sku} is not approved for ${identity.model_name} / BOM ${identity.bom_revision} / unit ${unit}. Add an active BOM-SKU mapping before issue or consume.`);
   }
   return mappings[0].id;
 }
@@ -129,17 +116,15 @@ export const recordInventoryMovement = createServerFn({ method: "POST" }).valida
   const actor = await admin();
   const sql = await getSql();
   const identity = await traveller(sql, data.travellerId, data.venture);
-
-  let mappingId: string | undefined;
   if (data.movementType === "issue" || data.movementType === "consume") {
-    mappingId = await validateMappedInventorySku(sql, identity, data.sku, data.unit);
+    await validateMappedInventorySku(sql, identity, data.sku, data.unit);
   }
-
-  const recordId = id("MOV");
-  const notes = mappingId
-    ? `${data.notes}${data.notes ? " · " : ""}BOM-SKU mapping: ${mappingId}`
-    : data.notes;
-  await sql.query(`insert into epr_inventory_movements (id,traveller_id,venture,sku,movement_type,quantity,unit,reference,notes,recorded_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [recordId,data.travellerId,data.venture,data.sku,data.movementType,data.quantity,data.unit,data.reference,notes,actor]);
-  await audit(sql, data.venture, "inventory_movement", recordId, "recorded", actor, { ...data, mappingId: mappingId ?? null, serialNumber: identity.serial_number, modelId: identity.model_id, bomRevision: identity.bom_revision });
-  return { ok: true, recordId, mappingId: mappingId ?? null };
+  const movementId = id("MOV");
+  const ledgerId = id("LED");
+  const rows = await sql.query<{ movement_id: string; ledger_id: string; resulting_balance: number | string }>(
+    `select * from post_epr_inventory_movement($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+    [movementId, ledgerId, data.travellerId, data.venture, data.sku, data.movementType, data.quantity, data.unit, data.reference, data.notes, actor],
+  );
+  if (!rows[0]) throw new Error("Inventory movement was not posted.");
+  return { ok: true, recordId: movementId, ledgerId: rows[0].ledger_id, resultingBalance: Number(rows[0].resulting_balance) };
 });
