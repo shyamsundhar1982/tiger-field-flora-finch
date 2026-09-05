@@ -122,7 +122,7 @@ export const getEprReleaseReadiness = createServerFn({ method: "GET" }).validato
     sql.query(`select id,record_type,severity,title,status from epr_ncr_capa where traveller_id=$1 and status not in ('closed','rejected')`,[data.travellerId]),
     sql.query(`select * from epr_authoritative_inventory_balance where venture=$1`,[traveller[0].venture]),
     sql.query(`select coalesce(sum(cogs_inr),0) as total_cogs_inr from epr_cogs_entries where traveller_id=$1`,[data.travellerId]),
-    sql.query(`select containment_case_id,case_type,severity,title,reason,disposition from epr_active_release_blocks where traveller_id=$1`,[data.travellerId]),
+    sql.query(`select b.case_id as containment_case_id,c.source_type as case_type,c.severity,c.reason,t.action as disposition from epr_release_blocks b join epr_containment_cases c on c.id=b.case_id join epr_containment_targets t on t.case_id=b.case_id and t.traveller_id=b.traveller_id where b.traveller_id=$1 and b.active=true and t.status='active'`,[data.travellerId]),
   ]);
   const gateMap=new Map(gates.map(g=>[g.gate_id,g.status]));
   const evidenceMap=new Map(evidence.map(e=>[e.gate_id,e]));
