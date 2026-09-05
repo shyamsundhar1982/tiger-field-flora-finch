@@ -9,7 +9,7 @@ const LINKS = [
   { to: "/command", label: "Command" },
 ] as const;
 
-const VAYU_LOGO = "/brand/vayu-logo.svg?v=3";
+const VAYU_LOGO = "/brand/vayu-official.svg";
 
 export function SiteHeader({ ghost = false }: { ghost?: boolean }) {
   const [open, setOpen] = useState(false);
