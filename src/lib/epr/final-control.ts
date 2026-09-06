@@ -33,7 +33,7 @@ export const createEprMapping = createServerFn({ method: "POST" }).validator(z.o
 })).handler(async ({ data }) => {
   const actor = await admin();
   const sql = await getSql();
-  const master = await sql.query<{ id: string; status: string; code: string }[]>(
+  const master = await sql.query<{ id: string; status: string; code: string }>(
     `select id,status,code from master_data_records where domain='inventory' and code=$1 and status='approved' order by revision desc limit 1`,
     [data.sku],
   );
@@ -51,7 +51,7 @@ export const approveEprMapping = createServerFn({ method: "POST" }).validator(z.
   const m = rows[0];
   if (!m) throw new Error("BOM-SKU mapping not found.");
   if (m.status !== "draft") throw new Error(`Only draft mappings can be approved; current status is ${m.status}.`);
-  const master = await sql.query<{id:string}[]>(`select id from master_data_records where domain='inventory' and code=$1 and status='approved' order by revision desc limit 1`,[m.sku]);
+  const master = await sql.query<{id:string}>(`select id from master_data_records where domain='inventory' and code=$1 and status='approved' order by revision desc limit 1`,[m.sku]);
   if (!master[0]) throw new Error(`SKU ${m.sku} is no longer approved in Inventory Master.`);
   await sql.query(`update epr_bom_inventory_mappings set status='superseded',effective_to=now(),updated_at=now() where venture=$1 and model_id=$2 and bom_revision=$3 and bom_line_key=$4 and sku=$5 and status='active' and effective_to is null`,[m.venture,m.model_id,m.bom_revision,m.bom_line_key,m.sku]);
   await sql.query(`update epr_bom_inventory_mappings set status='active',approved_by=$1,approved_at=now(),effective_from=now(),effective_to=null,updated_at=now() where id=$2`,[actor,m.id]);
@@ -88,7 +88,7 @@ export const approveInventoryOpeningBalance = createServerFn({ method: "POST" })
   const row=rows[0];
   if(!row) throw new Error("Opening balance not found.");
   if(row.status!=="draft") throw new Error("Only draft opening balances can be approved.");
-  const mapped=await sql.query<{id:string}[]>(`select m.id from epr_bom_inventory_mappings m join master_data_records md on md.domain='inventory' and md.code=m.sku and md.status='approved' where m.venture=$1 and m.sku=$2 and m.unit=$3 and m.status='active' and m.effective_from<=now() and (m.effective_to is null or m.effective_to>now()) order by md.revision desc limit 1`,[row.venture,row.sku,row.unit]);
+  const mapped=await sql.query<{id:string}>(`select m.id from epr_bom_inventory_mappings m join master_data_records md on md.domain='inventory' and md.code=m.sku and md.status='approved' where m.venture=$1 and m.sku=$2 and m.unit=$3 and m.status='active' and m.effective_from<=now() and (m.effective_to is null or m.effective_to>now()) order by md.revision desc limit 1`,[row.venture,row.sku,row.unit]);
   if(!mapped[0]) throw new Error("Opening balance approval requires an active BOM-SKU mapping and an approved Inventory Master SKU.");
   await sql.query(`update epr_inventory_opening_balances set status='approved',approved_by=$1,approved_at=now() where id=$2`,[actor,row.id]);
   await audit(sql,row.venture,"inventory_opening_balance",row.id,"approved",actor,{mappingId:mapped[0].id,sku:row.sku,unit:row.unit});
