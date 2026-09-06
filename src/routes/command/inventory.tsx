@@ -3,6 +3,7 @@ import { Panel, Kpi } from "@/components/kpi";
 import { inr } from "@/lib/format";
 import { getAuthoritativeInventory, getInventoryControlSummary, getInventoryMslWarnings, getInventoryFifoTrace } from "@/lib/inventory-authority";
 
+// Inventory is the single operational entry point; detailed ledgers are selected from this hub.
 export const Route=createFileRoute("/command/inventory")({
  loader:async()=>{const [summary,balances,msl,fifo]=await Promise.all([getInventoryControlSummary(),getAuthoritativeInventory(),getInventoryMslWarnings(),getInventoryFifoTrace()]);return {summary,balances,msl,fifo};},
  component:Inventory,
