@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
+import { hashPassword } from "better-auth/crypto";
 import type { CommandRole } from "@/lib/page-access";
 import { getCommandRole } from "@/lib/command-access";
 import { getSessionUser } from "@/lib/auth/verify.server";
@@ -57,6 +59,33 @@ export const createVindyUser = createServerFn({ method: "POST" })
 
     const userId = result.user?.id;
     if (!userId) throw new Error("Account was not created.");
+
+    // Better Auth should create the credential account as part of signUpEmail.
+    // Keep this invariant explicit because these accounts are created by an
+    // administrator rather than by the user's own sign-up flow. If a runtime
+    // adapter/version creates the user row but omits the credential account,
+    // repair it here with Better Auth's own password hashing format.
+    const passwordHash = await hashPassword(data.password);
+    const credential = await sql<{ id: string }[]>`
+      select id from "account"
+      where "userId" = ${userId} and "providerId" = 'credential'
+      limit 1
+    `;
+    if (credential[0]) {
+      await sql`
+        update "account"
+        set "password" = ${passwordHash}, "updatedAt" = now()
+        where id = ${credential[0].id}
+      `;
+    } else {
+      await sql`
+        insert into "account" (
+          "id", "accountId", "providerId", "userId", "password", "createdAt", "updatedAt"
+        ) values (
+          ${randomUUID()}, ${userId}, 'credential', ${userId}, ${passwordHash}, now(), now()
+        )
+      `;
+    }
 
     await sql`
       insert into vindy_user_roles (user_id, role) values (${userId}, ${data.role})
