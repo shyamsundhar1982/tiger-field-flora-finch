@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { LockKeyhole } from "lucide-react";
 import { type FormEvent, useState } from "react";
+import { authClient } from "@/lib/auth/client";
 import { unlockCommand } from "@/lib/command-access";
 
 export const Route = createFileRoute("/command-login")({ component: CommandLogin });
@@ -16,15 +17,43 @@ function CommandLogin() {
     event.preventDefault();
     setError("");
     setBusy(true);
+
     try {
-      const result = await unlockCommand({ data: { username, password } });
+      const identity = username.trim();
+
+      // VINDY-managed individual users are Better Auth accounts. The previous
+      // command-login screen only checked the legacy COMMAND_* environment
+      // passwords, so newly created VINDY users could never authenticate here
+      // even though their Better Auth credentials were valid.
+      if (identity.includes("@")) {
+        const normalizedEmail = identity.toLowerCase();
+        const result = await authClient.signIn.email({
+          email: normalizedEmail,
+          password,
+        });
+
+        if (result.error) {
+          setError(result.error.message ?? "Incorrect email or password.");
+          return;
+        }
+
+        // The server resolves the user's VINDY role from vindy_user_roles on
+        // the authenticated Better Auth session. No legacy command password is
+        // created or required for individual users.
+        await navigate({ to: "/command" });
+        return;
+      }
+
+      // Preserve the existing legacy admin/role login path for installations
+      // that still use COMMAND_PASSWORD and COMMAND_*_PASSWORD values.
+      const result = await unlockCommand({ data: { username: identity, password } });
       if (!result.ok) {
         setError(result.error ?? "Access denied.");
         return;
       }
       await navigate({ to: "/command" });
-    } catch {
-      setError("Unable to verify access. Please try again.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to verify access. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -45,13 +74,13 @@ function CommandLogin() {
           </div>
 
           <p className="mb-6 text-sm leading-6 text-muted">
-            Admin has full control. User access is view-only and cannot change Command data.
+            Admin has full control. Individual VINDY users sign in with their own email and password and receive the role assigned by Admin.
           </p>
 
           <form onSubmit={submit} className="space-y-4">
             <label className="block">
-              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-muted">Username</span>
-              <input autoFocus type="text" value={username} onChange={(event) => setUsername(event.target.value)} className="control w-full" placeholder="admin or user" autoComplete="username" disabled={busy} />
+              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-muted">Email or Username</span>
+              <input autoFocus type="text" value={username} onChange={(event) => setUsername(event.target.value)} className="control w-full" placeholder="name@company.com or admin" autoComplete="username" disabled={busy} />
             </label>
             <label className="block">
               <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-muted">Password</span>
