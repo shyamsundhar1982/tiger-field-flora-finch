@@ -4,10 +4,12 @@ import type { FinanceAssumptions, ProductLineId, ScenarioId } from "@/lib/financ
 import { DEFAULT_FINANCE_ASSUMPTIONS } from "@/lib/finance/model";
 import { DEFAULT_ACCOUNTING_ASSUMPTIONS, type AccountingAssumptions, type FundingType } from "@/lib/finance/accounting";
 import type { BomCostSource, BomTier } from "@/lib/finance/bom-engine";
+import type { EquipmentLedgerId, EquipmentLedgerItem } from "@/lib/finance/equipment-ledger";
 import { ACTIONS } from "@/lib/data/actions";
 
 type ActionState = Record<string, "open" | "doing" | "done">;
 type NumericAccountingKey = Exclude<keyof AccountingAssumptions, "fundingTypeByMonth">;
+type EquipmentEditableKey = Exclude<keyof EquipmentLedgerItem, "id">;
 const initialActions: ActionState = Object.fromEntries(ACTIONS.map((a) => [a.id, "open"]));
 
 type Store = {
@@ -20,7 +22,7 @@ type Store = {
   setDrawStandby: (v: boolean) => void;
   setAction: (id: string, s: "open" | "doing" | "done") => void;
   setFinance: (finance: FinanceAssumptions) => void;
-  updateGlobalFinance: (key: keyof Omit<FinanceAssumptions, "productLines" | "aluminiumVertical" | "bomOverrides" | "bomCostSource" | "bomTierByProduct">, value: number) => void;
+  updateGlobalFinance: (key: keyof Omit<FinanceAssumptions, "productLines" | "aluminiumVertical" | "bomOverrides" | "bomCostSource" | "bomTierByProduct" | "equipmentLedger">, value: number) => void;
   updateProductLine: (id: ProductLineId, key: "aspLakh" | "cogsLakh" | "mixPct" | "launchMonth", value: number) => void;
   updateProductCostSource: (id: ProductLineId, value: BomCostSource) => void;
   updateProductBomTier: (id: ProductLineId, value: BomTier) => void;
@@ -28,6 +30,7 @@ type Store = {
   updateAluminiumVertical: (key: keyof FinanceAssumptions["aluminiumVertical"], value: number) => void;
   updateAccounting: (key: NumericAccountingKey, value: number) => void;
   setFundingType: (month: number, value: FundingType) => void;
+  updateEquipmentItem: (id: string, key: EquipmentEditableKey, value: string | number | EquipmentLedgerId) => void;
   resetFinance: () => void;
 };
 
@@ -51,6 +54,7 @@ export const useVeloxis = create<Store>()(
       updateAluminiumVertical: (key, value) => set((state) => ({ finance: { ...state.finance, aluminiumVertical: { ...state.finance.aluminiumVertical, [key]: value } } })),
       updateAccounting: (key, value) => set((state) => ({ accounting: { ...state.accounting, [key]: value } })),
       setFundingType: (month, value) => set((state) => ({ accounting: { ...state.accounting, fundingTypeByMonth: { ...(state.accounting.fundingTypeByMonth ?? {}), [month]: value } } })),
+      updateEquipmentItem: (id, key, value) => set((state) => ({ finance: { ...state.finance, equipmentLedger: (state.finance.equipmentLedger ?? []).map((item) => item.id === id ? { ...item, [key]: value } : item) } })),
       resetFinance: () => set({ finance: DEFAULT_FINANCE_ASSUMPTIONS, accounting: DEFAULT_ACCOUNTING_ASSUMPTIONS }),
     }),
     { name: "veloxis-planning-state", partialize: (state) => ({ scenario: state.scenario, drawStandby: state.drawStandby, actions: state.actions, finance: state.finance, accounting: state.accounting }) },
