@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getSql } from "@/lib/db";
 import { getCommandRole } from "@/lib/command-access";
 import { canPerform, type CommandPermission } from "@/lib/page-access";
+import { SEED_INVENTORY } from "@/lib/data/inventory";
 
 const statusSchema = z.enum(["draft", "pending_approval", "approved", "superseded"]);
 const domainSchema = z.enum(["product", "bom", "material", "supplier", "price", "inventory", "process", "quality", "epr", "finance", "document"]);
@@ -52,6 +53,53 @@ export const createMasterData = createServerFn({ method: "POST" }).validator(rec
   await sql`insert into master_data_records (id, domain, code, name, revision, status, owner_role, approver_role, effective_from, source_ref, attributes, created_by) values (${id}, ${data.domain}, ${data.code}, ${data.name}, ${data.revision}, ${data.status}, ${data.ownerRole}, ${data.approverRole}, ${data.effectiveFrom ?? null}, ${data.sourceRef ?? null}, ${JSON.stringify(data.attributes)}::jsonb, ${`command:${role}`})`;
   await sql`insert into master_data_audit_events (id, master_data_id, event_type, actor_user_id, actor_role, to_status, source_ref) values (${crypto.randomUUID()}, ${id}, ${"MASTER_DATA_CREATED"}, ${`command:${role}`}, ${role}, ${data.status}, ${data.sourceRef ?? null})`;
   return { ok: true, id };
+});
+
+/**
+ * Explicit migration bridge for the legacy component catalogue.
+ * It creates inventory-master DRAFT records only; it never approves, posts,
+ * or changes the legacy SEED_INVENTORY values themselves.
+ */
+export const importLegacyInventoryAsDrafts = createServerFn({ method: "POST" }).handler(async () => {
+  await assertSameSiteRequest();
+  const role = await requirePermission("edit");
+  const sql = await getSql();
+  let created = 0;
+  let existing = 0;
+
+  for (const item of SEED_INVENTORY) {
+    const sourceRef = `SEED_INVENTORY:${item.sku}`;
+    const found = await sql<{ id: string }[]>`select id from master_data_records where domain='inventory' and source_ref=${sourceRef} limit 1`;
+    if (found[0]) {
+      existing += 1;
+      continue;
+    }
+
+    const id = crypto.randomUUID();
+    const attributes = {
+      legacyId: item.id,
+      category: item.category,
+      subcategory: item.subcategory,
+      brand: item.brand,
+      model: item.model,
+      detail: item.detail,
+      legacyPriceInr: item.priceInr,
+      legacyStockQty: item.stockQty,
+      reorderLevel: item.reorderLevel,
+      coreEnabled: item.coreEnabled,
+      proEnabled: item.proEnabled,
+      apexEnabled: item.apexEnabled,
+      legacySource: item.source,
+      legacyNotes: item.notes,
+      controlState: "migration_candidate",
+    };
+
+    await sql`insert into master_data_records (id, domain, code, name, revision, status, owner_role, approver_role, effective_from, source_ref, attributes, created_by) values (${id}, 'inventory', ${item.sku}, ${`${item.brand} ${item.model}`.trim()}, 1, 'draft', 'operations', 'operations', null, ${sourceRef}, ${JSON.stringify(attributes)}::jsonb, ${`command:${role}`})`;
+    await sql`insert into master_data_audit_events (id, master_data_id, event_type, actor_user_id, actor_role, to_status, source_ref, note) values (${crypto.randomUUID()}, ${id}, 'LEGACY_CATALOGUE_IMPORTED_AS_DRAFT', ${`command:${role}`}, ${role}, 'draft', ${sourceRef}, 'Explicit migration candidate import; no approval or inventory posting performed.')`;
+    created += 1;
+  }
+
+  return { ok: true, created, existing, total: SEED_INVENTORY.length };
 });
 
 const transitionSchema = z.object({ id: z.string().uuid(), toStatus: statusSchema, note: z.string().max(500).optional(), sourceRef: z.string().max(500).optional() });
