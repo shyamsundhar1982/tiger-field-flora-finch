@@ -60,32 +60,7 @@ export const createVindyUser = createServerFn({ method: "POST" })
     const userId = result.user?.id;
     if (!userId) throw new Error("Account was not created.");
 
-    // Better Auth should create the credential account as part of signUpEmail.
-    // Keep this invariant explicit because these accounts are created by an
-    // administrator rather than by the user's own sign-up flow. If a runtime
-    // adapter/version creates the user row but omits the credential account,
-    // repair it here with Better Auth's own password hashing format.
-    const passwordHash = await hashPassword(data.password);
-    const credential = await sql<{ id: string }[]>`
-      select id from "account"
-      where "userId" = ${userId} and "providerId" = 'credential'
-      limit 1
-    `;
-    if (credential[0]) {
-      await sql`
-        update "account"
-        set "password" = ${passwordHash}, "updatedAt" = now()
-        where id = ${credential[0].id}
-      `;
-    } else {
-      await sql`
-        insert into "account" (
-          "id", "accountId", "providerId", "userId", "password", "createdAt", "updatedAt"
-        ) values (
-          ${randomUUID()}, ${userId}, 'credential', ${userId}, ${passwordHash}, now(), now()
-        )
-      `;
-    }
+    await ensureCredentialPassword(sql, userId, data.password);
 
     await sql`
       insert into vindy_user_roles (user_id, role) values (${userId}, ${data.role})
@@ -102,6 +77,47 @@ export const createVindyUser = createServerFn({ method: "POST" })
     if (!created[0]) throw new Error("Account was created but could not be verified in the user register.");
 
     return { ok: true, user: created[0] };
+  });
+
+async function ensureCredentialPassword(sql: Awaited<ReturnType<typeof getSql>>, userId: string, password: string) {
+  const passwordHash = await hashPassword(password);
+  const credential = await sql<{ id: string }[]>`
+    select id from "account"
+    where "userId" = ${userId} and "providerId" = 'credential'
+    limit 1
+  `;
+  if (credential[0]) {
+    await sql`
+      update "account"
+      set "password" = ${passwordHash}, "updatedAt" = now()
+      where id = ${credential[0].id}
+    `;
+  } else {
+    await sql`
+      insert into "account" (
+        "id", "accountId", "providerId", "userId", "password", "createdAt", "updatedAt"
+      ) values (
+        ${randomUUID()}, ${userId}, 'credential', ${userId}, ${passwordHash}, now(), now()
+      )
+    `;
+  }
+}
+
+export const resetVindyUserPassword = createServerFn({ method: "POST" })
+  .validator(z.object({
+    userId: z.string().min(1).max(200),
+    password: z.string().min(8).max(128),
+  }))
+  .handler(async ({ data }) => {
+    await requireAdmin();
+    const sql = await getSql();
+    const existing = await sql<{ id: string }[]>`
+      select id from "user" where id = ${data.userId} limit 1
+    `;
+    if (!existing[0]) throw new Error("User account was not found.");
+
+    await ensureCredentialPassword(sql, data.userId, data.password);
+    return { ok: true };
   });
 
 export const setVindyUserRole = createServerFn({ method: "POST" })
