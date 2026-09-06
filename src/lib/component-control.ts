@@ -55,20 +55,22 @@ export const getComponentControl = createServerFn({ method: "GET" })
       ),
     ]);
 
+    const balanceRows = Array.isArray(balances) ? balances.filter((row): row is Record<string, unknown> => row != null) : [];
     const balanceByKey = new Map(
-      (balances as Array<Record<string, unknown>>).map((row) => [
-        `${row.venture}|${row.sku}|${row.unit}`,
+      balanceRows.map((row) => [
+        `${row.venture ?? data.venture}|${row.sku ?? ""}|${row.unit ?? ""}`,
         Number(row.quantity_balance ?? 0),
       ]),
     );
+    const mslRows = Array.isArray(mslControls) ? mslControls.filter((row) => row != null) : [];
     const mslByKey = new Map(
-      mslControls.map((row) => [
+      mslRows.map((row) => [
         `${data.venture}|${row.sku}|${row.unit}`,
         Number(row.minimum_stock_level),
       ]),
     );
 
-    return mappings.map((mapping) => {
+    return (Array.isArray(mappings) ? mappings : []).filter((mapping) => mapping != null).map((mapping) => {
       const key = `${data.venture}|${mapping.sku}|${mapping.unit}`;
       const balance = balanceByKey.get(key) ?? 0;
       const requiredQty = Number(mapping.quantity);
