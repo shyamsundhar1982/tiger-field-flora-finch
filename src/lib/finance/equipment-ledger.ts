@@ -5,11 +5,21 @@ export type EquipmentLedgerId =
   | "deadIdle"
   | "consumables";
 
+export type EquipmentLedgerCategory = {
+  id: string;
+  ledger: EquipmentLedgerId;
+  name: string;
+  description?: string;
+  sortOrder?: number;
+};
+
 export type EquipmentLedgerItem = {
   id: string;
   name: string;
   ledger: EquipmentLedgerId;
   category: string;
+  categoryId?: string;
+  details?: string;
   costLakh: number;
   monthlyCostLakh: number;
   purchaseMonth: number;
@@ -25,7 +35,34 @@ export const EQUIPMENT_LEDGER_META: Record<EquipmentLedgerId, { label: string; t
   consumables: { label: "Consumables", treatment: "Expense according to actual use" },
 };
 
-export const DEFAULT_EQUIPMENT_LEDGER: EquipmentLedgerItem[] = [
+const DEFAULT_CATEGORY_ROWS: [string, EquipmentLedgerId, string][] = [
+  ["mfg-jigs", "manufacturing", "Jigs"],
+  ["mfg-moulds", "manufacturing", "Moulds"],
+  ["mfg-processing", "manufacturing", "Composite processing"],
+  ["mfg-tables", "manufacturing", "Production tables"],
+  ["mfg-finishing", "manufacturing", "Finishing"],
+  ["mfg-storage", "manufacturing", "Material storage"],
+  ["mfg-tools", "manufacturing", "Tooling"],
+  ["quality-testing", "qualitySupport", "Quality & testing"],
+  ["quality-inspection", "qualitySupport", "Inspection"],
+  ["quality-storage", "qualitySupport", "Storage"],
+  ["quality-workshop", "qualitySupport", "Workshop"],
+  ["quality-tool-management", "qualitySupport", "Tool management"],
+  ["quality-stores", "qualitySupport", "Stores"],
+  ["office-it", "officeAdmin", "IT"],
+  ["office-furniture", "officeAdmin", "Furniture"],
+  ["office-facilities", "officeAdmin", "Facilities"],
+  ["office-other", "officeAdmin", "Other office equipment"],
+  ["dead-nonproductive", "deadIdle", "Non-productive"],
+  ["cons-production", "consumables", "Production"],
+  ["cons-workshop", "consumables", "Workshop"],
+  ["cons-operations", "consumables", "Operations"],
+  ["cons-administration", "consumables", "Administration"],
+];
+
+export const DEFAULT_EQUIPMENT_LEDGER_CATEGORIES: EquipmentLedgerCategory[] = DEFAULT_CATEGORY_ROWS.map(([id, ledger, name], i) => ({ id, ledger, name, sortOrder: i }));
+
+const DEFAULT_ITEM_ROWS: [string, string, EquipmentLedgerId, string][] = [
   ["manufacturing-jigs", "Manufacturing jigs", "manufacturing", "Jigs"],
   ["aluminium-moulds", "Aluminium moulds", "manufacturing", "Moulds"],
   ["autoclave", "Autoclave", "manufacturing", "Composite processing"],
@@ -51,11 +88,15 @@ export const DEFAULT_EQUIPMENT_LEDGER: EquipmentLedgerItem[] = [
   ["workshop-consumables", "Workshop consumables", "consumables", "Workshop"],
   ["ppe-cleaning", "PPE / cleaning materials", "consumables", "Operations"],
   ["office-consumables", "Office consumables", "consumables", "Administration"],
-].map(([id, name, ledger, category]) => ({
+];
+
+export const DEFAULT_EQUIPMENT_LEDGER: EquipmentLedgerItem[] = DEFAULT_ITEM_ROWS.map(([id, name, ledger, category]) => ({
   id,
   name,
-  ledger: ledger as EquipmentLedgerId,
+  ledger,
   category,
+  categoryId: DEFAULT_CATEGORY_ROWS.find(([, l, n]) => l === ledger && n === category)?.[0],
+  details: "",
   costLakh: 0,
   monthlyCostLakh: 0,
   purchaseMonth: 1,
@@ -72,17 +113,14 @@ export type EquipmentLedgerSummary = {
 };
 
 export function equipmentSummary(items: EquipmentLedgerItem[]): EquipmentLedgerSummary {
-  return items.reduce<EquipmentLedgerSummary>(
-    (sum, item) => {
-      if (item.ledger === "manufacturing") sum.manufacturingCapex += Math.max(0, item.costLakh);
-      if (item.ledger === "qualitySupport") sum.supportCapex += Math.max(0, item.costLakh);
-      if (item.ledger === "officeAdmin") sum.officeCapex += Math.max(0, item.costLakh);
-      if (item.ledger === "deadIdle") sum.deadIdleValue += Math.max(0, item.costLakh);
-      if (item.ledger === "consumables") sum.consumablesMonthly += Math.max(0, item.monthlyCostLakh);
-      return sum;
-    },
-    { manufacturingCapex: 0, supportCapex: 0, officeCapex: 0, deadIdleValue: 0, consumablesMonthly: 0 },
-  );
+  return items.reduce<EquipmentLedgerSummary>((sum, item) => {
+    if (item.ledger === "manufacturing") sum.manufacturingCapex += Math.max(0, item.costLakh);
+    if (item.ledger === "qualitySupport") sum.supportCapex += Math.max(0, item.costLakh);
+    if (item.ledger === "officeAdmin") sum.officeCapex += Math.max(0, item.costLakh);
+    if (item.ledger === "deadIdle") sum.deadIdleValue += Math.max(0, item.costLakh);
+    if (item.ledger === "consumables") sum.consumablesMonthly += Math.max(0, item.monthlyCostLakh);
+    return sum;
+  }, { manufacturingCapex: 0, supportCapex: 0, officeCapex: 0, deadIdleValue: 0, consumablesMonthly: 0 });
 }
 
 function depreciationForLedger(items: EquipmentLedgerItem[], month: number, ledgers: EquipmentLedgerId[]) {
@@ -94,40 +132,20 @@ function depreciationForLedger(items: EquipmentLedgerItem[], month: number, ledg
   }, 0);
 }
 
-export function equipmentMonthlyDepreciation(items: EquipmentLedgerItem[], month: number) {
-  return depreciationForLedger(items, month, ["manufacturing", "qualitySupport", "officeAdmin"]);
-}
-
-export function equipmentDirectManufacturingDepreciationForMonth(items: EquipmentLedgerItem[], month: number) {
-  return depreciationForLedger(items, month, ["manufacturing"]);
-}
-
-export function equipmentManufacturingSupportDepreciationForMonth(items: EquipmentLedgerItem[], month: number) {
-  return depreciationForLedger(items, month, ["qualitySupport"]);
-}
-
-export function equipmentOfficeDepreciationForMonth(items: EquipmentLedgerItem[], month: number) {
-  return depreciationForLedger(items, month, ["officeAdmin"]);
-}
+export function equipmentMonthlyDepreciation(items: EquipmentLedgerItem[], month: number) { return depreciationForLedger(items, month, ["manufacturing", "qualitySupport", "officeAdmin"]); }
+export function equipmentDirectManufacturingDepreciationForMonth(items: EquipmentLedgerItem[], month: number) { return depreciationForLedger(items, month, ["manufacturing"]); }
+export function equipmentManufacturingSupportDepreciationForMonth(items: EquipmentLedgerItem[], month: number) { return depreciationForLedger(items, month, ["qualitySupport"]); }
+export function equipmentOfficeDepreciationForMonth(items: EquipmentLedgerItem[], month: number) { return depreciationForLedger(items, month, ["officeAdmin"]); }
 
 export function equipmentCapexForMonth(items: EquipmentLedgerItem[], month: number) {
-  return items.reduce((sum, item) => {
-    if (item.ledger === "deadIdle" || item.ledger === "consumables") return sum;
-    return sum + (item.purchaseMonth === month ? Math.max(0, item.costLakh) : 0);
-  }, 0);
+  return items.reduce((sum, item) => item.ledger === "deadIdle" || item.ledger === "consumables" ? sum : sum + (item.purchaseMonth === month ? Math.max(0, item.costLakh) : 0), 0);
 }
 
 export function equipmentConsumablesForMonth(items: EquipmentLedgerItem[], month: number, ledger: EquipmentLedgerId) {
   if (ledger !== "consumables") return 0;
-  return items.reduce((sum, item) => {
-    if (item.ledger !== "consumables" || item.id === "office-consumables" || month < item.purchaseMonth) return sum;
-    return sum + Math.max(0, item.monthlyCostLakh) * Math.max(0, item.allocationPct) / 100;
-  }, 0);
+  return items.reduce((sum, item) => item.ledger !== "consumables" || item.id === "office-consumables" || month < item.purchaseMonth ? sum : sum + Math.max(0, item.monthlyCostLakh) * Math.max(0, item.allocationPct) / 100, 0);
 }
 
 export function equipmentOfficeConsumablesForMonth(items: EquipmentLedgerItem[], month: number) {
-  return items.reduce((sum, item) => {
-    if (item.ledger !== "consumables" || item.id !== "office-consumables" || month < item.purchaseMonth) return sum;
-    return sum + Math.max(0, item.monthlyCostLakh) * Math.max(0, item.allocationPct) / 100;
-  }, 0);
+  return items.reduce((sum, item) => item.ledger !== "consumables" || item.id !== "office-consumables" || month < item.purchaseMonth ? sum : sum + Math.max(0, item.monthlyCostLakh) * Math.max(0, item.allocationPct) / 100, 0);
 }
