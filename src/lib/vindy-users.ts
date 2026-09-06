@@ -11,6 +11,16 @@ import { getSql } from "@/lib/db";
 const roles: CommandRole[] = ["admin", "management", "board", "finance", "operations", "engineering", "qa", "compliance", "viewer"];
 const isRole = (value: unknown): value is CommandRole => typeof value === "string" && roles.includes(value as CommandRole);
 
+function isBootstrapAdminEmail(email: string | null | undefined): boolean {
+  const normalizedEmail = email?.trim().toLowerCase();
+  if (!normalizedEmail) return false;
+  return (process.env.VINDY_ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean)
+    .includes(normalizedEmail);
+}
+
 async function requireAdmin() {
   const role = await getCommandRole();
   if (role !== "admin") throw new Error("Admin access is required.");
@@ -69,8 +79,13 @@ async function ensureCredentialPassword(sql: Awaited<ReturnType<typeof getSql>>,
       insert into "account" (
         "id", "accountId", "providerId", "userId", "password", "createdAt", "updatedAt"
       ) values (
-        ${randomUUID()}, ${userId}, 'credential', ${userId}, ${passwordHash}, now(), now()
+        ${randomUUID()}, ${userId}, 'credential', ${userId}, 'credential', now(), now()
       )
+    `;
+    await sql`
+      update "account"
+      set "password" = ${passwordHash}, "updatedAt" = now()
+      where "userId" = ${userId} and "providerId" = 'credential'
     `;
   }
 
@@ -180,6 +195,13 @@ export const setVindyUserRole = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await requireAdmin();
     const sql = await getSql();
+    const target = await sql<{ email: string | null }[]>`
+      select email from "user" where id = ${data.userId} limit 1
+    `;
+    if (!target[0]) throw new Error("User account was not found.");
+    if (isBootstrapAdminEmail(target[0].email) && data.role !== "admin") {
+      throw new Error("The configured bootstrap administrator cannot be downgraded.");
+    }
     await sql`
       insert into vindy_user_roles (user_id, role) values (${data.userId}, ${data.role})
       on conflict (user_id) do update set role = excluded.role, updated_at = now()
@@ -194,10 +216,13 @@ export const deleteVindyUser = createServerFn({ method: "POST" })
     const current = await getSessionUser();
     if (current?.id === data.userId) throw new Error("You cannot delete the account currently in use.");
     const sql = await getSql();
-    const existing = await sql<{ id: string }[]>`
-      select id from "user" where id = ${data.userId} limit 1
+    const target = await sql<{ email: string | null }[]>`
+      select email from "user" where id = ${data.userId} limit 1
     `;
-    if (!existing[0]) throw new Error("User account was not found.");
+    if (!target[0]) throw new Error("User account was not found.");
+    if (isBootstrapAdminEmail(target[0].email)) {
+      throw new Error("The configured bootstrap administrator cannot be deleted.");
+    }
     await sql`delete from vindy_user_roles where user_id = ${data.userId}`;
     await sql`delete from "user" where id = ${data.userId}`;
     return { ok: true, userId: data.userId };
