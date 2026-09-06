@@ -98,8 +98,12 @@ export function equipmentMonthlyDepreciation(items: EquipmentLedgerItem[], month
   return depreciationForLedger(items, month, ["manufacturing", "qualitySupport", "officeAdmin"]);
 }
 
-export function equipmentManufacturingDepreciationForMonth(items: EquipmentLedgerItem[], month: number) {
-  return depreciationForLedger(items, month, ["manufacturing", "qualitySupport"]);
+export function equipmentDirectManufacturingDepreciationForMonth(items: EquipmentLedgerItem[], month: number) {
+  return depreciationForLedger(items, month, ["manufacturing"]);
+}
+
+export function equipmentManufacturingSupportDepreciationForMonth(items: EquipmentLedgerItem[], month: number) {
+  return depreciationForLedger(items, month, ["qualitySupport"]);
 }
 
 export function equipmentOfficeDepreciationForMonth(items: EquipmentLedgerItem[], month: number) {
