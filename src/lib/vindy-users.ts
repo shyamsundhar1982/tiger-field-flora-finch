@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { CommandRole } from "@/lib/page-access";
+import { auth } from "@/lib/auth/server";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
 
@@ -36,6 +37,37 @@ export const listVindyUsers = createServerFn({ method: "GET" }).middleware([auth
     order by u.created_at asc
   `;
 });
+
+export const createVindyUser = createServerFn({ method: "POST" }).middleware([authMiddleware])
+  .validator(z.object({
+    name: z.string().trim().min(1).max(120),
+    email: z.string().trim().email().max(320),
+    password: z.string().min(8).max(128),
+    role: z.enum(["admin", "management", "board", "finance", "operations", "engineering", "qa", "compliance", "viewer"]),
+  }))
+  .handler(async ({ context, data }) => {
+    const sql = await getSql();
+    const me = await actor(sql, context.userId);
+    if (me.role !== "admin") throw new Error("Admin access is required.");
+
+    const result = await auth.api.signUpEmail({
+      body: {
+        name: data.name,
+        email: data.email,
+        password: data.password,
+      },
+    }) as { user?: { id?: string } | null };
+
+    const userId = result.user?.id;
+    if (!userId) throw new Error("Account was not created.");
+
+    await sql`
+      insert into vindy_user_roles (user_id, role) values (${userId}, ${data.role})
+      on conflict (user_id) do update set role = excluded.role, updated_at = now()
+    `;
+
+    return { ok: true, userId };
+  });
 
 export const setVindyUserRole = createServerFn({ method: "POST" }).middleware([authMiddleware])
   .validator(z.object({ userId: z.string().min(1).max(200), role: z.enum(["admin", "management", "board", "finance", "operations", "engineering", "qa", "compliance", "viewer"]) }))
