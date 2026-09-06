@@ -84,10 +84,14 @@ export const createInventoryOpeningBalance = createServerFn({ method: "POST" }).
 
 export const approveInventoryOpeningBalance = createServerFn({ method: "POST" }).validator(z.object({ openingId:z.string().min(1) })).handler(async ({data})=>{
   const actor=await admin(); const sql=await getSql();
-  const rows=await sql.query<{id:string;venture:"carbon"|"aluminium";status:string}>(`select id,venture,status from epr_inventory_opening_balances where id=$1`,[data.openingId]);
-  const row=rows[0]; if(!row) throw new Error("Opening balance not found."); if(row.status!=="draft") throw new Error("Only draft opening balances can be approved.");
+  const rows=await sql.query<{id:string;venture:"carbon"|"aluminium";sku:string;unit:string;status:string}>(`select id,venture,sku,unit,status from epr_inventory_opening_balances where id=$1`,[data.openingId]);
+  const row=rows[0];
+  if(!row) throw new Error("Opening balance not found.");
+  if(row.status!=="draft") throw new Error("Only draft opening balances can be approved.");
+  const mapped=await sql.query<{id:string}[]>(`select m.id from epr_bom_inventory_mappings m join master_data_records md on md.domain='inventory' and md.code=m.sku and md.status='approved' where m.venture=$1 and m.sku=$2 and m.unit=$3 and m.status='active' and m.effective_from<=now() and (m.effective_to is null or m.effective_to>now()) order by md.revision desc limit 1`,[row.venture,row.sku,row.unit]);
+  if(!mapped[0]) throw new Error("Opening balance approval requires an active BOM-SKU mapping and an approved Inventory Master SKU.");
   await sql.query(`update epr_inventory_opening_balances set status='approved',approved_by=$1,approved_at=now() where id=$2`,[actor,row.id]);
-  await audit(sql,row.venture,"inventory_opening_balance",row.id,"approved",actor);
+  await audit(sql,row.venture,"inventory_opening_balance",row.id,"approved",actor,{mappingId:mapped[0].id,sku:row.sku,unit:row.unit});
   return {ok:true};
 });
 
