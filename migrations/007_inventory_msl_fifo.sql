@@ -22,12 +22,10 @@ create index if not exists epr_inventory_controls_msl_idx
   on epr_inventory_controls (venture, sku, unit, minimum_stock_level)
   where active = true;
 
--- Carry the existing component catalogue reorder level into operational MSL controls
--- where the SKU already exists in the catalogue. No stock is created by this seed.
 insert into epr_inventory_controls
   (id, venture, sku, unit, minimum_stock_level, reorder_quantity, notes)
 select
-  'MSL-' || ci.sku,
+  'MSL-' || v.venture || '-' || ci.sku,
   v.venture,
   ci.sku,
   'unit',
@@ -68,13 +66,9 @@ create table if not exists epr_inventory_fifo_allocations (
 
 create index if not exists epr_inventory_fifo_alloc_issue_idx
   on epr_inventory_fifo_allocations (issue_ledger_id);
-
 create index if not exists epr_inventory_fifo_alloc_layer_idx
   on epr_inventory_fifo_allocations (layer_id);
 
--- Rebuild FIFO layers from positive historical ledger entries. Historical negative
--- entries cannot be reconstructed with certainty, so they are deliberately not
--- retroactively assigned to lots; all future issues are FIFO-controlled.
 insert into epr_inventory_fifo_layers
   (id, venture, sku, unit, source_ledger_id, received_at, quantity_received, quantity_remaining, unit_cost_inr)
 select
