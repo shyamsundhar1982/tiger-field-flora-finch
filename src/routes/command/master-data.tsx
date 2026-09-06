@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { MASTER_DATA_DOMAINS, MASTER_DATA_STATUS_LABELS, type MasterDataRecord, type MasterDataStatus } from "@/lib/master-data";
-import { listMasterData, listMasterDataAudit, transitionMasterData } from "@/lib/master-data.server";
+import { listMasterData, listMasterDataAudit, transitionMasterData } from "@/lib/master-data-actions";
 
 export const Route = createFileRoute("/command/master-data")({ component: MasterDataEngine });
 
