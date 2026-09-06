@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
-import { hashPassword } from "better-auth/crypto";
+import { hashPassword, verifyPassword } from "better-auth/crypto";
 import type { CommandRole } from "@/lib/page-access";
 import { getCommandRole } from "@/lib/command-access";
 import { getSessionUser } from "@/lib/auth/verify.server";
@@ -36,15 +36,20 @@ export const listVindyUsers = createServerFn({ method: "GET" }).handler(async ()
 
 async function ensureCredentialPassword(sql: Awaited<ReturnType<typeof getSql>>, userId: string, password: string) {
   const passwordHash = await hashPassword(password);
-  const credential = await sql<{ id: string }[]>`
-    select id from "account"
+  const credential = await sql<{ id: string; account_id: string; password: string | null }[]>`
+    select id, "accountId" as account_id, password from "account"
     where "userId" = ${userId} and "providerId" = 'credential'
+    order by "createdAt" asc
     limit 1
   `;
+
   if (credential[0]) {
+    // Normalize the credential identity as well as the password. This repairs
+    // older VINDY-created accounts whose credential row may have the wrong
+    // accountId even though the Better Auth userId is correct.
     await sql`
       update "account"
-      set "password" = ${passwordHash}, "updatedAt" = now()
+      set "accountId" = ${userId}, "password" = ${passwordHash}, "updatedAt" = now()
       where id = ${credential[0].id}
     `;
   } else {
@@ -55,6 +60,20 @@ async function ensureCredentialPassword(sql: Awaited<ReturnType<typeof getSql>>,
         ${randomUUID()}, ${userId}, 'credential', ${userId}, ${passwordHash}, now(), now()
       )
     `;
+  }
+
+  // Verify the exact credential row we just wrote before reporting success.
+  // This prevents the admin UI from claiming a reset succeeded when the stored
+  // hash is not actually compatible with Better Auth's verifier.
+  const verified = await sql<{ password: string | null }[]>`
+    select password from "account"
+    where "userId" = ${userId} and "providerId" = 'credential' and "accountId" = ${userId}
+    order by "updatedAt" desc
+    limit 1
+  `;
+  const storedPassword = verified[0]?.password;
+  if (!storedPassword || !(await verifyPassword({ hash: storedPassword, password }))) {
+    throw new Error("Password reset could not be verified against the credential store.");
   }
 }
 
