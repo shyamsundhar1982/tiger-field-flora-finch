@@ -6,27 +6,14 @@ import { canPerform } from "@/lib/page-access";
 async function requireInventoryView() {
   const role = await getCommandRole();
   if (!role || !canPerform(role, "view")) throw new Error("Inventory view permission denied.");
-  return role;
 }
 
-/**
- * Authoritative inventory read model.
- *
- * IMPORTANT: this deliberately does not read SEED_INVENTORY or browser
- * localStorage. Quantity and inventory value come only from the append-only
- * EPR inventory ledgers and controlled opening balances.
- */
+/** Authoritative inventory read model. Never reads SEED_INVENTORY/localStorage. */
 export const getAuthoritativeInventory = createServerFn({ method: "GET" }).handler(async () => {
   await requireInventoryView();
   const sql = await getSql();
   return sql`
-    select
-      venture,
-      sku,
-      unit,
-      quantity_balance::number as quantity_balance,
-      inventory_value_inr::number as inventory_value_inr,
-      weighted_average_cost_inr::number as weighted_average_cost_inr
+    select venture, sku, unit, quantity_balance, inventory_value_inr, weighted_average_cost_inr
     from epr_authoritative_inventory_balance
     order by venture, sku, unit
   `;
@@ -36,20 +23,9 @@ export const getAuthoritativeInventoryMovements = createServerFn({ method: "GET"
   await requireInventoryView();
   const sql = await getSql();
   return sql`
-    select
-      m.id,
-      m.venture,
-      m.sku,
-      m.movement_type,
-      m.quantity::number as quantity,
-      m.unit,
-      m.reference,
-      m.notes,
-      m.recorded_by,
-      m.created_at::text as created_at,
-      l.quantity_delta::number as quantity_delta,
-      l.traveller_id,
-      l.serial_number
+    select m.id, m.venture, m.sku, m.movement_type, m.quantity, m.unit, m.reference,
+      m.notes, m.recorded_by, m.created_at::text as created_at,
+      l.quantity_delta, l.traveller_id, l.serial_number
     from epr_inventory_movements m
     join epr_inventory_ledger l on l.movement_id = m.id
     order by m.created_at desc
@@ -61,17 +37,15 @@ export const getInventoryControlSummary = createServerFn({ method: "GET" }).hand
   await requireInventoryView();
   const sql = await getSql();
   const [summary] = await sql`
-    select
-      count(*)::int as sku_count,
-      coalesce(sum(quantity_balance),0)::number as total_units,
-      coalesce(sum(inventory_value_inr),0)::number as inventory_value_inr,
+    select count(*)::int as sku_count,
+      coalesce(sum(quantity_balance),0) as total_units,
+      coalesce(sum(inventory_value_inr),0) as inventory_value_inr,
       count(*) filter (where quantity_balance < 0)::int as negative_balance_count
     from epr_authoritative_inventory_balance
   `;
   const [postedOpening] = await sql`
     select count(*)::int as posted_opening_balance_count
-    from epr_inventory_opening_balances
-    where status='posted'
+    from epr_inventory_opening_balances where status='posted'
   `;
   return {
     skuCount: Number(summary?.sku_count ?? 0),
