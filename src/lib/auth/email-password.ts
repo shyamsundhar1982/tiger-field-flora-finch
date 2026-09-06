@@ -1,10 +1,7 @@
 /**
- * Local email/password sign-in (this app's Better Auth DB — not the broker).
+ * Local email/password sign-in for VINDY's individual user accounts.
  *
- * Off by default. To enable: set `emailAndPasswordEnabled` to `true` below,
- * then build sign-up / sign-in forms with `authClient.signUp.email` /
- * `authClient.signIn.email` from `@/lib/auth/client` (see the auth skill).
- *
- * Do NOT edit `server.ts` for this — that file is frozen pre-wired config.
+ * Enabled for Phase L. Users authenticate against this app's own Better Auth
+ * database; authorization is then resolved from vindy_user_roles.
  */
-export const emailAndPasswordEnabled = false;
+export const emailAndPasswordEnabled = true;
