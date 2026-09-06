@@ -16,7 +16,7 @@ function ProductionJobCards() {
   return <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 space-y-6">
     <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div><p className="text-[10px] uppercase tracking-[0.22em] text-green">Operations · order handoff</p><h1 className="mt-2 text-4xl font-bold text-accent">Production job cards</h1><p className="mt-3 max-w-3xl text-sm leading-6 text-muted">Every confirmed model order is converted into one controlled production handoff. The card carries the model, quantity, BOM tier and stage-wise component/raw-material requirements.</p></div>
-      <Link to="/command/sales" className="rounded-lg border border-border px-4 py-2.5 text-sm font-semibold text-muted hover:border-accent">Back to sales →</Link>
+      <Link to="/command/production" className="rounded-lg border border-border px-4 py-2.5 text-sm font-semibold text-muted hover:border-accent">Back to Production →</Link>
     </header>
     <div className="grid gap-3 sm:grid-cols-3"><Kpi label="Job cards" value={String(cards.length)} hint="One per order"/><Kpi label="Released / active" value={String(released)} hint="Production queue"/><Kpi label="Units" value={String(units)} hint={`${stageCount} controlled stages`}/></div>
     {cards.length === 0 ? <Panel title="Production queue is empty"><p className="text-sm text-muted">No production job cards have been generated yet. Add a confirmed order in Sales & Revenue Engine.</p></Panel> : cards.map((card: any) => {
