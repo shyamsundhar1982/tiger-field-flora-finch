@@ -85,17 +85,25 @@ export function equipmentSummary(items: EquipmentLedgerItem[]): EquipmentLedgerS
   );
 }
 
+function depreciationForLedger(items: EquipmentLedgerItem[], month: number, ledgers: EquipmentLedgerId[]) {
+  return items.reduce((sum, item) => {
+    if (!ledgers.includes(item.ledger) || month < item.purchaseMonth || item.usefulLifeMonths <= 0 || item.costLakh <= 0) return sum;
+    const elapsed = month - item.purchaseMonth;
+    if (elapsed >= item.usefulLifeMonths) return sum;
+    return sum + (item.costLakh / item.usefulLifeMonths) * Math.max(0, item.allocationPct) / 100;
+  }, 0);
+}
+
 export function equipmentMonthlyDepreciation(items: EquipmentLedgerItem[], month: number) {
-  return items.reduce(
-    (sum, item) => {
-      if (item.ledger === "deadIdle" || item.ledger === "consumables") return sum;
-      if (month < item.purchaseMonth || item.usefulLifeMonths <= 0 || item.costLakh <= 0) return sum;
-      const elapsed = month - item.purchaseMonth;
-      if (elapsed >= item.usefulLifeMonths) return sum;
-      return sum + (item.costLakh / item.usefulLifeMonths) * Math.max(0, item.allocationPct) / 100;
-    },
-    0,
-  );
+  return depreciationForLedger(items, month, ["manufacturing", "qualitySupport", "officeAdmin"]);
+}
+
+export function equipmentManufacturingDepreciationForMonth(items: EquipmentLedgerItem[], month: number) {
+  return depreciationForLedger(items, month, ["manufacturing", "qualitySupport"]);
+}
+
+export function equipmentOfficeDepreciationForMonth(items: EquipmentLedgerItem[], month: number) {
+  return depreciationForLedger(items, month, ["officeAdmin"]);
 }
 
 export function equipmentCapexForMonth(items: EquipmentLedgerItem[], month: number) {
@@ -105,10 +113,17 @@ export function equipmentCapexForMonth(items: EquipmentLedgerItem[], month: numb
   }, 0);
 }
 
-export function equipmentConsumablesForMonth(items: EquipmentLedgerItem[], month: number) {
+export function equipmentConsumablesForMonth(items: EquipmentLedgerItem[], month: number, ledger: EquipmentLedgerId) {
+  if (ledger !== "consumables") return 0;
   return items.reduce((sum, item) => {
-    if (item.ledger !== "consumables") return sum;
-    if (month < item.purchaseMonth) return sum;
+    if (item.ledger !== "consumables" || item.id === "office-consumables" || month < item.purchaseMonth) return sum;
+    return sum + Math.max(0, item.monthlyCostLakh) * Math.max(0, item.allocationPct) / 100;
+  }, 0);
+}
+
+export function equipmentOfficeConsumablesForMonth(items: EquipmentLedgerItem[], month: number) {
+  return items.reduce((sum, item) => {
+    if (item.ledger !== "consumables" || item.id !== "office-consumables" || month < item.purchaseMonth) return sum;
     return sum + Math.max(0, item.monthlyCostLakh) * Math.max(0, item.allocationPct) / 100;
   }, 0);
 }
