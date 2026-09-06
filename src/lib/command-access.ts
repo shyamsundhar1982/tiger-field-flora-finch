@@ -33,24 +33,33 @@ const roleCredentials: Array<{ username: string; role: Exclude<CommandRole, "adm
 
 function getCommandEnv(): CommandEnv { return process.env as CommandEnv; }
 
+function getBootstrapAdminEmails(): string[] {
+  return (process.env.VINDY_ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+}
+
 async function getRoleForUser(userId: string, email?: string | null): Promise<CommandRole> {
   const sql = await getSql();
-  const rows = await sql<{ role: string }[]>`
-    select role from vindy_user_roles where user_id = ${userId} limit 1
-  `;
-  const role = rows[0]?.role as CommandRole | undefined;
-  if (role) return role;
+  const normalizedEmail = email?.trim().toLowerCase();
 
-  const bootstrapEmails = (process.env.VINDY_ADMIN_EMAILS ?? "")
-    .split(",").map((item) => item.trim().toLowerCase()).filter(Boolean);
-  if (email && bootstrapEmails.includes(email.toLowerCase())) {
+  // The configured bootstrap administrator is authoritative. Older attempts
+  // could leave a viewer role row for this identity; never let that stale row
+  // downgrade the designated administrator. Repair the row while resolving it.
+  if (normalizedEmail && getBootstrapAdminEmails().includes(normalizedEmail)) {
     await sql`
       insert into vindy_user_roles (user_id, role) values (${userId}, 'admin')
       on conflict (user_id) do update set role = 'admin', updated_at = now()
     `;
     return "admin";
   }
-  return "viewer";
+
+  const rows = await sql<{ role: string }[]>`
+    select role from vindy_user_roles where user_id = ${userId} limit 1
+  `;
+  const role = rows[0]?.role as CommandRole | undefined;
+  return role ?? "viewer";
 }
 
 async function getLegacySession() {
@@ -66,26 +75,39 @@ async function getLegacySession() {
   });
 }
 
-export const getCommandRole = createServerFn({ method: "GET" }).handler(async () => {
-  const user = await getSessionUser();
-  if (user) return getRoleForUser(user.id, user.email);
+async function getLegacyRole(): Promise<CommandRole | null> {
   try {
     const session = await getLegacySession();
     return session.data.role ?? null;
   } catch {
     return null;
   }
+}
+
+/**
+ * Authentication precedence is deliberate:
+ * 1. A valid legacy command session keeps its established legacy authority.
+ * 2. Otherwise a Better Auth identity uses its VINDY role assignment.
+ *
+ * The command-login screen clears the opposite session when switching paths,
+ * so one browser cannot accidentally carry an old authority into a new login.
+ */
+export const getCommandRole = createServerFn({ method: "GET" }).handler(async () => {
+  const legacyRole = await getLegacyRole();
+  if (legacyRole) return legacyRole;
+
+  const user = await getSessionUser();
+  if (user) return getRoleForUser(user.id, user.email);
+  return null;
 });
 
 export const getCommandAccess = createServerFn({ method: "GET" }).handler(async () => {
+  const legacyRole = await getLegacyRole();
+  if (legacyRole) return true;
+
   const user = await getSessionUser();
-  if (user) return (await getRoleForUser(user.id, user.email)) !== null;
-  try {
-    const session = await getLegacySession();
-    return session.data.role != null;
-  } catch {
-    return false;
-  }
+  if (user) return true;
+  return false;
 });
 
 export const unlockCommand = createServerFn({ method: "POST" })
