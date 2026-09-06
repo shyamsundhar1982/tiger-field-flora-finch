@@ -1,0 +1,12 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { Panel } from "@/components/kpi";
+
+export const Route=createFileRoute("/command/planning")({component:PlanningHub});
+const PLANS=[
+ ["Scenarios","Base / delayed / stress cases","/command/scenarios"],
+ ["Finance assumptions","Shared pricing, mix, funding and timing assumptions","/command/finance-assumptions"],
+ ["Procurement planning","36-month requirement, MSL lead time and planned actions","/command/procurement-planning"],
+ ["Production planning","Volume, mix and capacity plan","/command/production"],
+ ["Sales planning","Demand and order-book plan","/command/sales"],
+] as const;
+function PlanningHub(){return <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 space-y-6"><header><p className="text-[10px] uppercase tracking-[0.22em] text-green">Planning · scenarios and assumptions</p><h1 className="mt-2 text-4xl font-bold text-accent">Planning</h1><p className="mt-3 max-w-3xl text-sm leading-6 text-muted">Planning is deliberately separated from execution. Scenarios and assumptions live here; inventory, procurement receipts, production job cards and actuals remain operational records.</p></header><Panel title="Planning workspaces" kicker="One home for modeled intent"><div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">{PLANS.map(([title,note,to])=><Link key={to} to={to as any} className="rounded-xl border border-border bg-bg-elevated/30 p-5 hover:border-accent"><p className="text-sm font-semibold text-fg">{title}</p><p className="mt-1 text-xs leading-5 text-muted">{note}</p><span className="mt-5 inline-block text-[10px] font-bold uppercase tracking-[0.14em] text-accent">Open →</span></Link>)}</div></Panel><Panel title="Planning rule" kicker="Avoid duplicate data"><div className="grid gap-3 md:grid-cols-4">{[["Scenario","changes model assumptions"],["Plan","sets expected demand / production"],["Execution","records orders, job cards, receipts and issues"],["Actual","records what happened"]].map(([t,d])=><div key={t} className="rounded-xl border border-border p-4"><p className="text-sm font-semibold">{t}</p><p className="mt-1 text-xs leading-5 text-muted">{d}</p></div>)}</div></Panel></main>}
