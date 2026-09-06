@@ -69,9 +69,28 @@ function FlowGuide({ role }: { role: CommandRole | null }) {
   const previous = match.index > 0 ? ERP_FLOW[match.index - 1] : null;
   const next = match.index < ERP_FLOW.length - 1 ? ERP_FLOW[match.index + 1] : null;
   const firstAccessible = (routes: string[]) => routes.find((route) => canAccessPage(role, getRouteMeta(route)));
-  return <section className="mb-6 rounded-lg border border-border bg-surface/30 p-3" aria-label="ERP business flow"><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-subtle">ERP FLOW · {match.index + 1} / {ERP_FLOW.length}</p><p className="mt-1 text-sm font-medium text-fg">{match.step.label}</p></div><span className="hidden text-[10px] text-muted sm:block">Hover a step to understand its role</span></div><div className="mt-3 grid grid-cols-3 gap-1 sm:grid-cols-5">{ERP_FLOW.map((step, index) => <div key={step.id} className="group relative"><div title={`${step.label}: ${step.purpose}\nInputs: ${step.inputs}\nOutputs: ${step.outputs}`} className={cn("h-1.5 rounded-full", index === match.index ? "bg-fg" : index < match.index ? "bg-fg/50" : "bg-border")} /><div className="pointer-events-none absolute left-1/2 top-3 z-20 hidden w-64 -translate-x-1/2 rounded-md border border-border bg-bg p-3 text-left text-[10px] leading-4 shadow-lg group-hover:block"><p className="font-semibold text-fg">{step.label}</p><p className="mt-1 text-muted">{step.purpose}</p><p className="mt-2 text-subtle">Input: {step.inputs}</p><p className="text-subtle">Output: {step.outputs}</p></div></div>)}</div><div className="mt-4 grid gap-2 text-xs sm:grid-cols-2">{previous && firstAccessible(previous.routes) ? <Link to={firstAccessible(previous.routes)! as never} className="rounded-md border border-border px-3 py-2 text-muted hover:bg-bg hover:text-fg">← {previous.label}<span className="ml-2 text-[10px] text-subtle">previous</span></Link> : <span />}{next && firstAccessible(next.routes) ? <Link to={firstAccessible(next.routes)! as never} className="rounded-md border border-border px-3 py-2 text-right text-muted hover:bg-bg hover:text-fg">{next.label} →<span className="ml-2 text-[10px] text-subtle">next</span></Link> : <span />}</div></section>;
+  const stages = [
+    { label: "Engineering", range: [1, 4], detail: "Product, BOM, mapping and inventory foundation.", icon: DraftingCompass },
+    { label: "Commercial", range: [5, 6], detail: "Operations, EPR, sales and go-to-market execution.", icon: LineChart },
+    { label: "Finance", range: [7], detail: "Finance, cash, funding and scenario intelligence.", icon: Wallet },
+    { label: "Decision", range: [8], detail: "Validated evidence for management and board decisions.", icon: Radar },
+  ];
+  const currentStage = stages.findIndex((stage) => match.index >= stage.range[0] && match.index <= stage.range[1]);
+  return <section className="mb-6 rounded-xl border border-border bg-surface/40 p-4 backdrop-blur-sm" aria-label="ERP business flow">
+    <div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-subtle">ERP FLOW · EXECUTIVE PATH</p><p className="mt-1 text-sm font-medium text-fg">{match.step.label}</p></div><span className="hidden text-[10px] text-muted sm:block">Hover a stage to see what drives it</span></div>
+    <div className="mt-4 grid gap-2 sm:grid-cols-4">{stages.map((stage, index) => { const Icon=stage.icon; const done=index<currentStage; const active=index===currentStage; const sourceSteps=ERP_FLOW.slice(stage.range[0], stage.range[1]+1); return <div key={stage.label} className="group relative">
+      <div className={cn("relative rounded-xl border p-3 transition-all", active ? "border-accent bg-accent/10 shadow-sm" : done ? "border-border bg-bg/60" : "border-border/70 bg-bg/30 hover:border-accent/40")}>
+        <div className="flex items-center gap-2"><Icon className={cn("size-4", active ? "text-accent" : done ? "text-fg" : "text-subtle")} /><span className="text-sm font-semibold text-fg">{stage.label}</span><span className="ml-auto text-[9px] uppercase tracking-wider text-subtle">{done ? "Complete" : active ? "Current" : "Next"}</span></div>
+        <p className="mt-1.5 text-[10px] leading-4 text-muted">{stage.detail}</p>
+      </div>
+      <div className="pointer-events-none absolute left-1/2 top-full z-30 mt-2 hidden w-72 -translate-x-1/2 rounded-xl border border-border bg-bg/95 p-3 text-left shadow-xl backdrop-blur-xl group-hover:block">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-accent">{stage.label}</p>
+        <div className="mt-2 space-y-2">{sourceSteps.map(step=><div key={step.id}><p className="text-xs font-medium text-fg">{step.label}</p><p className="text-[10px] leading-4 text-muted">{step.purpose}</p></div>)}</div>
+      </div>
+    </div>})}</div>
+    <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">{previous && firstAccessible(previous.routes) ? <Link to={firstAccessible(previous.routes)! as never} className="rounded-md border border-border px-3 py-2 text-muted hover:bg-bg hover:text-fg">← {previous.label}<span className="ml-2 text-[10px] text-subtle">previous</span></Link> : <span />}{next && firstAccessible(next.routes) ? <Link to={firstAccessible(next.routes)! as never} className="rounded-md border border-border px-3 py-2 text-right text-muted hover:bg-bg hover:text-fg">{next.label} →<span className="ml-2 text-[10px] text-subtle">next</span></Link> : <span />}</div>
+  </section>;
 }
-
 function ContextBack() {
   const location = useLocation();
   const isCommand = location.pathname.startsWith("/command");
