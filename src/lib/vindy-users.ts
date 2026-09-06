@@ -24,8 +24,9 @@ export const listVindyUsers = createServerFn({ method: "GET" }).handler(async ()
   const sql = await getSql();
   return sql<{ id: string; name: string | null; email: string | null; role: string | null; created_at: string }[]>`
     select u.id, u.name, u.email, r.role, u.created_at
-    from "user" u left join vindy_user_roles r on r.user_id = u.id
-    order by u.created_at asc
+    from "user" u
+    left join vindy_user_roles r on r.user_id = u.id
+    order by u.created_at desc
   `;
 });
 
@@ -40,13 +41,17 @@ export const createVindyUser = createServerFn({ method: "POST" })
     await requireAdmin();
 
     const sql = await getSql();
+    const name = data.name.trim();
+    const email = data.email.trim().toLowerCase();
+
+    const existing = await sql<{ id: string }[]>`
+      select id from "user" where lower(email) = ${email} limit 1
+    `;
+    if (existing[0]) throw new Error("An account with this email already exists.");
+
     const result = await auth.api.signUpEmail({
-      body: {
-        name: data.name,
-        email: data.email,
-        password: data.password,
-      },
-    }) as { user?: { id?: string } | null };
+      body: { name, email, password: data.password },
+    }) as { user?: { id?: string; name?: string | null; email?: string | null; createdAt?: string | Date } | null };
 
     const userId = result.user?.id;
     if (!userId) throw new Error("Account was not created.");
@@ -56,7 +61,16 @@ export const createVindyUser = createServerFn({ method: "POST" })
       on conflict (user_id) do update set role = excluded.role, updated_at = now()
     `;
 
-    return { ok: true, userId };
+    const created = await sql<{ id: string; name: string | null; email: string | null; role: string; created_at: string }[]>`
+      select u.id, u.name, u.email, r.role, u.created_at
+      from "user" u
+      join vindy_user_roles r on r.user_id = u.id
+      where u.id = ${userId}
+      limit 1
+    `;
+    if (!created[0]) throw new Error("Account was created but could not be verified in the user register.");
+
+    return { ok: true, user: created[0] };
   });
 
 export const setVindyUserRole = createServerFn({ method: "POST" })
