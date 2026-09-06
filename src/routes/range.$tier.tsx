@@ -3,10 +3,14 @@ import { useEffect, useMemo, useState } from "react";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { TIERS } from "@/lib/data/company";
 import { BOM, bomTotal } from "@/lib/data/bom";
-import { SEED_INVENTORY, useInventory, type InventoryCategory, type InventoryItem } from "@/lib/data/inventory";
+import { SEED_INVENTORY, type InventoryCategory, type InventoryItem } from "@/lib/data/inventory";
+import { getAuthoritativeInventory } from "@/lib/inventory-authority";
 import { inr, pct } from "@/lib/format";
 
-export const Route = createFileRoute("/range/$tier")({ component: TierPage });
+export const Route = createFileRoute("/range/$tier")({
+  loader: async () => getAuthoritativeInventory(),
+  component: TierPage,
+});
 const DEFAULTS = {
   core:{groupset:"gs-105-r7000",tyre:"ty-rubino-pro",wheelset:"ws-alloy",handlebar:"hb-alloy-420",stem:"stem-90",saddle:"sad-men-broad-long",thruaxle:"ta-core","bottom-bracket":"bb-bsa","bottle-cage":"cage-plastic","tool-pouch":"tool-pouch",bracket:"bracket-computer",colour:"colour-bright-1"},
   pro:{groupset:"gs-105-r7150",tyre:"ty-gp5000",wheelset:"ws-carbon-50",handlebar:"hb-carbon-420",stem:"stem-integrated-100",saddle:"sad-men-narrow-long",thruaxle:"ta-premium","bottom-bracket":"bb-t47i-85","bottle-cage":"cage-carbon","tool-pouch":"tool-pouch",bracket:"bracket-computer",colour:"colour-metal-2"},
@@ -21,7 +25,8 @@ function optionLabel(item:InventoryItem){return `${item.brand} ${item.model}`;}
 function delta(item:InventoryItem,options:readonly InventoryItem[],defaultId:string){const standard=options.find(x=>x.id===defaultId);return standard?item.priceInr-standard.priceInr:0;}
 
 function TierPage(){
- const {tier}=Route.useParams(); const [inventory]=useInventory(SEED_INVENTORY); const t=TIERS.find(x=>x.id===tier); if(!t) throw notFound(); const tierId=t.id as Tier; const defaults=DEFAULTS[tierId];
+ const {tier}=Route.useParams(); const authoritative=Route.useLoaderData(); const t=TIERS.find(x=>x.id===tier); if(!t) throw notFound(); const tierId=t.id as Tier; const defaults=DEFAULTS[tierId];
+ const inventory=useMemo(()=>{const balanceBySku=new Map<string,number>(); for(const row of authoritative){if(row.venture!=="carbon") continue; balanceBySku.set(`${row.sku}|${row.unit}`,Number(row.quantity_balance??0));} return SEED_INVENTORY.map(item=>({...item,stockQty:balanceBySku.get(`${item.sku}|unit`)??0}));},[authoritative]);
  const available=inventory.filter(x=>x.stockQty>0&&tierEnabled(x,tierId));
  const options=useMemo(()=>Object.fromEntries(CONFIG_CATEGORIES.map(({key})=>[key,available.filter(x=>x.category===key)])) as Record<InventoryCategory,InventoryItem[]>,[inventory,tierId]);
  const [selection,setSelection]=useState<Record<string,string>>({...defaults});
