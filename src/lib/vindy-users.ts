@@ -36,22 +36,34 @@ export const listVindyUsers = createServerFn({ method: "GET" }).handler(async ()
 
 async function ensureCredentialPassword(sql: Awaited<ReturnType<typeof getSql>>, userId: string, password: string) {
   const passwordHash = await hashPassword(password);
-  const credential = await sql<{ id: string; account_id: string; password: string | null }[]>`
-    select id, "accountId" as account_id, password from "account"
+  const credentials = await sql<{ id: string; account_id: string; password: string | null }[]>`
+    select id, "accountId" as account_id, password
+    from "account"
     where "userId" = ${userId} and "providerId" = 'credential'
     order by "createdAt" asc
-    limit 1
   `;
 
-  if (credential[0]) {
-    // Normalize the credential identity as well as the password. This repairs
-    // older VINDY-created accounts whose credential row may have the wrong
-    // accountId even though the Better Auth userId is correct.
+  // Better Auth resolves email/password identities through the credential
+  // account. Older VINDY provisioning attempts could leave more than one
+  // credential row behind; that makes the password lookup nondeterministic.
+  // Keep exactly one canonical credential row per user.
+  const credential = credentials[0];
+  if (credential) {
     await sql`
       update "account"
       set "accountId" = ${userId}, "password" = ${passwordHash}, "updatedAt" = now()
-      where id = ${credential[0].id}
+      where id = ${credential.id}
     `;
+
+    if (credentials.length > 1) {
+      const duplicateIds = credentials.slice(1).map((row) => row.id);
+      await sql`
+        delete from "account"
+        where "userId" = ${userId}
+          and "providerId" = 'credential'
+          and id = any(${duplicateIds}::text[])
+      `;
+    }
   } else {
     await sql`
       insert into "account" (
@@ -62,16 +74,18 @@ async function ensureCredentialPassword(sql: Awaited<ReturnType<typeof getSql>>,
     `;
   }
 
-  // Verify the exact credential row we just wrote before reporting success.
-  // This prevents the admin UI from claiming a reset succeeded when the stored
-  // hash is not actually compatible with Better Auth's verifier.
-  const verified = await sql<{ password: string | null }[]>`
-    select password from "account"
-    where "userId" = ${userId} and "providerId" = 'credential' and "accountId" = ${userId}
+  // Verify the exact single credential row we just canonicalized before
+  // reporting success. Never expose the password or hash to the client.
+  const verified = await sql<{ id: string; account_id: string; password: string | null }[]>`
+    select id, "accountId" as account_id, password
+    from "account"
+    where "userId" = ${userId} and "providerId" = 'credential'
     order by "updatedAt" desc
-    limit 1
   `;
-  const storedPassword = verified[0]?.password;
+  if (verified.length !== 1 || verified[0].account_id !== userId) {
+    throw new Error("Password reset could not be verified against the credential store.");
+  }
+  const storedPassword = verified[0].password;
   if (!storedPassword || !(await verifyPassword({ hash: storedPassword, password }))) {
     throw new Error("Password reset could not be verified against the credential store.");
   }
