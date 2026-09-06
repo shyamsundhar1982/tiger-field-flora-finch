@@ -79,13 +79,8 @@ async function ensureCredentialPassword(sql: Awaited<ReturnType<typeof getSql>>,
       insert into "account" (
         "id", "accountId", "providerId", "userId", "password", "createdAt", "updatedAt"
       ) values (
-        ${randomUUID()}, ${userId}, 'credential', ${userId}, 'credential', now(), now()
+        ${randomUUID()}, ${userId}, 'credential', ${userId}, ${passwordHash}, now(), now()
       )
-    `;
-    await sql`
-      update "account"
-      set "password" = ${passwordHash}, "updatedAt" = now()
-      where "userId" = ${userId} and "providerId" = 'credential'
     `;
   }
 
