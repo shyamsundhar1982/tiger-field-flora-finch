@@ -44,9 +44,6 @@ async function getRoleForUser(userId: string, email?: string | null): Promise<Co
   const sql = await getSql();
   const normalizedEmail = email?.trim().toLowerCase();
 
-  // The configured bootstrap administrator is authoritative. Older attempts
-  // could leave a viewer role row for this identity; never let that stale row
-  // downgrade the designated administrator. Repair the row while resolving it.
   if (normalizedEmail && getBootstrapAdminEmails().includes(normalizedEmail)) {
     await sql`
       insert into vindy_user_roles (user_id, role) values (${userId}, 'admin')
@@ -67,8 +64,8 @@ async function getLegacySession() {
   if (!password) throw new Error("COMMAND_PASSWORD is not configured on the Worker.");
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(password));
   const sessionPassword = Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
-  const { useSession } = await import("@tanstack/react-start/server");
-  return useSession<CommandSession>({
+  const { useSession: getServerSession } = await import("@tanstack/react-start/server");
+  return getServerSession<CommandSession>({
     name: SESSION_NAME,
     password: sessionPassword,
     cookie: { secure: true, httpOnly: true, sameSite: "lax", maxAge: SESSION_MAX_AGE, path: "/" },
@@ -79,35 +76,29 @@ async function getLegacyRole(): Promise<CommandRole | null> {
   try {
     const session = await getLegacySession();
     return session.data.role ?? null;
-  } catch {
+  } catch (error) {
+    console.warn("Legacy command session lookup failed; continuing with Better Auth.", error);
     return null;
   }
 }
 
 /**
- * Authentication precedence is deliberate:
- * 1. A valid legacy command session keeps its established legacy authority.
- * 2. Otherwise a Better Auth identity uses its VINDY role assignment.
- *
- * The command-login screen clears the opposite session when switching paths,
- * so one browser cannot accidentally carry an old authority into a new login.
+ * Better Auth is authoritative whenever a signed-in identity exists.
+ * The legacy command session is a bootstrap compatibility path only and is
+ * consulted after Better Auth, never before it.
  */
 export const getCommandRole = createServerFn({ method: "GET" }).handler(async () => {
-  const legacyRole = await getLegacyRole();
-  if (legacyRole) return legacyRole;
-
   const user = await getSessionUser();
   if (user) return getRoleForUser(user.id, user.email);
-  return null;
+
+  return getLegacyRole();
 });
 
 export const getCommandAccess = createServerFn({ method: "GET" }).handler(async () => {
-  const legacyRole = await getLegacyRole();
-  if (legacyRole) return true;
-
   const user = await getSessionUser();
   if (user) return true;
-  return false;
+
+  return Boolean(await getLegacyRole());
 });
 
 export const unlockCommand = createServerFn({ method: "POST" })
