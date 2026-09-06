@@ -5,7 +5,7 @@ import { buildModelWithInputs, totals } from "@/lib/finance/model";
 import { useVeloxis } from "@/lib/store";
 
 export const Route = createFileRoute("/command/founder-control")({ component: FounderControl });
-const money = (n: number) => `₹${n.toFixed(1)}L`;
+const money = (n: number | undefined) => `₹${(Number.isFinite(n) ? n : 0).toFixed(1)}L`;
 
 function FounderControl() {
   const scenario = useVeloxis((s) => s.scenario);
@@ -13,8 +13,8 @@ function FounderControl() {
   const finance = useVeloxis((s) => s.finance);
   const rows = buildModelWithInputs(scenario, drawStandby, finance);
   const t = totals(rows);
-  const trough = rows.reduce((min, row) => row.closingCash < min.closingCash ? row : min, rows[0]);
-  const cashRisk = trough.closingCash < FOUNDER_CONTROL_THRESHOLDS.cashFloorLakh;
+  const trough = rows.reduce((min, row) => row.closing < min.closing ? row : min, rows[0]);
+  const cashRisk = trough.closing < FOUNDER_CONTROL_THRESHOLDS.cashFloorLakh;
   const blocked = founderActionSummary.filter((a) => a.status === "blocked");
   const active = founderActionSummary.filter((a) => a.status === "active");
 
@@ -26,7 +26,7 @@ function FounderControl() {
     </header>
 
     <div className="grid gap-3 sm:grid-cols-4">
-      <Kpi label="Cash trough" value={money(trough.closingCash)} hint={`M${trough.m}`} tone={cashRisk ? "danger" : "ok"} />
+      <Kpi label="Cash trough" value={money(trough?.closing)} hint={trough ? `M${trough.m}` : "No model rows"} tone={cashRisk ? "danger" : "ok"} />
       <Kpi label="36M revenue" value={money(t.revenue)} hint="Current model" />
       <Kpi label="Blocked" value={`${blocked.length}`} hint="Needs intervention" tone={blocked.length ? "danger" : "ok"} />
       <Kpi label="Active" value={`${active.length}`} hint="Founder queue" tone="ok" />
