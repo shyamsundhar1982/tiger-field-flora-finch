@@ -2,9 +2,28 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { LockKeyhole } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { authClient } from "@/lib/auth/client";
-import { unlockCommand } from "@/lib/command-access";
+import { lockCommand, unlockCommand } from "@/lib/command-access";
 
 export const Route = createFileRoute("/command-login")({ component: CommandLogin });
+
+async function clearBetterAuthSession() {
+  try {
+    await authClient.signOut();
+  } catch {
+    // Legacy authentication remains authoritative even if an old Better Auth
+    // session cannot be cleared. The server-side role resolver also prefers the
+    // legacy command session.
+  }
+}
+
+async function clearLegacyCommandSession() {
+  try {
+    await lockCommand();
+  } catch {
+    // A missing legacy session/config should never prevent a valid Better Auth
+    // user from signing in.
+  }
+}
 
 function CommandLogin() {
   const navigate = useNavigate();
@@ -21,11 +40,12 @@ function CommandLogin() {
     try {
       const identity = username.trim();
 
-      // VINDY-managed individual users are Better Auth accounts. The previous
-      // command-login screen only checked the legacy COMMAND_* environment
-      // passwords, so newly created VINDY users could never authenticate here
-      // even though their Better Auth credentials were valid.
+      // VINDY-managed individual users are Better Auth accounts. Clear any
+      // previous legacy command session first so an old admin/role cookie cannot
+      // override the newly authenticated user's assigned VINDY permissions.
       if (identity.includes("@")) {
+        await clearLegacyCommandSession();
+
         const normalizedEmail = identity.toLowerCase();
         const result = await authClient.signIn.email({
           email: normalizedEmail,
@@ -37,15 +57,14 @@ function CommandLogin() {
           return;
         }
 
-        // The server resolves the user's VINDY role from vindy_user_roles on
-        // the authenticated Better Auth session. No legacy command password is
-        // created or required for individual users.
         await navigate({ to: "/command" });
         return;
       }
 
-      // Preserve the existing legacy admin/role login path for installations
-      // that still use COMMAND_PASSWORD and COMMAND_*_PASSWORD values.
+      // Legacy command credentials remain a first-class authentication path and
+      // retain their original authority. Clear any Better Auth identity first
+      // so an individual VINDY account cannot leak into a legacy login.
+      await clearBetterAuthSession();
       const result = await unlockCommand({ data: { username: identity, password } });
       if (!result.ok) {
         setError(result.error ?? "Access denied.");
