@@ -13,18 +13,15 @@ export function Kpi({
   tone?: "default" | "ok" | "warn" | "danger";
 }) {
   const explanation = hint
-    ? `Why: this KPI is a decision signal for ${label.toLowerCase()}. How derived: ${hint}`
-    : `Why: this KPI provides a decision signal for ${label.toLowerCase()}. How derived: the value shown is supplied by the page's underlying data/model.`;
+    ? hint
+    : `Based on the underlying data and model used for ${label.toLowerCase()}.`;
 
   return (
-    <div
-      title={explanation}
-      className="min-h-[104px] rounded-lg border border-border bg-bg-elevated p-4 transition-colors hover:border-fg/30 hover:bg-bg-elevated/80"
-    >
+    <div className="group relative min-h-[128px] rounded-xl border border-border bg-bg-elevated p-5 transition-all hover:border-fg/30 hover:shadow-sm">
       <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-subtle sm:text-[11px]">{label}</p>
       <p
         className={cn(
-          "mt-2 break-words font-display text-2xl tabular-nums tracking-tight text-fg",
+          "mt-3 break-words font-display text-3xl tabular-nums tracking-tight text-fg",
           tone === "ok" && "text-ok",
           tone === "warn" && "text-warn",
           tone === "danger" && "text-danger",
@@ -32,7 +29,15 @@ export function Kpi({
       >
         {value}
       </p>
-      {hint ? <p className="mt-2 break-words text-xs leading-5 text-muted">{hint}</p> : <p className="mt-2 text-xs leading-5 text-muted">Hover for why this matters and how it is derived.</p>}
+      <p className="mt-3 line-clamp-2 text-xs leading-5 text-muted">
+        {hint ?? "Derived value — hover for details."}
+      </p>
+
+      <div className="pointer-events-none absolute left-3 right-3 top-full z-20 mt-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+        <div className="rounded-xl border border-white/20 bg-white/25 p-3 text-xs leading-5 text-fg backdrop-blur-md">
+          {explanation}
+        </div>
+      </div>
     </div>
   );
 }
