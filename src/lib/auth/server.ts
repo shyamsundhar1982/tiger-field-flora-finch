@@ -46,19 +46,35 @@ const LOCAL_DEV_ORIGINS: string[] = [
   "http://127.0.0.1:8080",
   "http://[::1]:8080",
 ];
+
+// Vercel creates a different hostname for each production/preview deployment.
+// Better Auth must trust the actual browser origin, otherwise email/password
+// sign-in is rejected with "Invalid origin" before credentials are checked.
+// Scope the wildcard to this VINDY application rather than every Vercel app.
+const VERCEL_APP_ORIGINS: string[] = [
+  "https://tiger-field-flora-finch-*.vercel.app",
+];
+const VERCEL_APP_HOSTS: string[] = ["tiger-field-flora-finch-*.vercel.app"];
+
 const baseURL = explicitBaseURL ?? {
-  allowedHosts: [...previewAllowedHosts, "localhost", "127.0.0.1", "[::1]"],
+  allowedHosts: [
+    ...previewAllowedHosts,
+    ...VERCEL_APP_HOSTS,
+    "localhost",
+    "127.0.0.1",
+    "[::1]",
+  ],
   protocol: "auto" as const,
   fallback: "http://localhost:8080",
 };
 
-const trustedOrigins: string[] = explicitBaseURL
-  ? [explicitBaseURL, ...LOCAL_DEV_ORIGINS]
-  : [
-      ...previewAllowedHosts,
-      ...previewAllowedHosts.flatMap((host) => [`https://${host}`, `http://${host}`]),
-      ...LOCAL_DEV_ORIGINS,
-    ];
+const trustedOrigins: string[] = [
+  ...(explicitBaseURL ? [explicitBaseURL] : []),
+  ...VERCEL_APP_ORIGINS,
+  ...previewAllowedHosts,
+  ...previewAllowedHosts.flatMap((host) => [`https://${host}`, `http://${host}`]),
+  ...LOCAL_DEV_ORIGINS,
+];
 
 const databaseUrl = env("DATABASE_URL");
 const issuerBase = grokIssuer.replace(/\/+$/, "");
