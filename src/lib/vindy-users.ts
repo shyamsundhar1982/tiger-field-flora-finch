@@ -91,6 +91,37 @@ async function ensureCredentialPassword(sql: Awaited<ReturnType<typeof getSql>>,
   }
 }
 
+async function verifyWithBetterAuth(sql: Awaited<ReturnType<typeof getSql>>, userId: string, password: string) {
+  const user = await sql<{ email: string | null }[]>`
+    select email from "user" where id = ${userId} limit 1
+  `;
+  const email = user[0]?.email?.trim().toLowerCase();
+  if (!email) throw new Error("Credential verification could not find the user's email.");
+
+  // Exercise the same Better Auth sign-in path used by the browser. This is
+  // deliberately stronger than verifying the hash directly: Better Auth first
+  // resolves the user by email, selects the credential account, verifies the
+  // password, and then creates a session. A successful result proves that the
+  // persisted VINDY identity is compatible with the real authentication path.
+  let result: { token?: string; user?: { id?: string } };
+  try {
+    result = await auth.api.signInEmail({
+      body: { email, password },
+    }) as { token?: string; user?: { id?: string } };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown Better Auth error";
+    throw new Error(`Better Auth rejected the VINDY credential: ${message}`);
+  }
+
+  if (result.user?.id !== userId || !result.token) {
+    throw new Error("Better Auth authenticated the credential but returned an unexpected user/session.");
+  }
+
+  // signInEmail creates a real session as part of its normal contract. This
+  // diagnostic must never leave an administrator-created session behind.
+  await sql`delete from "session" where token = ${result.token}`;
+}
+
 export const createVindyUser = createServerFn({ method: "POST" })
   .validator(z.object({
     name: z.string().trim().min(1).max(120),
@@ -115,6 +146,7 @@ export const createVindyUser = createServerFn({ method: "POST" })
     if (!userId) throw new Error("Account was not created.");
 
     await ensureCredentialPassword(sql, userId, data.password);
+    await verifyWithBetterAuth(sql, userId, data.password);
     await sql`
       insert into vindy_user_roles (user_id, role) values (${userId}, ${data.role})
       on conflict (user_id) do update set role = excluded.role, updated_at = now()
@@ -139,6 +171,7 @@ export const resetVindyUserPassword = createServerFn({ method: "POST" })
     `;
     if (!existing[0]) throw new Error("User account was not found.");
     await ensureCredentialPassword(sql, data.userId, data.password);
+    await verifyWithBetterAuth(sql, data.userId, data.password);
     return { ok: true };
   });
 
