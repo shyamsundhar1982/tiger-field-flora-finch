@@ -34,51 +34,6 @@ export const listVindyUsers = createServerFn({ method: "GET" }).handler(async ()
   `;
 });
 
-export const createVindyUser = createServerFn({ method: "POST" })
-  .validator(z.object({
-    name: z.string().trim().min(1).max(120),
-    email: z.string().trim().email().max(320),
-    password: z.string().min(8).max(128),
-    role: z.enum(["admin", "management", "board", "finance", "operations", "engineering", "qa", "compliance", "viewer"]),
-  }))
-  .handler(async ({ data }) => {
-    await requireAdmin();
-
-    const sql = await getSql();
-    const name = data.name.trim();
-    const email = data.email.trim().toLowerCase();
-
-    const existing = await sql<{ id: string }[]>`
-      select id from "user" where lower(email) = ${email} limit 1
-    `;
-    if (existing[0]) throw new Error("An account with this email already exists.");
-
-    const result = await auth.api.signUpEmail({
-      body: { name, email, password: data.password },
-    }) as { user?: { id?: string; name?: string | null; email?: string | null; createdAt?: string | Date } | null };
-
-    const userId = result.user?.id;
-    if (!userId) throw new Error("Account was not created.");
-
-    await ensureCredentialPassword(sql, userId, data.password);
-
-    await sql`
-      insert into vindy_user_roles (user_id, role) values (${userId}, ${data.role})
-      on conflict (user_id) do update set role = excluded.role, updated_at = now()
-    `;
-
-    const created = await sql<{ id: string; name: string | null; email: string | null; role: string; created_at: string }[]>`
-      select u.id, u.name, u.email, r.role, u."createdAt" as created_at
-      from "user" u
-      join vindy_user_roles r on r.user_id = u.id
-      where u.id = ${userId}
-      limit 1
-    `;
-    if (!created[0]) throw new Error("Account was created but could not be verified in the user register.");
-
-    return { ok: true, user: created[0] };
-  });
-
 async function ensureCredentialPassword(sql: Awaited<ReturnType<typeof getSql>>, userId: string, password: string) {
   const passwordHash = await hashPassword(password);
   const credential = await sql<{ id: string }[]>`
@@ -103,11 +58,46 @@ async function ensureCredentialPassword(sql: Awaited<ReturnType<typeof getSql>>,
   }
 }
 
-export const resetVindyUserPassword = createServerFn({ method: "POST" })
+export const createVindyUser = createServerFn({ method: "POST" })
   .validator(z.object({
-    userId: z.string().min(1).max(200),
+    name: z.string().trim().min(1).max(120),
+    email: z.string().trim().email().max(320),
     password: z.string().min(8).max(128),
+    role: z.enum(["admin", "management", "board", "finance", "operations", "engineering", "qa", "compliance", "viewer"]),
   }))
+  .handler(async ({ data }) => {
+    await requireAdmin();
+    const sql = await getSql();
+    const name = data.name.trim();
+    const email = data.email.trim().toLowerCase();
+    const existing = await sql<{ id: string }[]>`
+      select id from "user" where lower(email) = ${email} limit 1
+    `;
+    if (existing[0]) throw new Error("An account with this email already exists.");
+
+    const result = await auth.api.signUpEmail({
+      body: { name, email, password: data.password },
+    }) as { user?: { id?: string } | null };
+    const userId = result.user?.id;
+    if (!userId) throw new Error("Account was not created.");
+
+    await ensureCredentialPassword(sql, userId, data.password);
+    await sql`
+      insert into vindy_user_roles (user_id, role) values (${userId}, ${data.role})
+      on conflict (user_id) do update set role = excluded.role, updated_at = now()
+    `;
+
+    const created = await sql<{ id: string; name: string | null; email: string | null; role: string; created_at: string }[]>`
+      select u.id, u.name, u.email, r.role, u."createdAt" as created_at
+      from "user" u join vindy_user_roles r on r.user_id = u.id
+      where u.id = ${userId} limit 1
+    `;
+    if (!created[0]) throw new Error("Account was created but could not be verified in the user register.");
+    return { ok: true, user: created[0] };
+  });
+
+export const resetVindyUserPassword = createServerFn({ method: "POST" })
+  .validator(z.object({ userId: z.string().min(1).max(200), password: z.string().min(8).max(128) }))
   .handler(async ({ data }) => {
     await requireAdmin();
     const sql = await getSql();
@@ -115,7 +105,6 @@ export const resetVindyUserPassword = createServerFn({ method: "POST" })
       select id from "user" where id = ${data.userId} limit 1
     `;
     if (!existing[0]) throw new Error("User account was not found.");
-
     await ensureCredentialPassword(sql, data.userId, data.password);
     return { ok: true };
   });
@@ -138,13 +127,11 @@ export const deleteVindyUser = createServerFn({ method: "POST" })
     await requireAdmin();
     const current = await getSessionUser();
     if (current?.id === data.userId) throw new Error("You cannot delete the account currently in use.");
-
     const sql = await getSql();
     const existing = await sql<{ id: string }[]>`
       select id from "user" where id = ${data.userId} limit 1
     `;
     if (!existing[0]) throw new Error("User account was not found.");
-
     await sql`delete from vindy_user_roles where user_id = ${data.userId}`;
     await sql`delete from "user" where id = ${data.userId}`;
     return { ok: true, userId: data.userId };
