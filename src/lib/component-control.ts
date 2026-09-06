@@ -31,7 +31,7 @@ export const getComponentControl = createServerFn({ method: "GET" })
         sku: string;
         quantity: number | string;
         unit: string;
-      }[]>(
+      }>(
         `select model_id,bom_revision,bom_line_key,sku,quantity,unit
          from epr_bom_inventory_mappings
          where venture=$1
@@ -47,7 +47,7 @@ export const getComponentControl = createServerFn({ method: "GET" })
         sku: string;
         unit: string;
         minimum_stock_level: number | string;
-      }[]>(
+      }>(
         `select sku,unit,minimum_stock_level
          from epr_inventory_controls
          where venture=$1 and active=true`,
