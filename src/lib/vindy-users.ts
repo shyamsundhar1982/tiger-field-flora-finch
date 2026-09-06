@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { CommandRole } from "@/lib/page-access";
 import { getCommandRole } from "@/lib/command-access";
+import { getSessionUser } from "@/lib/auth/verify.server";
 import { auth } from "@/lib/auth/server";
 import { getSql } from "@/lib/db";
 
@@ -15,8 +16,9 @@ async function requireAdmin() {
 }
 
 export const getVindyUserContext = createServerFn({ method: "GET" }).handler(async () => {
+  const user = await getSessionUser();
   const role = await getCommandRole();
-  return { id: null, email: null, role: isRole(role) ? role : null };
+  return { id: user?.id ?? null, email: user?.email ?? null, role: isRole(role) ? role : null };
 });
 
 export const listVindyUsers = createServerFn({ method: "GET" }).handler(async () => {
@@ -83,4 +85,22 @@ export const setVindyUserRole = createServerFn({ method: "POST" })
       on conflict (user_id) do update set role = excluded.role, updated_at = now()
     `;
     return { ok: true };
+  });
+
+export const deleteVindyUser = createServerFn({ method: "POST" })
+  .validator(z.object({ userId: z.string().min(1).max(200) }))
+  .handler(async ({ data }) => {
+    await requireAdmin();
+    const current = await getSessionUser();
+    if (current?.id === data.userId) throw new Error("You cannot delete the account currently in use.");
+
+    const sql = await getSql();
+    const existing = await sql<{ id: string }[]>`
+      select id from "user" where id = ${data.userId} limit 1
+    `;
+    if (!existing[0]) throw new Error("User account was not found.");
+
+    await sql`delete from vindy_user_roles where user_id = ${data.userId}`;
+    await sql`delete from "user" where id = ${data.userId}`;
+    return { ok: true, userId: data.userId };
   });
