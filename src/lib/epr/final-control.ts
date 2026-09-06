@@ -33,19 +33,26 @@ export const createEprMapping = createServerFn({ method: "POST" }).validator(z.o
 })).handler(async ({ data }) => {
   const actor = await admin();
   const sql = await getSql();
+  const master = await sql.query<{ id: string; status: string; code: string }[]>(
+    `select id,status,code from master_data_records where domain='inventory' and code=$1 and status='approved' order by revision desc limit 1`,
+    [data.sku],
+  );
+  if (!master[0]) throw new Error(`SKU ${data.sku} is not an approved Inventory Master record. Approve the SKU before mapping it to a BOM.`);
   const mappingId = makeId("MAP");
   await sql.query(`insert into epr_bom_inventory_mappings (id,venture,model_id,bom_revision,bom_line_key,sku,quantity,unit,status,notes,created_by) values ($1,$2,$3,$4,$5,$6,$7,$8,'draft',$9,$10)`, [mappingId,data.venture,data.modelId,data.bomRevision,data.bomLineKey,data.sku,data.quantity,data.unit,data.notes,actor]);
-  await audit(sql,data.venture,"bom_inventory_mapping",mappingId,"draft_created",actor,data);
+  await audit(sql,data.venture,"bom_inventory_mapping",mappingId,"draft_created",actor,{...data,inventoryMasterId:master[0].id});
   return { ok:true, mappingId };
 });
 
 export const approveEprMapping = createServerFn({ method: "POST" }).validator(z.object({ mappingId: z.string().min(1) })).handler(async ({ data }) => {
   const actor = await admin();
   const sql = await getSql();
-  const rows = await sql.query<{id:string;venture:"carbon"|"aluminium";model_id:string;bom_revision:string;bom_line_key:string;sku:string;status:string}>(`select id,venture,model_id,bom_revision,bom_line_key,sku,status from epr_bom_inventory_mappings where id=$1`,[data.mappingId]);
+  const rows = await sql.query<{id:string;venture:"carbon"|"aluminium";model_id:string;bom_revision:string;bom_line_key:string;sku:string;unit:string;status:string}>(`select id,venture,model_id,bom_revision,bom_line_key,sku,unit,status from epr_bom_inventory_mappings where id=$1`,[data.mappingId]);
   const m = rows[0];
   if (!m) throw new Error("BOM-SKU mapping not found.");
   if (m.status !== "draft") throw new Error(`Only draft mappings can be approved; current status is ${m.status}.`);
+  const master = await sql.query<{id:string}[]>(`select id from master_data_records where domain='inventory' and code=$1 and status='approved' order by revision desc limit 1`,[m.sku]);
+  if (!master[0]) throw new Error(`SKU ${m.sku} is no longer approved in Inventory Master.`);
   await sql.query(`update epr_bom_inventory_mappings set status='superseded',effective_to=now(),updated_at=now() where venture=$1 and model_id=$2 and bom_revision=$3 and bom_line_key=$4 and sku=$5 and status='active' and effective_to is null`,[m.venture,m.model_id,m.bom_revision,m.bom_line_key,m.sku]);
   await sql.query(`update epr_bom_inventory_mappings set status='active',approved_by=$1,approved_at=now(),effective_from=now(),effective_to=null,updated_at=now() where id=$2`,[actor,m.id]);
   await audit(sql,m.venture,"bom_inventory_mapping",m.id,"approved",actor,m);
