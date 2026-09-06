@@ -25,10 +25,10 @@ export const listVindyUsers = createServerFn({ method: "GET" }).handler(async ()
   await requireAdmin();
   const sql = await getSql();
   return sql<{ id: string; name: string | null; email: string | null; role: string | null; created_at: string }[]>`
-    select u.id, u.name, u.email, r.role, u.created_at
+    select u.id, u.name, u.email, r.role, u."createdAt" as created_at
     from "user" u
     left join vindy_user_roles r on r.user_id = u.id
-    order by u.created_at desc
+    order by u."createdAt" desc
   `;
 });
 
@@ -64,7 +64,7 @@ export const createVindyUser = createServerFn({ method: "POST" })
     `;
 
     const created = await sql<{ id: string; name: string | null; email: string | null; role: string; created_at: string }[]>`
-      select u.id, u.name, u.email, r.role, u.created_at
+      select u.id, u.name, u.email, r.role, u."createdAt" as created_at
       from "user" u
       join vindy_user_roles r on r.user_id = u.id
       where u.id = ${userId}
