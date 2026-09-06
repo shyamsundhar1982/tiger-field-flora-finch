@@ -4,21 +4,11 @@ import { getRouteMeta, type PageMaturity, type PageMode } from "@/lib/page-metad
 export const Route = createFileRoute("/command/classification")({ component: Classification });
 
 const MODES: PageMode[] = ["understand", "observe", "operate", "showcase"];
-const MATURITY: PageMaturity[] = ["keep", "merge", "review"];
-const modeLabel: Record<PageMode,string> = { understand:"UNDERSTAND", observe:"OBSERVE", operate:"OPERATE", showcase:"SHOWCASE" };
 const maturityLabel: Record<PageMaturity,string> = { keep:"KEEP", merge:"MERGE", review:"REVIEW" };
+const modeLabel: Record<PageMode,string> = { understand:"UNDERSTAND", observe:"OBSERVE", operate:"OPERATE", showcase:"SHOWCASE" };
 
 function Classification(){
-  const pages = Object.values(import.meta.glob("/src/routes/command/*.tsx", { eager:true, query:"?url", import:"default" }));
-  const registry = Object.values((getRouteMeta as unknown as { registry?: Record<string, never> }).registry ?? {});
-  void pages; void registry;
-  const known = [
-    "/command","/command/control-tower","/command/management-intelligence","/command/founder-command","/command/decision-engine",
-    "/command/knowledge","/command/technical","/command/design-philosophy","/command/ai-knowledge",
-    "/command/balance-sheet","/command/finance","/command/ca-audit","/command/scenarios","/command/qa-verification","/command/epr-live",
-    "/command/finance-assumptions","/command/master-finance","/command/finance-control","/command/funding","/command/cash","/command/operations","/command/inventory","/inventory","/command/production","/command/manufacturing","/command/quality","/command/product","/command/bom","/command/engineering","/command/epr-workflow","/command/epr-execution",
-    "/command/investor-pitch","/command/stakeholder-portal","/command/financial-cockpit","/command/phase-4","/command/phase-5","/command/phase-6","/command/phase-6a","/command/deployment-readiness","/command/aluminium-finance","/command/ops","/command/sales","/command/market-survey","/command/gtm","/command/legal","/command/legal-control","/command/risk","/command/actions","/command/investor-board"
-  ].map(route=>getRouteMeta(route)).filter(Boolean);
+  const known = Object.keys(import.meta.glob("/src/routes/command/*.tsx", { eager:true })).map(route=>route.replace(/^\/src\/routes/, "").replace(/\.tsx$/, "")).map(route=>getRouteMeta(route)).filter(Boolean);
   const counts = MODES.map(mode=>({mode,count:known.filter(p=>p?.mode===mode).length}));
   return <div className="space-y-6">
     <header><p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-subtle">VINDY 2.0</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">Page Classification</h1><p className="mt-2 max-w-3xl text-sm text-muted">Every page is governed by four tags: <strong>Mode</strong> — why the user opened it; <strong>Domain</strong> — business area; <strong>Owner</strong> — primary user; <strong>Maturity</strong> — Keep, Merge or Review.</p></header>
