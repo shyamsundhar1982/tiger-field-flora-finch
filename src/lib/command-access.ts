@@ -43,7 +43,13 @@ async function getRoleForUser(userId: string, email?: string | null): Promise<Co
 
   const bootstrapEmails = (process.env.VINDY_ADMIN_EMAILS ?? "")
     .split(",").map((item) => item.trim().toLowerCase()).filter(Boolean);
-  if (email && bootstrapEmails.includes(email.toLowerCase())) return "admin";
+  if (email && bootstrapEmails.includes(email.toLowerCase())) {
+    await sql`
+      insert into vindy_user_roles (user_id, role) values (${userId}, 'admin')
+      on conflict (user_id) do update set role = 'admin', updated_at = now()
+    `;
+    return "admin";
+  }
   return "viewer";
 }
 
@@ -73,7 +79,7 @@ export const getCommandRole = createServerFn({ method: "GET" }).handler(async ()
 
 export const getCommandAccess = createServerFn({ method: "GET" }).handler(async () => {
   const user = await getSessionUser();
-  if (user) return true;
+  if (user) return (await getRoleForUser(user.id, user.email)) !== null;
   try {
     const session = await getLegacySession();
     return session.data.role != null;
