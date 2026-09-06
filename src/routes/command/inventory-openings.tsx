@@ -1,74 +1,28 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { Panel, Kpi } from "@/components/kpi";
 import { inr } from "@/lib/format";
-import {
-  approveInventoryOpeningBalance,
-  createInventoryOpeningBalance,
-  getAuthoritativeInventoryControl,
-  postInventoryOpeningBalance,
-} from "@/lib/epr/final-control";
+import { approveInventoryOpeningBalance, createInventoryOpeningBalance, getAuthoritativeInventoryControl, postInventoryOpeningBalance } from "@/lib/epr/final-control";
 
-export const Route = createFileRoute("/command/inventory-openings")({
-  loader: () => getAuthoritativeInventoryControl(),
-  component: InventoryOpenings,
-});
+export const Route = createFileRoute("/command/inventory-openings")({ loader: () => getAuthoritativeInventoryControl(), component: InventoryOpenings });
+type Venture = "carbon" | "aluminium";
 
 function InventoryOpenings() {
   const router = useRouter();
   const { openings, balances } = Route.useLoaderData();
-  const [form, setForm] = useState({ venture: "aluminium", sku: "", unit: "kg", quantity: "", unitCostInr: "", reference: "", notes: "" });
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-
-  async function run(action: () => Promise<unknown>, success: string) {
-    setBusy(true); setError(""); setMessage("");
-    try { await action(); setMessage(success); await router.invalidate(); }
-    catch (e) { setError(e instanceof Error ? e.message : "Operation failed."); }
-    finally { setBusy(false); }
-  }
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    const quantity = Number(form.quantity); const unitCostInr = Number(form.unitCostInr);
-    if (!form.sku.trim() || !form.reference.trim() || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitCostInr) || unitCostInr < 0) {
-      setError("Enter SKU, positive quantity, non-negative unit cost and a reference."); return;
-    }
-    await run(() => createInventoryOpeningBalance({ data: { venture: form.venture as "carbon" | "aluminium", sku: form.sku.trim(), unit: form.unit.trim(), quantity, unitCostInr, reference: form.reference.trim(), notes: form.notes.trim() } }), "Opening balance created as DRAFT. Approve it before posting.");
-  }
-
+  const [form, setForm] = useState({ venture: "aluminium" as Venture, sku: "", unit: "kg", quantity: "", unitCostInr: "", reference: "", notes: "" });
+  const [busy, setBusy] = useState(false); const [message, setMessage] = useState(""); const [error, setError] = useState("");
+  async function run(action: () => Promise<unknown>, success: string) { setBusy(true); setError(""); setMessage(""); try { await action(); setMessage(success); await router.invalidate(); } catch (e) { setError(e instanceof Error ? e.message : "Operation failed."); } finally { setBusy(false); } }
+  async function submit(e: FormEvent) { e.preventDefault(); const quantity=Number(form.quantity); const unitCostInr=Number(form.unitCostInr); if(!form.sku.trim()||!form.reference.trim()||!Number.isFinite(quantity)||quantity<=0||!Number.isFinite(unitCostInr)||unitCostInr<0){setError("Enter SKU, positive quantity, non-negative unit cost and a reference.");return;} await run(()=>createInventoryOpeningBalance({data:{venture:form.venture,sku:form.sku.trim(),unit:form.unit.trim(),quantity,unitCostInr,reference:form.reference.trim(),notes:form.notes.trim()}}),"Opening balance created as DRAFT. Approve it before posting."); }
   return <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
-    <p className="text-[10px] uppercase tracking-[0.22em] text-green">Operate · controlled mutation</p>
-    <h1 className="mt-2 text-4xl font-bold text-accent">Inventory opening balances</h1>
-    <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">Create, approve and post opening stock into the authoritative EPR inventory and cost ledgers. No browser seed inventory is imported.</p>
-
-    <div className="mt-8 grid gap-3 sm:grid-cols-3">
-      <Kpi label="Current authoritative SKUs" value={String(balances.length)} />
-      <Kpi label="Opening records" value={String(openings.length)} />
-      <Kpi label="Posted openings" value={String(openings.filter((x: any) => x.status === "posted").length)} />
-    </div>
-
-    <Panel title="Create controlled opening balance" className="mt-6">
-      <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Field label="Venture"><select className="input" value={form.venture} onChange={e => setForm({ ...form, venture: e.target.value })}><option value="aluminium">Aluminium</option><option value="carbon">Carbon</option></select></Field>
-        <Field label="SKU"><input className="input" value={form.sku} onChange={e => setForm({ ...form, sku: e.target.value })} placeholder="Approved SKU" /></Field>
-        <Field label="Unit"><input className="input" value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} /></Field>
-        <Field label="Quantity"><input className="input" type="number" min="0" step="0.0001" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} /></Field>
-        <Field label="Unit cost (INR)"><input className="input" type="number" min="0" step="0.01" value={form.unitCostInr} onChange={e => setForm({ ...form, unitCostInr: e.target.value })} /></Field>
-        <Field label="Reference"><input className="input" value={form.reference} onChange={e => setForm({ ...form, reference: e.target.value })} placeholder="Count sheet / opening ref" /></Field>
-        <Field label="Notes"><input className="input" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></Field>
-        <div className="flex items-end"><button disabled={busy} className="w-full rounded-lg border border-green/40 bg-green/10 px-4 py-2.5 text-sm font-semibold text-fg disabled:opacity-50">{busy ? "Saving…" : "Create draft"}</button></div>
-      </form>
-      {(message || error) && <p className={`mt-4 rounded-lg border p-3 text-sm ${error ? "border-red-400/40 text-red-300" : "border-green/30 text-green"}`}>{error || message}</p>}
-    </Panel>
-
-    <Panel title="Controlled opening workflow" className="mt-6">
-      <div className="overflow-x-auto"><table className="w-full min-w-[1000px] text-left text-sm"><thead className="text-[10px] uppercase tracking-[0.14em] text-green"><tr><th className="px-3 py-3">Status</th><th className="px-3 py-3">Venture</th><th className="px-3 py-3">SKU</th><th className="px-3 py-3">Qty</th><th className="px-3 py-3">Unit cost</th><th className="px-3 py-3">Reference</th><th className="px-3 py-3">Created</th><th className="px-3 py-3">Action</th></tr></thead><tbody>{openings.map((x: any) => <tr key={x.id} className="border-t border-border/70"><td className="px-3 py-3 uppercase text-xs font-semibold">{x.status}</td><td className="px-3 py-3 uppercase">{x.venture}</td><td className="px-3 py-3 font-mono text-xs">{x.sku}</td><td className="px-3 py-3 tabular-nums">{Number(x.quantity)}</td><td className="px-3 py-3 tabular-nums">{inr(Number(x.unit_cost_inr))}</td><td className="px-3 py-3 text-xs">{x.reference}</td><td className="px-3 py-3 text-xs text-muted">{x.created_at ? new Date(x.created_at).toLocaleString() : "—"}</td><td className="px-3 py-3"><div className="flex gap-2">{x.status === "draft" && <button disabled={busy} onClick={() => run(() => approveInventoryOpeningBalance({ data: { openingId: x.id } }), "Opening balance approved. It is now ready to post.")} className="rounded-md border border-border px-3 py-1.5 text-xs">Approve</button>}{x.status === "approved" && <button disabled={busy} onClick={() => run(() => postInventoryOpeningBalance({ data: { openingId: x.id } }), "Opening balance posted to the authoritative quantity and cost ledgers.")} className="rounded-md border border-green/40 bg-green/10 px-3 py-1.5 text-xs font-semibold">Post</button>}{x.status === "posted" && <span className="text-xs text-green">Authoritative</span>}</div></td></tr>)}</tbody></table></div>
-      {openings.length === 0 && <div className="rounded-xl border border-dashed border-border p-6 text-sm text-muted">No opening-balance records yet. Create a draft only for stock supported by an approved BOM-SKU mapping and a controlled count/cost reference.</div>}
-    </Panel>
+    <p className="text-[10px] uppercase tracking-[0.22em] text-green">Operate · controlled mutation</p><h1 className="mt-2 text-4xl font-bold text-accent">Inventory opening balances</h1><p className="mt-3 max-w-3xl text-sm leading-6 text-muted">Create, approve and post opening stock into the authoritative EPR inventory and cost ledgers. No browser seed inventory is imported.</p>
+    <div className="mt-8 grid gap-3 sm:grid-cols-3"><Kpi label="Current authoritative SKUs" value={String(balances.length)} /><Kpi label="Opening records" value={String(openings.length)} /><Kpi label="Posted openings" value={String(openings.filter((x:any)=>x.status==="posted").length)} /></div>
+    <Panel title="Create controlled opening balance" className="mt-6"><form onSubmit={submit} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <Field label="Venture"><select className="input" value={form.venture} onChange={e=>setForm({...form,venture:e.target.value as Venture})}><option value="aluminium">Aluminium</option><option value="carbon">Carbon</option></select></Field><Field label="SKU"><input className="input" value={form.sku} onChange={e=>setForm({...form,sku:e.target.value})} placeholder="Approved SKU" /></Field><Field label="Unit"><input className="input" value={form.unit} onChange={e=>setForm({...form,unit:e.target.value})} /></Field><Field label="Quantity"><input className="input" type="number" min="0" step="0.0001" value={form.quantity} onChange={e=>setForm({...form,quantity:e.target.value})} /></Field><Field label="Unit cost (INR)"><input className="input" type="number" min="0" step="0.01" value={form.unitCostInr} onChange={e=>setForm({...form,unitCostInr:e.target.value})} /></Field><Field label="Reference"><input className="input" value={form.reference} onChange={e=>setForm({...form,reference:e.target.value})} placeholder="Count sheet / opening ref" /></Field><Field label="Notes"><input className="input" value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} /></Field><div className="flex items-end"><button disabled={busy} className="w-full rounded-lg border border-green/40 bg-green/10 px-4 py-2.5 text-sm font-semibold text-fg disabled:opacity-50">{busy?"Saving…":"Create draft"}</button></div>
+    </form>{(message||error)&&<p className={`mt-4 rounded-lg border p-3 text-sm ${error?"border-red-400/40 text-red-300":"border-green/30 text-green"}`}>{error||message}</p>}</Panel>
+    <Panel title="Controlled opening workflow" className="mt-6"><div className="overflow-x-auto"><table className="w-full min-w-[1000px] text-left text-sm"><thead className="text-[10px] uppercase tracking-[0.14em] text-green"><tr><th className="px-3 py-3">Status</th><th className="px-3 py-3">Venture</th><th className="px-3 py-3">SKU</th><th className="px-3 py-3">Qty</th><th className="px-3 py-3">Unit cost</th><th className="px-3 py-3">Reference</th><th className="px-3 py-3">Created</th><th className="px-3 py-3">Action</th></tr></thead><tbody>{openings.map((x:any)=><tr key={x.id} className="border-t border-border/70"><td className="px-3 py-3 uppercase text-xs font-semibold">{x.status}</td><td className="px-3 py-3 uppercase">{x.venture}</td><td className="px-3 py-3 font-mono text-xs">{x.sku}</td><td className="px-3 py-3 tabular-nums">{Number(x.quantity)}</td><td className="px-3 py-3 tabular-nums">{inr(Number(x.unit_cost_inr))}</td><td className="px-3 py-3 text-xs">{x.reference}</td><td className="px-3 py-3 text-xs text-muted">{x.created_at?new Date(x.created_at).toLocaleString():"—"}</td><td className="px-3 py-3"><div className="flex gap-2">{x.status==="draft"&&<button disabled={busy} onClick={()=>run(()=>approveInventoryOpeningBalance({data:{openingId:x.id}}),"Opening balance approved. It is now ready to post.")} className="rounded-md border border-border px-3 py-1.5 text-xs">Approve</button>}{x.status==="approved"&&<button disabled={busy} onClick={()=>run(()=>postInventoryOpeningBalance({data:{openingId:x.id}}),"Opening balance posted to the authoritative quantity and cost ledgers.")} className="rounded-md border border-green/40 bg-green/10 px-3 py-1.5 text-xs font-semibold">Post</button>}{x.status==="posted"&&<span className="text-xs text-green">Authoritative</span>}</div></td></tr>)}</tbody></table></div>{openings.length===0&&<div className="rounded-xl border border-dashed border-border p-6 text-sm text-muted">No opening-balance records yet. Create a draft only for stock supported by an approved BOM-SKU mapping and a controlled count/cost reference.</div>}</Panel>
     <p className="mt-5 text-xs leading-5 text-subtle">Control rule: opening balances are never silently accepted. They must be created as draft, approved, then posted through the database transaction. Posting establishes both quantity and cost basis used by weighted-average inventory and subsequent actual COGS.</p>
   </main>;
 }
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block"><span className="mb-1.5 block text-[10px] uppercase tracking-[0.14em] text-subtle">{label}</span>{children}</label>; }
+function Field({label,children}:{label:string;children:ReactNode}){return <label className="block"><span className="mb-1.5 block text-[10px] uppercase tracking-[0.14em] text-subtle">{label}</span>{children}</label>;}
