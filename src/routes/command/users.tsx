@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { createVindyUser, getVindyUserContext, listVindyUsers, setVindyUserRole } from "@/lib/vindy-users";
+import { createVindyUser, deleteVindyUser, getVindyUserContext, listVindyUsers, setVindyUserRole } from "@/lib/vindy-users";
 import type { CommandRole } from "@/lib/page-access";
 
 export const Route = createFileRoute("/command/users")({ component: UsersPage });
@@ -10,11 +10,12 @@ const roles: CommandRole[] = ["admin", "management", "board", "finance", "operat
 type VindyUser = { id: string; name: string | null; email: string | null; role: string | null; created_at: string };
 
 function UsersPage() {
-  const [me, setMe] = useState<{ role: CommandRole | null } | null>(null);
+  const [me, setMe] = useState<{ id: string | null; role: CommandRole | null } | null>(null);
   const [users, setUsers] = useState<VindyUser[]>([]);
   const [error, setError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [deletingId, setDeletingId] = useState("");
   const [form, setForm] = useState({ name: "", email: "", password: "", role: "viewer" as CommandRole });
 
   async function refresh() {
@@ -48,7 +49,6 @@ function UsersPage() {
       setUsers((current) => [result.user as VindyUser, ...current.filter((user) => user.id !== result.user.id)]);
       setForm({ name: "", email: "", password: "", role: "viewer" });
       setShowCreate(false);
-      // Re-read the authoritative register after the immediate UI update.
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create user.");
@@ -57,12 +57,27 @@ function UsersPage() {
     }
   }
 
+  async function deleteUser(user: VindyUser) {
+    if (user.id === me?.id) return;
+    if (!window.confirm(`Delete the account for ${user.name || user.email || user.id}? This removes the account and its VINDY role assignment.`)) return;
+    try {
+      setDeletingId(user.id);
+      setError("");
+      await deleteVindyUser({ data: { userId: user.id } });
+      setUsers((current) => current.filter((item) => item.id !== user.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to delete user.");
+    } finally {
+      setDeletingId("");
+    }
+  }
+
   if (me?.role !== "admin") return <div className="p-8"><h1 className="text-2xl font-semibold text-slate-950">User Access</h1><p className="mt-2 text-sm font-medium text-slate-700">Administrator access is required.</p>{error && <p className="mt-4 text-sm font-medium text-red-700">{error}</p>}</div>;
 
   return (
     <main className="space-y-6 p-8 text-slate-950">
       <header className="flex flex-wrap items-end justify-between gap-4">
-        <div><p className="text-xs font-bold uppercase tracking-[0.25em] text-orange-600">VINDY • IDENTITY</p><h1 className="mt-2 text-3xl font-semibold text-slate-950">User Access Control</h1><p className="mt-2 text-sm font-medium text-slate-700">Create individual accounts, assign least-privilege roles and maintain auditable access.</p></div>
+        <div><p className="text-xs font-bold uppercase tracking-[0.25em] text-orange-600">VINDY • IDENTITY</p><h1 className="mt-2 text-3xl font-semibold text-slate-950">User Access Control</h1><p className="mt-2 max-w-3xl text-sm font-medium text-slate-700">Create individual accounts, assign least-privilege roles and maintain auditable access. Hover over the register headers and user ID to see why each field exists and how it is sourced.</p></div>
         <div className="flex items-center gap-2"><button type="button" onClick={() => void refresh()} className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50">Refresh</button><button type="button" onClick={() => { setError(""); setShowCreate(true); }} className="rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm hover:bg-orange-400">+ Create user</button></div>
       </header>
       {error && <p className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800">{error}</p>}
@@ -78,10 +93,26 @@ function UsersPage() {
         <div className="mt-5 flex justify-end"><button type="button" disabled={creating || !form.name.trim() || !form.email.trim() || form.password.length < 8} onClick={() => void createUser()} className="rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-40">{creating ? "Creating…" : "Create account"}</button></div>
       </section>}
 
-      <section className="overflow-hidden rounded-2xl border border-slate-300 bg-white">
-        <div className="grid grid-cols-[1.3fr_1.5fr_1fr_1fr] gap-4 border-b border-slate-300 bg-slate-100 px-5 py-3 text-xs font-bold uppercase tracking-wide text-slate-700"><span>User</span><span>Email</span><span>Role</span><span>Created</span></div>
-        {users.length === 0 && <div className="px-5 py-10 text-center text-sm font-medium text-slate-600">No VINDY users are registered yet.</div>}
-        {users.map((user) => <div key={user.id} className="grid grid-cols-[1.3fr_1.5fr_1fr_1fr] items-center gap-4 border-b border-slate-200 px-5 py-4 text-sm"><span className="font-semibold text-slate-950">{user.name || "Unnamed user"}</span><span className="font-medium text-slate-700">{user.email || "—"}</span><select value={user.role || "viewer"} onChange={(e) => void changeRole(user.id, e.target.value as CommandRole)} className="rounded-lg border border-slate-400 bg-white px-2 py-2 font-semibold text-slate-950">{roles.map((role) => <option key={role} value={role}>{role}</option>)}</select><span className="font-medium text-slate-700">{new Date(user.created_at).toLocaleDateString()}</span></div>)}
+      <section className="overflow-x-auto rounded-2xl border border-slate-300 bg-white shadow-sm">
+        <div className="min-w-[980px]">
+          <div className="grid grid-cols-[minmax(150px,1.1fr)_minmax(210px,1.4fr)_minmax(260px,1.7fr)_minmax(120px,.7fr)_minmax(130px,.8fr)_minmax(100px,.6fr)] gap-4 border-b border-slate-300 bg-slate-100 px-5 py-3 text-xs font-bold uppercase tracking-wide text-slate-700">
+            <span title="Why: identifies the person who owns this account. How derived: Better Auth user.name, stored when the account is created.">User</span>
+            <span title="Why: the login identity and duplicate-account control. How derived: Better Auth user.email, normalized to lowercase during creation.">Email</span>
+            <span title="Why: this is the stable identity key used by VINDY role assignment and access checks. How derived: Better Auth generates the user.id; it is read back from the authoritative user register.">User ID</span>
+            <span title="Why: controls what the account can do. How derived: vindy_user_roles.role assigned by an administrator.">Role</span>
+            <span title="Why: provides account provenance. How derived: Better Auth user.createdAt, read from the authoritative user register.">Created</span>
+            <span title="Why: allows an administrator to remove an account that should no longer have access. How derived: deletes the selected Better Auth user and its VINDY role assignment; the current account cannot be deleted.">Action</span>
+          </div>
+          {users.length === 0 && <div className="px-5 py-10 text-center text-sm font-medium text-slate-600">No VINDY users are registered yet.</div>}
+          {users.map((user) => <div key={user.id} className="grid grid-cols-[minmax(150px,1.1fr)_minmax(210px,1.4fr)_minmax(260px,1.7fr)_minmax(120px,.7fr)_minmax(130px,.8fr)_minmax(100px,.6fr)] items-center gap-4 border-b border-slate-200 px-5 py-4 text-sm">
+            <span className="font-semibold text-slate-950">{user.name || "Unnamed user"}</span>
+            <span className="break-all font-medium text-slate-700">{user.email || "—"}</span>
+            <span title={`Why: stable account reference. How derived: Better Auth user.id created with this account.`} className="break-all font-mono text-xs font-semibold text-slate-800">{user.id}</span>
+            <select aria-label={`Role for ${user.name || user.email || user.id}`} value={user.role || "viewer"} onChange={(e) => void changeRole(user.id, e.target.value as CommandRole)} className="rounded-lg border border-slate-400 bg-white px-2 py-2 font-semibold text-slate-950">{roles.map((role) => <option key={role} value={role}>{role}</option>)}</select>
+            <span className="font-medium text-slate-700">{new Date(user.created_at).toLocaleDateString()}</span>
+            <button type="button" disabled={deletingId === user.id || user.id === me?.id} onClick={() => void deleteUser(user)} title={user.id === me?.id ? "The account currently in use cannot be deleted." : "Delete this user account and its VINDY role assignment."} className="rounded-lg border border-red-300 bg-white px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40">{deletingId === user.id ? "Deleting…" : "Delete"}</button>
+          </div>)}
+        </div>
       </section>
     </main>
   );
