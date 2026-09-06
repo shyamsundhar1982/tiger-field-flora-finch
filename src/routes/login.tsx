@@ -15,7 +15,8 @@ function LoginPage() {
     event.preventDefault();
     setBusy(true);
     setError("");
-    const result = await authClient.signIn.email({ email, password });
+    const normalizedEmail = email.trim().toLowerCase();
+    const result = await authClient.signIn.email({ email: normalizedEmail, password });
     if (result.error) {
       setError(result.error.message ?? "Sign-in failed.");
       setBusy(false);
