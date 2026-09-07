@@ -31,15 +31,25 @@ const env = (key: string): string | undefined => {
   return value ? value : undefined;
 };
 
+function validHttpUrl(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.toString().replace(/\/$/, "") : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 const authDisabled = env("VITE_AUTH_ENABLED") === "false";
-const grokIssuer = env("GROK_AUTH_ISSUER") ?? GROK_ISSUER_DEFAULT;
+const grokIssuer = validHttpUrl(env("GROK_AUTH_ISSUER")) ?? GROK_ISSUER_DEFAULT;
 const grokClientId = env("GROK_AUTH_CLIENT_ID") ?? PREVIEW_CLIENT_ID;
 const grokClientSecret = env("GROK_AUTH_CLIENT_SECRET") ?? PREVIEW_CLIENT_SECRET;
 
 export const authConfigured =
   !authDisabled && Boolean(grokClientId && grokClientSecret);
 
-const explicitBaseURL = env("BETTER_AUTH_URL");
+const explicitBaseURL = validHttpUrl(env("BETTER_AUTH_URL"));
 const previewAllowedHosts: string[] = [...PREVIEW_ALLOWED_HOSTS];
 const LOCAL_DEV_ORIGINS: string[] = [
   "http://localhost:8080",
