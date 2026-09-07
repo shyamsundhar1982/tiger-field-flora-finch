@@ -10,13 +10,13 @@ export const INVENTORY_CONTROL_PAGES: InventoryNavPage[] = [
 ];
 
 export const INVENTORY_LEDGER_PAGES = [
-  { id: "stock", label: "Stock Ledger", detail: "Authoritative balance, WAC and inventory value", group: "Inventory" },
-  { id: "movements", label: "Movement Ledger", detail: "Posted receipts, issues, consumption and returns", group: "Inventory" },
-  { id: "fifo", label: "FIFO Ledger", detail: "Receipt layers, remaining quantities and allocations", group: "Inventory" },
-  { id: "msl", label: "MSL Ledger", detail: "Minimum stock, shortage, reorder and lead time", group: "Inventory" },
-  { id: "tooling", label: "Manufacturing Tooling Ledger", detail: "Jigs, aluminium moulds, processing and production tooling", group: "Assets & Support" },
-  { id: "quality", label: "Quality & Test Ledger", detail: "Quality/test and inspection equipment", group: "Assets & Support" },
-  { id: "stores-tools", label: "Stores & Tool Crib Ledger", detail: "Racks, bins, workshop tools, tool crib and stores equipment", group: "Assets & Support" },
+  { id: "stock", label: "Stock balance", detail: "Authoritative balance, WAC and inventory value", group: "Stock & replenishment" },
+  { id: "movements", label: "Posted movements", detail: "Receipts, issues, consumption and returns", group: "Stock & replenishment" },
+  { id: "fifo", label: "FIFO layers", detail: "Receipt layers, remaining quantities and allocations", group: "Stock & replenishment" },
+  { id: "msl", label: "Minimum stock", detail: "Minimum stock, shortage, reorder and lead time", group: "Stock & replenishment" },
+  { id: "tooling", label: "Manufacturing tooling", detail: "Jigs, aluminium moulds, processing and production tooling", group: "Support assets" },
+  { id: "quality", label: "Quality & test equipment", detail: "Quality, test and inspection equipment", group: "Support assets" },
+  { id: "stores-tools", label: "Stores & tool crib", detail: "Racks, bins, workshop tools and stores equipment", group: "Support assets" },
 ] as const;
 
 export type InventoryLedgerId = typeof INVENTORY_LEDGER_PAGES[number]["id"];

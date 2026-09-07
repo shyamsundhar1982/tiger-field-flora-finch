@@ -7,6 +7,7 @@ import type { EquipmentLedgerId, EquipmentLedgerItem, EquipmentLedgerCategory } 
 import { DEFAULT_EQUIPMENT_LEDGER, DEFAULT_EQUIPMENT_LEDGER_CATEGORIES } from "@/lib/finance/equipment-ledger";
 import type { BomCostSource, BomTier } from "@/lib/finance/bom-engine";
 import { ACTIONS } from "@/lib/data/actions";
+import type { MasterLedgerRow } from "@/lib/master-ledger";
 
 type ActionState = Record<string, "open" | "doing" | "done">;
 type NumericAccountingKey = Exclude<keyof AccountingAssumptions, "fundingTypeByMonth">;
@@ -22,6 +23,26 @@ function withEquipmentDefaults(finance: FinanceAssumptions): FinanceAssumptions 
 }
 
 const newId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+const SUPPORT_LEDGER_BY_EQUIPMENT: Record<EquipmentLedgerId, MasterLedgerRow["ledgerId"]> = {
+  manufacturing: "tooling",
+  qualitySupport: "quality",
+  officeAdmin: "stores-tools",
+  deadIdle: "stores-tools",
+  consumables: "stores-tools",
+};
+const INITIAL_MASTER_LEDGER_ROWS: MasterLedgerRow[] = DEFAULT_EQUIPMENT_LEDGER.map((item) => ({
+  id: `seed-${item.id}`,
+  ledgerId: SUPPORT_LEDGER_BY_EQUIPMENT[item.ledger],
+  serialNo: item.id.toUpperCase(),
+  description: item.name,
+  purchasePrice: Math.max(0, item.costLakh) * 100000,
+  purchaseDate: "",
+  expiryDate: "",
+  nextInspectionDate: "",
+  quantity: 1,
+  mslLevel: 0,
+  issues: [],
+}));
 
 type Store = {
   scenario: ScenarioId;
@@ -29,6 +50,7 @@ type Store = {
   actions: ActionState;
   finance: FinanceAssumptions;
   accounting: AccountingAssumptions;
+  masterLedgerRows: MasterLedgerRow[];
   setScenario: (s: ScenarioId) => void;
   setDrawStandby: (v: boolean) => void;
   setAction: (id: string, s: "open" | "doing" | "done") => void;
@@ -45,6 +67,8 @@ type Store = {
   addEquipmentCategory: (ledger: EquipmentLedgerId, name: string, description?: string) => void;
   updateEquipmentCategory: (id: string, key: "name" | "description", value: string) => void;
   addEquipmentItem: (ledger: EquipmentLedgerId, categoryId: string, name: string) => void;
+  addMasterLedgerRow: (row: Omit<MasterLedgerRow, "id" | "issues">) => void;
+  issueMasterLedger: (ledgerId: MasterLedgerRow["ledgerId"], quantity: number, date: string) => void;
   resetFinance: () => void;
 };
 
@@ -56,6 +80,7 @@ export const useVeloxis = create<Store>()(
       actions: initialActions,
       finance: withEquipmentDefaults(DEFAULT_FINANCE_ASSUMPTIONS),
       accounting: DEFAULT_ACCOUNTING_ASSUMPTIONS,
+      masterLedgerRows: INITIAL_MASTER_LEDGER_ROWS,
       setScenario: (scenario) => set({ scenario }),
       setDrawStandby: (drawStandby) => set({ drawStandby }),
       setAction: (id, status) => set((state) => ({ actions: { ...state.actions, [id]: status } })),
@@ -72,11 +97,29 @@ export const useVeloxis = create<Store>()(
       addEquipmentCategory: (ledger, name, description = "") => set((state) => ({ finance: { ...state.finance, equipmentLedgerCategories: [...(state.finance.equipmentLedgerCategories ?? DEFAULT_EQUIPMENT_LEDGER_CATEGORIES), { id: newId("category"), ledger, name: name.trim() || "New category", description, sortOrder: (state.finance.equipmentLedgerCategories ?? []).filter((c) => c.ledger === ledger).length } as EquipmentLedgerCategory] } })),
       updateEquipmentCategory: (id, key, value) => set((state) => ({ finance: { ...state.finance, equipmentLedgerCategories: (state.finance.equipmentLedgerCategories ?? DEFAULT_EQUIPMENT_LEDGER_CATEGORIES).map((category) => category.id === id ? { ...category, [key]: value } : category) } })),
       addEquipmentItem: (ledger, categoryId, name) => set((state) => ({ finance: { ...state.finance, equipmentLedger: [...(state.finance.equipmentLedger ?? DEFAULT_EQUIPMENT_LEDGER), { id: newId("equipment"), name: name.trim() || "New item", ledger, category: (state.finance.equipmentLedgerCategories ?? DEFAULT_EQUIPMENT_LEDGER_CATEGORIES).find((c) => c.id === categoryId)?.name ?? "Other", categoryId, details: "", costLakh: 0, monthlyCostLakh: 0, purchaseMonth: 1, usefulLifeMonths: 60, allocationPct: 100 } as EquipmentLedgerItem] } })),
+      addMasterLedgerRow: (row) => set((state) => ({ masterLedgerRows: [...state.masterLedgerRows, { ...row, id: newId("ledger-row"), issues: [] }] })),
+      issueMasterLedger: (ledgerId, quantity, date) => set((state) => {
+        let remaining = Math.max(0, quantity);
+        const issueAmounts = new Map<string, number>();
+        state.masterLedgerRows.filter((row) => row.ledgerId === ledgerId).sort((a, b) => (a.purchaseDate || "9999-12-31").localeCompare(b.purchaseDate || "9999-12-31")).forEach((row) => {
+          if (remaining <= 0) return;
+          const used = Math.min(Math.max(0, row.quantity - row.issues.reduce((sum, issue) => sum + issue.quantity, 0)), remaining);
+          if (used > 0) {
+            issueAmounts.set(row.id, used);
+            remaining -= used;
+          }
+        });
+        const rows = state.masterLedgerRows.map((row) => {
+          const used = issueAmounts.get(row.id) ?? 0;
+          return used > 0 ? { ...row, issues: [...row.issues, { id: newId("issue"), quantity: used, date }] } : row;
+        });
+        return { masterLedgerRows: rows };
+      }),
       resetFinance: () => set({ finance: withEquipmentDefaults(DEFAULT_FINANCE_ASSUMPTIONS), accounting: DEFAULT_ACCOUNTING_ASSUMPTIONS }),
     }),
     {
       name: "veloxis-planning-state",
-      partialize: (state) => ({ scenario: state.scenario, drawStandby: state.drawStandby, actions: state.actions, finance: state.finance, accounting: state.accounting }),
+      partialize: (state) => ({ scenario: state.scenario, drawStandby: state.drawStandby, actions: state.actions, finance: state.finance, accounting: state.accounting, masterLedgerRows: state.masterLedgerRows }),
       onRehydrateStorage: () => (state) => { if (state) state.setFinance(withEquipmentDefaults(state.finance)); },
     },
   ),
