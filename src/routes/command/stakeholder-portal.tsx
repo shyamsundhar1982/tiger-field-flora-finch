@@ -12,13 +12,13 @@ function StakeholderPortal() {
 
   return <div className="space-y-7">
     <header>
-      <p className="text-[10px] uppercase tracking-[0.2em] text-subtle">Phase J · External Stakeholder</p>
-      <h1 className="mt-2 font-display text-4xl">VINDY Stakeholder Portal</h1>
-      <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">{STAKEHOLDER_PORTAL_STATUS.headline} A read-only presentation view that separates verified evidence, modeled assumptions, pending validation and reserved decisions.</p>
-      <div className="mt-3 flex flex-wrap gap-3 text-sm font-semibold"><Link to="/command/inventory-truth" className="text-accent">Inventory evidence →</Link><Link to="/command/financial-cockpit" className="text-accent">Finance evidence →</Link><Link to="/command/procurement" className="text-accent">Procurement evidence →</Link></div>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-green">External stakeholder · read-only</p>
+      <h1 className="mt-2 font-display text-4xl text-accent">VINDY Stakeholder Portal</h1>
+      <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">{STAKEHOLDER_PORTAL_STATUS.headline} A presentation view that separates verified evidence, modeled assumptions, pending validation and reserved decisions.</p>
+      <div className="mt-3 flex flex-wrap gap-3 text-sm font-semibold"><Link to="/command/investor-board" className="text-accent">Board evidence →</Link><Link to="/command/financial-cockpit" className="text-accent">Finance evidence →</Link><Link to="/command/qa-verification" className="text-accent">QA evidence →</Link><Link to="/command/epr-live" className="text-accent">EPR evidence →</Link></div>
     </header>
 
-    <div className="grid gap-3 sm:grid-cols-4">
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <Kpi label="Current tranche" value={`₹${STAKEHOLDER_PORTAL_STATUS.currentTrancheLakh}L`} hint="Controlled ask" />
       <Kpi label="Maximum ladder" value={`₹${STAKEHOLDER_PORTAL_STATUS.totalLadderLakh / 100}Cr`} hint="Conditional" />
       <Kpi label="Ready sections" value={`${ready}/${STAKEHOLDER_SECTIONS.length}`} hint="Evidence posture" tone="ok" />
@@ -26,7 +26,7 @@ function StakeholderPortal() {
     </div>
 
     <Panel title="Stakeholder briefing" kicker="Controlled external narrative">
-      <div className="grid gap-3 md:grid-cols-2">{STAKEHOLDER_SECTIONS.map((item) => <Link key={item.id} to={item.route as never} className="rounded-lg border border-border bg-surface p-4 hover:border-accent"><div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold">{item.title}</p><span className={`text-[10px] uppercase tracking-wider ${statusClass(item.status)}`}>{item.status}</span></div><p className="mt-2 text-xs leading-5 text-muted">{item.summary}</p><p className="mt-3 text-xs text-accent">Open controlled source →</p></Link>)}</div>
+      <div className="grid gap-3 md:grid-cols-2">{STAKEHOLDER_SECTIONS.map((item) => <Link key={item.id} to={item.route as never} className="rounded-lg border border-border bg-surface p-4 transition-colors hover:border-accent"><div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold">{item.title}</p><span className={`text-[10px] uppercase tracking-wider ${statusClass(item.status)}`}>{item.status}</span></div><p className="mt-2 text-xs leading-5 text-muted">{item.summary}</p><p className="mt-3 text-xs font-semibold text-accent">Open presentation-safe evidence →</p></Link>)}</div>
     </Panel>
 
     <div className="grid gap-4 md:grid-cols-2">
@@ -38,6 +38,6 @@ function StakeholderPortal() {
       </Panel>
     </div>
 
-    <div className="rounded-lg border border-border bg-surface p-5"><p className="text-[10px] uppercase tracking-wider text-subtle">External disclosure rule</p><p className="mt-2 text-sm leading-6 text-muted">{STAKEHOLDER_PORTAL_STATUS.disclosureRule} Investor-facing material must distinguish <strong>verified</strong>, <strong>modeled</strong>, <strong>pending</strong> and <strong>approval-required</strong> states.</p><div className="mt-4 flex flex-wrap gap-2"><Link to="/command/investor-pitch" className="rounded-md border border-border px-3 py-2 text-xs text-accent">Investor Pitch</Link><Link to="/command/investor-board" className="rounded-md border border-border px-3 py-2 text-xs text-accent">Investor / Board</Link><Link to="/command/governance" className="rounded-md border border-border px-3 py-2 text-xs text-accent">Governance</Link><Link to="/command/founder-control" className="rounded-md border border-border px-3 py-2 text-xs text-accent">Founder Control</Link></div></div>
+    <div className="rounded-lg border border-border bg-surface p-5"><p className="text-[10px] font-semibold uppercase tracking-wider text-green">External disclosure rule</p><p className="mt-2 text-sm leading-6 text-muted">{STAKEHOLDER_PORTAL_STATUS.disclosureRule} Investor-facing material must distinguish <strong>verified</strong>, <strong>modeled</strong>, <strong>pending</strong> and <strong>approval-required</strong> states.</p><div className="mt-4 flex flex-wrap gap-2"><Link to="/command/investor-pitch" className="rounded-md border border-border px-3 py-2 text-xs text-accent">Investor Pitch</Link><Link to="/command/investor-board" className="rounded-md border border-border px-3 py-2 text-xs text-accent">Investor / Board</Link><Link to="/command/ca-audit" className="rounded-md border border-border px-3 py-2 text-xs text-accent">CA Verification</Link><Link to="/command/epr-live" className="rounded-md border border-border px-3 py-2 text-xs text-accent">EPR Evidence</Link></div></div>
   </div>;
 }
