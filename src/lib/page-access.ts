@@ -1,4 +1,4 @@
-import { getRouteMeta, type PageDomain, type PageMeta, type PageMode, type PageOwner } from "@/lib/page-metadata";
+import { getRouteMeta, routeRegistry, type PageDomain, type PageMeta, type PageMode, type PageOwner } from "./page-metadata.ts";
 
 export type CommandRole =
   | "admin"
@@ -88,7 +88,17 @@ export function canAccessPage(role: CommandRole | null, page: PageMeta | undefin
 }
 
 export function canAccessRoute(role: CommandRole | null, route: string): boolean {
-  return canAccessPage(role, getRouteMeta(route));
+  const direct = getRouteMeta(route);
+  if (direct) return canAccessPage(role, direct);
+
+  // Nested pages such as /command/inventory-ledgers/stock are real router
+  // routes, but their navigation metadata belongs to the registered parent.
+  // Resolve the most specific registered parent before the command shell's
+  // beforeLoad guard runs, otherwise every child link is redirected to /command.
+  const parentRoute = Object.keys(routeRegistry)
+    .filter((candidate) => route.startsWith(`${candidate}/`))
+    .sort((left, right) => right.length - left.length)[0];
+  return canAccessPage(role, parentRoute ? getRouteMeta(parentRoute) : undefined);
 }
 
 export function isModeAllowed(role: CommandRole | null, mode: PageMode): boolean {
