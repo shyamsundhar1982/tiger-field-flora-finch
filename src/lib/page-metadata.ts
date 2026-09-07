@@ -25,6 +25,8 @@ export const routeOwnership:Record<string,RouteOwnership>={
   '/command/platform-walkthrough':{canonicalRoute:'/command/platform-walkthrough',source:'showcase',mutability:'read-only',notes:'Guided read-only demonstration linking back to command source evidence.'},
 };
 export const getRouteOwnership=(route:string)=>routeOwnership[route];
+export const ROUTE_FILE_EXCLUSIONS = new Set(["/command/inventory-ledgers/$ledger"]);
+export const PUBLIC_REFERENCE_ROUTES = ["/", "/range", "/range/$tier", "/fit-calculator", "/inventory"] as const;
 export function validateRouteOwnership(): string[] {
   const errors: string[] = [];
   for (const [route, ownership] of Object.entries(routeOwnership)) {
