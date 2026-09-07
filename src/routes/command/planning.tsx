@@ -68,13 +68,12 @@ function MasterPlan() {
         <Kpi label="Capital ladder" value={`₹${capitalLadder}L`} hint={`${approvalCount} approvals currently flagged`} />
       </section>
 
-      <nav className="overflow-x-auto rounded-xl border border-border bg-surface/40 p-1" aria-label="Master Plan sections">
+      <nav className="overflow-x-auto rounded-xl border border-border bg-surface/40 p-1 [scrollbar-width:thin]" aria-label="Master Plan sections">
         <div className="flex min-w-max gap-1">
           {PLAN_TABS.map((tab, index) => (
             <Link
               key={tab.label}
               to={tab.to as never}
-              title={tab.note}
               className={`rounded-lg px-4 py-2 text-xs font-semibold transition-colors ${index === 0 ? "bg-accent text-accent-fg" : "text-muted hover:bg-bg/60 hover:text-fg"}`}
             >
               {tab.label}
@@ -127,8 +126,15 @@ function MasterPlan() {
         </div>
       </Panel>
 
-      <Panel title="36-month timeline" kicker="Quarter view · expand detailed planners only when needed">
-        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-4">
+      <details className="rounded-xl border border-border bg-surface/25 p-5 sm:p-6">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 [&::-webkit-details-marker]:hidden">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-green">Quarter view · M1–M36</p>
+            <h2 className="mt-1 font-display text-xl font-semibold text-accent">36-month timeline</h2>
+          </div>
+          <span className="shrink-0 text-xs font-semibold text-muted">12 quarters · expand</span>
+        </summary>
+        <div className="mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-4">
           {QUARTERS.map((quarter) => (
             <div key={quarter.quarter} className="rounded-xl border border-border bg-surface/25 p-4">
               <div className="flex items-center justify-between gap-3"><p className="text-sm font-bold text-fg">{quarter.quarter}</p><span className="text-[10px] text-subtle">{quarter.months}</span></div>
@@ -136,7 +142,7 @@ function MasterPlan() {
             </div>
           ))}
         </div>
-      </Panel>
+      </details>
 
       <details className="rounded-xl border border-border bg-surface/20 p-4">
         <summary className="cursor-pointer text-sm font-semibold text-accent">Help & methodology</summary>
