@@ -18,8 +18,6 @@ import {
 } from "@/lib/finance/equipment-ledger";
 import type { BomCostSource, BomTier } from "@/lib/finance/bom-engine";
 import { ACTIONS } from "@/lib/data/actions";
-import { SEED_INVENTORY } from "@/lib/data/inventory";
-import { fifoIssue, mergeLedgerDefaults, type MasterLedgerRow } from "@/lib/master-ledger";
 
 type ActionState = Record<string, "open" | "doing" | "done">;
 type NumericAccountingKey = Exclude<keyof AccountingAssumptions, "fundingTypeByMonth">;
@@ -35,55 +33,7 @@ function withEquipmentDefaults(finance: FinanceAssumptions): FinanceAssumptions 
   };
 }
 
-const newId = (prefix: string) =>
-  `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-const SUPPORT_LEDGER_BY_EQUIPMENT: Record<EquipmentLedgerId, MasterLedgerRow["ledgerId"]> = {
-  manufacturing: "tooling",
-  qualitySupport: "quality",
-  officeAdmin: "stores-tools",
-  deadIdle: "stores-tools",
-  consumables: "stores-tools",
-};
-const EQUIPMENT_MASTER_LEDGER_ROWS: MasterLedgerRow[] = DEFAULT_EQUIPMENT_LEDGER.map((item) => ({
-  id: `seed-${item.id}`,
-  ledgerId: SUPPORT_LEDGER_BY_EQUIPMENT[item.ledger],
-  serialNo: item.id.toUpperCase(),
-  description: item.name,
-  category: item.category,
-  unit: "ea",
-  purchasePrice: Math.max(0, item.costLakh) * 100000,
-  purchaseDate: "",
-  expiryDate: "",
-  nextInspectionDate: "",
-  quantity: 1,
-  mslLevel: 0,
-  plannedMonthlyUse: 0,
-  source: "equipment-register",
-  issues: [],
-}));
-
-const COMPONENT_MASTER_LEDGER_ROWS: MasterLedgerRow[] = SEED_INVENTORY.map((item) => ({
-  id: `component-${item.id}`,
-  ledgerId: "components",
-  serialNo: item.sku,
-  description: `${item.brand} · ${item.model}`,
-  category: item.category,
-  unit: "ea",
-  purchasePrice: Math.max(0, item.priceInr),
-  purchaseDate: "",
-  expiryDate: "",
-  nextInspectionDate: "",
-  quantity: Math.max(0, item.stockQty),
-  mslLevel: Math.max(0, item.reorderLevel),
-  plannedMonthlyUse: 0,
-  source: "component-catalogue",
-  issues: [],
-}));
-
-export const INITIAL_MASTER_LEDGER_ROWS: MasterLedgerRow[] = [
-  ...COMPONENT_MASTER_LEDGER_ROWS,
-  ...EQUIPMENT_MASTER_LEDGER_ROWS,
-];
+const newId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
 type Store = {
   scenario: ScenarioId;
@@ -91,7 +41,6 @@ type Store = {
   actions: ActionState;
   finance: FinanceAssumptions;
   accounting: AccountingAssumptions;
-  masterLedgerRows: MasterLedgerRow[];
   setScenario: (s: ScenarioId) => void;
   setDrawStandby: (v: boolean) => void;
   setAction: (id: string, s: "open" | "doing" | "done") => void;
@@ -136,13 +85,6 @@ type Store = {
   addEquipmentCategory: (ledger: EquipmentLedgerId, name: string, description?: string) => void;
   updateEquipmentCategory: (id: string, key: "name" | "description", value: string) => void;
   addEquipmentItem: (ledger: EquipmentLedgerId, categoryId: string, name: string) => void;
-  saveMasterLedgerEntry: (row: Omit<MasterLedgerRow, "id" | "issues">) => void;
-  issueMasterLedger: (
-    ledgerId: MasterLedgerRow["ledgerId"],
-    sku: string,
-    quantity: number,
-    date: string,
-  ) => void;
   resetFinance: () => void;
 };
 
@@ -154,7 +96,6 @@ export const useVeloxis = create<Store>()(
       actions: initialActions,
       finance: withEquipmentDefaults(DEFAULT_FINANCE_ASSUMPTIONS),
       accounting: DEFAULT_ACCOUNTING_ASSUMPTIONS,
-      masterLedgerRows: INITIAL_MASTER_LEDGER_ROWS,
       setScenario: (scenario) => set({ scenario }),
       setDrawStandby: (drawStandby) => set({ drawStandby }),
       setAction: (id, status) => set((state) => ({ actions: { ...state.actions, [id]: status } })),
@@ -274,43 +215,6 @@ export const useVeloxis = create<Store>()(
             ],
           },
         })),
-      saveMasterLedgerEntry: (entry) =>
-        set((state) => {
-          const sku = entry.serialNo.trim().toLocaleUpperCase();
-          const matchesItem = (row: MasterLedgerRow) =>
-            row.ledgerId === entry.ledgerId && row.serialNo.trim().toLocaleUpperCase() === sku;
-          const controlledRows = state.masterLedgerRows.map((row) =>
-            matchesItem(row)
-              ? {
-                  ...row,
-                  description: entry.description,
-                  category: entry.category,
-                  unit: entry.unit,
-                  mslLevel: Math.max(0, entry.mslLevel),
-                  plannedMonthlyUse: Math.max(0, entry.plannedMonthlyUse ?? 0),
-                }
-              : row,
-          );
-          if (entry.quantity <= 0 && controlledRows.some(matchesItem))
-            return { masterLedgerRows: controlledRows };
-          return {
-            masterLedgerRows: [
-              ...controlledRows,
-              { ...entry, serialNo: sku, id: newId("ledger-row"), issues: [] },
-            ],
-          };
-        }),
-      issueMasterLedger: (ledgerId, sku, quantity, date) =>
-        set((state) => ({
-          masterLedgerRows: fifoIssue(
-            state.masterLedgerRows,
-            ledgerId,
-            sku,
-            quantity,
-            date,
-            newId("issue"),
-          ),
-        })),
       resetFinance: () =>
         set({
           finance: withEquipmentDefaults(DEFAULT_FINANCE_ASSUMPTIONS),
@@ -318,14 +222,15 @@ export const useVeloxis = create<Store>()(
         }),
     }),
     {
-      name: "veloxis-planning-state",
+      // Browser persistence is only a draft/cache. Inventory is intentionally absent:
+      // physical quantities live exclusively in the server-side Master Inventory/EPR FIFO authority.
+      name: "vyndi-planning-draft-cache-v2",
       partialize: (state) => ({
         scenario: state.scenario,
         drawStandby: state.drawStandby,
         actions: state.actions,
         finance: state.finance,
         accounting: state.accounting,
-        masterLedgerRows: state.masterLedgerRows,
       }),
       merge: (persisted, current) => {
         const saved = persisted as Partial<Store>;
@@ -333,10 +238,6 @@ export const useVeloxis = create<Store>()(
           ...current,
           ...saved,
           finance: withEquipmentDefaults(saved.finance ?? current.finance),
-          masterLedgerRows: mergeLedgerDefaults(
-            saved.masterLedgerRows ?? [],
-            INITIAL_MASTER_LEDGER_ROWS,
-          ),
         };
       },
     },
