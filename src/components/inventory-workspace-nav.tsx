@@ -8,16 +8,16 @@ export function InventoryWorkspaceNav({ active }: { active?: string }) {
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-subtle">
         <Link to="/command/inventory" className="hover:text-accent">
-          Inventory hub
+          Master Inventory
         </Link>
         <span aria-hidden="true">/</span>
         <Link to="/command/inventory-ledgers" className="hover:text-accent">
-          Ledger control
+          Ledger audit
         </Link>
       </div>
       <div>
-        <p className="mb-1 text-[10px] uppercase tracking-[0.14em] text-subtle">Control setup</p>
-        <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Inventory control pages">
+        <p className="mb-1 text-[10px] uppercase tracking-[0.14em] text-subtle">Audit & provenance</p>
+        <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Inventory audit pages">
           {INVENTORY_CONTROL_PAGES.map((page) => (
             <Link
               key={page.id}
