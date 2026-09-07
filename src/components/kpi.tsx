@@ -17,11 +17,11 @@ export function Kpi({
     : `Based on the underlying data and model used for ${label.toLowerCase()}.`;
 
   return (
-    <div className="group relative min-h-[128px] rounded-2xl border border-border bg-bg-elevated p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-fg/30 hover:shadow-lg">
+    <div title={explanation} className="relative min-h-[112px] rounded-xl border border-border bg-bg-elevated p-4 transition-colors duration-200 hover:border-fg/30 sm:p-5">
       <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-subtle sm:text-[11px]">{label}</p>
       <p
         className={cn(
-          "mt-4 break-words font-display text-3xl tabular-nums tracking-tight text-fg",
+          "mt-3 break-words font-display text-2xl tabular-nums tracking-tight text-fg sm:text-3xl",
           tone === "ok" && "text-ok",
           tone === "warn" && "text-warn",
           tone === "danger" && "text-danger",
@@ -29,15 +29,7 @@ export function Kpi({
       >
         {value}
       </p>
-      <p className="mt-3 text-xs leading-5 text-muted">
-        Hover for context
-      </p>
-
-      <div className="pointer-events-none absolute left-0 right-0 top-full z-30 mt-3 px-1 opacity-0 transition-all duration-200 group-hover:translate-y-1 group-hover:opacity-100">
-        <div className="rounded-2xl border border-white/15 bg-black/25 p-4 text-xs leading-6 text-fg shadow-2xl backdrop-blur-xl">
-          <p>{explanation}</p>
-        </div>
-      </div>
+      {hint ? <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted">{hint}</p> : null}
     </div>
   );
 }
