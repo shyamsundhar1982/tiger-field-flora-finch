@@ -247,7 +247,7 @@ function MoreNavigation({ role }: { role: CommandRole | null }) {
 function WorkspaceTabs({ routes, context, label }: { routes: readonly { to: string; label: string }[]; context: Set<string>; label: string }) {
   const location = useLocation();
   if (!context.has(location.pathname)) return null;
-  return <nav className="mb-6 overflow-x-auto rounded-xl border border-border bg-surface/50 p-1" aria-label={label}><div className="flex min-w-max gap-1">{routes.map((tab) => <Link key={tab.to} to={tab.to as never} className={cn("rounded-lg px-4 py-2 text-xs font-semibold transition-colors", location.pathname === tab.to ? "bg-bg text-accent shadow-sm" : "text-muted hover:bg-bg/60 hover:text-fg")}>{tab.label}</Link>)}</div></nav>;
+  return <nav className="mb-6 overflow-x-auto rounded-xl border border-border bg-surface/50 p-1 [scrollbar-width:thin]" aria-label={label}><div className="flex min-w-max gap-1">{routes.map((tab) => <Link key={tab.to} to={tab.to as never} className={cn("rounded-lg px-4 py-2 text-xs font-semibold transition-colors", location.pathname === tab.to ? "border border-accent/35 bg-accent/10 text-accent" : "border border-transparent text-muted hover:bg-bg/60 hover:text-fg")}>{tab.label}</Link>)}</div></nav>;
 }
 
 function FlowGuide({ role }: { role: CommandRole | null }) {
@@ -264,13 +264,51 @@ function FlowGuide({ role }: { role: CommandRole | null }) {
     { label: "Decision", range: [8], icon: Radar },
   ];
   const currentStage = stages.findIndex((stage) => match.index >= stage.range[0] && match.index <= stage.range[1]);
-  return <section className="mb-5 rounded-xl border border-border bg-surface/35 p-3" aria-label="ERP business flow"><div className="flex flex-wrap items-center gap-2"><div className="mr-auto"><p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-subtle">ERP flow</p><p className="text-xs font-medium text-fg">{match.step.label}</p></div>{stages.map((stage, index) => { const Icon = stage.icon; const done = index < currentStage; const active = index === currentStage; return <div key={stage.label} className={cn("flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px]", active ? "border-accent bg-accent/10 text-fg" : "border-border bg-bg/30 text-muted")}><Icon className={cn("size-3.5", active && "text-accent")} /><span className="font-semibold">{stage.label}</span><span className="text-[9px] text-subtle">{done ? "✓" : active ? "●" : "○"}</span></div>; })}</div><div className="mt-2 grid gap-2 text-[10px] sm:grid-cols-2">{previous && firstAccessible(previous.routes) ? <Link to={firstAccessible(previous.routes)! as never} className="rounded-md border border-border px-2.5 py-1.5 text-muted hover:bg-bg hover:text-fg">← {previous.label}</Link> : <span />}{next && firstAccessible(next.routes) ? <Link to={firstAccessible(next.routes)! as never} className="rounded-md border border-border px-2.5 py-1.5 text-right text-muted hover:bg-bg hover:text-fg">{next.label} →</Link> : <span />}</div></section>;
+  return (
+    <section className="mb-5 rounded-xl border border-border bg-surface/35 p-3" aria-label="ERP business flow">
+      <div>
+        <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-subtle">ERP flow</p>
+        <p className="text-xs font-medium text-fg">{match.step.label}</p>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {stages.map((stage, index) => {
+          const Icon = stage.icon;
+          const done = index < currentStage;
+          const active = index === currentStage;
+          return (
+            <div key={stage.label} className={cn("flex min-w-0 items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px]", active ? "border-accent bg-accent/10 text-fg" : "border-border bg-bg/30 text-muted")}>
+              <Icon className={cn("size-3.5 shrink-0", active && "text-accent")} />
+              <span className="truncate font-semibold">{stage.label}</span>
+              <span className="ml-auto text-[9px] text-subtle">{done ? "✓" : active ? "●" : "○"}</span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-2 grid gap-2 text-[10px] sm:grid-cols-2">
+        {previous && firstAccessible(previous.routes) ? <Link to={firstAccessible(previous.routes)! as never} className="rounded-md border border-border px-2.5 py-1.5 text-muted hover:bg-bg hover:text-fg">← {previous.label}</Link> : <span />}
+        {next && firstAccessible(next.routes) ? <Link to={firstAccessible(next.routes)! as never} className="rounded-md border border-border px-2.5 py-1.5 text-left text-muted hover:bg-bg hover:text-fg sm:text-right">{next.label} →</Link> : <span />}
+      </div>
+    </section>
+  );
+}
+
+function workspaceForPath(pathname: string) {
+  const route = LEGACY_ROUTE_REDIRECTS[pathname] ?? pathname;
+  return WORKSPACES.find((workspace) =>
+    route === workspace.to ||
+    workspace.context.has(route) ||
+    [...workspace.context].some((candidate) => candidate !== "/command" && route.startsWith(`${candidate}/`)),
+  );
 }
 
 function ContextBack() {
   const location = useLocation();
   if (!location.pathname.startsWith("/command") || location.pathname === "/command") return null;
-  return <button type="button" onClick={() => window.history.length > 1 ? window.history.back() : window.location.assign("/command")} className="mb-4 inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-xs font-medium text-muted transition-colors hover:bg-bg hover:text-fg" aria-label="Return to the previous command page">← Back</button>;
+  const workspace = workspaceForPath(location.pathname);
+  const target = workspace?.to ?? "/command";
+  const label = workspace?.label ?? "Command Centre";
+  if (location.pathname === target) return null;
+  return <Link to={target as never} className="mb-4 inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-xs font-medium text-muted transition-colors hover:border-accent/40 hover:bg-bg hover:text-fg" aria-label={`Return to ${label}`}>← {label}</Link>;
 }
 
 function NavigationBody({ view, role }: { view: NavigationView; role: CommandRole | null }) {
@@ -290,5 +328,5 @@ export function CommandShell() {
   useEffect(() => { getCommandRole().then(setRole).catch(() => setRole(null)); }, []);
   const viewer = role === "viewer";
   async function logout() { if (loggingOut) return; setLoggingOut(true); try { await lockCommand(); setRole(null); await navigate({ to: "/command-login" }); } finally { setLoggingOut(false); } }
-  return <div className="min-h-dvh bg-bg"><SiteHeader /><div className="mx-auto flex max-w-7xl"><aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-72 shrink-0 flex-col border-r border-border py-6 lg:flex"><p className="px-5 pb-3 text-[10px] uppercase tracking-[0.2em] text-subtle">VINDY 2.0 · Operating System</p><div className="px-3 pb-3"><div className="grid grid-cols-2 rounded-md border border-border bg-surface/40 p-0.5"><button type="button" onClick={() => setView("workspaces")} className={cn("rounded px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em]", view === "workspaces" ? "bg-bg text-fg shadow-sm" : "text-muted hover:text-fg")}>Workspaces</button><button type="button" onClick={() => setView("more")} className={cn("rounded px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em]", view === "more" ? "bg-bg text-fg shadow-sm" : "text-muted hover:text-fg")}>More</button></div></div><nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-4 pr-1 [scrollbar-width:thin]"><NavigationBody view={view} role={role} /></nav><div className="px-3 pt-3"><button type="button" onClick={logout} disabled={loggingOut} className="flex w-full items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted hover:bg-surface hover:text-fg disabled:opacity-50"><LogOut className="size-4" />{loggingOut ? "Logging out…" : `Log out${viewer ? " · User" : role === "admin" ? " · Admin" : ""}`}</button></div></aside><div className="min-w-0 flex-1"><MobileNavigation view={view} role={role} setView={setView} logout={logout} loggingOut={loggingOut} /><div className="px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8"><ContextBack /><FlowGuide role={role} /><WorkspaceTabs routes={FINANCE_TABS} context={FINANCE_CONTEXT_ROUTES} label="Finance workspace" /><WorkspaceTabs routes={SUPPLY_TABS} context={SUPPLY_CONTEXT_ROUTES} label="Supply and Production workspace" /><WorkspaceTabs routes={COMMERCIAL_TABS} context={COMMERCIAL_CONTEXT_ROUTES} label="Commercial workspace" /><WorkspaceTabs routes={ENGINEERING_TABS} context={ENGINEERING_CONTEXT_ROUTES} label="Engineering workspace" /><WorkspaceTabs routes={GOVERNANCE_TABS} context={GOVERNANCE_CONTEXT_ROUTES} label="Governance workspace" /><div className={cn(viewer && "pointer-events-none select-none opacity-95")}><fieldset disabled={viewer} className="m-0 min-w-0 border-0 p-0"><Outlet /></fieldset></div></div></div></div></div>;
+  return <div className="min-h-dvh bg-bg"><SiteHeader /><div className="mx-auto flex max-w-7xl"><aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-72 shrink-0 flex-col border-r border-border py-6 lg:flex"><p className="px-5 pb-3 text-[10px] uppercase tracking-[0.2em] text-subtle">VINDY 2.0 · Operating System</p><div className="px-3 pb-3"><div className="grid grid-cols-2 rounded-md border border-border bg-surface/40 p-0.5"><button type="button" onClick={() => setView("workspaces")} className={cn("rounded px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em]", view === "workspaces" ? "bg-bg text-fg shadow-sm" : "text-muted hover:text-fg")}>Workspaces</button><button type="button" onClick={() => setView("more")} className={cn("rounded px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em]", view === "more" ? "bg-bg text-fg shadow-sm" : "text-muted hover:text-fg")}>More</button></div></div><nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-4 pr-1 [scrollbar-width:thin]"><NavigationBody view={view} role={role} /></nav><div className="px-3 pt-3"><button type="button" onClick={logout} disabled={loggingOut} className="flex w-full items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted hover:bg-surface hover:text-fg disabled:opacity-50"><LogOut className="size-4" />{loggingOut ? "Logging out…" : `Log out${viewer ? " · User" : role === "admin" ? " · Admin" : ""}`}</button></div></aside><div className="min-w-0 flex-1"><MobileNavigation view={view} role={role} setView={setView} logout={logout} loggingOut={loggingOut} /><div className="px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8"><ContextBack /><FlowGuide role={role} /><WorkspaceTabs routes={FINANCE_TABS} context={FINANCE_CONTEXT_ROUTES} label="Finance workspace" /><WorkspaceTabs routes={SUPPLY_TABS} context={SUPPLY_CONTEXT_ROUTES} label="Supply and Production workspace" /><WorkspaceTabs routes={COMMERCIAL_TABS} context={COMMERCIAL_CONTEXT_ROUTES} label="Commercial workspace" /><WorkspaceTabs routes={ENGINEERING_TABS} context={ENGINEERING_CONTEXT_ROUTES} label="Engineering workspace" /><WorkspaceTabs routes={GOVERNANCE_TABS} context={GOVERNANCE_CONTEXT_ROUTES} label="Governance workspace" /><fieldset disabled={viewer} className="m-0 min-w-0 border-0 p-0"><Outlet /></fieldset></div></div></div></div>;
 }

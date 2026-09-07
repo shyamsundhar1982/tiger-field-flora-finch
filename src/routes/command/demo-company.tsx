@@ -5,18 +5,18 @@ import { TIERS } from "@/lib/data/company";
 export const Route = createFileRoute("/command/demo-company")({ component: DemoCompany });
 
 const CONTROL_LAYERS = [
-  ["Command", "Founder Command · Decision Engine · Governance", "Decide"],
-  ["Finance", "Financial Planning · Cash · Funding · Finance Control", "Control"],
-  ["Product", "Product · BOM & Cost Engine · Engineering Control", "Build"],
-  ["Manufacturing", "Production · Procurement · Inventory · Quality", "Execute"],
-  ["EPR", "Workflow · Execution · Live Transactions", "Comply"],
+  ["Command", "Command Centre · Governance", "Decide"],
+  ["Planning", "Master Plan · 36-month roadmap · scenarios", "Plan"],
+  ["Engineering", "Product · BOM · revision control · validation", "Build"],
+  ["Supply", "Procurement · inventory · production · manufacturing · quality", "Execute"],
+  ["Commercial + Finance", "Demand · orders · collections · cash · funding", "Convert"],
   ["Stakeholders", "Investor Demo · Business Story · Platform Walkthrough", "Present"],
 ];
 
 const DEMO_SCENARIO = [
-  ["09:00", "Cash threshold", "Founder Command flags a cash-floor intervention.", "WATCH"],
-  ["09:05", "Decision packet", "Decision Engine identifies the owner, dependency and evidence required.", "READY"],
-  ["09:20", "Supplier action", "Operations confirms the next production input and attaches evidence.", "ACTIVE"],
+  ["09:00", "Cash threshold", "Command Centre flags a cash-floor intervention.", "WATCH"],
+  ["09:05", "Decision packet", "The executive exception queue identifies the owner, dependency and evidence required.", "READY"],
+  ["09:20", "Supplier action", "Supply & Production confirms the next production input and captures evidence.", "ACTIVE"],
   ["10:00", "Approval gate", "Governance records the accountable approval before release.", "APPROVAL"],
   ["10:15", "Executive update", "Financial and operational impact becomes available to the stakeholder view.", "REPORTED"],
 ];
@@ -24,15 +24,15 @@ const DEMO_SCENARIO = [
 function DemoCompany() {
   return <div className="space-y-7">
     <header>
-      <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">VINDY · Showcase Mode</p>
-      <h1 className="mt-1 font-display text-4xl">Demo Company</h1>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">VINDY · Showcase Mode</p>
+      <h1 className="mt-1 font-display text-4xl text-accent">Demo Company</h1>
       <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">A realistic end-to-end company scenario for demonstrating VINDY without presenting demonstration data as audited company performance. The scenario shows how one business moves from signal to decision, execution, evidence and stakeholder reporting.</p>
       <div className="mt-4 flex flex-wrap gap-2"><span className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs">Demonstration dataset</span><span className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs">Mode: Showcase</span><span className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs">Not audited</span></div>
     </header>
 
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Kpi label="Product platform" value="VINDY" hint="Connected operating system"/><Kpi label="Capital story" value="₹15L → ₹2Cr" hint="Staged funding ladder"/><Kpi label="Planning horizon" value="36 mo" hint="Evidence-gated execution"/><Kpi label="Control principle" value="Evidence" hint="No silent completion"/></div>
 
-    <section className="rounded-xl border border-border bg-surface p-6 sm:p-8"><p className="text-xs uppercase tracking-[0.18em] text-accent">The demo company story</p><h2 className="mt-3 max-w-4xl font-display text-3xl leading-tight">A performance-bicycle company uses VINDY to connect product creation with cash, production, compliance and governance.</h2><p className="mt-4 max-w-3xl text-sm leading-6 text-muted">The demonstration begins with a business signal and follows it through the complete operating loop. Each layer remains accountable to its owner while the command layer preserves the executive picture.</p></section>
+    <section className="rounded-xl border border-border bg-surface p-6 sm:p-8"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-green">The demo company story</p><h2 className="mt-3 max-w-4xl font-display text-3xl leading-tight text-accent">A performance-bicycle company uses VINDY to connect product creation with cash, production, compliance and governance.</h2><p className="mt-4 max-w-3xl text-sm leading-6 text-muted">The demonstration begins with a business signal and follows it through the complete operating loop. Each layer remains accountable to its owner while the command layer preserves the executive picture.</p></section>
 
     <Panel title="Company operating layers" kicker="One business · six connected control layers">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{CONTROL_LAYERS.map(([layer,systems,verb]) => <div key={layer} className="rounded-md border border-border p-5"><div className="flex items-center justify-between"><p className="text-sm font-semibold">{layer}</p><span className="text-[10px] uppercase tracking-[0.16em] text-accent">{verb}</span></div><p className="mt-3 text-xs leading-5 text-muted">{systems}</p></div>)}</div>
@@ -46,15 +46,15 @@ function DemoCompany() {
       <div className="grid gap-3 md:grid-cols-3">{TIERS.map(tier => <div key={tier.id} className="rounded-md border border-border p-5"><p className="text-sm font-semibold">{tier.name}</p><p className="mt-1 text-xs text-subtle">{tier.epithet}</p><p className="mt-4 text-xs leading-5 text-muted">The product master feeds BOM, cost, engineering control, manufacturing planning and the commercial model.</p></div>)}</div>
     </Panel>
 
-    <Panel title="Procurement planning control" kicker="New · 36-month MRP-style planning fence">
+    <Panel title="Procurement planning control" kicker="36-month MRP-style planning fence">
       <div className="grid gap-3 md:grid-cols-3"><div className="rounded-md border border-border p-4"><p className="text-xs text-subtle">MSL planning</p><p className="mt-1 text-sm font-semibold">2 months early</p><p className="mt-1 text-xs leading-5 text-muted">Material signals are raised before the requirement month.</p></div><div className="rounded-md border border-border p-4"><p className="text-xs text-subtle">Financial alignment</p><p className="mt-1 text-sm font-semibold">M1–M36</p><p className="mt-1 text-xs leading-5 text-muted">Procurement cash remains tied to the existing financial schedule.</p></div><div className="rounded-md border border-border p-4"><p className="text-xs text-subtle">Execution</p><p className="mt-1 text-sm font-semibold">RFQ → approval → PO</p><p className="mt-1 text-xs leading-5 text-muted">Forecast signals are separated from executed procurement actions.</p></div></div>
-      <Link to="/command/procurement-planning" className="mt-4 inline-flex rounded-md border border-accent px-3 py-2 text-xs font-semibold text-accent hover:bg-accent/10">Open Procurement Planning Status →</Link>
+      <p className="mt-4 rounded-lg border border-border bg-bg/40 px-3 py-2 text-xs leading-5 text-muted">The editable procurement planner is available to authorised Operations and Management roles. Showcase users stay on evidence-safe presentation surfaces.</p>
     </Panel>
 
     <Panel title="What the stakeholder sees" kicker="Presentation layer stays separate from operational truth">
       <div className="grid gap-3 md:grid-cols-2"><div className="rounded-md border border-border p-5"><p className="text-sm font-semibold">Verified</p><p className="mt-2 text-xs leading-5 text-muted">Evidence-backed facts, completed approvals and reconciled information can be presented as verified.</p></div><div className="rounded-md border border-border p-5"><p className="text-sm font-semibold">Modeled / pending</p><p className="mt-2 text-xs leading-5 text-muted">Management assumptions, forecasts, pending certifications and open decisions remain clearly disclosed.</p></div></div>
     </Panel>
 
-    <section className="rounded-xl border border-border p-6"><h2 className="text-sm font-semibold">Run the full demo</h2><div className="mt-4 flex flex-wrap gap-2"><Link to="/command/platform-walkthrough" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:bg-surface hover:text-fg">Platform Walkthrough</Link><Link to="/command/investor-pitch" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:bg-surface hover:text-fg">Investor Demo</Link><Link to="/command/stakeholder-portal" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:bg-surface hover:text-fg">Business Story</Link><Link to="/command/financial-cockpit" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:bg-surface hover:text-fg">Financial Cockpit</Link><Link to="/command/procurement-planning" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:bg-surface hover:text-fg">Procurement Planning</Link></div></section>
+    <section className="rounded-xl border border-border p-6"><h2 className="text-sm font-semibold text-accent">Run the full demo</h2><div className="mt-4 flex flex-wrap gap-2"><Link to="/command/platform-walkthrough" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:bg-surface hover:text-fg">Platform Walkthrough</Link><Link to="/command/investor-pitch" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:bg-surface hover:text-fg">Investor Demo</Link><Link to="/command/stakeholder-portal" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:bg-surface hover:text-fg">Business Story</Link><Link to="/command/financial-cockpit" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:bg-surface hover:text-fg">Finance</Link><Link to="/command/qa-verification" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:bg-surface hover:text-fg">QA Verification</Link><Link to="/command/investor-board" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:bg-surface hover:text-fg">Investor / Board</Link></div></section>
   </div>;
 }

@@ -8,7 +8,7 @@ export const FOUNDER_CONTROL_THRESHOLDS = {
 
 export const FOUNDER_CONTROL_LANES = [
   { id: "cash", title: "Cash protection", owner: "Founder", route: "/command/cash", rule: "Escalate when modeled closing cash falls below the management floor." },
-  { id: "engineering", title: "Engineering lock", owner: "Founder", route: "/command/phase-5", rule: "Do not release the design baseline until VEDM and 700×40 clearance evidence agree." },
+  { id: "engineering", title: "Engineering lock", owner: "Founder", route: "/command/engineering", rule: "Do not release the design baseline until VEDM and 700×40 clearance evidence agree." },
   { id: "funding", title: "Funding readiness", owner: "Founder", route: "/command/funding", rule: "Every capital request must map to an evidence gate and use-of-proceeds record." },
   { id: "supplier", title: "Supplier release", owner: "Founder", route: "/command/operations", rule: "RFQs advance only after NDA and controlled engineering inputs are present." },
   { id: "validation", title: "Validation release", owner: "QA", route: "/command/qa-verification", rule: "Prototype and structural claims remain pending until test evidence is recorded." },

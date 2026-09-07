@@ -11,10 +11,10 @@ function InvestorPitchExternal() {
   return (
     <div className="space-y-6">
       <header>
-        <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">
           Investor relations · External pitch
         </p>
-        <h1 className="mt-1 font-display text-4xl">Investor Pitch</h1>
+        <h1 className="mt-1 font-display text-4xl text-accent">Investor Pitch</h1>
         <p className="mt-2 max-w-3xl text-sm text-muted">
           The dedicated investor presentation is hosted at the approved pitch
           destination below. This route keeps the pitch accessible from the
@@ -39,7 +39,7 @@ function InvestorPitchExternal() {
             to="/command/investor-pitch"
             className="inline-flex rounded-md border border-border px-4 py-2 text-sm text-muted hover:bg-surface hover:text-fg"
           >
-            Back to investor controls
+            Back to VINDY showcase
           </Link>
         </div>
 
@@ -47,7 +47,7 @@ function InvestorPitchExternal() {
           <iframe
             title="Investor pitch"
             src={INVESTOR_PITCH_URL}
-            className="h-[78vh] min-h-[640px] w-full border-0"
+            className="h-[72vh] min-h-[480px] w-full border-0 sm:h-[78vh] sm:min-h-[640px]"
             loading="lazy"
             referrerPolicy="strict-origin-when-cross-origin"
           />
