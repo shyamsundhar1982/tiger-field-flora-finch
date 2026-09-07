@@ -12,5 +12,10 @@ export const routeOwnership:Record<string,RouteOwnership>={
   '/command/inventory-truth':{canonicalRoute:'/command/inventory-truth',source:'operational',mutability:'read-only',notes:'Server-backed balances, movements, WAC, MSL, FIFO and audit read model.'},
   '/command/procurement-planning':{canonicalRoute:'/command/procurement-planning',source:'planning',mutability:'editable',notes:'Planning assumptions consume inventory signals; they do not own balances.'},
   '/command/actuals':{canonicalRoute:'/command/actuals',source:'operational',mutability:'read-only',notes:'Read model of operational actuals; source transactions remain in domain workflows.'},
+  '/command/finance':{canonicalRoute:'/command/finance',source:'planning',mutability:'read-only',notes:'Scenario projection over persisted planning assumptions.'},
+  '/command/finance-assumptions':{canonicalRoute:'/command/finance-assumptions',source:'planning',mutability:'editable',notes:'Editable scenario, operating and accounting assumptions; does not post ERP facts.'},
+  '/command/financial-cockpit':{canonicalRoute:'/command/financial-cockpit',source:'planning',mutability:'read-only',notes:'Executive projection consuming planning assumptions and accounting model outputs.'},
+  '/command/balance-sheet':{canonicalRoute:'/command/balance-sheet',source:'planning',mutability:'read-only',notes:'Management accounting projection requiring CA reconciliation before statutory use.'},
+  '/command/cash':{canonicalRoute:'/command/cash',source:'planning',mutability:'editable',notes:'Scenario cash and working-capital projection; inventory facts remain in Inventory Truth.'},
 };
 export const getRouteOwnership=(route:string)=>routeOwnership[route];

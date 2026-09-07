@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 import {
   Bar,
@@ -39,8 +39,10 @@ function Finance() {
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Schedule 1 + 2 + 8</p>
+        <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Planning · scenario projection</p>
         <h1 className="font-display text-4xl">Finance</h1>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">Editable scenario outputs from the shared planning model. Posted inventory valuation and replenishment signals remain in the ERP read models.</p>
+        <div className="mt-3 flex flex-wrap gap-3 text-sm font-semibold"><Link to="/command/inventory-truth" className="text-accent">Inventory truth →</Link><Link to="/command/procurement" className="text-accent">Procurement control →</Link><Link to="/command/finance-assumptions" className="text-accent">Edit assumptions →</Link></div>
       </div>
 
       <div className="flex flex-wrap gap-2">

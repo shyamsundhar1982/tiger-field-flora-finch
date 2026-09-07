@@ -30,8 +30,8 @@ function CashPlanning() {
 
   return <div className="space-y-6">
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div><p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Treasury · working capital → cash</p><h1 className="mt-1 font-display text-4xl">Cash & working capital</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-muted">The cash control room: where money comes from, where it goes, how much gets trapped in inventory, and when the business crosses its minimum cash policy.</p></div>
-      <div className="flex flex-wrap gap-2"><Link to="/command/finance-assumptions" className="rounded-lg border border-accent px-4 py-2.5 text-sm font-semibold text-accent hover:bg-accent/10">Edit assumptions</Link><Link to="/command/financial-cockpit" className="rounded-lg border border-border px-4 py-2.5 text-sm font-semibold hover:border-accent">Financial cockpit</Link></div>
+      <div><p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Planning · treasury projection</p><h1 className="mt-1 font-display text-4xl">Cash & working capital</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-muted">A scenario-based cash projection. Inventory cash is modeled here; posted quantity and valuation evidence remains in Inventory Truth.</p></div>
+      <div className="flex flex-wrap gap-2"><Link to="/command/finance-assumptions" className="rounded-lg border border-accent px-4 py-2.5 text-sm font-semibold text-accent hover:bg-accent/10">Edit assumptions</Link><Link to="/command/financial-cockpit" className="rounded-lg border border-border px-4 py-2.5 text-sm font-semibold hover:border-accent">Financial cockpit</Link><Link to="/command/inventory-truth" className="rounded-lg border border-border px-4 py-2.5 text-sm font-semibold hover:border-accent">Inventory truth</Link></div>
     </div>
 
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
