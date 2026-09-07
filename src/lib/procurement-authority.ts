@@ -48,18 +48,41 @@ export const getProcurementPlanningReport = createServerFn({ method: "GET" }).ha
     order by requirement_month, plan_month, action_type
   `;
   const stock = await sql`
-    select c.venture, c.sku, c.unit, c.minimum_stock_level, c.reorder_quantity, c.lead_time_days,
-      coalesce(b.quantity_balance, 0) as quantity_balance,
-      greatest(c.minimum_stock_level - coalesce(b.quantity_balance, 0), 0) as shortage_quantity,
-      case when coalesce(b.quantity_balance, 0) <= 0 then 'critical'
-           when coalesce(b.quantity_balance, 0) <= c.minimum_stock_level then 'low'
+    with physical as (
+      select i.id, i.ledger_id, i.sku, i.unit, i.minimum_stock_level, i.planned_monthly_use,
+        coalesce(sum(l.quantity_remaining), 0) as physical_quantity
+      from master_inventory_items i
+      left join master_inventory_lots l on l.item_id = i.id
+      where i.active = true
+      group by i.id
+    ), committed as (
+      select upper(line.sku) as sku, coalesce(sum(line.quantity), 0) as committed_quantity
+      from epr_production_job_card_lines line
+      join epr_production_job_cards card on card.id = line.job_card_id
+      where line.sku is not null
+        and card.status in ('released', 'in_progress')
+        and line.issue_status in ('reserved', 'short')
+      group by upper(line.sku)
+    ), availability as (
+      select p.*,
+        coalesce(c.committed_quantity, 0) as committed_quantity,
+        greatest(p.physical_quantity - coalesce(c.committed_quantity, 0), 0) as free_quantity
+      from physical p
+      left join committed c on c.sku = upper(p.sku)
+    )
+    select ledger_id as venture, sku, unit, minimum_stock_level,
+      greatest(minimum_stock_level + planned_monthly_use - free_quantity, 0) as reorder_quantity,
+      0::int as lead_time_days,
+      free_quantity as quantity_balance,
+      physical_quantity,
+      committed_quantity,
+      greatest(minimum_stock_level - free_quantity, 0) as shortage_quantity,
+      case when free_quantity <= 0 then 'critical'
+           when free_quantity <= minimum_stock_level then 'low'
            else 'ok' end as status
-    from epr_inventory_controls c
-    left join epr_authoritative_inventory_balance b
-      on b.venture=c.venture and b.sku=c.sku and b.unit=c.unit
-    where c.active=true
-    order by case when coalesce(b.quantity_balance,0)<=0 then 0 when coalesce(b.quantity_balance,0)<=c.minimum_stock_level then 1 else 2 end,
-      c.venture, c.sku
+    from availability
+    order by case when free_quantity <= 0 then 0 when free_quantity <= minimum_stock_level then 1 else 2 end,
+      ledger_id, sku
   `;
   return { summary, forecast: summary.rows as ProcurementForecastRow[], actions, stock, plan };
 });
@@ -102,6 +125,7 @@ export const getProcurementPlanningMethod = createServerFn({ method: "GET" }).ha
     horizonMonths: 36,
     principles: [
       "Time-phased material requirements are pegged to the Admin-published rolling 36-month operating plan.",
+      "Confirmed configured orders consume free Master Inventory capacity before procurement shortages are calculated.",
       "MSL planning signals activate two months before the requirement month.",
       "Planning early does not pull cash forward: financial impact remains on the planned purchase/receipt month.",
       "Action status is separately recorded so management can distinguish a forecast signal from an executed procurement action.",
