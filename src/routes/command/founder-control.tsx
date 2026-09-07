@@ -1,7 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Kpi, Panel } from "@/components/kpi";
-import { founderActionSummary, FOUNDER_CONTROL_CHECKS, FOUNDER_CONTROL_LANES, FOUNDER_CONTROL_THRESHOLDS } from "@/lib/data/founder-control";
+import {
+  founderActionSummary,
+  FOUNDER_CONTROL_CHECKS,
+  FOUNDER_CONTROL_LANES,
+  FOUNDER_CONTROL_THRESHOLDS,
+} from "@/lib/data/founder-control";
 import { buildModelWithInputs, totals } from "@/lib/finance/model";
+import { DEFAULT_APPROVED_OPERATING_PLAN } from "@/lib/planning/operating-plan";
 import { useVeloxis } from "@/lib/store";
 
 export const Route = createFileRoute("/command/founder-control")({ component: FounderControl });
@@ -11,10 +17,11 @@ function FounderControl() {
   const scenario = useVeloxis((s) => s.scenario);
   const drawStandby = useVeloxis((s) => s.drawStandby);
   const finance = useVeloxis((s) => s.finance);
+  const plan = finance.operatingPlan ?? DEFAULT_APPROVED_OPERATING_PLAN;
   const rows = buildModelWithInputs(scenario, drawStandby, finance);
   const t = totals(rows);
   const trough = rows.reduce((min, row) => (row.closing < min.closing ? row : min), rows[0]!);
-  const cashRisk = trough.closing < FOUNDER_CONTROL_THRESHOLDS.cashFloorLakh;
+  const cashRisk = trough.closing < plan.cashFloorLakh;
   const blocked = founderActionSummary.filter((a) => a.status === "blocked");
   const active = founderActionSummary.filter((a) => a.status === "active");
 
@@ -23,7 +30,10 @@ function FounderControl() {
       <header>
         <p className="text-[10px] uppercase tracking-[0.2em] text-subtle">Phase I · Deep Control</p>
         <h1 className="mt-2 font-display text-4xl">Founder Control Upgrade</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">A tighter operating layer above the Founder Command Centre: guardrails, intervention lanes, action urgency and release rules. It surfaces risk; it never fabricates completion.</p>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
+          A tighter operating layer above the Founder Command Centre: guardrails, intervention lanes,
+          action urgency and release rules. It surfaces risk; it never fabricates completion.
+        </p>
       </header>
 
       <div className="grid gap-3 sm:grid-cols-4">
@@ -100,11 +110,11 @@ function FounderControl() {
       </Panel>
 
       <div className="rounded-lg border border-border bg-surface p-5">
-        <p className="text-[10px] uppercase tracking-wider text-subtle">Control constants</p>
+        <p className="text-[10px] uppercase tracking-wider text-subtle">Control guardrails</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           <div>
-            <p className="text-xs text-muted">Management cash floor</p>
-            <p className="mt-1 text-lg font-semibold">{money(FOUNDER_CONTROL_THRESHOLDS.cashFloorLakh)}</p>
+            <p className="text-xs text-muted">Approved-plan cash floor</p>
+            <p className="mt-1 text-lg font-semibold">{money(plan.cashFloorLakh)}</p>
           </div>
           <div>
             <p className="text-xs text-muted">Evidence freshness window</p>
@@ -115,7 +125,11 @@ function FounderControl() {
             <p className="mt-1 text-lg font-semibold">{FOUNDER_CONTROL_THRESHOLDS.criticalActionDays} days</p>
           </div>
         </div>
-        <p className="mt-4 text-xs leading-5 text-muted">These are operating guardrails, not accounting or legal conclusions. Any change to the underlying financial, engineering or compliance source remains subject to its own control register.</p>
+        <p className="mt-4 text-xs leading-5 text-muted">
+          The cash floor is owned by the published Operating Plan; evidence and action windows remain
+          governance guardrails. Changes to financial, engineering or compliance sources remain subject
+          to their own control registers.
+        </p>
       </div>
     </div>
   );
