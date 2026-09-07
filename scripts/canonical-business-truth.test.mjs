@@ -8,6 +8,7 @@ import { pendingMigrations } from "./migration-plan.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const migrationsDir = join(here, "..", "migrations");
+const releasedGroupsetMappingId = "MAP-CORE-TIAGRA-GROUPSET-TEST";
 
 async function createCanonicalDb() {
   const db = new PGlite();
@@ -51,7 +52,7 @@ async function createReleasedCard(db, { orderId, cardId, lineId, quantity }) {
      values ($1,'aluminium','core-tiagra','BOM-TEST-1','option:groupset','TEST-SKU',2,'ea','active',
        'test-admin',now(),'test-admin','groupset','gs-tiagra-4700')
      on conflict (id) do nothing`,
-    [`MAP-${cardId}`],
+    [releasedGroupsetMappingId],
   );
   await db.query(
     `insert into epr_production_job_cards
@@ -59,7 +60,7 @@ async function createReleasedCard(db, { orderId, cardId, lineId, quantity }) {
        model_tier,variant_id,configuration,sales_order_revision,bom_revision,released_mapping_set,updated_by)
      values ($1,$2,'aluminium','VINDY Longitude Tiagra',$3,'core',6,'released','operations','test-user',
        'core','core-tiagra',$4::jsonb,1,'BOM-TEST-1',$5::jsonb,'test-user')`,
-    [cardId, orderId, quantity / 2, JSON.stringify({ groupset: "gs-tiagra-4700" }), JSON.stringify([`MAP-${cardId}`])],
+    [cardId, orderId, quantity / 2, JSON.stringify({ groupset: "gs-tiagra-4700" }), JSON.stringify([releasedGroupsetMappingId])],
   );
   await db.query(
     `insert into epr_production_job_card_lines
@@ -67,7 +68,7 @@ async function createReleasedCard(db, { orderId, cardId, lineId, quantity }) {
        sku,category,available_quantity,shortage_quantity,bom_mapping_id,requirement_revision)
      values ($1,$2,1,'ST-01','Kitting','component','Tiagra groupset',$3,'ea','option:groupset','pending',
        'TEST-SKU','groupset',0,$3,$4,1)`,
-    [lineId, cardId, quantity, `MAP-${cardId}`],
+    [lineId, cardId, quantity, releasedGroupsetMappingId],
   );
 }
 
