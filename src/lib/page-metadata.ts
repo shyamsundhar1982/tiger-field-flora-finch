@@ -25,3 +25,12 @@ export const routeOwnership:Record<string,RouteOwnership>={
   '/command/platform-walkthrough':{canonicalRoute:'/command/platform-walkthrough',source:'showcase',mutability:'read-only',notes:'Guided read-only demonstration linking back to command source evidence.'},
 };
 export const getRouteOwnership=(route:string)=>routeOwnership[route];
+export function validateRouteOwnership(): string[] {
+  const errors: string[] = [];
+  for (const [route, ownership] of Object.entries(routeOwnership)) {
+    if (route !== "/command/inventory-ledgers/:ledger" && !routeRegistry[route]) errors.push(`${route} is missing from routeRegistry`);
+    if (ownership.canonicalRoute !== route && ownership.canonicalRoute !== "/command/inventory-truth" && !routeRegistry[ownership.canonicalRoute]) errors.push(`${route} points to an unregistered canonical route`);
+    if (!ownership.notes.trim()) errors.push(`${route} has no ownership notes`);
+  }
+  return errors;
+}
