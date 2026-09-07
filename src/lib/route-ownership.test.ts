@@ -33,3 +33,12 @@ test("public and compatibility route contracts remain registered", () => {
   assert.equal(getRouteOwnership("/inventory")?.compatibility, true);
   assert.equal(ROUTE_FILE_EXCLUSIONS.has("/command/inventory-ledgers/$ledger"), true);
 });
+
+test("external business review is a registered read-only showcase route", () => {
+  const route = routeRegistry["/command/investor-pitch-external"];
+  assert.equal(route?.label, "External Business Review");
+  assert.equal(route?.mode, "showcase");
+  assert.equal(route?.group, "Showcase");
+  assert.equal(getRouteOwnership(route.route)?.source, "showcase");
+  assert.equal(getRouteOwnership(route.route)?.mutability, "read-only");
+});
