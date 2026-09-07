@@ -44,7 +44,7 @@ function ProcurementPlanning() {
       <div>
         <p className="text-[10px] uppercase tracking-[0.22em] text-green">Plan · supply + finance integration</p>
         <h1 className="mt-2 text-4xl font-bold text-accent">Procurement Planning Status</h1>
-        <p className="mt-3 max-w-4xl text-sm leading-6 text-muted">36-month, time-phased procurement planning tied to the base financial model and funding tranches. MSL signals activate <strong className="text-fg">{MSL_PLANNING_LEAD_MONTHS} months before</strong> the requirement month so Operations can act early without pulling the financial cash impact forward.</p>
+        <p className="mt-3 max-w-4xl text-sm leading-6 text-muted">36-month, time-phased planning tied to the base financial model and funding tranches. This editable planning surface consumes MSL signals but does not own posted balances or inventory valuation. MSL signals activate <strong className="text-fg">{MSL_PLANNING_LEAD_MONTHS} months before</strong> the requirement month so Operations can act early without pulling the financial cash impact forward.</p>
       </div>
       <div className="flex gap-2"><Link to="/command/procurement" className="rounded-lg border border-border px-4 py-2.5 text-sm font-semibold text-muted hover:text-accent">Live MSL queue</Link><Link to="/command/financial-cockpit" className="rounded-lg border border-border px-4 py-2.5 text-sm font-semibold text-muted hover:text-accent">Financial cockpit</Link></div>
     </div>
