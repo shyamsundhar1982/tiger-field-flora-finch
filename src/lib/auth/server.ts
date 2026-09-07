@@ -57,11 +57,14 @@ const LOCAL_DEV_ORIGINS: string[] = [
   "http://[::1]:8080",
 ];
 
-// Vercel creates a different hostname for each production/preview deployment.
-// Better Auth must trust the actual browser origin, otherwise email/password
-// sign-in is rejected with "Invalid origin" before credentials are checked.
-// Scope the wildcard to this VINDY application rather than every Vercel app.
+// Vercel can create multiple deployment hostnames for the same application.
+// Trust this application's actual Vercel domains, including deployment previews.
 const VERCEL_APP_ORIGINS: string[] = [
+  "https://vindy-architecture.vercel.app",
+  "https://vindy-architecture-*.vercel.app",
+  "https://vindy-architecture-the-final3.vercel.app",
+  "https://vindy-architecture-git-main-the-final3.vercel.app",
+  "https://vindy-architecture-*-the-final3.vercel.app",
   "https://tiger-field-flora-finch-*.vercel.app",
 ];
 
@@ -72,12 +75,14 @@ const CLOUDFLARE_APP_ORIGINS: string[] = [
   "https://tiger-field-flora-finch.shyamsundhar1982.workers.dev",
 ];
 
-// Better Auth's server API methods (including admin-created email accounts)
-// require a URL string here. Origin policy remains separately enforced below.
-const baseURL = explicitBaseURL ?? "http://localhost:8080";
+// Better Auth's server API methods require a URL string here. Prefer the
+// configured URL; otherwise use the stable VINDY production hostname rather
+// than localhost, which would make production auth construct incorrect URLs.
+const baseURL = explicitBaseURL ?? "https://vindy-architecture.vercel.app";
 
 const trustedOrigins: string[] = [
-  ...(explicitBaseURL ? [explicitBaseURL] : []),
+  baseURL,
+  ...(explicitBaseURL ? [] : []),
   ...VERCEL_APP_ORIGINS,
   ...CLOUDFLARE_APP_ORIGINS,
   ...previewAllowedHosts,
