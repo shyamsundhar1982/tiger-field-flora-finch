@@ -2,8 +2,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getSql } from "@/lib/db";
 import { assertSameSiteRequest } from "@/lib/auth/isolation.server";
+import { getSessionUser } from "@/lib/auth/verify.server";
 import { getCommandRole } from "@/lib/command-access";
-import { canPerform } from "@/lib/page-access";
+import { canPerform, type CommandRole } from "@/lib/page-access";
 import {
   DEFAULT_APPROVED_OPERATING_PLAN,
   normalizeOperatingPlan,
@@ -38,7 +39,7 @@ const draftSchema = z.object({
   changeReason: z.string().min(3).max(1000),
   sourceVersionId: z.string().uuid().nullable().optional(),
 });
-
+const updateDraftSchema = draftSchema.extend({ id: z.string().uuid() });
 const idSchema = z.object({ id: z.string().uuid() });
 const rejectSchema = idSchema.extend({ reason: z.string().min(3).max(1000) });
 
@@ -122,14 +123,10 @@ async function requirePlanningRole(permission: "view" | "edit") {
   return role;
 }
 
-const selectColumns = `
-  id, revision_no, status, label, plan, change_reason, source_version_id,
-  created_by, created_role, created_at::text,
-  submitted_by, submitted_at::text,
-  approved_by, approved_at::text,
-  published_by, published_at::text,
-  rejected_by, rejected_at::text
-`;
+async function actorForRole(role: CommandRole) {
+  const user = await getSessionUser();
+  return user ? `user:${user.id}` : `command:${role}`;
+}
 
 export const getPublishedOperatingPlan = createServerFn({ method: "GET" }).handler(async () => {
   assertSameSiteRequest();
@@ -176,7 +173,7 @@ export const createOperatingPlanDraft = createServerFn({ method: "POST" })
     const role = await requirePlanningRole("edit");
     const sql = await getSql();
     const id = crypto.randomUUID();
-    const actor = `command:${role}`;
+    const actor = await actorForRole(role);
     const plan = normalizeOperatingPlan(data.plan as OperatingPlan);
     const rows = await sql<DbPlanRow>`
       insert into operating_plan_versions
@@ -194,13 +191,41 @@ export const createOperatingPlanDraft = createServerFn({ method: "POST" })
     return toRecord(rows[0]);
   });
 
+export const updateOperatingPlanDraft = createServerFn({ method: "POST" })
+  .validator(updateDraftSchema)
+  .handler(async ({ data }) => {
+    assertSameSiteRequest();
+    const role = await requirePlanningRole("edit");
+    const sql = await getSql();
+    const actor = await actorForRole(role);
+    const plan = normalizeOperatingPlan(data.plan as OperatingPlan);
+    const rows = await sql<DbPlanRow>`
+      update operating_plan_versions
+      set plan = ${JSON.stringify(plan)}::jsonb,
+          change_reason = ${data.changeReason.trim()},
+          source_version_id = ${data.sourceVersionId ?? null},
+          created_by = ${actor},
+          created_role = ${role},
+          created_at = now()
+      where id = ${data.id} and status = 'draft'
+      returning id, revision_no, status, label, plan, change_reason, source_version_id,
+        created_by, created_role, created_at::text,
+        submitted_by, submitted_at::text,
+        approved_by, approved_at::text,
+        published_by, published_at::text,
+        rejected_by, rejected_at::text
+    `;
+    if (!rows[0]) throw new Error("Only a draft operating plan can be updated.");
+    return toRecord(rows[0]);
+  });
+
 export const submitOperatingPlan = createServerFn({ method: "POST" })
   .validator(idSchema)
   .handler(async ({ data }) => {
     assertSameSiteRequest();
     const role = await requirePlanningRole("edit");
     const sql = await getSql();
-    const actor = `command:${role}`;
+    const actor = await actorForRole(role);
     const rows = await sql<DbPlanRow>`
       update operating_plan_versions
       set status = 'submitted', submitted_by = ${actor}, submitted_at = now()
@@ -225,7 +250,7 @@ export const approveAndPublishOperatingPlan = createServerFn({ method: "POST" })
       throw new Error("Only an administrator can approve and publish the operating plan.");
     }
     const sql = await getSql();
-    const actor = `command:${role}`;
+    const actor = await actorForRole(role);
     const rows = await sql<DbPlanRow>`
       with superseded as (
         update operating_plan_versions
@@ -256,10 +281,12 @@ export const rejectOperatingPlan = createServerFn({ method: "POST" })
     const role = await getCommandRole();
     if (role !== "admin") throw new Error("Only an administrator can reject a submitted plan.");
     const sql = await getSql();
-    const actor = `command:${role}`;
+    const actor = await actorForRole(role);
     const rows = await sql<DbPlanRow>`
       update operating_plan_versions
-      set status = 'rejected', rejected_by = ${actor}, rejected_at = now(),
+      set status = 'rejected',
+          rejected_by = ${actor},
+          rejected_at = now(),
           change_reason = change_reason || E'\nRejected: ' || ${data.reason.trim()}
       where id = ${data.id} and status = 'submitted'
       returning id, revision_no, status, label, plan, change_reason, source_version_id,
