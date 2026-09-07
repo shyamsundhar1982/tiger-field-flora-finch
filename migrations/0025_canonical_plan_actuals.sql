@@ -46,12 +46,12 @@ declare v_id text; v_revision integer;
 begin
   if p_horizon_months<>36 then raise exception 'VYNDI operating plan horizon must remain 36 months.'; end if;
   perform pg_advisory_xact_lock(hashtext('plan-draft|' || p_actor_user_id)::bigint);
-  select id,revision into v_id,v_revision
-    from vyndi_plan_revisions where created_by=p_actor_user_id and status='draft'
-    order by created_at desc limit 1 for update;
+  select pr.id,pr.revision into v_id,v_revision
+    from vyndi_plan_revisions as pr where pr.created_by=p_actor_user_id and pr.status='draft'
+    order by pr.created_at desc limit 1 for update;
   if not found then
     perform pg_advisory_xact_lock(hashtext('vyndi-plan-revision-sequence')::bigint);
-    select coalesce(max(revision),0)+1 into v_revision from vyndi_plan_revisions;
+    select coalesce(max(pr.revision),0)+1 into v_revision from vyndi_plan_revisions as pr;
     v_id:=p_id;
     insert into vyndi_plan_revisions
       (id,revision,status,horizon_months,scenario,draw_standby,finance_json,accounting_json,change_reason,created_by)
