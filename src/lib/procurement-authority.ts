@@ -2,18 +2,45 @@ import { createServerFn } from "@tanstack/react-start";
 import { getSql } from "@/lib/db";
 import { getCommandRole } from "@/lib/command-access";
 import { canPerform } from "@/lib/page-access";
-import { buildProcurementForecast, procurementSummary, type ProcurementForecastRow } from "@/lib/data/procurement-planning";
-import type { ScenarioId } from "@/lib/finance/model";
+import {
+  buildProcurementForecast,
+  procurementSummary,
+  type ProcurementForecastRow,
+} from "@/lib/data/procurement-planning";
+import {
+  DEFAULT_APPROVED_OPERATING_PLAN,
+  normalizeOperatingPlan,
+  type OperatingPlan,
+} from "@/lib/planning/operating-plan";
 
 async function requireProcurementView() {
   const role = await getCommandRole();
   if (!role || !canPerform(role, "view")) throw new Error("Procurement view permission denied.");
 }
 
+async function publishedOperatingPlan(sql: Awaited<ReturnType<typeof getSql>>): Promise<OperatingPlan> {
+  try {
+    const rows = await sql<{ plan: OperatingPlan }>`
+      select plan
+      from operating_plan_versions
+      where status = 'published'
+      order by published_at desc nulls last, created_at desc
+      limit 1
+    `;
+    return rows[0]?.plan
+      ? normalizeOperatingPlan(rows[0].plan)
+      : DEFAULT_APPROVED_OPERATING_PLAN;
+  } catch {
+    // Migration 0023 may not yet exist in a fresh environment. Keep the repository baseline readable.
+    return DEFAULT_APPROVED_OPERATING_PLAN;
+  }
+}
+
 export const getProcurementPlanningReport = createServerFn({ method: "GET" }).handler(async () => {
   await requireProcurementView();
   const sql = await getSql();
-  const summary = procurementSummary("base");
+  const plan = await publishedOperatingPlan(sql);
+  const summary = procurementSummary("base", plan);
   const actions = await sql`
     select id, scenario, plan_month, requirement_month, tranche_id, action_type, status, note, updated_at::text as updated_at
     from epr_procurement_plan_actions
@@ -34,14 +61,24 @@ export const getProcurementPlanningReport = createServerFn({ method: "GET" }).ha
     order by case when coalesce(b.quantity_balance,0)<=0 then 0 when coalesce(b.quantity_balance,0)<=c.minimum_stock_level then 1 else 2 end,
       c.venture, c.sku
   `;
-  return { summary, forecast: summary.rows as ProcurementForecastRow[], actions, stock };
+  return { summary, forecast: summary.rows as ProcurementForecastRow[], actions, stock, plan };
 });
 
 export const setProcurementPlanningAction = createServerFn({ method: "POST" })
-  .validator((input: { planMonth: number; requirementMonth: number; trancheId?: string | null; actionType: "plan" | "rfq" | "approval" | "po" | "receipt" | "hold"; status: "planned" | "in_progress" | "complete" | "on_hold" | "cancelled"; note?: string }) => input)
+  .validator(
+    (input: {
+      planMonth: number;
+      requirementMonth: number;
+      trancheId?: string | null;
+      actionType: "plan" | "rfq" | "approval" | "po" | "receipt" | "hold";
+      status: "planned" | "in_progress" | "complete" | "on_hold" | "cancelled";
+      note?: string;
+    }) => input,
+  )
   .handler(async ({ data }) => {
     const role = await getCommandRole();
-    if (!role || !canPerform(role, "edit")) throw new Error("Procurement planning edit permission denied.");
+    if (!role || !canPerform(role, "edit"))
+      throw new Error("Procurement planning edit permission denied.");
     const sql = await getSql();
     const id = `PPA-base-${data.planMonth}-${data.requirementMonth}-${data.actionType}`;
     await sql`
@@ -64,7 +101,7 @@ export const getProcurementPlanningMethod = createServerFn({ method: "GET" }).ha
     planningLeadMonths: 2,
     horizonMonths: 36,
     principles: [
-      "Time-phased material requirements are pegged to the 36-month production plan.",
+      "Time-phased material requirements are pegged to the Admin-published rolling 36-month operating plan.",
       "MSL planning signals activate two months before the requirement month.",
       "Planning early does not pull cash forward: financial impact remains on the planned purchase/receipt month.",
       "Action status is separately recorded so management can distinguish a forecast signal from an executed procurement action.",
