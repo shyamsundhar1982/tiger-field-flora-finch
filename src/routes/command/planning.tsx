@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Panel } from "@/components/kpi";
+import { Kpi, Panel } from "@/components/kpi";
 import { COMPANY, TRANCHES } from "@/lib/data/company";
 import { DECISION_PACKETS, DECISION_STATE_LABELS, decisionPriorityRank } from "@/lib/data/decision-engine";
 
@@ -49,44 +49,38 @@ function statusClass(status: string) {
 
 function MasterPlan() {
   return (
-    <main className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6">
+    <main className="space-y-6">
       <header className="flex flex-col gap-4 border-b border-border pb-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-green">Planning · canonical operating plan</p>
-          <h1 className="mt-2 text-4xl font-bold text-accent">Master Plan</h1>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">
-            One 36-month planning surface for {COMPANY.brand}. Keep modeled intent here; orders, receipts, job cards, inventory movements and actuals stay in Operate.
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">Planning · canonical operating plan</p>
+          <h1 className="mt-1 font-display text-4xl text-accent">Master Plan</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
+            One 36-month planning surface for {COMPANY.brand}. Keep modeled intent here; orders, receipts, job cards, inventory movements and actuals stay in their operating workspaces.
           </p>
         </div>
-        <Link to="/command" className="w-fit rounded-lg border border-border px-4 py-2.5 text-sm font-semibold text-muted hover:border-accent hover:text-fg">Command Centre →</Link>
+        <Link to="/command" className="w-fit rounded-lg border border-border px-4 py-2.5 text-sm font-semibold text-muted transition-colors hover:border-accent hover:text-fg">Command Centre →</Link>
       </header>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Planning status">
-        {[
-          ["Planning horizon", "36 months", "Quarter view by default"],
-          ["Critical decisions", String(criticalCount), "Only decision-grade exceptions"],
-          ["Blocked items", String(blockedCount), "Resolve before dependent release"],
-          ["Capital ladder", `₹${capitalLadder}L`, `${approvalCount} approvals currently flagged`],
-        ].map(([label, value, note]) => (
-          <div key={label} className="rounded-xl border border-border bg-surface/40 p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-subtle">{label}</p>
-            <p className="mt-2 text-2xl font-bold text-fg">{value}</p>
-            <p className="mt-1 text-xs leading-5 text-muted">{note}</p>
-          </div>
-        ))}
+        <Kpi label="Planning horizon" value="36 months" hint="Quarter view by default" />
+        <Kpi label="Critical decisions" value={String(criticalCount)} hint="Only decision-grade exceptions" tone={criticalCount ? "warn" : "ok"} />
+        <Kpi label="Blocked items" value={String(blockedCount)} hint="Resolve before dependent release" tone={blockedCount ? "danger" : "ok"} />
+        <Kpi label="Capital ladder" value={`₹${capitalLadder}L`} hint={`${approvalCount} approvals currently flagged`} />
       </section>
 
-      <nav className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6" aria-label="Master Plan sections">
-        {PLAN_TABS.map((tab, index) => (
-          <Link
-            key={tab.label}
-            to={tab.to as never}
-            className={`rounded-xl border p-3 transition-colors ${index === 0 ? "border-accent bg-accent/10" : "border-border bg-surface/30 hover:border-accent/50"}`}
-          >
-            <p className={`text-sm font-semibold ${index === 0 ? "text-accent" : "text-fg"}`}>{tab.label}</p>
-            <p className="mt-1 text-[10px] leading-4 text-muted">{tab.note}</p>
-          </Link>
-        ))}
+      <nav className="overflow-x-auto rounded-xl border border-border bg-surface/40 p-1" aria-label="Master Plan sections">
+        <div className="flex min-w-max gap-1">
+          {PLAN_TABS.map((tab, index) => (
+            <Link
+              key={tab.label}
+              to={tab.to as never}
+              title={tab.note}
+              className={`rounded-lg px-4 py-2 text-xs font-semibold transition-colors ${index === 0 ? "bg-accent text-accent-fg" : "text-muted hover:bg-bg/60 hover:text-fg"}`}
+            >
+              {tab.label}
+            </Link>
+          ))}
+        </div>
       </nav>
 
       <Panel title="Needs attention" kicker="Exceptions only · no duplicate dashboard noise">
@@ -101,10 +95,10 @@ function MasterPlan() {
                 <p className="mt-1 text-xs leading-5 text-muted">{packet.nextAction}</p>
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-[0.12em] text-subtle">Owner</p>
+                <p className="text-[10px] uppercase tracking-[0.12em] text-green">Owner</p>
                 <p className="mt-1 text-xs text-fg">{packet.owner}</p>
               </div>
-              <Link to={packet.source as never} className="w-fit rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-fg">Open evidence →</Link>
+              <Link to={packet.source as never} className="w-fit rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted transition-colors hover:border-accent hover:text-fg">Open evidence →</Link>
             </div>
           ))}
         </div>
@@ -118,7 +112,7 @@ function MasterPlan() {
             </thead>
             <tbody className="divide-y divide-border">
               {ROADMAP.map((row) => (
-                <tr key={row.month} className="bg-surface/20 hover:bg-surface/50">
+                <tr key={row.month} className="bg-surface/20 transition-colors hover:bg-surface/50">
                   <td className="px-4 py-3 font-semibold text-accent">{row.month}</td>
                   <td className="px-4 py-3 font-semibold text-fg">{row.phase}</td>
                   <td className="px-4 py-3 text-muted">{row.owner}</td>
@@ -145,12 +139,12 @@ function MasterPlan() {
       </Panel>
 
       <details className="rounded-xl border border-border bg-surface/20 p-4">
-        <summary className="cursor-pointer text-sm font-semibold text-fg">Help & methodology</summary>
+        <summary className="cursor-pointer text-sm font-semibold text-accent">Help & methodology</summary>
         <div className="mt-3 grid gap-3 text-xs leading-5 text-muted md:grid-cols-2">
-          <p><span className="font-semibold text-fg">Planning:</span> demand, timing, assumptions, dependencies, funding gates and expected capacity.</p>
-          <p><span className="font-semibold text-fg">Operate:</span> purchase orders, receipts, inventory issues, production job cards, quality records and actual transactions.</p>
-          <p><span className="font-semibold text-fg">Exception rule:</span> if a metric does not change a decision, trigger an action, document evidence or explain a material deviation, it stays off this screen.</p>
-          <p><span className="font-semibold text-fg">Detail rule:</span> use the six plan sections above for specialist work; return here for the integrated roadmap and exceptions.</p>
+          <p><span className="font-semibold text-green">Planning:</span> demand, timing, assumptions, dependencies, funding gates and expected capacity.</p>
+          <p><span className="font-semibold text-green">Operate:</span> purchase orders, receipts, inventory issues, production job cards, quality records and actual transactions.</p>
+          <p><span className="font-semibold text-green">Exception rule:</span> if a metric does not change a decision, trigger an action, document evidence or explain a material deviation, it stays off this screen.</p>
+          <p><span className="font-semibold text-green">Detail rule:</span> use the six plan sections above for specialist work; return here for the integrated roadmap and exceptions.</p>
         </div>
       </details>
     </main>
