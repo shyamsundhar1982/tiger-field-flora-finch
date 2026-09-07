@@ -2,6 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { CommandShell } from "@/components/command-shell";
 import { getCommandAccess, getCommandRole } from "@/lib/command-access";
+import { DEFAULT_FINANCE_ASSUMPTIONS } from "@/lib/finance/model";
 import { canAccessRoute } from "@/lib/page-access";
 import { getRouteMeta } from "@/lib/page-metadata";
 import { useVeloxis } from "@/lib/store";
@@ -47,7 +48,17 @@ function CommandRouteShell() {
 
   useEffect(() => {
     const state = useVeloxis.getState();
-    state.setFinance({ ...state.finance, operatingPlan: plan });
+    state.setFinance({
+      ...state.finance,
+      // These persisted fields belonged to the legacy product model. Canonical demand and launch
+      // now come from the published Operating Plan, so stale local values cannot re-enter forecasts.
+      unitMultiplier: 1,
+      aluminiumVertical: {
+        ...DEFAULT_FINANCE_ASSUMPTIONS.aluminiumVertical,
+        inventoryCover: 1,
+      },
+      operatingPlan: plan,
+    });
   }, [plan]);
 
   return <CommandShell />;
