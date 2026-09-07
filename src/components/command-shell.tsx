@@ -89,11 +89,9 @@ function isPrimaryNavigationPage(page: RouteMeta) {
 
 function PageLink({ page, role, compact = false }: { page: RouteMeta; role: CommandRole | null; compact?: boolean }) {
   if (!canAccessPage(role, page)) return null;
-  const location = useLocation();
   const flow = getErpFlowStep(page.route);
-  const supplyActive = page.route === SUPPLY_HOME_ROUTE && SUPPLY_CONTEXT_ROUTES.has(location.pathname);
   const label = page.route === FINANCE_HOME_ROUTE ? "Finance" : page.route === SUPPLY_HOME_ROUTE ? "Supply & Production" : page.label;
-  return <Link key={page.route} to={page.route as never} title={flow ? `${flow.step.label}: ${flow.step.purpose}\nInputs: ${flow.step.inputs}\nOutputs: ${flow.step.outputs}` : page.label} className={cn("flex items-center gap-2 rounded-md px-3 py-2 text-muted transition-colors hover:bg-surface hover:text-fg", compact ? "text-xs" : "text-sm", supplyActive && "bg-surface text-fg")} activeProps={{ className: "bg-surface text-fg" }}><Activity className="size-4 shrink-0" />{label}</Link>;
+  return <Link key={page.route} to={page.route as never} title={flow ? `${flow.step.label}: ${flow.step.purpose}\nInputs: ${flow.step.inputs}\nOutputs: ${flow.step.outputs}` : page.label} className={cn("flex items-center gap-2 rounded-md px-3 py-2 text-muted transition-colors hover:bg-surface hover:text-fg", compact ? "text-xs" : "text-sm")} activeProps={{ className: "bg-surface text-fg" }}><Activity className="size-4 shrink-0" />{label}</Link>;
 }
 
 function DomainGroup({ domain, mode, role }: { domain: PageDomain; mode: PageMode; role: CommandRole | null }) {
