@@ -1,4 +1,4 @@
-import { groupsetName } from "./groupsets";
+import { groupsetName } from "./groupsets.ts";
 export type Model={id:string;tier:"core"|"pro"|"apex";name:string;brand:"Shimano"|"SRAM";groupset:string;wheelset:string;tyres:string;asp:number};
 export const MODELS:Model[]=[
 {id:"core-tiagra",tier:"core",name:"VINDY Longitude Tiagra",brand:"Shimano",groupset:groupsetName("tiagra"),wheelset:"Performance Alloy",tyres:"Continental Ultra Sport III",asp:111900},
