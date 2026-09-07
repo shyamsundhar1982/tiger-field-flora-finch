@@ -94,7 +94,7 @@ declare
   v_snapshot jsonb;
 begin
   perform pg_advisory_xact_lock(hashtext('sales-order|' || p_id)::bigint);
-  select revision into v_revision from vyndi_sales_orders where id=p_id for update;
+  select so.revision into v_revision from vyndi_sales_orders as so where so.id=p_id for update;
   v_created := not found;
   v_revision := coalesce(v_revision,0)+1;
 
