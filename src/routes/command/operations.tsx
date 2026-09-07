@@ -1,32 +1,182 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { Kpi, Panel } from "@/components/kpi";
+import { getInventoryMslWarnings } from "@/lib/inventory-authority";
 import { buildModelWithInputs, type ScenarioId } from "@/lib/finance/model";
-import { buildAccountingModel } from "@/lib/finance/accounting";
-import { buildComponentRequirements, buildOperationsMonths, totalBomRequirementInr } from "@/lib/finance/operations-engine";
-import { inr, lakh } from "@/lib/format";
+import { MANUFACTURING_CONTROLS, MANUFACTURING_GATES } from "@/lib/data/manufacturing-control";
+import { qualitySummary } from "@/lib/finance/quality-engine";
 import { useVeloxis } from "@/lib/store";
 
-export const Route = createFileRoute("/command/operations")({ component: Operations });
+export const Route = createFileRoute("/command/operations")({
+  loader: () => getInventoryMslWarnings(),
+  component: SupplyProduction,
+});
 
-function Operations() {
+function SupplyProduction() {
+  const warnings = Route.useLoaderData();
   const scenario = useVeloxis((s) => s.scenario) as ScenarioId;
   const drawStandby = useVeloxis((s) => s.drawStandby);
   const finance = useVeloxis((s) => s.finance);
-  const accounting = useVeloxis((s) => s.accounting);
-  const rows = useMemo(() => buildModelWithInputs(scenario, drawStandby, finance), [scenario, drawStandby, finance]);
-  const accountingRows = useMemo(() => buildAccountingModel(rows, accounting), [rows, accounting]);
-  const months = useMemo(() => buildOperationsMonths(rows, finance), [rows, finance]);
-  const components = useMemo(() => buildComponentRequirements(rows, finance), [rows, finance]);
-  const bomRequirement = totalBomRequirementInr(rows, finance);
-  const trough = accountingRows.reduce((min, r) => r.closingCash < min.closingCash ? r : min, accountingRows[0]);
-  const workingCapital = accountingRows.at(-1) ? accountingRows.at(-1)!.receivables + accountingRows.at(-1)!.inventory - accountingRows.at(-1)!.payables : 0;
+  const rows = useMemo(
+    () => buildModelWithInputs(scenario, drawStandby, finance),
+    [scenario, drawStandby, finance],
+  );
 
-  return <div className="space-y-6">
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Planning · operations model</p><h1 className="font-display text-4xl">Operations & Procurement</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-muted">A scenario projection connecting production, BOM requirements, procurement exposure and accounting cash. Posted stock and replenishment signals remain canonical in Inventory Truth and Procurement.</p></div><div className="flex flex-wrap gap-3 text-sm font-semibold"><Link to="/command/inventory-truth" className="text-accent">Inventory truth →</Link><Link to="/command/procurement" className="text-accent">Procurement control →</Link></div></div>
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"><Kpi label="36-mo units" value={String(rows.reduce((s,r)=>s+r.units,0))} hint={scenario}/><Kpi label="BOM requirement" value={inr(Math.round(bomRequirement))} hint="Quantity × landed cost"/><Kpi label="Accounting purchases" value={lakh(accountingRows.reduce((s,r)=>s+r.purchases,0))} hint="Inventory movement"/><Kpi label="Working capital" value={lakh(workingCapital)} hint="AR + inventory − AP at M36"/><Kpi label="Cash trough" value={lakh(trough.closingCash)} hint={`M${trough.m}`} tone={trough.closingCash<0?"danger":trough.closingCash<15?"warn":"ok"}/></div>
-    <Panel title="Monthly production → material requirement" kicker="36 months · live BOM"><div className="overflow-x-auto"><table className="w-full min-w-[860px] text-sm"><thead className="border-b border-border text-[10px] uppercase tracking-[0.14em] text-subtle"><tr><th className="px-3 py-3 text-left">Month</th><th className="px-3 py-3 text-right">Units</th><th className="px-3 py-3 text-right">Aluminium</th><th className="px-3 py-3 text-right">Carbon</th><th className="px-3 py-3 text-right">Premium</th><th className="px-3 py-3 text-right">BOM req.</th><th className="px-3 py-3 text-right">Inventory buy</th><th className="px-3 py-3 text-right">Accounting cash</th></tr></thead><tbody>{months.filter(r=>r.units>0||r.bomRequirementInr>0).map(r=><tr key={r.m} className="border-t border-border/70"><td className="px-3 py-3 font-semibold text-fg">M{r.m}</td><td className="px-3 py-3 text-right tabular-nums">{r.units}</td><td className="px-3 py-3 text-right tabular-nums text-muted">{r.aluminiumUnits}</td><td className="px-3 py-3 text-right tabular-nums text-muted">{r.carbonUnits}</td><td className="px-3 py-3 text-right tabular-nums text-muted">{r.premiumCarbonUnits}</td><td className="px-3 py-3 text-right tabular-nums text-accent">{inr(Math.round(r.bomRequirementInr))}</td><td className="px-3 py-3 text-right tabular-nums">{lakh(r.inventoryBuy)}</td><td className="px-3 py-3 text-right tabular-nums">{lakh(accountingRows[r.m-1]?.closingCash??0)}</td></tr>)}</tbody></table></div></Panel>
-    <Panel title="Component procurement exposure" kicker="36-mo requirement from BOM"><div className="overflow-x-auto"><table className="w-full min-w-[720px] text-sm"><thead className="border-b border-border text-[10px] uppercase tracking-[0.14em] text-subtle"><tr><th className="px-3 py-3 text-left">Component</th><th className="px-3 py-3 text-right">Required qty</th><th className="px-3 py-3 text-right">Estimated landed spend</th></tr></thead><tbody>{components.slice(0,18).map(r=><tr key={r.item} className="border-t border-border/70"><td className="px-3 py-3 font-medium text-fg">{r.item}</td><td className="px-3 py-3 text-right tabular-nums">{r.quantity.toFixed(r.quantity%1?2:0)}</td><td className="px-3 py-3 text-right tabular-nums">{inr(Math.round(r.estimatedCostInr))}</td></tr>)}</tbody></table></div><p className="mt-3 text-xs leading-5 text-muted">This is a BOM-driven requirement, not yet a purchase order or stock deduction. Phase 3 keeps the engineering requirement separate until each BOM component is mapped to an operational SKU and supplier lead time.</p></Panel>
-    <div className="grid gap-4 lg:grid-cols-3"><Panel title="Working capital" kicker="Accounting layer"><p className="text-sm text-muted">M36 AR</p><p className="text-xl tabular-nums text-fg">{lakh(accountingRows.at(-1)?.receivables??0)}</p><p className="mt-3 text-sm text-muted">M36 inventory</p><p className="text-xl tabular-nums text-fg">{lakh(accountingRows.at(-1)?.inventory??0)}</p><p className="mt-3 text-sm text-muted">M36 AP</p><p className="text-xl tabular-nums text-fg">{lakh(accountingRows.at(-1)?.payables??0)}</p></Panel><Panel title="Procurement rules" kicker="Control before cash"><ul className="space-y-2 text-sm text-muted"><li>• Validate supplier quote before replacing BOM estimates.</li><li>• Separate recoverable GST from product COGS with the CA.</li><li>• Confirm lead time and MOQ before committing the purchase month.</li><li>• Do not treat listed catalogue prices as accounting inventory cost.</li></ul></Panel><Panel title="Inventory controls" kicker="MSL + FIFO"><p className="text-sm leading-6 text-muted">Minimum stock warnings are driven from authoritative inventory. Receipts create FIFO layers; issues consume the oldest available layer first.</p><Link to="/command/procurement" className="mt-4 inline-block text-sm font-semibold text-accent">Open MSL procurement queue →</Link></Panel></div>
-  </div>;
+  const critical = warnings.filter((item: any) => item.status === "critical").length;
+  const stockAlerts = warnings.length;
+  const shortage = warnings.reduce(
+    (sum: number, item: any) => sum + Number(item.shortage_quantity || 0),
+    0,
+  );
+  const openManufacturing = MANUFACTURING_CONTROLS.filter(
+    (control) => control.status === "pending" || control.status === "verify",
+  );
+  const firstProduction = rows.find((row) => row.units > 0);
+  const quality = qualitySummary();
+
+  const attention = [
+    ...warnings.slice(0, 4).map((item: any) => ({
+      tone: item.status === "critical" ? "danger" : "warn",
+      title: `${item.sku} · ${item.status === "critical" ? "stockout" : "below MSL"}`,
+      detail: `${Number(item.quantity_balance)} on hand · MSL ${Number(item.minimum_stock_level)} · shortfall ${Number(item.shortage_quantity)}`,
+      to: "/command/procurement",
+    })),
+    ...(openManufacturing.length
+      ? [{
+          tone: "warn",
+          title: `${openManufacturing.length} manufacturing controls need evidence or verification`,
+          detail: `${openManufacturing.slice(0, 2).map((control) => control.title).join(" · ")}${openManufacturing.length > 2 ? " · …" : ""}`,
+          to: "/command/manufacturing",
+        }]
+      : []),
+    ...(quality.openNcr
+      ? [{
+          tone: "warn",
+          title: `${quality.openNcr} open NCR${quality.openNcr === 1 ? "" : "s"}`,
+          detail: "Containment and CAPA remain part of release readiness.",
+          to: "/command/quality",
+        }]
+      : []),
+    ...(!firstProduction
+      ? [{
+          tone: "warn",
+          title: "No production month is scheduled",
+          detail: "The active plan currently has no build quantity. Review the integrated Master Plan before procurement commitments.",
+          to: "/command/planning",
+        }]
+      : []),
+  ];
+
+  const readiness = [
+    {
+      area: "Procurement",
+      signal: stockAlerts ? `${stockAlerts} MSL alert${stockAlerts === 1 ? "" : "s"}` : "No MSL alerts",
+      status: stockAlerts ? "Attention" : "Healthy",
+      rule: "Validate supplier, MOQ, lead time, price and approval before PO release.",
+      to: "/command/procurement",
+    },
+    {
+      area: "Inventory",
+      signal: critical ? `${critical} stockout${critical === 1 ? "" : "s"}` : "FIFO / MSL authoritative",
+      status: critical ? "Attention" : "Controlled",
+      rule: "Receipts create FIFO layers; issues consume oldest available stock first.",
+      to: "/command/inventory",
+    },
+    {
+      area: "Production",
+      signal: firstProduction ? `First planned build M${firstProduction.m} · ${firstProduction.units} units` : "No build scheduled",
+      status: firstProduction ? "Planned" : "Attention",
+      rule: "Production volume follows the shared plan; actual job execution stays separate.",
+      to: "/command/production",
+    },
+    {
+      area: "Manufacturing",
+      signal: `${openManufacturing.length} controls open · ${MANUFACTURING_GATES.length} release gates`,
+      status: openManufacturing.length ? "Attention" : "Ready",
+      rule: "Supplier, tooling, traceability and release evidence must precede downstream gates.",
+      to: "/command/manufacturing",
+    },
+    {
+      area: "Quality",
+      signal: `${quality.openNcr} open NCR · ${quality.warrantyOpen} warranty open`,
+      status: quality.openNcr || quality.warrantyOpen ? "Attention" : "Healthy",
+      rule: "NCR/CAPA and recurring field failures feed release and engineering decisions.",
+      to: "/command/quality",
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <header className="flex flex-col gap-4 border-b border-border pb-6 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">Operate · cross-functional control</p>
+          <h1 className="mt-1 font-display text-4xl text-accent">Supply & Production</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
+            One exception-led operating view across replenishment, authoritative stock, the production plan, manufacturing readiness and quality release. Detailed transactions remain in their specialist controls.
+          </p>
+        </div>
+        <Link to="/command/planning" className="text-sm font-semibold text-accent hover:text-fg">Master Plan →</Link>
+      </header>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Kpi label="Stock alerts" value={String(stockAlerts)} hint={`${critical} critical`} tone={stockAlerts ? "warn" : "ok"} />
+        <Kpi label="MSL shortfall" value={String(shortage)} hint="Units to configured minimum" tone={shortage ? "warn" : "ok"} />
+        <Kpi label="Next production" value={firstProduction ? `M${firstProduction.m}` : "Not set"} hint={firstProduction ? `${firstProduction.units} planned units` : `${scenario} scenario`} tone={firstProduction ? "ok" : "warn"} />
+        <Kpi label="Mfg controls open" value={String(openManufacturing.length)} hint={`${MANUFACTURING_GATES.length} release gates`} tone={openManufacturing.length ? "warn" : "ok"} />
+      </div>
+
+      <Panel title="Needs attention" kicker={attention.length ? `${attention.length} material exception${attention.length === 1 ? "" : "s"}` : "No material exceptions"}>
+        {attention.length ? (
+          <div className="grid gap-3 lg:grid-cols-2">
+            {attention.slice(0, 8).map((item, index) => (
+              <Link key={`${item.title}-${index}`} to={item.to as never} className="rounded-lg border border-border bg-surface p-4 transition-colors hover:border-accent">
+                <div className="flex items-start gap-3">
+                  <span className={`mt-1.5 size-2.5 shrink-0 rounded-full ${item.tone === "danger" ? "bg-danger" : "bg-warn"}`} />
+                  <div>
+                    <p className="text-sm font-semibold text-fg">{item.title}</p>
+                    <p className="mt-1 text-xs leading-5 text-muted">{item.detail}</p>
+                    <p className="mt-2 text-xs font-semibold text-accent">Open control →</p>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted">No stock, manufacturing or quality exception currently requires intervention.</p>
+        )}
+      </Panel>
+
+      <Panel title="Operating control surface" kicker="One owner per truth">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px] text-left text-sm">
+            <thead className="border-b border-border text-[10px] uppercase tracking-[0.14em] text-subtle">
+              <tr>
+                <th className="px-3 py-3">Control</th>
+                <th className="px-3 py-3">Current signal</th>
+                <th className="px-3 py-3">Status</th>
+                <th className="px-3 py-3">Operating rule</th>
+                <th className="px-3 py-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {readiness.map((row) => (
+                <tr key={row.area} className="border-t border-border/70 align-top">
+                  <td className="px-3 py-3 font-semibold text-fg">{row.area}</td>
+                  <td className="px-3 py-3 text-muted">{row.signal}</td>
+                  <td className={row.status === "Attention" ? "px-3 py-3 font-semibold text-warn" : "px-3 py-3 font-semibold text-green"}>{row.status}</td>
+                  <td className="px-3 py-3 text-xs leading-5 text-muted">{row.rule}</td>
+                  <td className="px-3 py-3 text-right"><Link to={row.to as never} className="text-xs font-semibold text-accent">Open →</Link></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+
+      <details className="rounded-xl border border-border bg-surface/40 p-4 text-xs leading-5 text-muted">
+        <summary className="cursor-pointer font-semibold text-fg">Control methodology</summary>
+        <p className="mt-3">Procurement consumes MSL signals from Master Inventory; it does not own stock. Master Inventory remains the ledger authority for category, balance, MSL, forecast coverage and FIFO. Production is a shared planning output until execution is released. Manufacturing and Quality retain their own evidence and release controls.</p>
+      </details>
+    </div>
+  );
 }
