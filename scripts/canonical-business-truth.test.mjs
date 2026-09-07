@@ -139,11 +139,21 @@ test("canonical order → reservation → ATP → FIFO/COGS and stale-order cont
     /Insufficient available-to-promise stock/,
   );
 
-  await db.query(
-    `insert into epr_travellers
-      (id,venture,model_id,model_name,sku,bom_revision,engineering_revision,serial_number,supplier,status,created_by)
-     values ('TRV-TEST-1','aluminium','core','Longitude','VINDY-LONGITUDE-TEST','BOM-TEST-1','VEDM-TEST-1','SERIAL-TEST-1','Test OEM','released','test-user')`,
+  const raisedTraveller = await db.query(
+    `select * from raise_epr_traveller_for_job_card($1,$2,$3,$4,$5,$6,$7)`,
+    ["TRV-TEST-1", "CARD-TEST-1", "SERIAL-TEST-1", "VEDM-TEST-1", "Test OEM", "test-user", "operations"],
   );
+  assert.equal(raisedTraveller.rows[0].job_card_id, "CARD-TEST-1");
+  assert.equal(raisedTraveller.rows[0].sales_order_id, "SO-TEST-1");
+  assert.equal(raisedTraveller.rows[0].traveller_status, "draft");
+  const linkedTraveller = await db.query(
+    `select job_card_id,job_card_revision,model_name,bom_revision from epr_travellers where id='TRV-TEST-1'`,
+  );
+  assert.equal(linkedTraveller.rows[0].job_card_id, "CARD-TEST-1");
+  assert.equal(Number(linkedTraveller.rows[0].job_card_revision), 1);
+  assert.equal(linkedTraveller.rows[0].model_name, "Longitude");
+  assert.equal(linkedTraveller.rows[0].bom_revision, "BOM-TEST-1");
+  await db.query(`update epr_travellers set status='released' where id='TRV-TEST-1'`);
 
   const consumed = await db.query(
     `select * from consume_epr_inventory_reservation($1,$2,$3,$4,$5,$6)`,
@@ -198,6 +208,13 @@ test("canonical order → reservation → ATP → FIFO/COGS and stale-order cont
     `select * from reserve_epr_inventory_for_job_line($1,$2,$3,$4,$5)`,
     ["RES-TEST-2", "CARD-TEST-2", "LINE-TEST-2", "test-user", "operations"],
   );
+  await assert.rejects(
+    () => db.query(
+      `select * from consume_epr_inventory_reservation($1,$2,$3,$4,$5,$6)`,
+      ["RES-TEST-2", "TRV-TEST-1", "MOV-WRONG-TRAVELLER", "LED-WRONG-TRAVELLER", "test-user", "operations"],
+    ),
+    /is not linked to reservation job card/,
+  );
 
   const partialOrder = await saveSalesOrder(db, { id: "SO-TEST-PARTIAL", units: 4 });
   assert.equal(Number(partialOrder.rows[0].revision), 1);
@@ -230,9 +247,9 @@ test("canonical order → reservation → ATP → FIFO/COGS and stale-order cont
 
   const audit = await db.query(
     `select count(*)::int as count from vyndi_audit_events
-      where entity_type in ('sales_order','production_job_card','inventory_reservation','inventory_movement')`,
+      where entity_type in ('sales_order','production_job_card','production_traveller','inventory_reservation','inventory_movement')`,
   );
-  assert.ok(Number(audit.rows[0].count) >= 6, "canonical flow must leave an auditable event chain");
+  assert.ok(Number(audit.rows[0].count) >= 7, "canonical flow must leave an auditable event chain");
 });
 
 test("zero physical inventory preserves released production demand and exposes the full shortage", async (t) => {
