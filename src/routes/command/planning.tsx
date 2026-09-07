@@ -1,12 +1,158 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Panel } from "@/components/kpi";
+import { COMPANY, TRANCHES } from "@/lib/data/company";
+import { DECISION_PACKETS, DECISION_STATE_LABELS, decisionPriorityRank } from "@/lib/data/decision-engine";
 
-export const Route=createFileRoute("/command/planning")({component:PlanningHub});
-const PLANS=[
- ["Scenarios","Base / delayed / stress cases","/command/scenarios"],
- ["Finance assumptions","Shared pricing, mix, funding and timing assumptions","/command/finance-assumptions"],
- ["Procurement planning","36-month requirement, MSL lead time and planned actions","/command/procurement-planning"],
- ["Production planning","Volume, mix and capacity plan","/command/production"],
- ["Sales planning","Demand and order-book plan","/command/sales"],
+export const Route = createFileRoute("/command/planning")({ component: MasterPlan });
+
+type PlanTab = { label: string; note: string; to: string };
+const PLAN_TABS: PlanTab[] = [
+  { label: "Roadmap", note: "36-month integrated plan", to: "/command/planning" },
+  { label: "Demand", note: "Demand and order-book plan", to: "/command/sales" },
+  { label: "Procurement", note: "Requirements, MSL and lead time", to: "/command/procurement-planning" },
+  { label: "Production", note: "Volume, mix and capacity", to: "/command/production" },
+  { label: "Finance", note: "Assumptions, funding and timing", to: "/command/finance-assumptions" },
+  { label: "Scenarios", note: "Base, delayed and stress cases", to: "/command/scenarios" },
+];
+
+const ROADMAP = [
+  { phase: "Foundation", month: "M1", owner: "Founder", due: "Month 1", status: "Current control", dependency: "Incorporation + banking", evidence: "Foundation execution", to: "/command/founder-command" },
+  { phase: "Engineering baseline", month: "M3", owner: "Engineering", due: "Month 3", status: "Blocked", dependency: "VEDM reconciliation + 700×40 evidence", evidence: "Controlled geometry baseline", to: "/command/engineering" },
+  { phase: "Prototype & validation", month: "M6", owner: "Engineering + QA", due: "Month 6", status: "Gate", dependency: "Design freeze", evidence: "Prototype / NDT / ISO evidence", to: "/command/qa-verification" },
+  { phase: "Tooling & pilot", month: "M10", owner: "Operations", due: "Month 10", status: "Planned", dependency: "Validation release", evidence: "Tooling + pilot release", to: "/command/manufacturing" },
+  { phase: "Launch readiness", month: "M14", owner: "Founder + Commercial", due: "Month 14", status: "Planned", dependency: "Inventory + working capital", evidence: "First 100 customer readiness", to: "/command/sales" },
+  { phase: "Scale", month: "M15–36", owner: "Leadership", due: "Months 15–36", status: "Planned", dependency: "Validated demand + funded capacity", evidence: "Monthly operating reviews", to: "/command/financial-cockpit" },
 ] as const;
-function PlanningHub(){return <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 space-y-6"><header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[10px] uppercase tracking-[0.22em] text-green">Planning · scenarios and assumptions</p><h1 className="mt-2 text-4xl font-bold text-accent">Planning</h1><p className="mt-3 max-w-3xl text-sm leading-6 text-muted">Planning is deliberately separated from execution. Scenarios and assumptions live here; inventory, procurement receipts, production job cards and actuals remain operational records.</p></div><Link to="/command" className="rounded-lg border border-border px-4 py-2.5 text-sm font-semibold text-muted hover:border-accent">Back to Command →</Link></header><Panel title="Planning workspaces" kicker="One home for modeled intent"><div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">{PLANS.map(([title,note,to])=><Link key={to} to={to as any} className="rounded-xl border border-border bg-bg-elevated/30 p-5 hover:border-accent"><p className="text-sm font-semibold text-fg">{title}</p><p className="mt-1 text-xs leading-5 text-muted">{note}</p><span className="mt-5 inline-block text-[10px] font-bold uppercase tracking-[0.14em] text-accent">Open →</span></Link>)}</div></Panel><Panel title="Planning rule" kicker="Avoid duplicate data"><div className="grid gap-3 md:grid-cols-4">{[["Scenario","changes model assumptions"],["Plan","sets expected demand / production"],["Execution","records orders, job cards, receipts and issues"],["Actual","records what happened"]].map(([t,d])=><div key={t} className="rounded-xl border border-border p-4"><p className="text-sm font-semibold">{t}</p><p className="mt-1 text-xs leading-5 text-muted">{d}</p></div>)}</div></Panel></main>}
+
+const QUARTERS = Array.from({ length: 12 }, (_, index) => {
+  const start = index * 3 + 1;
+  const end = start + 2;
+  const gates = TRANCHES.filter((tranche) => tranche.month >= start && tranche.month <= end);
+  return { quarter: `Q${index + 1}`, months: `M${start}–M${end}`, gates };
+});
+
+const attention = [...DECISION_PACKETS]
+  .filter((packet) => packet.state === "blocked" || packet.state === "approval" || packet.priority === "critical")
+  .sort((a, b) => decisionPriorityRank[a.priority] - decisionPriorityRank[b.priority])
+  .slice(0, 4);
+const blockedCount = DECISION_PACKETS.filter((packet) => packet.state === "blocked").length;
+const approvalCount = DECISION_PACKETS.filter((packet) => packet.state === "approval").length;
+const criticalCount = DECISION_PACKETS.filter((packet) => packet.priority === "critical").length;
+const capitalLadder = TRANCHES.filter((tranche) => tranche.id !== "STBY").reduce((sum, tranche) => sum + tranche.amount, 0);
+
+function statusClass(status: string) {
+  if (status === "Blocked") return "border-red-500/30 bg-red-500/10 text-red-300";
+  if (status === "Current control") return "border-green/30 bg-green/10 text-green";
+  if (status === "Gate") return "border-accent/30 bg-accent/10 text-accent";
+  return "border-border bg-bg-elevated/40 text-muted";
+}
+
+function MasterPlan() {
+  return (
+    <main className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6">
+      <header className="flex flex-col gap-4 border-b border-border pb-6 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-green">Planning · canonical operating plan</p>
+          <h1 className="mt-2 text-4xl font-bold text-accent">Master Plan</h1>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">
+            One 36-month planning surface for {COMPANY.brand}. Keep modeled intent here; orders, receipts, job cards, inventory movements and actuals stay in Operate.
+          </p>
+        </div>
+        <Link to="/command" className="w-fit rounded-lg border border-border px-4 py-2.5 text-sm font-semibold text-muted hover:border-accent hover:text-fg">Command Centre →</Link>
+      </header>
+
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Planning status">
+        {[
+          ["Planning horizon", "36 months", "Quarter view by default"],
+          ["Critical decisions", String(criticalCount), "Only decision-grade exceptions"],
+          ["Blocked items", String(blockedCount), "Resolve before dependent release"],
+          ["Capital ladder", `₹${capitalLadder}L`, `${approvalCount} approvals currently flagged`],
+        ].map(([label, value, note]) => (
+          <div key={label} className="rounded-xl border border-border bg-surface/40 p-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-subtle">{label}</p>
+            <p className="mt-2 text-2xl font-bold text-fg">{value}</p>
+            <p className="mt-1 text-xs leading-5 text-muted">{note}</p>
+          </div>
+        ))}
+      </section>
+
+      <nav className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6" aria-label="Master Plan sections">
+        {PLAN_TABS.map((tab, index) => (
+          <Link
+            key={tab.label}
+            to={tab.to as never}
+            className={`rounded-xl border p-3 transition-colors ${index === 0 ? "border-accent bg-accent/10" : "border-border bg-surface/30 hover:border-accent/50"}`}
+          >
+            <p className={`text-sm font-semibold ${index === 0 ? "text-accent" : "text-fg"}`}>{tab.label}</p>
+            <p className="mt-1 text-[10px] leading-4 text-muted">{tab.note}</p>
+          </Link>
+        ))}
+      </nav>
+
+      <Panel title="Needs attention" kicker="Exceptions only · no duplicate dashboard noise">
+        <div className="divide-y divide-border rounded-xl border border-border">
+          {attention.map((packet) => (
+            <div key={packet.id} className="grid gap-3 p-4 lg:grid-cols-[120px_1fr_180px_auto] lg:items-center">
+              <div>
+                <span className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${packet.state === "blocked" ? "border-red-500/30 bg-red-500/10 text-red-300" : packet.state === "approval" ? "border-accent/30 bg-accent/10 text-accent" : "border-green/30 bg-green/10 text-green"}`}>{DECISION_STATE_LABELS[packet.state]}</span>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-fg">{packet.title}</p>
+                <p className="mt-1 text-xs leading-5 text-muted">{packet.nextAction}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.12em] text-subtle">Owner</p>
+                <p className="mt-1 text-xs text-fg">{packet.owner}</p>
+              </div>
+              <Link to={packet.source as never} className="w-fit rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-fg">Open evidence →</Link>
+            </div>
+          ))}
+        </div>
+      </Panel>
+
+      <Panel title="Master milestones" kicker="Phase · owner · dependency · evidence">
+        <div className="overflow-x-auto rounded-xl border border-border">
+          <table className="min-w-[980px] w-full text-left text-sm">
+            <thead className="border-b border-border bg-bg-elevated/60 text-[10px] uppercase tracking-[0.13em] text-subtle">
+              <tr><th className="px-4 py-3">Milestone</th><th className="px-4 py-3">Phase</th><th className="px-4 py-3">Owner</th><th className="px-4 py-3">Due</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Dependency</th><th className="px-4 py-3">Evidence</th></tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {ROADMAP.map((row) => (
+                <tr key={row.month} className="bg-surface/20 hover:bg-surface/50">
+                  <td className="px-4 py-3 font-semibold text-accent">{row.month}</td>
+                  <td className="px-4 py-3 font-semibold text-fg">{row.phase}</td>
+                  <td className="px-4 py-3 text-muted">{row.owner}</td>
+                  <td className="px-4 py-3 text-muted">{row.due}</td>
+                  <td className="px-4 py-3"><span className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold ${statusClass(row.status)}`}>{row.status}</span></td>
+                  <td className="px-4 py-3 text-xs leading-5 text-muted">{row.dependency}</td>
+                  <td className="px-4 py-3"><Link to={row.to as never} className="text-xs font-semibold text-fg hover:text-accent">{row.evidence} →</Link></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+
+      <Panel title="36-month timeline" kicker="Quarter view · expand detailed planners only when needed">
+        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-4">
+          {QUARTERS.map((quarter) => (
+            <div key={quarter.quarter} className="rounded-xl border border-border bg-surface/25 p-4">
+              <div className="flex items-center justify-between gap-3"><p className="text-sm font-bold text-fg">{quarter.quarter}</p><span className="text-[10px] text-subtle">{quarter.months}</span></div>
+              {quarter.gates.length ? <div className="mt-3 space-y-2">{quarter.gates.map((gate) => <div key={gate.id} className="rounded-lg border border-accent/20 bg-accent/5 p-3"><div className="flex items-center justify-between gap-2"><span className="text-[10px] font-bold uppercase tracking-[0.12em] text-accent">{gate.id}</span><span className="text-xs font-semibold text-fg">₹{gate.amount}L</span></div><p className="mt-1 text-[10px] leading-4 text-muted">{gate.name}</p></div>)}</div> : <p className="mt-3 text-xs text-muted">Execution and evidence period. No new capital gate defined.</p>}
+            </div>
+          ))}
+        </div>
+      </Panel>
+
+      <details className="rounded-xl border border-border bg-surface/20 p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-fg">Help & methodology</summary>
+        <div className="mt-3 grid gap-3 text-xs leading-5 text-muted md:grid-cols-2">
+          <p><span className="font-semibold text-fg">Planning:</span> demand, timing, assumptions, dependencies, funding gates and expected capacity.</p>
+          <p><span className="font-semibold text-fg">Operate:</span> purchase orders, receipts, inventory issues, production job cards, quality records and actual transactions.</p>
+          <p><span className="font-semibold text-fg">Exception rule:</span> if a metric does not change a decision, trigger an action, document evidence or explain a material deviation, it stays off this screen.</p>
+          <p><span className="font-semibold text-fg">Detail rule:</span> use the six plan sections above for specialist work; return here for the integrated roadmap and exceptions.</p>
+        </div>
+      </details>
+    </main>
+  );
+}
