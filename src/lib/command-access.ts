@@ -21,7 +21,11 @@ type CommandEnv = {
   user?: string;
 };
 
-const roleCredentials: Array<{ username: string; role: Exclude<CommandRole, "admin" | "viewer">; envKey: keyof CommandEnv }> = [
+const roleCredentials: Array<{
+  username: string;
+  role: Exclude<CommandRole, "admin" | "viewer">;
+  envKey: keyof CommandEnv;
+}> = [
   { username: "management", role: "management", envKey: "COMMAND_MANAGEMENT_PASSWORD" },
   { username: "board", role: "board", envKey: "COMMAND_BOARD_PASSWORD" },
   { username: "finance", role: "finance", envKey: "COMMAND_FINANCE_PASSWORD" },
@@ -31,7 +35,9 @@ const roleCredentials: Array<{ username: string; role: Exclude<CommandRole, "adm
   { username: "compliance", role: "compliance", envKey: "COMMAND_COMPLIANCE_PASSWORD" },
 ];
 
-function getCommandEnv(): CommandEnv { return process.env as CommandEnv; }
+function getCommandEnv(): CommandEnv {
+  return process.env as CommandEnv;
+}
 
 function getBootstrapAdminEmails(): string[] {
   return (process.env.VINDY_ADMIN_EMAILS ?? "")
@@ -52,7 +58,7 @@ async function getRoleForUser(userId: string, email?: string | null): Promise<Co
     return "admin";
   }
 
-  const rows = await sql<{ role: string }[]>`
+  const rows = await sql<{ role: string }>`
     select role from vindy_user_roles where user_id = ${userId} limit 1
   `;
   const role = rows[0]?.role as CommandRole | undefined;
@@ -63,7 +69,9 @@ async function getLegacySession() {
   const password = getCommandEnv().COMMAND_PASSWORD;
   if (!password) throw new Error("COMMAND_PASSWORD is not configured on the Worker.");
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(password));
-  const sessionPassword = Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  const sessionPassword = Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
   const { useSession: getServerSession } = await import("@tanstack/react-start/server");
   return getServerSession<CommandSession>({
     name: SESSION_NAME,
@@ -115,7 +123,7 @@ export const unlockCommand = createServerFn({ method: "POST" })
     }
     if (!role) return { ok: false, role: null, error: "Incorrect username or password." };
     const session = await getLegacySession();
-    await session.update({ role }, { maxAge: SESSION_MAX_AGE });
+    await session.update({ role });
     return { ok: true, role, error: null };
   });
 

@@ -36,7 +36,13 @@ export const getVindyUserContext = createServerFn({ method: "GET" }).handler(asy
 export const listVindyUsers = createServerFn({ method: "GET" }).handler(async () => {
   await requireAdmin();
   const sql = await getSql();
-  return sql<{ id: string; name: string | null; email: string | null; role: string | null; created_at: string }[]>`
+  return sql<{
+    id: string;
+    name: string | null;
+    email: string | null;
+    role: string | null;
+    created_at: string;
+  }>`
     select u.id, u.name, u.email, r.role, u."createdAt" as created_at
     from "user" u
     left join vindy_user_roles r on r.user_id = u.id
@@ -46,7 +52,7 @@ export const listVindyUsers = createServerFn({ method: "GET" }).handler(async ()
 
 async function ensureCredentialPassword(sql: Awaited<ReturnType<typeof getSql>>, userId: string, password: string) {
   const passwordHash = await hashPassword(password);
-  const credentials = await sql<{ id: string; account_id: string; password: string | null }[]>`
+  const credentials = await sql<{ id: string; account_id: string; password: string | null }>`
     select id, "accountId" as account_id, password
     from "account"
     where "userId" = ${userId} and "providerId" = 'credential'
@@ -86,7 +92,7 @@ async function ensureCredentialPassword(sql: Awaited<ReturnType<typeof getSql>>,
 
   // Verify the exact single credential row we just canonicalized before
   // reporting success. Never expose the password or hash to the client.
-  const verified = await sql<{ id: string; account_id: string; password: string | null }[]>`
+  const verified = await sql<{ id: string; account_id: string; password: string | null }>`
     select id, "accountId" as account_id, password
     from "account"
     where "userId" = ${userId} and "providerId" = 'credential'
@@ -102,7 +108,7 @@ async function ensureCredentialPassword(sql: Awaited<ReturnType<typeof getSql>>,
 }
 
 async function verifyWithBetterAuth(sql: Awaited<ReturnType<typeof getSql>>, userId: string, password: string) {
-  const user = await sql<{ email: string | null }[]>`
+  const user = await sql<{ email: string | null }>`
     select email from "user" where id = ${userId} limit 1
   `;
   const email = user[0]?.email?.trim().toLowerCase();
@@ -115,9 +121,9 @@ async function verifyWithBetterAuth(sql: Awaited<ReturnType<typeof getSql>>, use
   // persisted VINDY identity is compatible with the real authentication path.
   let result: { token?: string; user?: { id?: string } };
   try {
-    result = await auth.api.signInEmail({
+    result = (await auth.api.signInEmail({
       body: { email, password },
-    }) as { token?: string; user?: { id?: string } };
+    })) as { token?: string; user?: { id?: string } };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown Better Auth error";
     throw new Error(`Better Auth rejected the VINDY credential: ${message}`);
@@ -133,25 +139,27 @@ async function verifyWithBetterAuth(sql: Awaited<ReturnType<typeof getSql>>, use
 }
 
 export const createVindyUser = createServerFn({ method: "POST" })
-  .validator(z.object({
-    name: z.string().trim().min(1).max(120),
-    email: z.string().trim().email().max(320),
-    password: z.string().min(8).max(128),
-    role: z.enum(["admin", "management", "board", "finance", "operations", "engineering", "qa", "compliance", "viewer"]),
-  }))
+  .validator(
+    z.object({
+      name: z.string().trim().min(1).max(120),
+      email: z.string().trim().email().max(320),
+      password: z.string().min(8).max(128),
+      role: z.enum(["admin", "management", "board", "finance", "operations", "engineering", "qa", "compliance", "viewer"]),
+    }),
+  )
   .handler(async ({ data }) => {
     await requireAdmin();
     const sql = await getSql();
     const name = data.name.trim();
     const email = data.email.trim().toLowerCase();
-    const existing = await sql<{ id: string }[]>`
+    const existing = await sql<{ id: string }>`
       select id from "user" where lower(email) = ${email} limit 1
     `;
     if (existing[0]) throw new Error("An account with this email already exists.");
 
-    const result = await auth.api.signUpEmail({
+    const result = (await auth.api.signUpEmail({
       body: { name, email, password: data.password },
-    }) as { user?: { id?: string } | null };
+    })) as { user?: { id?: string } | null };
     const userId = result.user?.id;
     if (!userId) throw new Error("Account was not created.");
 
@@ -162,7 +170,13 @@ export const createVindyUser = createServerFn({ method: "POST" })
       on conflict (user_id) do update set role = excluded.role, updated_at = now()
     `;
 
-    const created = await sql<{ id: string; name: string | null; email: string | null; role: string; created_at: string }[]>`
+    const created = await sql<{
+      id: string;
+      name: string | null;
+      email: string | null;
+      role: string;
+      created_at: string;
+    }>`
       select u.id, u.name, u.email, r.role, u."createdAt" as created_at
       from "user" u join vindy_user_roles r on r.user_id = u.id
       where u.id = ${userId} limit 1
@@ -176,7 +190,7 @@ export const resetVindyUserPassword = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await requireAdmin();
     const sql = await getSql();
-    const existing = await sql<{ id: string }[]>`
+    const existing = await sql<{ id: string }>`
       select id from "user" where id = ${data.userId} limit 1
     `;
     if (!existing[0]) throw new Error("User account was not found.");
@@ -186,11 +200,16 @@ export const resetVindyUserPassword = createServerFn({ method: "POST" })
   });
 
 export const setVindyUserRole = createServerFn({ method: "POST" })
-  .validator(z.object({ userId: z.string().min(1).max(200), role: z.enum(["admin", "management", "board", "finance", "operations", "engineering", "qa", "compliance", "viewer"]) }))
+  .validator(
+    z.object({
+      userId: z.string().min(1).max(200),
+      role: z.enum(["admin", "management", "board", "finance", "operations", "engineering", "qa", "compliance", "viewer"]),
+    }),
+  )
   .handler(async ({ data }) => {
     await requireAdmin();
     const sql = await getSql();
-    const target = await sql<{ email: string | null }[]>`
+    const target = await sql<{ email: string | null }>`
       select email from "user" where id = ${data.userId} limit 1
     `;
     if (!target[0]) throw new Error("User account was not found.");
@@ -211,7 +230,7 @@ export const deleteVindyUser = createServerFn({ method: "POST" })
     const current = await getSessionUser();
     if (current?.id === data.userId) throw new Error("You cannot delete the account currently in use.");
     const sql = await getSql();
-    const target = await sql<{ email: string | null }[]>`
+    const target = await sql<{ email: string | null }>`
       select email from "user" where id = ${data.userId} limit 1
     `;
     if (!target[0]) throw new Error("User account was not found.");

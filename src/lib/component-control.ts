@@ -55,38 +55,30 @@ export const getComponentControl = createServerFn({ method: "GET" })
       ),
     ]);
 
-    const balanceRows = Array.isArray(balances) ? balances.filter((row): row is Record<string, unknown> => row != null) : [];
-    const balanceByKey = new Map(
-      balanceRows.map((row) => [
-        `${row.venture ?? data.venture}|${row.sku ?? ""}|${row.unit ?? ""}`,
-        Number(row.quantity_balance ?? 0),
-      ]),
-    );
+    const balanceRows = Array.isArray(balances) ? balances.filter((row) => row != null) : [];
+    const balanceByKey = new Map(balanceRows.map((row) => [`${row.venture ?? data.venture}|${row.sku ?? ""}|${row.unit ?? ""}`, Number(row.quantity_balance ?? 0)]));
     const mslRows = Array.isArray(mslControls) ? mslControls.filter((row) => row != null) : [];
-    const mslByKey = new Map(
-      mslRows.map((row) => [
-        `${data.venture}|${row.sku}|${row.unit}`,
-        Number(row.minimum_stock_level),
-      ]),
-    );
+    const mslByKey = new Map(mslRows.map((row) => [`${data.venture}|${row.sku}|${row.unit}`, Number(row.minimum_stock_level)]));
 
-    return (Array.isArray(mappings) ? mappings : []).filter((mapping) => mapping != null).map((mapping) => {
-      const key = `${data.venture}|${mapping.sku}|${mapping.unit}`;
-      const balance = balanceByKey.get(key) ?? 0;
-      const requiredQty = Number(mapping.quantity);
-      const msl = mslByKey.get(key) ?? null;
-      const status = balance <= 0 ? "NO_STOCK" : balance < requiredQty ? "SHORT" : "AVAILABLE";
-      return {
-        modelId: mapping.model_id,
-        bomRevision: mapping.bom_revision,
-        componentKey: mapping.bom_line_key,
-        sku: mapping.sku,
-        unit: mapping.unit,
-        requiredQty,
-        balance,
-        msl,
-        status,
-        belowMsl: msl !== null && balance < msl,
-      };
-    });
+    return (Array.isArray(mappings) ? mappings : [])
+      .filter((mapping) => mapping != null)
+      .map((mapping) => {
+        const key = `${data.venture}|${mapping.sku}|${mapping.unit}`;
+        const balance = balanceByKey.get(key) ?? 0;
+        const requiredQty = Number(mapping.quantity);
+        const msl = mslByKey.get(key) ?? null;
+        const status = balance <= 0 ? "NO_STOCK" : balance < requiredQty ? "SHORT" : "AVAILABLE";
+        return {
+          modelId: mapping.model_id,
+          bomRevision: mapping.bom_revision,
+          componentKey: mapping.bom_line_key,
+          sku: mapping.sku,
+          unit: mapping.unit,
+          requiredQty,
+          balance,
+          msl,
+          status,
+          belowMsl: msl !== null && balance < msl,
+        };
+      });
   });

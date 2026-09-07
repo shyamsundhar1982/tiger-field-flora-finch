@@ -38,7 +38,9 @@ function Commercial() {
         });
         setActuals(compact);
       }
-    } catch {}
+    } catch {
+      // Missing or malformed local actuals leave the sales actuals map empty.
+    }
   }, []);
 
   const sales = useMemo(() => buildSalesMonths(rows, finance, orders, actuals, accounting), [rows, finance, orders, actuals, accounting]);
@@ -61,7 +63,9 @@ function Commercial() {
 
   function saveOrders(next: SalesOrder[]) {
     setOrders(next);
-    try { localStorage.setItem(ORDERS_KEY, JSON.stringify(next)); } catch {}
+    try { localStorage.setItem(ORDERS_KEY, JSON.stringify(next)); } catch {
+      // Storage may be unavailable; the current order-book state remains in memory.
+    }
   }
 
   async function ensureJobCard(order: SalesOrder) {

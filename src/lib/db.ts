@@ -2,13 +2,13 @@ import { pendingMigrations } from "../../scripts/migration-plan.mjs";
 
 /** Which database backend is active. */
 export type DbSource = "neon" | "pglite";
+export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+export type SqlRow = Record<string, JsonValue>;
 
 // An empty/whitespace DATABASE_URL (an easy misconfig in deploy UIs) must mean
 // "unset" — otherwise production would silently run on the PGLite fallback.
-const rawDatabaseUrl =
-  typeof process !== "undefined" ? process.env.DATABASE_URL : undefined;
-const databaseUrl =
-  rawDatabaseUrl && rawDatabaseUrl.trim() ? rawDatabaseUrl : undefined;
+const rawDatabaseUrl = typeof process !== "undefined" ? process.env.DATABASE_URL : undefined;
+const databaseUrl = rawDatabaseUrl && rawDatabaseUrl.trim() ? rawDatabaseUrl : undefined;
 
 /**
  * Active backend: real **Neon** when `DATABASE_URL` is set (deployed / configured
@@ -27,14 +27,8 @@ export const dbSource: DbSource = databaseUrl ? "neon" : "pglite";
  *   const rows2 = await sql.query("select * from todos where id = $1", [id]);
  */
 export interface Sql {
-  <T = Record<string, unknown>>(
-    strings: TemplateStringsArray,
-    ...values: unknown[]
-  ): Promise<T[]>;
-  query<T = Record<string, unknown>>(
-    text: string,
-    params?: unknown[],
-  ): Promise<T[]>;
+  <T = SqlRow>(strings: TemplateStringsArray, ...values: unknown[]): Promise<T[]>;
+  query<T = SqlRow>(text: string, params?: unknown[]): Promise<T[]>;
 }
 
 /**
@@ -71,17 +65,13 @@ type Run = <T>(text: string, params: unknown[]) => Promise<T[]>;
 
 /** Wrap a query runner in the tagged-template + `.query()` `Sql` surface. */
 function toSql(run: Run): Sql {
-  const sql = (async <T = Record<string, unknown>>(
-    strings: TemplateStringsArray,
-    ...values: unknown[]
-  ): Promise<T[]> => {
+  const sql = (async <T = SqlRow>(strings: TemplateStringsArray, ...values: unknown[]): Promise<T[]> => {
     // Rebuild with $1, $2, … placeholders so values stay parameterized.
     let text = strings[0];
     for (let i = 0; i < values.length; i += 1) text += `$${i + 1}${strings[i + 1]}`;
     return run<T>(text, values);
   }) as unknown as Sql;
-  sql.query = <T = Record<string, unknown>>(text: string, params: unknown[] = []) =>
-    run<T>(text, params);
+  sql.query = <T = SqlRow>(text: string, params: unknown[] = []) => run<T>(text, params);
   return sql;
 }
 
@@ -119,9 +109,7 @@ async function createPgliteSql(): Promise<Sql> {
       },
     });
     await pg.waitReady;
-    await pg.exec(
-      "create table if not exists _migrations (name text primary key, applied_at timestamptz not null default now())",
-    );
+    await pg.exec("create table if not exists _migrations (name text primary key, applied_at timestamptz not null default now())");
     return pg;
   })().catch((err) => {
     globalRef.__pgliteInstance__ = undefined;
@@ -142,9 +130,7 @@ async function createPgliteSql(): Promise<Sql> {
       import: "default",
       eager: true,
     }) as Record<string, string>;
-    const doneRows = await pg.query<{ name: string }>(
-      "select name from _migrations",
-    );
+    const doneRows = await pg.query<{ name: string }>("select name from _migrations");
     const done = doneRows.rows.map((r) => r.name);
     for (const { name, path } of pendingMigrations(Object.keys(migrations), done)) {
       // Apply + record atomically (parity with scripts/migrate.mjs) so a failed
@@ -171,10 +157,7 @@ let sqlPromise: Promise<Sql> | null = null;
 
 async function createSql(): Promise<Sql> {
   if (typeof window !== "undefined") {
-    throw new Error(
-      "@/lib/db is server-only — call getSql() from a createServerFn handler " +
-        "or a server route loader, never from client code.",
-    );
+    throw new Error("@/lib/db is server-only — call getSql() from a createServerFn handler " + "or a server route loader, never from client code.");
   }
   return dbSource === "neon" ? createNeonSql() : createPgliteSql();
 }

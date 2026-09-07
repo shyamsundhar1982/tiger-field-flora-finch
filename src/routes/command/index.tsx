@@ -2,31 +2,37 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { Kpi, Panel } from "@/components/kpi";
 import { DECISION_PACKETS, DECISION_STATE_LABELS, decisionPriorityRank } from "@/lib/data/decision-engine";
-import { FOUNDER_ACTIONS, FOUNDER_GATES, FOUNDER_STATUS_LABELS } from "@/lib/data/founder-command";
+import { FOUNDER_GATES, FOUNDER_STATUS_LABELS, resolveFounderActions } from "@/lib/data/founder-command";
 import { buildModel, minCash, totals } from "@/lib/finance/model";
 import { lakh } from "@/lib/format";
 import { useVeloxis } from "@/lib/store";
+import { getCommandRole } from "@/lib/command-access";
+import { canAccessRoute } from "@/lib/page-access";
 
-export const Route = createFileRoute("/command/")({ component: CommandCentre });
+export const Route = createFileRoute("/command/")({
+  loader: () => getCommandRole(),
+  component: CommandCentre,
+});
 
 const PRIORITY_RANK = { critical: 0, high: 1, normal: 2 } as const;
 
 function CommandCentre() {
+  const role = Route.useLoaderData();
+  const accessible = (to: string) => canAccessRoute(role, to);
   const scenario = useVeloxis((s) => s.scenario);
   const drawStandby = useVeloxis((s) => s.drawStandby);
+  const actionProgress = useVeloxis((s) => s.actions);
+  const founderActions = resolveFounderActions(actionProgress);
   const rows = useMemo(() => buildModel(scenario, drawStandby), [scenario, drawStandby]);
   const t = totals(rows);
   const trough = minCash(rows);
-  const blockedActions = FOUNDER_ACTIONS.filter((action) => action.status === "blocked");
-  const activeActions = FOUNDER_ACTIONS.filter((action) => action.status === "active");
-  const nextActions = [...FOUNDER_ACTIONS]
-    .filter((action) => action.status !== "complete" && action.status !== "waiting")
-    .sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority]);
-  const decisions = [...DECISION_PACKETS]
-    .sort((a, b) => decisionPriorityRank[a.priority] - decisionPriorityRank[b.priority])
-    .slice(0, 5);
-  const approvals = DECISION_PACKETS.filter((packet) => packet.state === "approval").length;
-  const blockedDecisions = DECISION_PACKETS.filter((packet) => packet.state === "blocked").length;
+  const blockedActions = founderActions.filter((action) => action.status === "blocked");
+  const activeActions = founderActions.filter((action) => action.status === "active");
+  const nextActions = [...founderActions].filter((action) => action.status !== "complete" && action.status !== "waiting").sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority]);
+  const visibleDecisions = DECISION_PACKETS.filter((packet) => accessible(packet.source));
+  const decisions = [...visibleDecisions].sort((a, b) => decisionPriorityRank[a.priority] - decisionPriorityRank[b.priority]).slice(0, 5);
+  const approvals = visibleDecisions.filter((packet) => packet.state === "approval").length;
+  const blockedDecisions = visibleDecisions.filter((packet) => packet.state === "blocked").length;
   const cashTone = trough.cash < 0 ? "danger" : trough.cash < 15 ? "warn" : "ok";
 
   return (
@@ -38,9 +44,21 @@ function CommandCentre() {
           <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">One screen for what needs attention now: financial health, blockers, decisions, accountable actions and the next operating gate. Detailed work stays in its specialist workspace.</p>
         </div>
         <div className="flex flex-wrap gap-3 text-sm font-semibold">
-          <Link to="/command/planning" className="text-accent hover:text-fg">Master Plan →</Link>
-          <Link to="/command/governance" className="text-accent hover:text-fg">Governance →</Link>
-          <Link to="/command/founder-command" className="text-muted hover:text-fg">Action & evidence ledger →</Link>
+          {accessible("/command/planning") && (
+            <Link to="/command/planning" className="text-accent hover:text-fg">
+              Master Plan →
+            </Link>
+          )}
+          {accessible("/command/governance") && (
+            <Link to="/command/governance" className="text-accent hover:text-fg">
+              Governance →
+            </Link>
+          )}
+          {accessible("/command/founder-command") && (
+            <Link to="/command/founder-command" className="text-muted hover:text-fg">
+              Action & evidence ledger →
+            </Link>
+          )}
         </div>
       </header>
 
@@ -67,7 +85,9 @@ function CommandCentre() {
                 <p className="text-[10px] uppercase tracking-wider text-subtle">State</p>
                 <p className="mt-1 text-xs text-muted">{DECISION_STATE_LABELS[packet.state]}</p>
               </div>
-              <Link to={packet.source as never} className="text-xs font-semibold text-accent hover:text-fg">Open source →</Link>
+              <Link to={packet.source as never} className="text-xs font-semibold text-accent hover:text-fg">
+                Open source →
+              </Link>
             </div>
           ))}
         </div>
@@ -77,7 +97,14 @@ function CommandCentre() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[52rem] text-left text-sm">
             <thead className="text-[10px] uppercase tracking-[0.14em] text-subtle">
-              <tr><th className="py-2 pr-3">ID</th><th className="py-2 pr-3">Action</th><th className="py-2 pr-3">Owner</th><th className="py-2 pr-3">Stage</th><th className="py-2 pr-3">Status</th><th className="py-2">Dependency / outcome</th></tr>
+              <tr>
+                <th className="py-2 pr-3">ID</th>
+                <th className="py-2 pr-3">Action</th>
+                <th className="py-2 pr-3">Owner</th>
+                <th className="py-2 pr-3">Stage</th>
+                <th className="py-2 pr-3">Status</th>
+                <th className="py-2">Dependency / outcome</th>
+              </tr>
             </thead>
             <tbody>
               {nextActions.slice(0, 6).map((action) => (
@@ -94,22 +121,35 @@ function CommandCentre() {
           </table>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          <Link to="/command/founder-command" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:border-accent hover:text-fg">Open full action & evidence ledger</Link>
-          <Link to="/command/actions" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:border-accent hover:text-fg">Action log</Link>
+          {accessible("/command/founder-command") && (
+            <Link to="/command/founder-command" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:border-accent hover:text-fg">
+              Open full action & evidence ledger
+            </Link>
+          )}
+          {accessible("/command/actions") && (
+            <Link to="/command/actions" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:border-accent hover:text-fg">
+              Action log
+            </Link>
+          )}
         </div>
       </Panel>
 
       <Panel title="Operating gates" kicker="Advance only with evidence">
         <div className="grid gap-3 md:grid-cols-5">
           {FOUNDER_GATES.map((gate) => {
-            const gateActions = FOUNDER_ACTIONS.filter((action) => gate.controls.includes(action.id as never));
+            const gateActions = founderActions.filter((action) => gate.controls.includes(action.id as never));
             const blocked = gateActions.some((action) => action.status === "blocked");
             const active = gateActions.some((action) => action.status === "active" || action.status === "next");
             return (
               <div key={gate.gate} className="rounded-lg border border-border p-4">
-                <div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold text-accent">{gate.gate}</span><span className={blocked ? "text-[10px] uppercase tracking-wider text-warn" : active ? "text-[10px] uppercase tracking-wider text-green" : "text-[10px] uppercase tracking-wider text-subtle"}>{blocked ? "Blocked" : active ? "Active" : "Waiting"}</span></div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-accent">{gate.gate}</span>
+                  <span className={blocked ? "text-[10px] uppercase tracking-wider text-warn" : active ? "text-[10px] uppercase tracking-wider text-green" : "text-[10px] uppercase tracking-wider text-subtle"}>{blocked ? "Blocked" : active ? "Active" : "Waiting"}</span>
+                </div>
                 <p className="mt-2 text-sm font-medium text-fg">{gate.title}</p>
-                <p className="mt-1 text-xs text-muted">{gate.when} · {gate.controls.join(" · ")}</p>
+                <p className="mt-1 text-xs text-muted">
+                  {gate.when} · {gate.controls.join(" · ")}
+                </p>
               </div>
             );
           })}
@@ -125,21 +165,31 @@ function CommandCentre() {
             ["Engineering", "Product, BOM, revisions, tooling and validation", "/command/engineering"],
             ["Commercial", "Demand, orders, sales forecast and GTM", "/command/sales"],
             ["Governance", "Risks, approvals, evidence and audit trail", "/command/governance"],
-          ].map(([title, note, to]) => (
-            <Link key={to} to={to as never} className="rounded-lg border border-border p-4 transition-colors hover:border-accent/50 hover:bg-surface">
-              <p className="text-sm font-semibold text-fg">{title}</p>
-              <p className="mt-1 text-xs leading-5 text-muted">{note}</p>
-            </Link>
-          ))}
+          ]
+            .filter(([, , to]) => accessible(to))
+            .map(([title, note, to]) => (
+              <Link key={to} to={to as never} className="rounded-lg border border-border p-4 transition-colors hover:border-accent/50 hover:bg-surface">
+                <p className="text-sm font-semibold text-fg">{title}</p>
+                <p className="mt-1 text-xs leading-5 text-muted">{note}</p>
+              </Link>
+            ))}
         </div>
       </Panel>
 
       <details className="rounded-lg border border-border bg-surface/40 p-4">
         <summary className="cursor-pointer text-sm font-medium text-fg">Support & methodology</summary>
         <div className="mt-3 grid gap-2 text-xs text-muted sm:grid-cols-2 lg:grid-cols-3">
-          <Link to="/command/founder-command" className="rounded-md border border-border p-3 hover:border-accent hover:text-fg">Founder action & evidence ledger</Link>
-          <Link to="/command/investor-board" className="rounded-md border border-border p-3 hover:border-accent hover:text-fg">Investor / board evidence</Link>
-          <Link to="/command/classification" className="rounded-md border border-border p-3 hover:border-accent hover:text-fg">Classification register</Link>
+          {[
+            ["Founder action & evidence ledger", "/command/founder-command"],
+            ["Investor / board evidence", "/command/investor-board"],
+            ["Classification register", "/command/classification"],
+          ]
+            .filter(([, to]) => accessible(to))
+            .map(([label, to]) => (
+              <Link key={to} to={to as never} className="rounded-md border border-border p-3 hover:border-accent hover:text-fg">
+                {label}
+              </Link>
+            ))}
         </div>
         <p className="mt-3 text-xs leading-5 text-subtle">Command Centre surfaces only information that changes a decision, triggers an action, records evidence or explains a material exception. Detailed calculations remain in their canonical functional workspaces.</p>
       </details>

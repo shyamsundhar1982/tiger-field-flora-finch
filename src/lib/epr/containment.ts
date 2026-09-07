@@ -33,44 +33,42 @@ export const getContainment = createServerFn({ method: "GET" })
        order by t.created_at desc`,
       [data.travellerId ?? null, data.serialNumber ?? null],
     );
-    return { cases: cases.rows, targets: targets.rows };
+    return { cases, targets };
   });
 
 export const createContainmentCase = createServerFn({ method: "POST" })
-  .validator(z.object({
-    venture: z.enum(["carbon", "aluminium"]),
-    sourceType: z.enum(["material_lot", "process_operation", "equipment", "operator", "method", "inspection", "ncr_capa", "serial"]),
-    sourceId: z.string().min(1),
-    reason: z.string().min(1),
-    severity: z.enum(["minor", "major", "critical"]),
-    notes: z.string().default(""),
-  }))
+  .validator(
+    z.object({
+      venture: z.enum(["carbon", "aluminium"]),
+      sourceType: z.enum(["material_lot", "process_operation", "equipment", "operator", "method", "inspection", "ncr_capa", "serial"]),
+      sourceId: z.string().min(1),
+      reason: z.string().min(1),
+      severity: z.enum(["minor", "major", "critical"]),
+      notes: z.string().default(""),
+    }),
+  )
   .handler(async ({ data }) => {
     const actor = await requireCommand(true);
     const sql = await getSql();
     const caseId = id("CASE");
-    await sql.query(
-      `select epr_create_containment_case($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [caseId, data.venture, data.sourceType, data.sourceId, data.reason, data.severity, actor, data.notes],
-    );
+    await sql.query(`select epr_create_containment_case($1,$2,$3,$4,$5,$6,$7,$8)`, [caseId, data.venture, data.sourceType, data.sourceId, data.reason, data.severity, actor, data.notes]);
     return { caseId };
   });
 
 export const applyContainmentTarget = createServerFn({ method: "POST" })
-  .validator(z.object({
-    caseId: z.string().min(1),
-    travellerId: z.string().min(1),
-    action: z.enum(["quarantine", "hold", "rework", "recall", "release"]),
-    notes: z.string().default(""),
-  }))
+  .validator(
+    z.object({
+      caseId: z.string().min(1),
+      travellerId: z.string().min(1),
+      action: z.enum(["quarantine", "hold", "rework", "recall", "release"]),
+      notes: z.string().default(""),
+    }),
+  )
   .handler(async ({ data }) => {
     const actor = await requireCommand(true);
     const sql = await getSql();
     const targetId = id("TARGET");
-    await sql.query(
-      `select epr_apply_containment_target($1,$2,$3,$4,$5,$6)`,
-      [targetId, data.caseId, data.travellerId, data.action, actor, data.notes],
-    );
+    await sql.query(`select epr_apply_containment_target($1,$2,$3,$4,$5,$6)`, [targetId, data.caseId, data.travellerId, data.action, actor, data.notes]);
     return { targetId };
   });
 
@@ -79,10 +77,7 @@ export const clearContainmentTarget = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const actor = await requireCommand(true);
     const sql = await getSql();
-    await sql.query(
-      `select epr_clear_containment_target($1,$2,$3)`,
-      [data.targetId, actor, data.notes],
-    );
+    await sql.query(`select epr_clear_containment_target($1,$2,$3)`, [data.targetId, actor, data.notes]);
     return { cleared: true };
   });
 
@@ -91,9 +86,6 @@ export const isTravellerReleaseBlocked = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     await requireCommand();
     const sql = await getSql();
-    const result = await sql.query<{ blocked: boolean }>(
-      `select epr_traveller_release_blocked($1) as blocked`,
-      [data.travellerId],
-    );
-    return { blocked: Boolean(result.rows[0]?.blocked) };
+    const result = await sql.query<{ blocked: boolean }>(`select epr_traveller_release_blocked($1) as blocked`, [data.travellerId]);
+    return { blocked: Boolean(result[0]?.blocked) };
   });
