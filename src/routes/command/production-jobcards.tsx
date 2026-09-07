@@ -20,6 +20,7 @@ function ProductionJobCards() {
       <Link to="/command/production" className="rounded-lg border border-border px-4 py-2.5 text-sm font-semibold text-muted hover:border-accent">Back to Production →</Link>
     </header>
     <InventoryWorkspaceNav />
+    <div className="rounded-xl border border-accent/30 bg-accent/5 p-4 text-sm"><p className="font-semibold text-fg">Production job-card workflow</p><p className="mt-1 text-xs leading-5 text-muted">Job cards are raised from confirmed sales orders. They read controlled BOM requirements; serial-linked inventory consumption is posted from EPR Live, not manually edited in this queue.</p><div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold"><Link to="/command/inventory-truth" className="text-accent">Inventory Truth →</Link><Link to="/command/epr-live" className="text-accent">EPR Live →</Link></div></div>
     <div className="grid gap-3 sm:grid-cols-3"><Kpi label="Job cards" value={String(cards.length)} hint="One per order"/><Kpi label="Released / active" value={String(released)} hint="Production queue"/><Kpi label="Units" value={String(units)} hint={`${stageCount} controlled stages`}/></div>
     {cards.length === 0 ? <Panel title="Production queue is empty"><p className="text-sm text-muted">No production job cards have been generated yet. Add a confirmed order in Sales & Revenue Engine.</p></Panel> : cards.map((card: any) => {
       const cardLines = lines.filter((x: any) => x.job_card_id === card.id);

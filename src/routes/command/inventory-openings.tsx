@@ -2,6 +2,7 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { Panel, Kpi } from "@/components/kpi";
+import { InventoryWorkspaceNav } from "@/components/inventory-workspace-nav";
 import { inr } from "@/lib/format";
 import { approveInventoryOpeningBalance, createInventoryOpeningBalance, getAuthoritativeInventoryControl, listEprMappings, postInventoryOpeningBalance } from "@/lib/epr/final-control";
 
@@ -29,6 +30,8 @@ function InventoryOpenings() {
   async function submit(e:FormEvent){e.preventDefault();const quantity=Number(form.quantity);const unitCostInr=Number(form.unitCostInr);if(!form.sku.trim()||!form.unit.trim()||!form.reference.trim()||!Number.isFinite(quantity)||quantity<=0||!Number.isFinite(unitCostInr)||unitCostInr<0){setError("Select an approved mapped SKU and enter unit, positive quantity, non-negative unit cost and a reference.");return}await run(()=>createInventoryOpeningBalance({data:{venture:form.venture,sku:form.sku.trim(),unit:form.unit.trim(),quantity,unitCostInr,reference:form.reference.trim(),notes:form.notes.trim()}}),"Opening balance created as DRAFT. Approve it before posting.")}
   return <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
     <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-[10px] uppercase tracking-[0.22em] text-green">Operate · controlled mutation</p><h1 className="mt-2 text-4xl font-bold text-accent">Opening Balances</h1><p className="mt-3 max-w-3xl text-sm leading-6 text-muted">Create, approve and post opening stock through the authoritative inventory and cost ledgers. Legacy seed inventory is excluded.</p></div><Link to="/command/inventory" className="rounded-lg border border-border px-4 py-2 text-sm">Back to Inventory Hub →</Link></div>
+    <InventoryWorkspaceNav active="openings" />
+    <div className="rounded-xl border border-accent/30 bg-accent/5 p-4 text-sm"><p className="font-semibold text-fg">Opening balance workflow</p><p className="mt-1 text-xs leading-5 text-muted">1. Approve an active BOM → SKU mapping. 2. Create a draft count with unit cost and reference. 3. Approve the draft. 4. Post it to Inventory Truth. Posted balances cannot be edited here.</p></div>
     <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Kpi label="Drafts" value={String(drafts)} /><Kpi label="Approved · pending posting" value={String(approved)} /><Kpi label="Posted" value={String(posted)} /><Kpi label="Total posted quantity" value={postedQuantity.toLocaleString(undefined,{maximumFractionDigits:4})} /></div>
     <Panel title="Create controlled opening balance" className="mt-6"><form onSubmit={submit} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <Field label="Venture"><select className="input" value={form.venture} onChange={e=>setForm({...form,venture:e.target.value as Venture,sku:""})}><option value="carbon">Carbon</option><option value="aluminium">Aluminium</option></select></Field>

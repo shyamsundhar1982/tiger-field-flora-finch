@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Panel, Kpi } from "@/components/kpi";
+import { InventoryWorkspaceNav } from "@/components/inventory-workspace-nav";
 import { getInventoryMslWarnings } from "@/lib/inventory-authority";
 
 export const Route = createFileRoute("/command/procurement")({
@@ -23,6 +24,8 @@ function Procurement() {
       <Link to="/command/inventory-truth" className="text-sm font-semibold text-accent">Inventory truth →</Link>
     </div>
 
+    <InventoryWorkspaceNav />
+    <div className="rounded-xl border border-accent/30 bg-accent/5 p-4 text-sm"><p className="font-semibold text-fg">How to use Procurement Control</p><p className="mt-1 text-xs leading-5 text-muted">This queue consumes posted inventory signals. Select a stock ledger below to inspect balances, movements, FIFO, or minimum stock; use Procurement Planning for RFQ, approval, and PO actions.</p></div>
     <div className="mt-8 flex flex-wrap gap-2 text-xs"><Link to="/command/inventory-truth" className="rounded-lg border border-border px-3 py-2 font-semibold text-muted hover:border-accent hover:text-accent">Verify posted balance →</Link><Link to="/command/procurement-planning" className="rounded-lg border border-border px-3 py-2 font-semibold text-muted hover:border-accent hover:text-accent">Open planning assumptions →</Link></div>
     <div className="mt-4 grid gap-3 sm:grid-cols-3">
       <Kpi label="Critical" value={String(critical)} hint="At zero stock" />
