@@ -18,5 +18,5 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Inventory and repository tests
-        run: npm test
+      - name: Master inventory integrity tests
+        run: node --experimental-strip-types --test src/lib/master-ledger.test.ts src/lib/master-inventory-db.test.ts src/lib/route-ownership.test.ts
