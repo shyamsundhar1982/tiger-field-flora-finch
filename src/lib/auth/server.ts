@@ -65,6 +65,13 @@ const VERCEL_APP_ORIGINS: string[] = [
   "https://tiger-field-flora-finch-*.vercel.app",
 ];
 
+// Cloudflare Workers is the declared production deployment surface. Unlike
+// Vercel, its workers.dev hostname is stable, so explicitly trust the live
+// production origin used by the VINDY application.
+const CLOUDFLARE_APP_ORIGINS: string[] = [
+  "https://tiger-field-flora-finch.shyamsundhar1982.workers.dev",
+];
+
 // Better Auth's server API methods (including admin-created email accounts)
 // require a URL string here. Origin policy remains separately enforced below.
 const baseURL = explicitBaseURL ?? "http://localhost:8080";
@@ -72,6 +79,7 @@ const baseURL = explicitBaseURL ?? "http://localhost:8080";
 const trustedOrigins: string[] = [
   ...(explicitBaseURL ? [explicitBaseURL] : []),
   ...VERCEL_APP_ORIGINS,
+  ...CLOUDFLARE_APP_ORIGINS,
   ...previewAllowedHosts,
   ...previewAllowedHosts.flatMap((host) => [`https://${host}`, `http://${host}`]),
   ...LOCAL_DEV_ORIGINS,
