@@ -1,8 +1,20 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { CommandShell } from "@/components/command-shell";
 import { getCommandAccess, getCommandRole } from "@/lib/command-access";
 import { canAccessRoute } from "@/lib/page-access";
 import { getRouteMeta } from "@/lib/page-metadata";
+import { useVeloxis } from "@/lib/store";
+import {
+  DEFAULT_APPROVED_OPERATING_PLAN,
+  type OperatingPlan,
+} from "@/lib/planning/operating-plan";
+import { getPublishedOperatingPlan } from "@/lib/planning/planning-control";
+
+type OperatingPlanLoaderData = {
+  plan: OperatingPlan;
+  revisionNo: number | null;
+};
 
 export const Route = createFileRoute("/command")({
   beforeLoad: async ({ location }) => {
@@ -18,5 +30,25 @@ export const Route = createFileRoute("/command")({
       });
     }
   },
-  component: CommandShell,
+  loader: async (): Promise<OperatingPlanLoaderData> => {
+    try {
+      const published = await getPublishedOperatingPlan();
+      return { plan: published.plan, revisionNo: published.record?.revisionNo ?? null };
+    } catch {
+      // Fresh environments can render safely before migration 0023 is applied.
+      return { plan: DEFAULT_APPROVED_OPERATING_PLAN, revisionNo: null };
+    }
+  },
+  component: CommandRouteShell,
 });
+
+function CommandRouteShell() {
+  const { plan } = Route.useLoaderData();
+
+  useEffect(() => {
+    const state = useVeloxis.getState();
+    state.setFinance({ ...state.finance, operatingPlan: plan });
+  }, [plan]);
+
+  return <CommandShell />;
+}
