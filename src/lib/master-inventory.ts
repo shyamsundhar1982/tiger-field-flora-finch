@@ -122,7 +122,7 @@ async function ensureComponentCatalogue(sql: Sql) {
     select id, 'components', upper(sku), name, category, unit, minimum_stock_level,
       planned_monthly_use, 'catalogue-seed', 'catalogue-seed'
     from seed
-    on conflict (ledger_id, sku) do nothing
+    on conflict (sku) do nothing
   `,
     [payload],
   );
