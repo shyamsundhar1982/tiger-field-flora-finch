@@ -3,7 +3,7 @@ import { getCommandRole } from "@/lib/command-access";
 import { getSql } from "@/lib/db";
 import { canPerform } from "@/lib/page-access";
 
-/** Read-only adapter over canonical job cards + live reservation/ATP + eligible travellers. */
+/** Read-only adapter over canonical job cards + live reservation/ATP + the full traveller register. */
 export const getProductionJobCardView = createServerFn({ method: "GET" }).handler(async () => {
   const role = await getCommandRole();
   if (!role || !canPerform(role, "view")) throw new Error("Production view permission denied.");
@@ -30,10 +30,10 @@ export const getProductionJobCardView = createServerFn({ method: "GET" }).handle
        order by l.job_card_id,l.stage_no,l.id
     `,
     sql`
-      select id,venture,model_id,model_name,sku,bom_revision,engineering_revision,serial_number,status
+      select id,venture,model_id,model_name,sku,bom_revision,engineering_revision,serial_number,status,
+             supplier,created_by,created_at::text as created_at,updated_at::text as updated_at
         from epr_travellers
-       where status in ('released','in_build')
-       order by model_name,bom_revision,serial_number
+       order by created_at desc,serial_number asc limit 250
     `,
   ]);
   return { cards, lines, travellers };
