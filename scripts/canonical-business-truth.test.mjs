@@ -199,6 +199,23 @@ test("canonical order → reservation → ATP → FIFO/COGS and stale-order cont
     ["RES-TEST-2", "CARD-TEST-2", "LINE-TEST-2", "test-user", "operations"],
   );
 
+  const partialOrder = await saveSalesOrder(db, { id: "SO-TEST-PARTIAL", units: 4 });
+  assert.equal(Number(partialOrder.rows[0].revision), 1);
+  await createReleasedCard(db, { orderId: "SO-TEST-PARTIAL", cardId: "CARD-TEST-PARTIAL", lineId: "LINE-TEST-PARTIAL", quantity: 8 });
+  const partialReservation = await db.query(
+    `select * from reserve_epr_inventory_for_job_line($1,$2,$3,$4,$5)`,
+    ["RES-TEST-PARTIAL", "CARD-TEST-PARTIAL", "LINE-TEST-PARTIAL", "test-user", "operations"],
+  );
+  assert.equal(Number(partialReservation.rows[0].reserved_quantity), 4);
+  assert.equal(Number(partialReservation.rows[0].shortage_quantity), 4);
+  await assert.rejects(
+    () => db.query(
+      `select * from consume_epr_inventory_reservation($1,$2,$3,$4,$5,$6)`,
+      ["RES-TEST-PARTIAL", "TRV-TEST-1", "MOV-PARTIAL-FAIL", "LED-PARTIAL-FAIL", "test-user", "operations"],
+    ),
+    /Partial reservation cannot be posted as a complete material issue/,
+  );
+
   const revised = await saveSalesOrder(db, { id: "SO-TEST-2", units: 2 });
   assert.equal(Number(revised.rows[0].revision), 2);
 
