@@ -10,7 +10,6 @@ import {
   Presentation,
   Wallet,
   DraftingCompass,
-  Radar,
   Scale,
   Settings2,
   Boxes,
@@ -28,7 +27,6 @@ import {
   type PageMode,
   type RouteMeta,
 } from "@/lib/page-metadata";
-import { ERP_FLOW, getErpFlowStep } from "@/lib/erp-flow";
 
 type NavigationView = "workspaces" | "more";
 type WorkspaceItem = {
@@ -169,12 +167,6 @@ const LEGACY_ROUTES = new Set<string>([
   "/command/phase-6",
   "/command/phase-6a",
 ]);
-const LEGACY_ROUTE_REDIRECTS: Record<string, string> = {
-  "/command/phase-4": COMMERCIAL_HOME_ROUTE,
-  "/command/phase-5": ENGINEERING_HOME_ROUTE,
-  "/command/phase-6": SUPPLY_HOME_ROUTE,
-  "/command/phase-6a": "/command/epr-execution",
-};
 
 const WORKSPACES: WorkspaceItem[] = [
   {
@@ -314,9 +306,7 @@ function WorkspaceNavigation({ role }: { role: CommandRole | null }) {
     <section className="rounded-xl border border-border bg-surface/30 p-2">
       <div className="flex items-center gap-2 px-2 pb-2 pt-1">
         <Activity className="size-3.5 text-accent" />
-        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-fg">
-          Core workspaces
-        </span>
+        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-fg">Core workspaces</span>
         <span className="ml-auto text-[9px] text-muted">7 operating surfaces</span>
       </div>
       <div className="space-y-0.5">
@@ -367,16 +357,9 @@ function SecondaryDomainGroup({
   role: CommandRole | null;
 }) {
   const group =
-    mode === "showcase"
-      ? "Showcase"
-      : mode === "observe"
-        ? "Observe"
-        : mode === "operate"
-          ? "Operate"
-          : "Understand";
+    mode === "showcase" ? "Showcase" : mode === "observe" ? "Observe" : mode === "operate" ? "Operate" : "Understand";
   const pages = navigationGroups[group].filter(
-    (page) =>
-      page.domain === domain && isSecondaryNavigationPage(page) && canAccessPage(role, page),
+    (page) => page.domain === domain && isSecondaryNavigationPage(page) && canAccessPage(role, page),
   );
   if (!pages.length) return null;
   const Icon = ICONS[domain] ?? Activity;
@@ -389,9 +372,7 @@ function SecondaryDomainGroup({
         <ChevronDown className="size-3" />
       </summary>
       <div className="ml-2 mt-1 space-y-0.5 border-l border-border pl-2">
-        {pages.map((page) => (
-          <PageLink key={page.route} page={page} role={role} />
-        ))}
+        {pages.map((page) => <PageLink key={page.route} page={page} role={role} />)}
       </div>
     </details>
   );
@@ -400,33 +381,19 @@ function SecondaryDomainGroup({
 function SecondaryMode({ mode, role }: { mode: PageMode; role: CommandRole | null }) {
   const location = useLocation();
   const group =
-    mode === "showcase"
-      ? "Showcase"
-      : mode === "observe"
-        ? "Observe"
-        : mode === "operate"
-          ? "Operate"
-          : "Understand";
-  const pages = navigationGroups[group].filter(
-    (page) => isSecondaryNavigationPage(page) && canAccessPage(role, page),
-  );
+    mode === "showcase" ? "Showcase" : mode === "observe" ? "Observe" : mode === "operate" ? "Operate" : "Understand";
+  const pages = navigationGroups[group].filter((page) => isSecondaryNavigationPage(page) && canAccessPage(role, page));
   if (!pages.length) return null;
-  const active = pages.some(
-    (page) => location.pathname === page.route || location.pathname.startsWith(`${page.route}/`),
-  );
+  const active = pages.some((page) => location.pathname === page.route || location.pathname.startsWith(`${page.route}/`));
   return (
     <details open={active} className="group/mode">
       <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-3 py-2 text-[11px] font-bold uppercase tracking-[0.18em] text-fg hover:bg-surface [&::-webkit-details-marker]:hidden">
         <span className="flex-1">{MODE_LABELS[mode]}</span>
-        <span className="mr-1 text-[9px] font-normal tracking-normal text-muted">
-          {MODE_DESCRIPTIONS[mode]}
-        </span>
+        <span className="mr-1 text-[9px] font-normal tracking-normal text-muted">{MODE_DESCRIPTIONS[mode]}</span>
         <ChevronDown className="size-3" />
       </summary>
       <div className="ml-2 mt-1 space-y-1 border-l border-border pl-2">
-        {DOMAIN_ORDER.map((domain) => (
-          <SecondaryDomainGroup key={domain} domain={domain} mode={mode} role={role} />
-        ))}
+        {DOMAIN_ORDER.map((domain) => <SecondaryDomainGroup key={domain} domain={domain} mode={mode} role={role} />)}
       </div>
     </details>
   );
@@ -463,10 +430,7 @@ function WorkspaceTabs({
   const accessibleRoutes = routes.filter((tab) => canAccessPage(role, getRouteMeta(tab.to)));
   if (!accessibleRoutes.length) return null;
   return (
-    <nav
-      className="mb-6 overflow-x-auto rounded-xl border border-border bg-surface/50 p-1 [scrollbar-width:thin]"
-      aria-label={label}
-    >
+    <nav className="mb-6 overflow-x-auto rounded-xl border border-border bg-surface/50 p-1 [scrollbar-width:thin]" aria-label={label}>
       <div className="flex min-w-max gap-1">
         {accessibleRoutes.map((tab) => (
           <Link
@@ -487,120 +451,8 @@ function WorkspaceTabs({
   );
 }
 
-function FlowGuide({ role }: { role: CommandRole | null }) {
-  const location = useLocation();
-  const match = getErpFlowStep(location.pathname);
-  if (!match) return null;
-  const previous = match.index > 0 ? ERP_FLOW[match.index - 1] : null;
-  const next = match.index < ERP_FLOW.length - 1 ? ERP_FLOW[match.index + 1] : null;
-  const firstAccessible = (routes: string[]) =>
-    routes
-      .map((route) => LEGACY_ROUTE_REDIRECTS[route] ?? route)
-      .find((route) => canAccessPage(role, getRouteMeta(route)));
-  const stages = [
-    { label: "Engineering", range: [1, 4], icon: DraftingCompass },
-    { label: "Commercial", range: [5, 6], icon: LineChart },
-    { label: "Finance", range: [7], icon: Wallet },
-    { label: "Decision", range: [8], icon: Radar },
-  ];
-  const currentStage = stages.findIndex(
-    (stage) => match.index >= stage.range[0] && match.index <= stage.range[1],
-  );
-  return (
-    <section
-      className="mb-5 rounded-xl border border-border bg-surface/35 p-3"
-      aria-label="ERP business flow"
-    >
-      <div>
-        <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-subtle">ERP flow</p>
-        <p className="text-xs font-medium text-fg">{match.step.label}</p>
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {stages.map((stage, index) => {
-          const Icon = stage.icon;
-          const done = index < currentStage;
-          const active = index === currentStage;
-          return (
-            <div
-              key={stage.label}
-              className={cn(
-                "flex min-w-0 items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px]",
-                active ? "border-accent bg-accent/10 text-fg" : "border-border bg-bg/30 text-muted",
-              )}
-            >
-              <Icon className={cn("size-3.5 shrink-0", active && "text-accent")} />
-              <span className="truncate font-semibold">{stage.label}</span>
-              <span className="ml-auto text-[9px] text-subtle">
-                {done ? "✓" : active ? "●" : "○"}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-      <div className="mt-2 grid gap-2 text-[10px] sm:grid-cols-2">
-        {previous && firstAccessible(previous.routes) ? (
-          <Link
-            to={firstAccessible(previous.routes)! as never}
-            className="rounded-md border border-border px-2.5 py-1.5 text-muted hover:bg-bg hover:text-fg"
-          >
-            ← {previous.label}
-          </Link>
-        ) : (
-          <span />
-        )}
-        {next && firstAccessible(next.routes) ? (
-          <Link
-            to={firstAccessible(next.routes)! as never}
-            className="rounded-md border border-border px-2.5 py-1.5 text-left text-muted hover:bg-bg hover:text-fg sm:text-right"
-          >
-            {next.label} →
-          </Link>
-        ) : (
-          <span />
-        )}
-      </div>
-    </section>
-  );
-}
-
-function workspaceForPath(pathname: string) {
-  const route = LEGACY_ROUTE_REDIRECTS[pathname] ?? pathname;
-  return WORKSPACES.find(
-    (workspace) =>
-      route === workspace.to ||
-      workspace.context.has(route) ||
-      [...workspace.context].some(
-        (candidate) => candidate !== "/command" && route.startsWith(`${candidate}/`),
-      ),
-  );
-}
-
-function ContextBack({ role }: { role: CommandRole | null }) {
-  const location = useLocation();
-  if (!location.pathname.startsWith("/command") || location.pathname === "/command") return null;
-  const workspace = workspaceForPath(location.pathname);
-  const workspaceTarget = workspace?.to ?? "/command";
-  const target = canAccessPage(role, getRouteMeta(workspaceTarget)) ? workspaceTarget : "/command";
-  const label =
-    target === workspaceTarget ? (workspace?.label ?? "Command Centre") : "Command Centre";
-  if (location.pathname === target) return null;
-  return (
-    <Link
-      to={target as never}
-      className="mb-4 inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-xs font-medium text-muted transition-colors hover:border-accent/40 hover:bg-bg hover:text-fg"
-      aria-label={`Return to ${label}`}
-    >
-      ← {label}
-    </Link>
-  );
-}
-
 function NavigationBody({ view, role }: { view: NavigationView; role: CommandRole | null }) {
-  return view === "workspaces" ? (
-    <WorkspaceNavigation role={role} />
-  ) : (
-    <MoreNavigation role={role} />
-  );
+  return view === "workspaces" ? <WorkspaceNavigation role={role} /> : <MoreNavigation role={role} />;
 }
 
 function MobileNavigation({
@@ -621,49 +473,13 @@ function MobileNavigation({
     <div className="border-b border-border px-3 py-2 lg:hidden">
       <div className="flex items-center gap-2">
         <div className="grid min-w-0 flex-1 grid-cols-2 gap-1 rounded-md border border-border bg-surface/40 p-0.5">
-          <button
-            type="button"
-            onClick={() => setView("workspaces")}
-            className={cn(
-              "rounded px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em]",
-              view === "workspaces" ? "bg-bg text-fg shadow-sm" : "text-muted hover:text-fg",
-            )}
-          >
-            Workspaces
-          </button>
-          <button
-            type="button"
-            onClick={() => setView("more")}
-            className={cn(
-              "rounded px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em]",
-              view === "more" ? "bg-bg text-fg shadow-sm" : "text-muted hover:text-fg",
-            )}
-          >
-            More
-          </button>
+          <button type="button" onClick={() => setView("workspaces")} className={cn("rounded px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em]", view === "workspaces" ? "bg-bg text-fg shadow-sm" : "text-muted hover:text-fg")}>Workspaces</button>
+          <button type="button" onClick={() => setView("more")} className={cn("rounded px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em]", view === "more" ? "bg-bg text-fg shadow-sm" : "text-muted hover:text-fg")}>More</button>
         </div>
-        <button
-          type="button"
-          onClick={() => setOpen((value) => !value)}
-          aria-expanded={open}
-          className="rounded-md border border-border px-3 py-2 text-xs font-semibold text-muted hover:bg-surface hover:text-fg"
-        >
-          {open ? "Close" : "Browse"}
-        </button>
+        <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} className="rounded-md border border-border px-3 py-2 text-xs font-semibold text-muted hover:bg-surface hover:text-fg">{open ? "Close" : "Browse"}</button>
       </div>
-      {open ? (
-        <nav className="mt-2 max-h-[58dvh] overflow-y-auto pb-1">
-          <NavigationBody view={view} role={role} />
-        </nav>
-      ) : null}
-      <button
-        type="button"
-        onClick={logout}
-        disabled={loggingOut}
-        className="mt-2 w-full rounded-md border border-border px-3 py-2 text-xs text-muted hover:bg-surface hover:text-fg"
-      >
-        {loggingOut ? "Logging out…" : "Log out"}
-      </button>
+      {open ? <nav className="mt-2 max-h-[58dvh] overflow-y-auto pb-1"><NavigationBody view={view} role={role} /></nav> : null}
+      <button type="button" onClick={logout} disabled={loggingOut} className="mt-2 w-full rounded-md border border-border px-3 py-2 text-xs text-muted hover:bg-surface hover:text-fg">{loggingOut ? "Logging out…" : "Log out"}</button>
     </div>
   );
 }
@@ -674,9 +490,7 @@ export function CommandShell() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [view, setView] = useState<NavigationView>("workspaces");
   useEffect(() => {
-    getCommandRole()
-      .then(setRole)
-      .catch(() => setRole(null));
+    getCommandRole().then(setRole).catch(() => setRole(null));
   }, []);
   const viewer = role === "viewer";
   async function logout() {
@@ -695,94 +509,30 @@ export function CommandShell() {
       <SiteHeader />
       <div className="mx-auto flex max-w-7xl">
         <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-72 shrink-0 flex-col border-r border-border py-6 lg:flex">
-          <p className="px-5 pb-3 text-[10px] uppercase tracking-[0.2em] text-subtle">
-            VINDY 2.0 · Operating System
-          </p>
+          <p className="px-5 pb-3 text-[10px] uppercase tracking-[0.2em] text-subtle">VINDY 2.0 · Operating System</p>
           <div className="px-3 pb-3">
             <div className="grid grid-cols-2 rounded-md border border-border bg-surface/40 p-0.5">
-              <button
-                type="button"
-                onClick={() => setView("workspaces")}
-                className={cn(
-                  "rounded px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em]",
-                  view === "workspaces" ? "bg-bg text-fg shadow-sm" : "text-muted hover:text-fg",
-                )}
-              >
-                Workspaces
-              </button>
-              <button
-                type="button"
-                onClick={() => setView("more")}
-                className={cn(
-                  "rounded px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em]",
-                  view === "more" ? "bg-bg text-fg shadow-sm" : "text-muted hover:text-fg",
-                )}
-              >
-                More
-              </button>
+              <button type="button" onClick={() => setView("workspaces")} className={cn("rounded px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em]", view === "workspaces" ? "bg-bg text-fg shadow-sm" : "text-muted hover:text-fg")}>Workspaces</button>
+              <button type="button" onClick={() => setView("more")} className={cn("rounded px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em]", view === "more" ? "bg-bg text-fg shadow-sm" : "text-muted hover:text-fg")}>More</button>
             </div>
           </div>
-          <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-4 pr-1 [scrollbar-width:thin]">
-            <NavigationBody view={view} role={role} />
-          </nav>
+          <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-4 pr-1 [scrollbar-width:thin]"><NavigationBody view={view} role={role} /></nav>
           <div className="px-3 pt-3">
-            <button
-              type="button"
-              onClick={logout}
-              disabled={loggingOut}
-              className="flex w-full items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted hover:bg-surface hover:text-fg disabled:opacity-50"
-            >
+            <button type="button" onClick={logout} disabled={loggingOut} className="flex w-full items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted hover:bg-surface hover:text-fg disabled:opacity-50">
               <LogOut className="size-4" />
-              {loggingOut
-                ? "Logging out…"
-                : `Log out${viewer ? " · User" : role === "admin" ? " · Admin" : ""}`}
+              {loggingOut ? "Logging out…" : `Log out${viewer ? " · User" : role === "admin" ? " · Admin" : ""}`}
             </button>
           </div>
         </aside>
         <div className="min-w-0 flex-1">
-          <MobileNavigation
-            view={view}
-            role={role}
-            setView={setView}
-            logout={logout}
-            loggingOut={loggingOut}
-          />
+          <MobileNavigation view={view} role={role} setView={setView} logout={logout} loggingOut={loggingOut} />
           <div className="px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
-            <ContextBack role={role} />
-            <FlowGuide role={role} />
-            <WorkspaceTabs
-              role={role}
-              routes={FINANCE_TABS}
-              context={FINANCE_CONTEXT_ROUTES}
-              label="Finance workspace"
-            />
-            <WorkspaceTabs
-              role={role}
-              routes={SUPPLY_TABS}
-              context={SUPPLY_CONTEXT_ROUTES}
-              label="Supply and Production workspace"
-            />
-            <WorkspaceTabs
-              role={role}
-              routes={COMMERCIAL_TABS}
-              context={COMMERCIAL_CONTEXT_ROUTES}
-              label="Commercial workspace"
-            />
-            <WorkspaceTabs
-              role={role}
-              routes={ENGINEERING_TABS}
-              context={ENGINEERING_CONTEXT_ROUTES}
-              label="Engineering workspace"
-            />
-            <WorkspaceTabs
-              role={role}
-              routes={GOVERNANCE_TABS}
-              context={GOVERNANCE_CONTEXT_ROUTES}
-              label="Governance workspace"
-            />
-            <fieldset disabled={viewer} className="m-0 min-w-0 border-0 p-0">
-              <Outlet />
-            </fieldset>
+            <WorkspaceTabs role={role} routes={FINANCE_TABS} context={FINANCE_CONTEXT_ROUTES} label="Finance workspace" />
+            <WorkspaceTabs role={role} routes={SUPPLY_TABS} context={SUPPLY_CONTEXT_ROUTES} label="Supply and Production workspace" />
+            <WorkspaceTabs role={role} routes={COMMERCIAL_TABS} context={COMMERCIAL_CONTEXT_ROUTES} label="Commercial workspace" />
+            <WorkspaceTabs role={role} routes={ENGINEERING_TABS} context={ENGINEERING_CONTEXT_ROUTES} label="Engineering workspace" />
+            <WorkspaceTabs role={role} routes={GOVERNANCE_TABS} context={GOVERNANCE_CONTEXT_ROUTES} label="Governance workspace" />
+            <fieldset disabled={viewer} className="m-0 min-w-0 border-0 p-0"><Outlet /></fieldset>
           </div>
         </div>
       </div>
