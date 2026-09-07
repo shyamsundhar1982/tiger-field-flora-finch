@@ -232,7 +232,7 @@ function capexFor(month: number, scenario: ScenarioId, plan: OperatingPlan) {
   const scenarioFactor = scenario === "stress" ? 1.2 : 1;
   return (
     events
-      .filter((event) => Math.max(1, Math.min(36, event.month + shift)) === month)
+      .filter((event) => event.month + shift === month)
       .reduce((sum, event) => sum + event.amount, 0) * scenarioFactor
   );
 }
@@ -246,10 +246,10 @@ function inventoryBuy(
 ) {
   const launch = effectiveMilestoneMonth(plan, "commercialLaunch", scenario);
   const launchStock = new Map<number, number>([
-    [Math.max(1, launch - 6), 2],
-    [Math.max(1, launch - 4), 8],
-    [Math.max(1, launch - 3), 10],
-    [Math.max(1, launch - 2), 12],
+    [launch - 6, 2],
+    [launch - 4, 8],
+    [launch - 3, 10],
+    [launch - 2, 12],
   ]);
   const scenarioFactor = scenario === "stress" ? 0.65 : scenario === "delayed" ? 0.9 : 1;
   const planned = (launchStock.get(month) ?? 0) * scenarioFactor;
@@ -309,7 +309,8 @@ export function buildModelWithInputs(
 
   for (let month = 1; month <= 36; month++) {
     const baseUnits = unitsForPlanMonth(plan, month, scenario);
-    const allocationLines = scenario === "stress" ? lines.filter((line) => line.id === "carbon") : lines;
+    const allocationLines =
+      scenario === "stress" ? lines.filter((line) => line.id === "carbon") : lines;
     const allocated = allocateUnits(baseUnits, allocationLines, month, plan, scenario);
     allocated.aluminium = Math.max(
       0,
@@ -356,7 +357,8 @@ export function buildModelWithInputs(
           : assumptions.aluminiumVertical.opexLakh * 0.35
         : 0;
     const manufacturingConsumables =
-      equipmentConsumablesForMonth(equipment, month, "consumables") * assumptions.inventoryMultiplier;
+      equipmentConsumablesForMonth(equipment, month, "consumables") *
+      assumptions.inventoryMultiplier;
     const officeConsumables =
       equipmentOfficeConsumablesForMonth(equipment, month) * assumptions.opexMultiplier;
     const equipmentCapex = equipmentCapexForMonth(equipment, month) * assumptions.capexMultiplier;
@@ -380,10 +382,21 @@ export function buildModelWithInputs(
     const grossProfit = revenue - cogs;
     const ebitda = grossProfit - opex;
     const opening = cash;
-    cash = opening + funding + revenue - opex - capex - inventoryPurchase - manufacturingConsumables;
+    cash =
+      opening + funding + revenue - opex - capex - inventoryPurchase - manufacturingConsumables;
     inventory = Math.max(0, inventory + inventoryPurchase - baseCogs);
-    if (month <= Math.max(8, plan.milestoneMonths.prototypeValidation)) iaud += capex * 0.7;
-    if (capex >= 20 || month >= plan.milestoneMonths.toolingPilot) tooling += capex;
+    if (
+      plan.milestoneMonths.prototypeValidation > 0 &&
+      month <= Math.max(8, plan.milestoneMonths.prototypeValidation)
+    ) {
+      iaud += capex * 0.7;
+    }
+    if (
+      capex >= 20 ||
+      (plan.milestoneMonths.toolingPilot > 0 && month >= plan.milestoneMonths.toolingPilot)
+    ) {
+      tooling += capex;
+    }
     const productCostPerUnit =
       units > 0
         ? (cogs + equipmentManufacturingDepreciation + equipmentSupportDepreciation) / units
@@ -429,7 +442,8 @@ export function runwayMonths(rows: MonthRow[], from: number) {
   let cash = start.closing;
   let months = 0;
   for (let index = from; index < rows.length; index++) {
-    const burn = rows[index].opex + rows[index].capex + rows[index].inventoryBuy - rows[index].revenue;
+    const burn =
+      rows[index].opex + rows[index].capex + rows[index].inventoryBuy - rows[index].revenue;
     if (burn <= 0) {
       months++;
       cash = rows[index].closing;
@@ -449,7 +463,8 @@ export function runwayMonths(rows: MonthRow[], from: number) {
 
 export function minCash(rows: MonthRow[]) {
   return rows.reduce(
-    (minimum, row) => (row.closing < minimum.cash ? { m: row.m, cash: row.closing } : minimum),
+    (minimum, row) =>
+      row.closing < minimum.cash ? { m: row.m, cash: row.closing } : minimum,
     { m: 1, cash: rows[0]?.closing ?? 0 },
   );
 }
@@ -473,8 +488,10 @@ export function totals(rows: MonthRow[]) {
   };
 }
 
-const ASP = DEFAULT_PRODUCT_LINES.reduce((sum, line) => sum + line.aspLakh * line.mixPct, 0) / 100;
-const COGS = DEFAULT_PRODUCT_LINES.reduce((sum, line) => sum + line.cogsLakh * line.mixPct, 0) / 100;
+const ASP =
+  DEFAULT_PRODUCT_LINES.reduce((sum, line) => sum + line.aspLakh * line.mixPct, 0) / 100;
+const COGS =
+  DEFAULT_PRODUCT_LINES.reduce((sum, line) => sum + line.cogsLakh * line.mixPct, 0) / 100;
 
 export const BREAKEVEN_EARLY = 19;
 export const BREAKEVEN_SCALE = 29;
