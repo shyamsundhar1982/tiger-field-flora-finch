@@ -234,3 +234,50 @@ test("canonical order → reservation → ATP → FIFO/COGS and stale-order cont
   );
   assert.ok(Number(audit.rows[0].count) >= 6, "canonical flow must leave an auditable event chain");
 });
+
+test("zero physical inventory preserves released production demand and exposes the full shortage", async (t) => {
+  const db = await createCanonicalDb();
+  t.after(() => db.close());
+
+  const order = await saveSalesOrder(db, { id: "SO-ZERO-STOCK", units: 2 });
+  assert.equal(Number(order.rows[0].revision), 1);
+  await createReleasedCard(db, {
+    orderId: "SO-ZERO-STOCK",
+    cardId: "CARD-ZERO-STOCK",
+    lineId: "LINE-ZERO-STOCK",
+    quantity: 4,
+  });
+
+  const reservation = await db.query(
+    `select * from reserve_epr_inventory_for_job_line($1,$2,$3,$4,$5)`,
+    ["RES-ZERO-STOCK", "CARD-ZERO-STOCK", "LINE-ZERO-STOCK", "test-user", "operations"],
+  );
+  assert.equal(Number(reservation.rows[0].required_quantity), 4);
+  assert.equal(Number(reservation.rows[0].physical_quantity), 0);
+  assert.equal(Number(reservation.rows[0].reserved_quantity), 0);
+  assert.equal(Number(reservation.rows[0].shortage_quantity), 4);
+  assert.equal(reservation.rows[0].reservation_id, null, "zero stock must not create a fake reservation");
+
+  const state = await db.query(
+    `select c.status as card_status,l.issue_status,l.available_quantity,l.shortage_quantity,
+            v.physical_quantity,v.reserved_quantity,v.available_to_promise,v.shortage_quantity as live_shortage
+       from epr_production_job_cards c
+       join epr_production_job_card_lines l on l.job_card_id=c.id and l.id='LINE-ZERO-STOCK'
+       join vyndi_live_job_card_requirements v on v.job_card_line_id=l.id
+      where c.id='CARD-ZERO-STOCK'`,
+  );
+  assert.equal(state.rows.length, 1, "zero stock must not suppress the job card or its requirement");
+  assert.equal(state.rows[0].card_status, "released");
+  assert.equal(state.rows[0].issue_status, "short");
+  assert.equal(Number(state.rows[0].available_quantity), 0);
+  assert.equal(Number(state.rows[0].physical_quantity), 0);
+  assert.equal(Number(state.rows[0].reserved_quantity), 0);
+  assert.equal(Number(state.rows[0].available_to_promise), 0);
+  assert.equal(Number(state.rows[0].shortage_quantity), 4);
+  assert.equal(Number(state.rows[0].live_shortage), 4);
+
+  const fakeStock = await db.query(
+    `select count(*)::int as count from epr_inventory_ledger where sku='TEST-SKU'`,
+  );
+  assert.equal(Number(fakeStock.rows[0].count), 0, "production demand must never seed physical stock");
+});
