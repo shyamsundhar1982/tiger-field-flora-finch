@@ -14,7 +14,8 @@ function StakeholderPortal() {
     <header>
       <p className="text-[10px] uppercase tracking-[0.2em] text-subtle">Phase J · External Stakeholder</p>
       <h1 className="mt-2 font-display text-4xl">VINDY Stakeholder Portal</h1>
-      <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">{STAKEHOLDER_PORTAL_STATUS.headline} A presentation-ready view that separates verified evidence, modeled assumptions, pending validation and reserved decisions.</p>
+      <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">{STAKEHOLDER_PORTAL_STATUS.headline} A read-only presentation view that separates verified evidence, modeled assumptions, pending validation and reserved decisions.</p>
+      <div className="mt-3 flex flex-wrap gap-3 text-sm font-semibold"><Link to="/command/inventory-truth" className="text-accent">Inventory evidence →</Link><Link to="/command/financial-cockpit" className="text-accent">Finance evidence →</Link><Link to="/command/procurement" className="text-accent">Procurement evidence →</Link></div>
     </header>
 
     <div className="grid gap-3 sm:grid-cols-4">

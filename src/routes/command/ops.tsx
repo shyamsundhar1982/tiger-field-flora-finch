@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Panel } from "@/components/kpi";
 import { CONTRACT_CLAUSES, GANTT, OEM_CRITERIA, QC_GATES } from "@/lib/data/ops";
 
@@ -8,12 +8,13 @@ function Ops() {
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Schedule 4 + Gantt</p>
-        <h1 className="font-display text-4xl">Manufacturing</h1>
+        <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Compatibility · legacy manufacturing reference</p>
+        <h1 className="font-display text-4xl">Manufacturing reference</h1>
         <p className="mt-2 max-w-2xl text-sm text-muted">
           Taiwan / Vietnam for frames. India for assembly, brand, and service. No CAD leaves the house until
           NDA + M3 provisional filing.
         </p>
+        <div className="mt-3 flex flex-wrap gap-3 text-sm font-semibold"><Link to="/command/operations" className="text-accent">Open canonical Operations →</Link><Link to="/command/production-jobcards" className="text-accent">Production job cards →</Link></div>
       </div>
 
       <Panel title="36-month operating critical path">
