@@ -95,6 +95,12 @@ begin
   return query select p_movement_id,p_ledger_id,v_balance+o.quantity;
 end; $$;
 
+-- PostgreSQL cannot change OUT columns with CREATE OR REPLACE. The phase-6
+-- function returned three columns; this control layer adds cogs_inr.
+drop function if exists post_epr_inventory_movement(
+  text, text, text, text, text, text, numeric, text, text, text, text
+);
+
 create or replace function post_epr_inventory_movement(
   p_movement_id text, p_ledger_id text, p_traveller_id text, p_venture text, p_sku text,
   p_movement_type text, p_quantity numeric, p_unit text, p_reference text, p_notes text, p_actor text

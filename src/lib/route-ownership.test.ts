@@ -1,7 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { ERP_FLOW, getErpFlowStep } from "./erp-flow.ts";
-import { getRouteOwnership, PUBLIC_REFERENCE_ROUTES, ROUTE_FILE_EXCLUSIONS, routeOwnership, routeRegistry, validateRouteOwnership } from "./page-metadata.ts";\nimport { canAccessRoute } from "./page-access.ts";
+import {
+  getRouteOwnership,
+  navigationGroups,
+  PUBLIC_REFERENCE_ROUTES,
+  ROUTE_FILE_EXCLUSIONS,
+  routeOwnership,
+  routeRegistry,
+  validateRouteOwnership,
+} from "./page-metadata.ts";
+import { canAccessRoute } from "./page-access.ts";
 
 test("route ownership metadata is internally complete", () => {
   assert.deepEqual(validateRouteOwnership(), []);
@@ -16,26 +25,45 @@ test("route ownership metadata is internally complete", () => {
 test("canonical inventory and compatibility boundaries remain explicit", () => {
   assert.equal(getRouteOwnership("/inventory")?.source, "reference");
   assert.equal(getRouteOwnership("/inventory")?.compatibility, true);
-  assert.equal(getRouteOwnership("/command/inventory")?.canonicalRoute, "/command/inventory-truth");
-  assert.equal(getRouteOwnership("/command/inventory-ledgers/:ledger")?.mutability, "read-only");
-  assert.equal(routeRegistry["/command/inventory-truth"].mode, "observe");
+  assert.equal(getRouteOwnership("/command/inventory")?.canonicalRoute, "/command/inventory");
+  assert.equal(getRouteOwnership("/command/inventory")?.mutability, "editable");
+  assert.equal(getRouteOwnership("/command/inventory-ledgers/:ledger")?.mutability, "editable");
+  assert.equal(routeRegistry["/command/inventory-truth"].adminOnly, true);
 });
 
 test("ERP flow covers nested inventory ledger routes", () => {
-  const match = getErpFlowStep("/command/inventory-ledgers/movements");
+  const match = getErpFlowStep("/command/inventory-ledgers/components");
   assert.ok(match);
   assert.equal(match.step, ERP_FLOW[3]);
   assert.equal(match.step.id, "inventory");
 });
 
 test("nested inventory ledger pages inherit the parent access policy", () => {
-  assert.equal(canAccessRoute("operations", "/command/inventory-ledgers/stock"), true);
+  assert.equal(canAccessRoute("operations", "/command/inventory-ledgers/components"), true);
   assert.equal(canAccessRoute("operations", "/command/inventory-ledgers/stores-tools"), true);
-  assert.equal(canAccessRoute("viewer", "/command/inventory-ledgers/stock"), false);
+  assert.equal(canAccessRoute("viewer", "/command/inventory-ledgers/components"), false);
+  assert.equal(canAccessRoute("operations", "/command/inventory-legacy"), false);
+  assert.equal(canAccessRoute("admin", "/command/inventory-legacy"), true);
+});
+
+test("normal navigation exposes one inventory workspace and hides legacy pages", () => {
+  const inventoryRoutes = Object.values(navigationGroups)
+    .flat()
+    .filter((page) => page.domain === "inventory")
+    .map((page) => page.route);
+  assert.deepEqual(inventoryRoutes, ["/command/inventory"]);
+  assert.equal(routeRegistry["/inventory"].navHidden, true);
+  assert.equal(routeRegistry["/command/inventory-ledgers"].navHidden, true);
 });
 
 test("public and compatibility route contracts remain registered", () => {
-  assert.deepEqual(PUBLIC_REFERENCE_ROUTES, ["/", "/range", "/range/$tier", "/fit-calculator", "/inventory"]);
+  assert.deepEqual(PUBLIC_REFERENCE_ROUTES, [
+    "/",
+    "/range",
+    "/range/$tier",
+    "/fit-calculator",
+    "/inventory",
+  ]);
   assert.equal(getRouteOwnership("/inventory")?.compatibility, true);
   assert.equal(ROUTE_FILE_EXCLUSIONS.has("/command/inventory-ledgers/$ledger"), true);
 });

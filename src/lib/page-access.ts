@@ -1,4 +1,11 @@
-import { getRouteMeta, routeRegistry, type PageDomain, type PageMeta, type PageMode, type PageOwner } from "./page-metadata.ts";
+import {
+  getRouteMeta,
+  routeRegistry,
+  type PageDomain,
+  type PageMeta,
+  type PageMode,
+  type PageOwner,
+} from "./page-metadata.ts";
 
 export type CommandRole =
   | "admin"
@@ -34,12 +41,41 @@ export const rolePolicies: Record<CommandRole, RolePolicy> = {
   },
   management: {
     modes: ["observe", "operate", "understand", "showcase"],
-    domains: ["command", "finance", "manufacturing", "inventory", "procurement", "engineering", "epr", "knowledge", "sales", "market", "legal", "risk", "leadership", "admin"],
+    domains: [
+      "command",
+      "finance",
+      "manufacturing",
+      "inventory",
+      "procurement",
+      "engineering",
+      "epr",
+      "knowledge",
+      "sales",
+      "market",
+      "legal",
+      "risk",
+      "leadership",
+      "admin",
+    ],
     permissions: ["view", "edit"],
   },
   board: {
     modes: ["observe", "showcase"],
-    domains: ["command", "finance", "manufacturing", "inventory", "procurement", "engineering", "epr", "knowledge", "sales", "market", "legal", "risk", "leadership"],
+    domains: [
+      "command",
+      "finance",
+      "manufacturing",
+      "inventory",
+      "procurement",
+      "engineering",
+      "epr",
+      "knowledge",
+      "sales",
+      "market",
+      "legal",
+      "risk",
+      "leadership",
+    ],
     permissions: ["view"],
   },
   finance: {
@@ -50,7 +86,15 @@ export const rolePolicies: Record<CommandRole, RolePolicy> = {
   },
   operations: {
     modes: ["observe", "operate", "understand"],
-    domains: ["command", "manufacturing", "inventory", "procurement", "engineering", "epr", "knowledge"],
+    domains: [
+      "command",
+      "manufacturing",
+      "inventory",
+      "procurement",
+      "engineering",
+      "epr",
+      "knowledge",
+    ],
     owners: ["founder", "operations", "engineering", "qa", "compliance", "knowledge", "all"],
     permissions: ["view", "edit", "approve"],
   },
@@ -63,7 +107,16 @@ export const rolePolicies: Record<CommandRole, RolePolicy> = {
   qa: {
     modes: ["observe", "operate", "understand"],
     domains: ["command", "manufacturing", "engineering", "knowledge", "risk", "epr"],
-    owners: ["founder", "engineering", "qa", "operations", "compliance", "knowledge", "risk", "all"],
+    owners: [
+      "founder",
+      "engineering",
+      "qa",
+      "operations",
+      "compliance",
+      "knowledge",
+      "risk",
+      "all",
+    ],
     permissions: ["view", "edit", "approve"],
   },
   compliance: {
@@ -80,10 +133,12 @@ export const rolePolicies: Record<CommandRole, RolePolicy> = {
 
 export function canAccessPage(role: CommandRole | null, page: PageMeta | undefined): boolean {
   if (!role || !page) return false;
+  if (page.adminOnly && role !== "admin") return false;
   const policy = rolePolicies[role];
   if (!policy.modes.includes(page.mode)) return false;
   if (policy.domains && !policy.domains.includes(page.domain)) return false;
-  if (policy.owners && !policy.owners.includes(page.owner) && !policy.owners.includes("all")) return false;
+  if (policy.owners && !policy.owners.includes(page.owner) && !policy.owners.includes("all"))
+    return false;
   return true;
 }
 

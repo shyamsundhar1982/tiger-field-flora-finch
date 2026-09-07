@@ -2,6 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { CommandShell } from "@/components/command-shell";
 import { getCommandAccess, getCommandRole } from "@/lib/command-access";
 import { canAccessRoute } from "@/lib/page-access";
+import { getRouteMeta } from "@/lib/page-metadata";
 
 export const Route = createFileRoute("/command")({
   beforeLoad: async ({ location }) => {
@@ -11,7 +12,10 @@ export const Route = createFileRoute("/command")({
     }
     const role = await getCommandRole();
     if (!canAccessRoute(role, location.pathname)) {
-      throw redirect({ to: "/command" });
+      const page = getRouteMeta(location.pathname);
+      throw redirect({
+        to: page?.adminOnly && page.domain === "inventory" ? "/command/inventory" : "/command",
+      });
     }
   },
   component: CommandShell,
