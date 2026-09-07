@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { ERP_FLOW, getErpFlowStep } from "./erp-flow.ts";
-import { getRouteOwnership, PUBLIC_REFERENCE_ROUTES, ROUTE_FILE_EXCLUSIONS, routeOwnership, routeRegistry, validateRouteOwnership } from "./page-metadata.ts";
+import { getRouteOwnership, PUBLIC_REFERENCE_ROUTES, ROUTE_FILE_EXCLUSIONS, routeOwnership, routeRegistry, validateRouteOwnership } from "./page-metadata.ts";\nimport { canAccessRoute } from "./page-access.ts";
 
 test("route ownership metadata is internally complete", () => {
   assert.deepEqual(validateRouteOwnership(), []);
@@ -26,6 +26,12 @@ test("ERP flow covers nested inventory ledger routes", () => {
   assert.ok(match);
   assert.equal(match.step, ERP_FLOW[3]);
   assert.equal(match.step.id, "inventory");
+});
+
+test("nested inventory ledger pages inherit the parent access policy", () => {
+  assert.equal(canAccessRoute("operations", "/command/inventory-ledgers/stock"), true);
+  assert.equal(canAccessRoute("operations", "/command/inventory-ledgers/stores-tools"), true);
+  assert.equal(canAccessRoute("viewer", "/command/inventory-ledgers/stock"), false);
 });
 
 test("public and compatibility route contracts remain registered", () => {
