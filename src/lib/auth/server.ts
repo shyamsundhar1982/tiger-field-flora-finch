@@ -54,19 +54,10 @@ const LOCAL_DEV_ORIGINS: string[] = [
 const VERCEL_APP_ORIGINS: string[] = [
   "https://tiger-field-flora-finch-*.vercel.app",
 ];
-const VERCEL_APP_HOSTS: string[] = ["tiger-field-flora-finch-*.vercel.app"];
 
-const baseURL = explicitBaseURL ?? {
-  allowedHosts: [
-    ...previewAllowedHosts,
-    ...VERCEL_APP_HOSTS,
-    "localhost",
-    "127.0.0.1",
-    "[::1]",
-  ],
-  protocol: "auto" as const,
-  fallback: "http://localhost:8080",
-};
+// Better Auth's server API methods (including admin-created email accounts)
+// require a URL string here. Origin policy remains separately enforced below.
+const baseURL = explicitBaseURL ?? "http://localhost:8080";
 
 const trustedOrigins: string[] = [
   ...(explicitBaseURL ? [explicitBaseURL] : []),
