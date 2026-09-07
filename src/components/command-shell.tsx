@@ -294,7 +294,11 @@ function FlowGuide({ role }: { role: CommandRole | null }) {
 
 function workspaceForPath(pathname: string) {
   const route = LEGACY_ROUTE_REDIRECTS[pathname] ?? pathname;
-  return WORKSPACES.find((workspace) => [...workspace.context].some((candidate) => route === candidate || route.startsWith(`${candidate}/`)));
+  return WORKSPACES.find((workspace) =>
+    route === workspace.to ||
+    workspace.context.has(route) ||
+    [...workspace.context].some((candidate) => candidate !== "/command" && route.startsWith(`${candidate}/`)),
+  );
 }
 
 function ContextBack() {
