@@ -38,7 +38,7 @@ export const MASTER_INVENTORY_LEDGER_PAGES = [
   },
 ] as const;
 
-/** Existing persisted records may still use these IDs; keep them readable. */
+/** Existing persisted records may still use these IDs; keep them readable but out of ordinary navigation. */
 export const LEGACY_INVENTORY_LEDGER_PAGES = [
   {
     id: "stock",
@@ -68,42 +68,23 @@ export function isMasterInventoryLedger(value: string): value is MasterInventory
   return MASTER_INVENTORY_LEDGER_PAGES.some((page) => page.id === value);
 }
 
+/**
+ * Only provenance/audit controls remain in ordinary navigation. Previous SKU,
+ * opening-balance, truth and component-control pages remain addressable for
+ * legacy records but do not compete with Master Inventory.
+ */
 export const INVENTORY_CONTROL_PAGES: InventoryNavPage[] = [
   {
-    id: "master",
-    label: "Controlled SKU master",
-    route: "/command/inventory-master",
-    detail: "Previous controlled SKU approval workflow",
-  },
-  {
     id: "mapping",
-    label: "BOM → Inventory mapping",
+    label: "BOM mapping audit",
     route: "/command/bom-inventory-mapping",
-    detail: "Previous component-to-SKU mapping workflow",
-  },
-  {
-    id: "openings",
-    label: "Opening balances",
-    route: "/command/inventory-openings",
-    detail: "Previous opening stock workflow",
-  },
-  {
-    id: "truth",
-    label: "Posted inventory truth",
-    route: "/command/inventory-truth",
-    detail: "Previous server-backed balance and valuation read model",
+    detail: "Trace configured BOM requirements to controlled Master Inventory SKUs",
   },
   {
     id: "audit",
     label: "MSL & FIFO audit",
     route: "/command/inventory-control-audit",
-    detail: "Previous reconciliation and replenishment control view",
-  },
-  {
-    id: "component",
-    label: "Component control",
-    route: "/command/component-control",
-    detail: "Previous component compatibility screen",
+    detail: "Reconciliation and replenishment control evidence",
   },
 ];
 
