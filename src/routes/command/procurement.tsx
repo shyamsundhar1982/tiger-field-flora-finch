@@ -18,12 +18,13 @@ function Procurement() {
       <div>
         <p className="text-[10px] uppercase tracking-[0.22em] text-green">Operate · procurement control</p>
         <h1 className="mt-2 text-4xl font-bold text-accent">Procurement</h1>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">MSL warnings from authoritative inventory become the replenishment queue. This page does not create a purchase order automatically; it gives Operations the controlled signal to act.</p>
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">MSL warnings from authoritative inventory become the replenishment queue. This page consumes posted ERP balances; it does not own stock or create a purchase order automatically.</p>
       </div>
       <Link to="/command/inventory-truth" className="text-sm font-semibold text-accent">Inventory truth →</Link>
     </div>
 
-    <div className="mt-8 grid gap-3 sm:grid-cols-3">
+    <div className="mt-8 flex flex-wrap gap-2 text-xs"><Link to="/command/inventory-truth" className="rounded-lg border border-border px-3 py-2 font-semibold text-muted hover:border-accent hover:text-accent">Verify posted balance →</Link><Link to="/command/procurement-planning" className="rounded-lg border border-border px-3 py-2 font-semibold text-muted hover:border-accent hover:text-accent">Open planning assumptions →</Link></div>
+    <div className="mt-4 grid gap-3 sm:grid-cols-3">
       <Kpi label="Critical" value={String(critical)} hint="At zero stock" />
       <Kpi label="Below MSL" value={String(low)} hint="Replenishment required" />
       <Kpi label="Total shortfall" value={String(shortage)} hint="Units to reach MSL" />
