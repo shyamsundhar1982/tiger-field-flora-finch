@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { Kpi } from "@/components/kpi";
 
 export const Route = createFileRoute("/command/governance")({ component: Governance });
 
@@ -36,22 +37,22 @@ function Governance() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <p className="text-[11px] uppercase tracking-[0.2em] text-green">Governance · Controlled decisions</p>
+      <header className="border-b border-border pb-6">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">Governance · controlled decisions</p>
         <h1 className="mt-1 font-display text-4xl text-accent">Governance</h1>
         <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">One control plane for approval gates, accountable owners, required evidence and audit visibility. Risk, Legal, QA and the Action Log remain specialist evidence owners behind this workspace.</p>
       </header>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="Governance gates" value={String(gates.length)} note="Controlled decision points" />
-        <Metric label="Approved" value={String(approved)} note="Evidence accepted" tone="ok" />
-        <Metric label="Pending approval" value={String(pending)} note="Authorised decision required" tone={pending ? "warn" : "ok"} />
-        <Metric label="Evidence gaps" value={String(evidenceGaps)} note="Cannot advance yet" tone={evidenceGaps ? "danger" : "ok"} />
+        <Kpi label="Governance gates" value={String(gates.length)} hint="Controlled decision points" />
+        <Kpi label="Approved" value={String(approved)} hint="Evidence accepted" tone="ok" />
+        <Kpi label="Pending approval" value={String(pending)} hint="Authorised decision required" tone={pending ? "warn" : "ok"} />
+        <Kpi label="Evidence gaps" value={String(evidenceGaps)} hint="Cannot advance yet" tone={evidenceGaps ? "danger" : "ok"} />
       </div>
 
-      <section className="rounded-xl border border-border bg-surface p-5">
+      <section className="rounded-xl border border-border bg-surface/35 p-5 sm:p-6">
         <div className="flex items-end justify-between gap-4">
-          <div><p className="text-[11px] uppercase tracking-[0.18em] text-green">Needs attention</p><h2 className="mt-1 font-display text-2xl text-accent">Decisions that cannot be treated as complete</h2></div>
+          <div><p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-green">Needs attention</p><h2 className="mt-1 font-display text-2xl text-accent">Decisions that cannot be treated as complete</h2></div>
           <span className="text-xs text-muted">{needsAttention.length} open controls</span>
         </div>
         <div className="mt-4 divide-y divide-border rounded-lg border border-border">
@@ -59,8 +60,8 @@ function Governance() {
         </div>
       </section>
 
-      <section className="rounded-xl border border-border bg-surface p-5">
-        <div className="mb-4"><p className="text-[11px] uppercase tracking-[0.18em] text-green">Approval register</p><h2 className="mt-1 font-display text-2xl text-accent">Owner → evidence → approver → decision</h2></div>
+      <section className="rounded-xl border border-border bg-surface/35 p-5 sm:p-6">
+        <div className="mb-4"><p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-green">Approval register</p><h2 className="mt-1 font-display text-2xl text-accent">Owner → evidence → approver → decision</h2></div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[980px] text-sm">
             <thead className="border-b border-border text-[10px] uppercase tracking-[0.14em] text-subtle"><tr><th className="px-3 py-3 text-left">Gate</th><th className="px-3 py-3 text-left">Decision</th><th className="px-3 py-3 text-left">Owner</th><th className="px-3 py-3 text-left">Approver</th><th className="px-3 py-3 text-left">Required evidence</th><th className="px-3 py-3 text-left">Status</th></tr></thead>
@@ -69,22 +70,17 @@ function Governance() {
         </div>
       </section>
 
-      <details className="rounded-xl border border-border bg-surface p-5">
-        <summary className="cursor-pointer list-none text-sm font-semibold text-fg">Recent governance events <span className="ml-2 text-xs font-normal text-muted">Audit visibility</span></summary>
+      <details className="rounded-xl border border-border bg-surface/25 p-5">
+        <summary className="cursor-pointer list-none text-sm font-semibold text-accent">Recent governance events <span className="ml-2 text-xs font-normal text-muted">Audit visibility</span></summary>
         <div className="mt-4 divide-y divide-border rounded-lg border border-border">{auditEvents.map(([area, event, actor]) => <div key={`${area}-${event}`} className="grid gap-2 p-4 md:grid-cols-[120px_1fr_180px]"><span className="text-xs font-semibold text-accent">{area}</span><span className="text-sm text-fg">{event}</span><span className="text-xs text-muted">Actor: {actor}</span></div>)}</div>
         <Link to="/command/actions" className="mt-4 inline-block text-sm font-semibold text-accent">Open Action & Audit Log →</Link>
       </details>
 
-      <section className="rounded-xl border border-border bg-bg p-5">
-        <p className="text-[11px] uppercase tracking-[0.18em] text-green">Evidence owners</p>
+      <section className="rounded-xl border border-border bg-surface/25 p-5">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-green">Evidence owners</p>
         <div className="mt-3 flex flex-wrap gap-2"><Link to="/command/risk" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">Risk register</Link><Link to="/command/legal" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">Legal & IP</Link><Link to="/command/qa-verification" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">QA verification</Link><Link to="/command/actions" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">Action & audit log</Link><Link to="/command/ca-audit" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">CA evidence</Link><Link to="/command/epr-live" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">EPR evidence</Link></div>
         <p className="mt-4 text-xs leading-5 text-muted">This is the application governance/read model. It should not be represented as an immutable security-grade audit ledger until authenticated actor identity, server-side approval enforcement, durable event IDs and retention controls are in place.</p>
       </section>
     </div>
   );
-}
-
-function Metric({ label, value, note, tone = "neutral" }: { label: string; value: string; note: string; tone?: "neutral" | "ok" | "warn" | "danger" }) {
-  const valueClass = tone === "ok" ? "text-green" : tone === "warn" ? "text-warn" : tone === "danger" ? "text-danger" : "text-fg";
-  return <div className="rounded-xl border border-border bg-surface p-5"><p className="text-xs text-subtle">{label}</p><p className={`mt-1 text-2xl font-semibold ${valueClass}`}>{value}</p><p className="mt-1 text-xs text-muted">{note}</p></div>;
 }
