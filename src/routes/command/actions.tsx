@@ -1,73 +1,34 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
 import { ACTIONS, type Action } from "@/lib/data/actions";
-import { useVeloxis } from "@/lib/store";
+import { listOperatingActionStatus, saveOperatingActionStatus, type OperatingActionStatus } from "@/lib/operating-action-authority";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/command/actions")({ component: ActionsPage });
-
+export const Route = createFileRoute("/command/actions")({
+  loader: () => listOperatingActionStatus(),
+  component: ActionsPage,
+});
 const WINDOWS: Array<Action["window"]> = ["2w", "M1-M3", "M4-M8", "M9-M24"];
-const LABELS: Record<Action["window"], string> = {
-  "2w": "First two weeks",
-  "M1-M3": "Foundation",
-  "M4-M8": "Engineering",
-  "M9-M24": "Launch",
-};
+const LABELS: Record<Action["window"], string> = { "2w":"First two weeks", "M1-M3":"Foundation", "M4-M8":"Engineering", "M9-M24":"Launch" };
 
 function ActionsPage() {
-  const state = useVeloxis((s) => s.actions);
-  const setAction = useVeloxis((s) => s.setAction);
-  const done = ACTIONS.filter((a) => state[a.id] === "done").length;
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Execution log</p>
-        <h1 className="font-display text-4xl">Actions</h1>
-        <p className="mt-2 text-sm text-muted">
-          {done} / {ACTIONS.length} complete. Status is saved on this device. Verification column stops a
-          planning assumption becoming a CA instruction.
-        </p>
-      </div>
-
-      {WINDOWS.map((w) => (
-        <section key={w}>
-          <h2 className="font-display text-2xl">{LABELS[w]}</h2>
-          <ul className="mt-3 space-y-2">
-            {ACTIONS.filter((a) => a.window === w).map((a) => {
-              const st = state[a.id] ?? "open";
-              return (
-                <li
-                  key={a.id}
-                  className="flex flex-col gap-3 rounded-lg border border-border bg-bg-elevated p-4 sm:flex-row sm:items-start"
-                >
-                  <div className="flex-1">
-                    <p className={cn("text-sm", st === "done" && "text-muted line-through")}>{a.title}</p>
-                    <p className="mt-1 text-xs text-muted">{a.why}</p>
-                    <p className="mt-2 text-[11px] uppercase tracking-[0.14em] text-subtle">
-                      {a.owner} · {a.verify}
-                    </p>
-                  </div>
-                  <div className="flex gap-1">
-                    {(["open", "doing", "done"] as const).map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => setAction(a.id, s)}
-                        className={cn(
-                          "h-9 rounded-md px-3 text-xs capitalize",
-                          st === s ? "bg-accent text-accent-fg" : "bg-surface text-muted",
-                        )}
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ))}
-    </div>
-  );
+  const loaded = Route.useLoaderData();
+  const [state, setState] = useState<Record<string, OperatingActionStatus>>(loaded);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
+  const done = ACTIONS.filter((a) => (state[a.id] ?? "open") === "done").length;
+  async function setAction(action: Action, status: OperatingActionStatus) {
+    setBusy(action.id); setMessage("");
+    try {
+      await saveOperatingActionStatus({ data: { actionId: action.id, status, owner: action.owner, note: action.verify } });
+      setState((current) => ({ ...current, [action.id]: status }));
+      setMessage(`${action.id} saved centrally as ${status}.`);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to update action."); }
+    finally { setBusy(null); }
+  }
+  return <div className="space-y-6">
+    <div><p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Governance · execution log</p><h1 className="font-display text-4xl">Actions</h1><p className="mt-2 text-sm text-muted">{done} / {ACTIONS.length} complete. Status is centrally persisted with actor and audit provenance; it is no longer device-local planning state.</p></div>
+    {message ? <div className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-muted">{message}</div> : null}
+    {WINDOWS.map((w)=><section key={w}><h2 className="font-display text-2xl">{LABELS[w]}</h2><ul className="mt-3 space-y-2">{ACTIONS.filter((a)=>a.window===w).map((a)=>{ const st=state[a.id]??"open"; return <li key={a.id} className="flex flex-col gap-3 rounded-lg border border-border bg-bg-elevated p-4 sm:flex-row sm:items-start"><div className="flex-1"><p className={cn("text-sm",st==="done"&&"text-muted line-through")}>{a.title}</p><p className="mt-1 text-xs text-muted">{a.why}</p><p className="mt-2 text-[11px] uppercase tracking-[0.14em] text-subtle">{a.owner} · {a.verify}</p></div><div className="flex gap-1">{(["open","doing","done"] as const).map((s)=><button key={s} type="button" disabled={busy===a.id} onClick={()=>void setAction(a,s)} className={cn("h-9 rounded-md px-3 text-xs capitalize disabled:opacity-50",st===s?"bg-accent text-accent-fg":"bg-surface text-muted")}>{s}</button>)}</div></li>;})}</ul></section>)}
+  </div>;
 }
