@@ -1,6 +1,14 @@
-import { buildModel, type ScenarioId } from "@/lib/finance/model";
-import { MIX } from "@/lib/data/bom";
+import {
+  buildModelWithInputs,
+  DEFAULT_FINANCE_ASSUMPTIONS,
+  type ScenarioId,
+} from "@/lib/finance/model";
 import { TRANCHES } from "@/lib/data/company";
+import {
+  DEFAULT_APPROVED_OPERATING_PLAN,
+  fundingGateMonth,
+  type OperatingPlan,
+} from "@/lib/planning/operating-plan";
 
 export const PROCUREMENT_PLANNING_HORIZON = 36;
 export const MSL_PLANNING_LEAD_MONTHS = 2;
@@ -21,20 +29,53 @@ export type ProcurementForecastRow = {
   status: "planned" | "watch" | "no-buy";
 };
 
-export function trancheForMonth(month: number) {
-  const direct = TRANCHES.find((x) => x.month === month);
+export function trancheForMonth(
+  month: number,
+  plan: OperatingPlan = DEFAULT_APPROVED_OPERATING_PLAN,
+  scenario: ScenarioId = "base",
+) {
+  const scheduled = TRANCHES.map((tranche) => ({
+    ...tranche,
+    effectiveMonth: fundingGateMonth(plan, tranche.id, scenario),
+  })).filter((tranche) => tranche.effectiveMonth > 0);
+
+  const direct = scheduled.find((tranche) => tranche.effectiveMonth === month);
   if (direct) return direct;
-  const previous = [...TRANCHES].filter((x) => x.month <= month).sort((a, b) => b.month - a.month)[0];
-  return previous ?? TRANCHES[0];
+
+  const previous = scheduled
+    .filter((tranche) => tranche.effectiveMonth <= month)
+    .sort((left, right) => right.effectiveMonth - left.effectiveMonth)[0];
+  if (previous) return previous;
+
+  const upcoming = scheduled
+    .filter((tranche) => tranche.effectiveMonth > month)
+    .sort((left, right) => left.effectiveMonth - right.effectiveMonth)[0];
+  if (upcoming) return upcoming;
+
+  return {
+    id: "OPER",
+    name: "Operating cash",
+    amount: 0,
+    month,
+    deliverable: "Post-funding-ladder operating procurement",
+    effectiveMonth: month,
+  };
 }
 
-export function buildProcurementForecast(scenario: ScenarioId = "base"): ProcurementForecastRow[] {
-  const rows = buildModel(scenario, false);
+export function buildProcurementForecast(
+  scenario: ScenarioId = "base",
+  plan: OperatingPlan = DEFAULT_APPROVED_OPERATING_PLAN,
+): ProcurementForecastRow[] {
+  const rows = buildModelWithInputs(scenario, false, {
+    ...DEFAULT_FINANCE_ASSUMPTIONS,
+    operatingPlan: plan,
+  });
+
   return rows.map((row) => {
     const procurement = Number(row.inventoryBuy.toFixed(2));
     const active = row.units > 0 || procurement > 0;
     const planningMonth = Math.max(1, row.m - MSL_PLANNING_LEAD_MONTHS);
-    const tranche = trancheForMonth(row.m);
+    const tranche = trancheForMonth(row.m, plan, scenario);
     const trigger = procurement > 0 ? "MSL-2M" : active ? "scheduled" : "none";
     return {
       month: row.m,
@@ -43,9 +84,10 @@ export function buildProcurementForecast(scenario: ScenarioId = "base"): Procure
       tranche: tranche.id,
       trancheName: tranche.name,
       units: row.units,
-      coreUnits: Math.round(row.units * MIX.core),
-      proUnits: Math.round(row.units * MIX.pro),
-      apexUnits: Math.max(0, row.units - Math.round(row.units * MIX.core) - Math.round(row.units * MIX.pro)),
+      // Keep field names for route compatibility; values are canonical VINDY model allocations.
+      coreUnits: row.aluminiumUnits,
+      proUnits: row.carbonUnits,
+      apexUnits: row.premiumCarbonUnits,
       procurementLakh: procurement,
       financialImpactMonth: row.m,
       trigger,
@@ -54,8 +96,11 @@ export function buildProcurementForecast(scenario: ScenarioId = "base"): Procure
   });
 }
 
-export function procurementSummary(scenario: ScenarioId = "base") {
-  const rows = buildProcurementForecast(scenario);
+export function procurementSummary(
+  scenario: ScenarioId = "base",
+  plan: OperatingPlan = DEFAULT_APPROVED_OPERATING_PLAN,
+) {
+  const rows = buildProcurementForecast(scenario, plan);
   return {
     scenario,
     horizonMonths: PROCUREMENT_PLANNING_HORIZON,
