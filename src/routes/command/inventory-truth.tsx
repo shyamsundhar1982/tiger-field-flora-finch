@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Panel, Kpi } from "@/components/kpi";
+import { InventoryWorkspaceNav } from "@/components/inventory-workspace-nav";
 import { inr } from "@/lib/format";
 import { getAuthoritativeInventory, getAuthoritativeInventoryMovements, getInventoryControlSummary, getInventoryFifoTrace, getInventoryMslWarnings } from "@/lib/inventory-authority";
 
@@ -19,12 +20,13 @@ export const Route = createFileRoute("/command/inventory-truth")({
 
 function InventoryTruth() {
   const { summary, balances, movements, mslWarnings, fifoTrace } = Route.useLoaderData();
-  return <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+  return <main className="mx-auto max-w-7xl space-y-6 px-4 py-10 sm:px-6">
     <div>
       <p className="text-[10px] uppercase tracking-[0.22em] text-green">Operate · authoritative data</p>
       <h1 className="mt-2 text-4xl font-bold text-accent">Inventory truth</h1>
       <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">This control view reads only the server-side EPR inventory ledger. Browser seed inventory and localStorage are deliberately excluded from these balances.</p>
     </div>
+    <InventoryWorkspaceNav active="truth" />
     <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
       <Kpi label="Authoritative SKUs" value={String(summary.skuCount)} />
       <Kpi label="Units on ledger" value={String(summary.totalUnits)} />
