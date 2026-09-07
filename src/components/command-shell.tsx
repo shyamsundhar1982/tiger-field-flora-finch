@@ -11,7 +11,7 @@ import { ERP_FLOW, getErpFlowStep } from "@/lib/erp-flow";
 type NavigationView = "classified" | "all";
 const ICONS: Record<string, typeof Activity> = { command: Activity, finance: Wallet, manufacturing: Factory, inventory: Boxes, procurement: Boxes, engineering: DraftingCompass, epr: ClipboardCheck, knowledge: BookOpen, sales: LineChart, market: LineChart, legal: Scale, risk: AlertTriangle, leadership: Presentation };
 const DOMAIN_LABELS: Record<PageDomain, string> = { command: "Command", finance: "Finance", manufacturing: "Manufacturing", inventory: "Inventory", procurement: "Procurement", engineering: "Engineering", epr: "EPR", knowledge: "Knowledge", sales: "Sales", market: "Market", legal: "Legal", risk: "Risk", leadership: "Executive", admin: "Admin" };
-const DOMAIN_ORDER: PageDomain[] = ["finance", "procurement", "inventory", "manufacturing", "engineering", "epr", "knowledge", "sales", "market", "legal", "risk", "leadership"];
+const DOMAIN_ORDER: PageDomain[] = ["command", "finance", "procurement", "inventory", "manufacturing", "engineering", "epr", "knowledge", "sales", "market", "legal", "risk", "leadership", "admin"];
 const MODE_LABELS: Record<PageMode, string> = { understand: "UNDERSTAND", observe: "OBSERVE", operate: "OPERATE", showcase: "SHOWCASE" };
 const MODE_DESCRIPTIONS: Record<PageMode, string> = { understand: "Knowledge and context", observe: "Truth and status", operate: "Execution and control", showcase: "External presentation" };
 
