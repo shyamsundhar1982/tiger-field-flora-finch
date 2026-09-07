@@ -21,7 +21,7 @@ export type ActualMonth = Partial<Record<ActualField, number | null>> & {
 export type ActualsMap = Record<number, ActualMonth>;
 
 const actualSchema = z.object({
-  month: z.number().int().min(1).max(120),
+  month: z.number().int().min(1).max(36),
   actual: z.object({
     revenue: z.number().min(0).nullable().optional(),
     units: z.number().min(0).nullable().optional(),
@@ -33,6 +33,12 @@ const actualSchema = z.object({
     payables: z.number().min(0).nullable().optional(),
     sourceReference: z.string().trim().max(500).default(""),
     verified: z.boolean().default(false),
+  }).superRefine((actual, context) => {
+    const hasValue = [actual.revenue, actual.units, actual.cogs, actual.opex, actual.closingCash, actual.inventory, actual.receivables, actual.payables]
+      .some((value) => value !== null && value !== undefined);
+    if (hasValue && !actual.sourceReference.trim()) {
+      context.addIssue({ code: "custom", path: ["sourceReference"], message: "Actuals require a source reference (bank/invoice/ledger/evidence)." });
+    }
   }),
 });
 
@@ -81,27 +87,15 @@ export const saveMonthlyActual = createServerFn({ method: "POST" })
     const a = data.actual;
     await sql.query(
       `select save_vyndi_monthly_actual($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-      [
-        data.month,
-        a.revenue ?? null,
-        a.units ?? null,
-        a.cogs ?? null,
-        a.opex ?? null,
-        a.closingCash ?? null,
-        a.inventory ?? null,
-        a.receivables ?? null,
-        a.payables ?? null,
-        a.sourceReference ?? "",
-        a.verified ?? false,
-        actor.userId,
-        actor.role,
-      ],
+      [data.month,a.revenue ?? null,a.units ?? null,a.cogs ?? null,a.opex ?? null,a.closingCash ?? null,
+       a.inventory ?? null,a.receivables ?? null,a.payables ?? null,a.sourceReference ?? "",a.verified ?? false,
+       actor.userId,actor.role],
     );
     return { ok: true, month: data.month };
   });
 
 export const clearMonthlyActual = createServerFn({ method: "POST" })
-  .validator(z.object({ month: z.number().int().min(1).max(120) }))
+  .validator(z.object({ month: z.number().int().min(1).max(36) }))
   .handler(async ({ data }) => {
     const actor = await requireBusinessActor("edit");
     const sql = await getSql();
