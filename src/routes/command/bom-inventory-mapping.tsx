@@ -1,241 +1,38 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Panel } from "@/components/kpi";
 import { InventoryWorkspaceNav } from "@/components/inventory-workspace-nav";
+import { approveControlledBomMapping, createControlledBomMapping, listControlledBomMappings, retireControlledBomMapping } from "@/lib/bom-mapping-authority";
 import { getCommandAccess, getCommandRole } from "@/lib/command-access";
+import { SEED_INVENTORY, type InventoryCategory } from "@/lib/data/inventory";
+import { MODELS } from "@/lib/data/models";
 import { canAccessRoute } from "@/lib/page-access";
-import { createEprMapping, listEprMappings, approveEprMapping, retireEprMapping } from "@/lib/epr/final-control";
+import { isEligible } from "@/lib/product-configuration";
 
-export const Route = createFileRoute("/command/bom-inventory-mapping")({
-  beforeLoad: async () => {
-    const access = await getCommandAccess();
-    if (!access) throw redirect({ to: "/command-login" });
-    const role = await getCommandRole();
-    if (!canAccessRoute(role, "/command/bom-inventory-mapping")) throw redirect({ to: "/command" });
-  },
-  component: BomInventoryMappingPage,
-});
+export const Route=createFileRoute("/command/bom-inventory-mapping")({beforeLoad:async()=>{if(!await getCommandAccess())throw redirect({to:"/command-login"});const role=await getCommandRole();if(!canAccessRoute(role,"/command/bom-inventory-mapping"))throw redirect({to:"/command"});},component:BomInventoryMappingPage});
+type Mapping={id:string;venture:"carbon"|"aluminium";model_id:string;bom_revision:string;bom_line_key:string;sku:string;quantity:number|string;unit:string;status:string;configuration_category:InventoryCategory|null;configuration_option_id:string|null;approved_by?:string|null;approved_at?:string|null;notes?:string};
+const planningScopes=[{id:"core",label:"Planning standard · Longitude",venture:"aluminium" as const},{id:"pro",label:"Planning standard · Latitude",venture:"carbon" as const},{id:"apex",label:"Planning standard · Altitude",venture:"carbon" as const}];
+const configurableCategories=["groupset","wheelset","tyre","handlebar","stem","saddle","thruaxle","bottom-bracket","bottle-cage","tool-pouch","bracket","colour"] as const;
+type ConfigurableCategory=(typeof configurableCategories)[number];
 
-type Mapping = {
-  id: string;
-  venture: string;
-  model_id: string;
-  bom_revision: string;
-  bom_line_key: string;
-  sku: string;
-  quantity: number | string;
-  unit: string;
-  status: string;
-  approved_by?: string | null;
-  approved_at?: string | null;
-  notes?: string;
-};
-
-function BomInventoryMappingPage() {
-  const [rows, setRows] = useState<Mapping[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [form, setForm] = useState<{
-    venture: "carbon" | "aluminium";
-    modelId: "core" | "pro" | "apex";
-    bomRevision: string;
-    bomLineKey: string;
-    sku: string;
-    quantity: string;
-    unit: string;
-    notes: string;
-  }>({
-    venture: "carbon",
-    modelId: "core",
-    bomRevision: "VEDM-301",
-    bomLineKey: "",
-    sku: "",
-    quantity: "1",
-    unit: "ea",
-    notes: "",
-  });
-  async function refresh() {
-    try {
-      setRows((await listEprMappings()) as Mapping[]);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Unable to load mappings.");
-    }
-  }
-  useEffect(() => {
-    void refresh();
-  }, []);
-  async function create() {
-    setBusy(true);
-    setError("");
-    try {
-      await createEprMapping({ data: { ...form, quantity: Number(form.quantity) } });
-      setForm({ ...form, bomLineKey: "", sku: "", quantity: "1", notes: "" });
-      await refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Mapping creation failed.");
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function approve(id: string) {
-    setBusy(true);
-    setError("");
-    try {
-      await approveEprMapping({ data: { mappingId: id } });
-      await refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Approval failed.");
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function retire(id: string) {
-    const reason = window.prompt("Retirement reason");
-    if (!reason) return;
-    setBusy(true);
-    setError("");
-    try {
-      await retireEprMapping({ data: { mappingId: id, reason } });
-      await refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Retirement failed.");
-    } finally {
-      setBusy(false);
-    }
-  }
-  const draft = rows.filter((x) => x.status === "draft").length,
-    active = rows.filter((x) => x.status === "active").length;
-  return (
-    <div className="space-y-6">
-      <header>
-        <p className="text-[11px] uppercase tracking-[0.2em] text-green">Controlled master data · EPR</p>
-        <h1 className="mt-2 font-display text-4xl">BOM → Inventory SKU Mapping</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">Map a stable BOM component key to an approved Inventory Master SKU. Mapping starts as Draft and becomes authoritative only after approval.</p>
-      </header>
-      <InventoryWorkspaceNav active="mapping" />
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Stat label="Mappings" value={String(rows.length)} />
-        <Stat label="Draft" value={String(draft)} />
-        <Stat label="Active" value={String(active)} />
-      </div>
-      <Panel title="Create mapping draft" kicker="Inventory Master gate">
-        <div className="grid gap-4 md:grid-cols-4">
-          <Field label="Venture">
-            <select className="control" value={form.venture} onChange={(e) => setForm({ ...form, venture: e.target.value as typeof form.venture })}>
-              <option value="carbon">Carbon</option>
-              <option value="aluminium">Aluminium</option>
-            </select>
-          </Field>
-          <Field label="Model">
-            <select className="control" value={form.modelId} onChange={(e) => setForm({ ...form, modelId: e.target.value as typeof form.modelId })}>
-              <option value="core">Core</option>
-              <option value="pro">Pro</option>
-              <option value="apex">Apex</option>
-            </select>
-          </Field>
-          <Field label="BOM revision">
-            <input className="control" value={form.bomRevision} onChange={(e) => setForm({ ...form, bomRevision: e.target.value })} />
-          </Field>
-          <Field label="BOM line key">
-            <input className="control" placeholder="stable component key" value={form.bomLineKey} onChange={(e) => setForm({ ...form, bomLineKey: e.target.value })} />
-          </Field>
-          <Field label="Inventory SKU">
-            <input className="control" placeholder="approved SKU only" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
-          </Field>
-          <Field label="Quantity">
-            <input className="control" type="number" min="0.0001" step="0.01" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
-          </Field>
-          <Field label="Unit">
-            <select className="control" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>
-              <option>ea</option>
-              <option>pair</option>
-              <option>set</option>
-              <option>m</option>
-              <option>kg</option>
-            </select>
-          </Field>
-          <Field label="Notes">
-            <input className="control" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-          </Field>
-        </div>
-        <div className="mt-4 flex items-center justify-between gap-4">
-          <p className="text-xs text-muted">
-            The server rejects SKUs that are not <strong className="text-fg">approved Inventory Master</strong> records. No fuzzy name matching.
-          </p>
-          <button disabled={busy || !form.bomLineKey || !form.sku} onClick={() => void create()} className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-bg disabled:opacity-40">
-            Create draft
-          </button>
-        </div>
-      </Panel>
-      {error && <div className="rounded-lg border border-warn/40 bg-warn/5 p-3 text-sm text-warn">{error}</div>}
-      <Panel title="Mapping register" kicker="Draft → Active → Superseded">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1000px] text-left text-sm">
-            <thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle">
-              <tr>
-                <th className="px-2 py-3">Venture</th>
-                <th className="px-2 py-3">Model</th>
-                <th className="px-2 py-3">BOM</th>
-                <th className="px-2 py-3">Component key</th>
-                <th className="px-2 py-3">SKU</th>
-                <th className="px-2 py-3 text-right">Qty</th>
-                <th className="px-2 py-3">Unit</th>
-                <th className="px-2 py-3">Status</th>
-                <th className="px-2 py-3">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((x) => (
-                <tr key={x.id} className="border-t border-border/70">
-                  <td className="px-2 py-3 capitalize">{x.venture}</td>
-                  <td className="px-2 py-3 uppercase">{x.model_id}</td>
-                  <td className="px-2 py-3 font-mono text-xs">{x.bom_revision}</td>
-                  <td className="px-2 py-3 font-mono text-xs">{x.bom_line_key}</td>
-                  <td className="px-2 py-3 font-mono text-xs font-semibold text-fg">{x.sku}</td>
-                  <td className="px-2 py-3 text-right tabular-nums">{Number(x.quantity)}</td>
-                  <td className="px-2 py-3">{x.unit}</td>
-                  <td className="px-2 py-3">
-                    <span className={`rounded-full border px-2 py-1 text-[10px] uppercase tracking-wider ${x.status === "active" ? "border-green/40 text-green" : "border-border text-muted"}`}>{x.status}</span>
-                  </td>
-                  <td className="px-2 py-3">
-                    {x.status === "draft" ? (
-                      <button disabled={busy} onClick={() => void approve(x.id)} className="text-xs font-semibold text-accent">
-                        Approve
-                      </button>
-                    ) : x.status === "active" ? (
-                      <button disabled={busy} onClick={() => void retire(x.id)} className="text-xs font-semibold text-muted hover:text-warn">
-                        Retire
-                      </button>
-                    ) : (
-                      <span className="text-xs text-subtle">—</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {rows.length === 0 && <p className="py-10 text-center text-sm text-muted">No BOM → inventory mappings yet. Create the first draft after the corresponding Inventory Master SKU is approved.</p>}
-        </div>
-      </Panel>
-      <div className="rounded-xl border border-border bg-bg-elevated/30 p-4 text-xs leading-5 text-muted">
-        <strong className="text-fg">Control boundary:</strong> an approved mapping is the only relationship EPR inventory execution may use. This page does not import seed data, change inventory quantities, or post ledger movements.
-      </div>
-    </div>
-  );
+function BomInventoryMappingPage(){
+  const [rows,setRows]=useState<Mapping[]>([]);const [busy,setBusy]=useState(false);const [error,setError]=useState("");
+  const [form,setForm]=useState({modelId:MODELS[0].id,bomRevision:"BOM-001",bomLineKey:"",sku:"",quantity:"1",unit:"ea",configurationCategory:"" as ""|ConfigurableCategory,configurationOptionId:"",notes:""});
+  const variant=MODELS.find((m)=>m.id===form.modelId);const planning=planningScopes.find((s)=>s.id===form.modelId);const venture=variant?(variant.tier==="core"?"aluminium":"carbon"):planning?.venture??"carbon";
+  const eligible=useMemo(()=>!variant||!form.configurationCategory?[]:SEED_INVENTORY.filter((i)=>i.category===form.configurationCategory&&isEligible(i,variant.tier)),[form.configurationCategory,variant]);
+  async function refresh(){setRows(await listControlledBomMappings() as Mapping[]);} useEffect(()=>{void refresh().catch((e)=>setError(e instanceof Error?e.message:"Unable to load mappings."));},[]);
+  function chooseOption(id:string){const option=SEED_INVENTORY.find((i)=>i.id===id);setForm({...form,configurationOptionId:id,sku:option?.sku??form.sku,bomLineKey:form.bomLineKey||(option?`option:${option.category}`:"")});}
+  async function create(){setBusy(true);setError("");try{await createControlledBomMapping({data:{venture,modelId:form.modelId,bomRevision:form.bomRevision,bomLineKey:form.bomLineKey,sku:form.sku,quantity:Number(form.quantity),unit:form.unit,configurationCategory:form.configurationCategory||null,configurationOptionId:form.configurationOptionId||null,notes:form.notes}});setForm({...form,bomLineKey:"",sku:"",quantity:"1",configurationCategory:"",configurationOptionId:"",notes:""});await refresh();}catch(e){setError(e instanceof Error?e.message:"Mapping creation failed.");}finally{setBusy(false);}}
+  async function approve(id:string){setBusy(true);setError("");try{await approveControlledBomMapping({data:{mappingId:id}});await refresh();}catch(e){setError(e instanceof Error?e.message:"Approval failed.");}finally{setBusy(false);}}
+  async function retire(id:string){const reason=window.prompt("Retirement reason");if(!reason)return;setBusy(true);setError("");try{await retireControlledBomMapping({data:{mappingId:id,reason}});await refresh();}catch(e){setError(e instanceof Error?e.message:"Retirement failed.");}finally{setBusy(false);}}
+  const active=rows.filter((x)=>x.status==="active").length;const scopes=[...new Set(rows.filter((x)=>x.status==="active").map((x)=>`${x.venture}|${x.model_id}`))];const ambiguous=scopes.filter((scope)=>new Set(rows.filter((x)=>x.status==="active"&&`${x.venture}|${x.model_id}`===scope).map((x)=>x.bom_revision)).size>1);
+  return <div className="space-y-6">
+    <header><p className="text-[11px] uppercase tracking-[0.2em] text-green">Controlled engineering → inventory authority</p><h1 className="mt-2 font-display text-4xl">BOM → Inventory SKU Mapping</h1><p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Release exact Longitude, Latitude and Altitude variants against approved Inventory Master SKUs. Catalogue eligibility is a design choice; an Active mapping is Production authority.</p></header><InventoryWorkspaceNav active="mapping"/>
+    <div className="grid gap-3 sm:grid-cols-4"><Stat label="Mappings" value={String(rows.length)}/><Stat label="Active" value={String(active)}/><Stat label="Draft" value={String(rows.filter((x)=>x.status==="draft").length)}/><Stat label="Ambiguous scopes" value={String(ambiguous.length)} tone={ambiguous.length?"warn":"ok"}/></div>
+    <Panel title="Create controlled mapping" kicker="Exact sellable variant or planning-standard family BOM"><div className="grid gap-4 md:grid-cols-4"><Field label="Mapping scope"><select className="control" value={form.modelId} onChange={(e)=>setForm({...form,modelId:e.target.value,configurationCategory:"",configurationOptionId:"",sku:""})}><optgroup label="Exact sellable variants">{MODELS.map((m)=><option key={m.id} value={m.id}>{m.name}</option>)}</optgroup><optgroup label="36-month planning standards">{planningScopes.map((s)=><option key={s.id} value={s.id}>{s.label}</option>)}</optgroup></select></Field><Field label="Venture"><input className="control uppercase" value={venture} disabled/></Field><Field label="BOM revision"><input className="control" value={form.bomRevision} onChange={(e)=>setForm({...form,bomRevision:e.target.value})}/></Field><Field label="BOM line key"><input className="control" value={form.bomLineKey} onChange={(e)=>setForm({...form,bomLineKey:e.target.value})} placeholder="stable controlled key"/></Field><Field label="Configuration category"><select className="control" value={form.configurationCategory} disabled={!variant} onChange={(e)=>setForm({...form,configurationCategory:e.target.value as ""|ConfigurableCategory,configurationOptionId:"",sku:""})}><option value="">Base BOM line</option>{configurableCategories.map((c)=><option key={c}>{c}</option>)}</select></Field><Field label="Controlled option"><select className="control" value={form.configurationOptionId} disabled={!form.configurationCategory} onChange={(e)=>chooseOption(e.target.value)}><option value="">Select option</option>{eligible.map((i)=><option key={i.id} value={i.id}>{i.brand} {i.model} · {i.sku}</option>)}</select></Field><Field label="Inventory SKU"><input className="control uppercase" value={form.sku} disabled={Boolean(form.configurationOptionId)} onChange={(e)=>setForm({...form,sku:e.target.value})} placeholder="approved SKU"/></Field><Field label="Qty / unit"><div className="grid grid-cols-2 gap-2"><input className="control" type="number" min="0.0001" step="0.01" value={form.quantity} onChange={(e)=>setForm({...form,quantity:e.target.value})}/><select className="control" value={form.unit} onChange={(e)=>setForm({...form,unit:e.target.value})}><option>ea</option><option>pair</option><option>set</option><option>m</option><option>kg</option><option>litre</option></select></div></Field></div><div className="mt-4 flex items-center justify-between gap-4"><p className="text-xs leading-5 text-muted">The server rejects unapproved SKUs, mismatched variants, ineligible options and option/SKU substitutions. Production also blocks a variant when more than one Active BOM revision exists.</p><button disabled={busy||!form.bomLineKey||!form.sku||(Boolean(form.configurationCategory)!==Boolean(form.configurationOptionId))} onClick={()=>void create()} className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-bg disabled:opacity-40">Create draft</button></div></Panel>
+    {error?<div className="rounded-lg border border-warn/40 bg-warn/5 p-3 text-sm text-warn">{error}</div>:null}
+    <Panel title="Mapping register" kicker="Draft → Active → Superseded"><div className="overflow-x-auto"><table className="w-full min-w-[1150px] text-left text-sm"><thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle"><tr><th className="px-2 py-3">Scope</th><th className="px-2 py-3">BOM</th><th className="px-2 py-3">Line</th><th className="px-2 py-3">Option</th><th className="px-2 py-3">SKU</th><th className="px-2 py-3 text-right">Qty</th><th className="px-2 py-3">Status</th><th className="px-2 py-3">Action</th></tr></thead><tbody>{rows.map((x)=><tr key={x.id} className="border-t border-border/70"><td className="px-2 py-3"><span className="font-mono text-xs">{x.model_id}</span><span className="block text-[10px] uppercase text-subtle">{x.venture}</span></td><td className="px-2 py-3 font-mono text-xs">{x.bom_revision}</td><td className="px-2 py-3 font-mono text-xs">{x.bom_line_key}</td><td className="px-2 py-3 text-xs">{x.configuration_option_id??"Base"}</td><td className="px-2 py-3 font-mono text-xs font-semibold">{x.sku}</td><td className="px-2 py-3 text-right">{Number(x.quantity)} {x.unit}</td><td className="px-2 py-3 uppercase text-xs">{x.status}</td><td className="px-2 py-3">{x.status==="draft"?<button disabled={busy} onClick={()=>void approve(x.id)} className="text-xs font-semibold text-accent">Approve</button>:x.status==="active"?<button disabled={busy} onClick={()=>void retire(x.id)} className="text-xs font-semibold text-muted hover:text-warn">Retire</button>:<span className="text-xs text-subtle">—</span>}</td></tr>)}</tbody></table></div></Panel>
+  </div>;
 }
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.14em] text-subtle">{label}</span>
-      {children}
-    </label>
-  );
-}
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-border bg-bg-elevated/40 p-4">
-      <p className="text-[10px] uppercase tracking-[0.14em] text-subtle">{label}</p>
-      <p className="mt-1 text-2xl font-bold tabular-nums text-accent">{value}</p>
-    </div>
-  );
-}
+function Field({label,children}:{label:string;children:React.ReactNode}){return <label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.14em] text-subtle">{label}</span>{children}</label>;}
+function Stat({label,value,tone="normal"}:{label:string;value:string;tone?:"normal"|"warn"|"ok"}){return <div className="rounded-xl border border-border bg-bg-elevated/40 p-4"><p className="text-[10px] uppercase tracking-[0.14em] text-subtle">{label}</p><p className={`mt-1 text-2xl font-bold ${tone==="warn"?"text-warn":tone==="ok"?"text-green":"text-accent"}`}>{value}</p></div>;}

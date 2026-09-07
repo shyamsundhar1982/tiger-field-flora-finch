@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Kpi, Panel } from "@/components/kpi";
+import { MODELS } from "@/lib/data/models";
+import { listMonthlyActuals } from "@/lib/actuals-authority";
 import { buildModelWithInputs, type ProductLineId, type ScenarioId } from "@/lib/finance/model";
 import {
   buildSalesMonths,
@@ -10,8 +12,7 @@ import {
   type SalesOrder,
   type SalesOrderStatus,
 } from "@/lib/finance/sales-engine";
-import { createProductionJobCard } from "@/lib/production-job-card";
-import { MODELS } from "@/lib/data/models";
+import { lakh } from "@/lib/format";
 import {
   CONFIGURATION_CATEGORIES,
   defaultConfiguration,
@@ -20,13 +21,12 @@ import {
   type ProductConfiguration,
   type ProductTier,
 } from "@/lib/product-configuration";
-import { lakh } from "@/lib/format";
+import { syncProductionJobCard } from "@/lib/production-job-card";
+import { listSalesOrders, saveSalesOrder } from "@/lib/sales-order-authority";
 import { useVeloxis } from "@/lib/store";
 
 export const Route = createFileRoute("/command/sales")({ component: Commercial });
 
-const ORDERS_KEY = "veloxis-sales-orders-v1";
-const ACTUALS_KEY = "veloxis-actuals-v1";
 const statusOptions: SalesOrderStatus[] = ["lead", "confirmed", "delivered", "cancelled"];
 const channelOptions: SalesChannel[] = ["direct", "dealer", "online"];
 const initialVariant = MODELS[0];
@@ -38,15 +38,11 @@ function Commercial() {
   const drawStandby = useVeloxis((s) => s.drawStandby);
   const finance = useVeloxis((s) => s.finance);
   const accounting = useVeloxis((s) => s.accounting);
-  const rows = useMemo(
-    () => buildModelWithInputs(scenario, drawStandby, finance),
-    [scenario, drawStandby, finance],
-  );
+  const rows = useMemo(() => buildModelWithInputs(scenario, drawStandby, finance), [scenario, drawStandby, finance]);
   const [orders, setOrders] = useState<SalesOrder[]>([]);
-  const [actuals, setActuals] = useState<
-    Record<number, { units?: number | null; revenue?: number | null }>
-  >({});
-  const [jobCardMessage, setJobCardMessage] = useState("");
+  const [actuals, setActuals] = useState<Record<number, { units?: number | null; revenue?: number | null }>>({});
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
   const [draft, setDraft] = useState({
     month: 1,
     variantId: initialVariant.id,
@@ -56,145 +52,59 @@ function Commercial() {
     configuration: defaultConfiguration(initialVariant.id),
   });
 
-  useEffect(() => {
-    try {
-      const savedOrders = localStorage.getItem(ORDERS_KEY);
-      if (savedOrders) setOrders(JSON.parse(savedOrders));
-      const savedActuals = localStorage.getItem(ACTUALS_KEY);
-      if (savedActuals) {
-        const parsed = JSON.parse(savedActuals);
-        const compact: Record<number, { units?: number | null; revenue?: number | null }> = {};
-        Object.entries(parsed).forEach(([month, value]: any) => {
-          compact[Number(month)] = { units: value?.units, revenue: value?.revenue };
-        });
-        setActuals(compact);
-      }
-    } catch {
-      // Missing or malformed local actuals leave the sales actuals map empty.
-    }
-  }, []);
-
-  const sales = useMemo(
-    () => buildSalesMonths(rows, finance, orders, actuals, accounting),
-    [rows, finance, orders, actuals, accounting],
-  );
-  const totals = salesTotals(sales);
-  const planned12 = sales.slice(0, 12).reduce((sum, month) => sum + month.plannedUnits, 0);
-  const confirmed12 = orders
-    .filter(
-      (order) =>
-        order.month <= 12 && (order.status === "confirmed" || order.status === "delivered"),
-    )
-    .reduce((sum, order) => sum + order.units, 0);
-  const coverage = planned12 > 0 ? (confirmed12 / planned12) * 100 : 0;
-  const confirmedUnits = orders
-    .filter((order) => order.status === "confirmed" || order.status === "delivered")
-    .reduce((sum, order) => sum + order.units, 0);
-  const leads = orders.filter((order) => order.status === "lead").length;
-  const latestActualMonth =
-    Object.entries(actuals)
-      .filter(([, value]) => value.revenue != null || value.units != null)
-      .map(([month]) => Number(month))
-      .sort((a, b) => b - a)[0] ?? null;
-  const latestVariance = latestActualMonth
-    ? (sales[latestActualMonth - 1]?.varianceRevenue ?? 0)
-    : null;
-  const openReceivables = sales.at(-1)?.openReceivables ?? 0;
-
-  const alerts = [
-    ...(planned12 > 0 && coverage < 50
-      ? [
-          {
-            tone: "warn",
-            title: "Demand coverage below 50%",
-            detail: `${confirmed12} confirmed/delivered units against ${planned12} planned units through M12.`,
-            to: "/command/sales",
-          },
-        ]
-      : []),
-    ...(confirmedUnits === 0
-      ? [
-          {
-            tone: "warn",
-            title: "No confirmed orders",
-            detail:
-              "The plan contains demand, but the order book has no confirmed or delivered units yet.",
-            to: "/command/sales",
-          },
-        ]
-      : []),
-    ...(leads > 0
-      ? [
-          {
-            tone: "ok",
-            title: `${leads} lead${leads === 1 ? "" : "s"} in pipeline`,
-            detail:
-              "Convert or close leads explicitly so pipeline does not masquerade as committed demand.",
-            to: "/command/sales",
-          },
-        ]
-      : []),
-    ...(latestVariance !== null && latestVariance < 0
-      ? [
-          {
-            tone: "danger",
-            title: "Actual revenue below plan",
-            detail: `Latest actual month M${latestActualMonth} is ${lakh(latestVariance)} versus plan.`,
-            to: "/command/actuals",
-          },
-        ]
-      : []),
-  ];
-
-  function saveOrders(next: SalesOrder[]) {
-    setOrders(next);
-    try {
-      localStorage.setItem(ORDERS_KEY, JSON.stringify(next));
-    } catch {
-      // Storage may be unavailable; the current order-book state remains in memory.
-    }
+  async function refresh() {
+    const [orderRows, actualRows] = await Promise.all([listSalesOrders(), listMonthlyActuals()]);
+    setOrders(orderRows);
+    const compact: Record<number, { units?: number | null; revenue?: number | null }> = {};
+    Object.entries(actualRows).forEach(([month, value]) => {
+      compact[Number(month)] = { units: value.units, revenue: value.revenue };
+    });
+    setActuals(compact);
   }
 
-  async function ensureJobCard(order: SalesOrder) {
-    if (order.status === "cancelled") return;
-    const productLabel =
-      finance.productLines.find((product) => product.id === order.product)?.label ?? order.product;
+  useEffect(() => {
+    void refresh().catch((error) => setMessage(error instanceof Error ? error.message : "Unable to load the central order book."));
+  }, []);
+
+  const sales = useMemo(() => buildSalesMonths(rows, finance, orders, actuals, accounting), [rows, finance, orders, actuals, accounting]);
+  const totals = salesTotals(sales);
+  const planned12 = sales.slice(0, 12).reduce((sum, month) => sum + month.plannedUnits, 0);
+  const confirmed12 = orders.filter((o) => o.month <= 12 && (o.status === "confirmed" || o.status === "delivered")).reduce((s, o) => s + o.units, 0);
+  const coverage = planned12 > 0 ? (confirmed12 / planned12) * 100 : 0;
+  const committedUnits = orders.filter((o) => o.status === "confirmed" || o.status === "delivered").reduce((s, o) => s + o.units, 0);
+  const leads = orders.filter((o) => o.status === "lead").length;
+  const openReceivables = sales.at(-1)?.openReceivables ?? 0;
+
+  async function persist(order: SalesOrder, reason: string) {
+    setBusy(true);
+    setMessage("");
     try {
-      const result = await createProductionJobCard({
-        data: {
-          salesOrderId: order.id,
-          productId: order.product,
-          productLabel: order.variantName ?? productLabel,
-          units: order.units,
-          dueMonth: order.month,
-          status: order.status === "confirmed" ? "released" : "planned",
-          modelTier: order.modelTier,
-          variantId: order.variantId,
-          configuration: order.configuration,
-        },
-      });
-      setJobCardMessage(
-        result.created
-          ? `Production job card ${result.id} raised for ${order.id}.`
-          : `Production job card ${result.id} already exists for ${order.id}.`,
+      const write = await saveSalesOrder({ data: { ...order, changeReason: reason } });
+      const projection = await syncProductionJobCard({ data: { salesOrderId: order.id } });
+      await refresh();
+      setMessage(
+        projection.state === "pipeline"
+          ? `${order.id} revision ${write.revision} saved as pipeline demand.`
+          : projection.state === "released"
+            ? `${order.id} revision ${write.revision} synchronized to Production job card ${projection.id}.`
+            : `${order.id} revision ${write.revision} saved; Production state is ${projection.state}.`,
       );
     } catch (error) {
-      setJobCardMessage(
-        error instanceof Error
-          ? `Order ${order.id} saved, but production handoff was not raised: ${error.message}`
-          : `Order ${order.id} saved, but production handoff failed.`,
-      );
+      await refresh().catch(() => undefined);
+      setMessage(error instanceof Error ? error.message : "Order update failed.");
+    } finally {
+      setBusy(false);
     }
   }
 
   async function addOrder() {
     const variant = MODELS.find((entry) => entry.id === draft.variantId);
-    if (!variant) return;
+    if (!variant || draft.month < 1 || draft.month > 36 || draft.units <= 0) return;
     const product = financeProductFor(variant.tier);
     const asp = variant.asp / 100_000 || productAsp(finance, product);
-    if (draft.month < 1 || draft.month > 36 || draft.units <= 0 || asp <= 0) return;
+    if (asp <= 0) return;
     const order: SalesOrder = {
-      id: `SO-${Date.now()}`,
+      id: `SO-${crypto.randomUUID()}`,
       month: draft.month,
       product,
       units: draft.units,
@@ -206,379 +116,72 @@ function Commercial() {
       variantName: variant.name,
       configuration: draft.configuration,
     };
-    saveOrders([...orders, order]);
-    await ensureJobCard(order);
+    await persist(order, "Created in Commercial workspace");
   }
 
-  async function updateOrder(
-    id: string,
-    key: "month" | "units" | "status",
-    value: number | string,
-  ) {
-    const next = orders.map((order) =>
-      order.id === id ? { ...order, [key]: key === "status" ? value : Number(value) } : order,
-    );
-    saveOrders(next);
-    const updated = next.find((order) => order.id === id);
-    if (updated && key === "status" && updated.status === "confirmed") await ensureJobCard(updated);
+  async function updateOrder(id: string, key: "month" | "units" | "status", value: number | string) {
+    const current = orders.find((order) => order.id === id);
+    if (!current) return;
+    const updated = { ...current, [key]: key === "status" ? value : Number(value) } as SalesOrder;
+    await persist(updated, `Commercial revision: ${key} changed`);
   }
 
   return (
     <div className="space-y-6">
       <header>
-        <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">
-          Commercial · demand to cash
-        </p>
+        <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Commercial · central demand to cash</p>
         <h1 className="mt-1 font-display text-4xl text-accent">Commercial</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-          One commercial workspace for planned demand, live orders, channel execution and
-          collections. The financial plan remains separate; confirmed orders hand off to production
-          without overwriting assumptions.
+          One centrally persisted order book. Leads remain pipeline; confirmed orders become committed demand and must synchronize through the exact released variant BOM before Production can reserve inventory.
         </p>
       </header>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi label="M1–M12 plan" value={`${planned12} units`} hint={`${scenario} scenario`} />
-        <Kpi
-          label="Confirmed coverage"
-          value={`${coverage.toFixed(0)}%`}
-          hint={`${confirmed12} confirmed / delivered`}
-          tone={coverage >= 80 ? "ok" : coverage >= 50 ? "warn" : "danger"}
-        />
-        <Kpi
-          label="Order book"
-          value={lakh(totals.ordersRevenue)}
-          hint={`${confirmedUnits} confirmed / delivered units`}
-        />
-        <Kpi
-          label="Collections"
-          value={lakh(totals.collections)}
-          hint={`AR ${lakh(openReceivables)}`}
-        />
+        <Kpi label="Confirmed coverage" value={`${coverage.toFixed(0)}%`} hint={`${confirmed12} committed units`} tone={coverage >= 80 ? "ok" : coverage >= 50 ? "warn" : "danger"} />
+        <Kpi label="Committed order book" value={lakh(totals.ordersRevenue)} hint={`${committedUnits} units · ${leads} leads`} />
+        <Kpi label="Collections" value={lakh(totals.collections)} hint={`AR ${lakh(openReceivables)}`} />
       </div>
 
-      <Panel title="Needs attention" kicker="Exceptions only">
-        {alerts.length === 0 ? (
-          <p className="text-sm text-muted">
-            No material commercial exception is currently detected.
-          </p>
-        ) : (
-          <div className="grid gap-3 lg:grid-cols-2">
-            {alerts.map((alert) => (
-              <Link
-                key={alert.title}
-                to={alert.to as never}
-                className="rounded-lg border border-border bg-surface p-4 hover:border-accent"
-              >
-                <div className="flex gap-3">
-                  <span
-                    className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${alert.tone === "danger" ? "bg-danger" : alert.tone === "warn" ? "bg-warn" : "bg-ok"}`}
-                  />
-                  <div>
-                    <p className="font-medium text-fg">{alert.title}</p>
-                    <p className="mt-1 text-xs leading-5 text-muted">{alert.detail}</p>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </Panel>
+      {message ? <div className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-muted">{message}</div> : null}
 
-      <Panel title="Demand & order book" kicker="Exact model, variant and options feed the BOM">
+      <Panel title="Demand & order book" kicker="Exact VINDY variant + controlled options">
         <div className="grid gap-3 rounded-xl border border-border bg-surface p-4 md:grid-cols-5">
-          <label className="text-xs text-muted">
-            Month
-            <input
-              type="number"
-              min="1"
-              max="36"
-              value={draft.month}
-              onChange={(event) => setDraft({ ...draft, month: Number(event.target.value) })}
-              className="mt-1 w-full rounded-md border border-border bg-bg px-2 py-2 text-sm text-fg"
-            />
-          </label>
-          <label className="text-xs text-muted">
-            Model & variant
-            <select
-              value={draft.variantId}
-              onChange={(event) => {
-                const variantId = event.target.value;
-                setDraft({ ...draft, variantId, configuration: defaultConfiguration(variantId) });
-              }}
-              className="mt-1 w-full rounded-md border border-border bg-bg px-2 py-2 text-sm text-fg"
-            >
-              {MODELS.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-xs text-muted">
-            Units
-            <input
-              type="number"
-              min="1"
-              value={draft.units}
-              onChange={(event) => setDraft({ ...draft, units: Number(event.target.value) })}
-              className="mt-1 w-full rounded-md border border-border bg-bg px-2 py-2 text-sm text-fg"
-            />
-          </label>
-          <label className="text-xs text-muted">
-            Channel
-            <select
-              value={draft.channel}
-              onChange={(event) =>
-                setDraft({ ...draft, channel: event.target.value as SalesChannel })
-              }
-              className="mt-1 w-full rounded-md border border-border bg-bg px-2 py-2 text-sm text-fg"
-            >
-              {channelOptions.map((channel) => (
-                <option key={channel}>{channel}</option>
-              ))}
-            </select>
-          </label>
-          <label className="text-xs text-muted">
-            Status
-            <select
-              value={draft.status}
-              onChange={(event) =>
-                setDraft({ ...draft, status: event.target.value as SalesOrderStatus })
-              }
-              className="mt-1 w-full rounded-md border border-border bg-bg px-2 py-2 text-sm text-fg"
-            >
-              {statusOptions.map((status) => (
-                <option key={status}>{status}</option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="button"
-            onClick={addOrder}
-            className="self-end rounded-md bg-accent px-4 py-2 text-sm font-semibold text-bg"
-          >
-            Add demand / order
-          </button>
+          <Field label="Month"><input type="number" min="1" max="36" value={draft.month} onChange={(e) => setDraft({ ...draft, month: Number(e.target.value) })} className="control mt-1" /></Field>
+          <Field label="Model & variant"><select value={draft.variantId} onChange={(e) => { const variantId=e.target.value; setDraft({ ...draft, variantId, configuration: defaultConfiguration(variantId) }); }} className="control mt-1">{MODELS.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}</select></Field>
+          <Field label="Units"><input type="number" min="1" value={draft.units} onChange={(e) => setDraft({ ...draft, units: Number(e.target.value) })} className="control mt-1" /></Field>
+          <Field label="Channel"><select value={draft.channel} onChange={(e) => setDraft({ ...draft, channel: e.target.value as SalesChannel })} className="control mt-1">{channelOptions.map((channel)=><option key={channel}>{channel}</option>)}</select></Field>
+          <Field label="Status"><select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as SalesOrderStatus })} className="control mt-1">{statusOptions.map((status)=><option key={status}>{status}</option>)}</select></Field>
+          <button type="button" disabled={busy} onClick={() => void addOrder()} className="self-end rounded-md bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-50">Add demand / order</button>
         </div>
+
         <details className="mt-3 rounded-xl border border-border bg-bg-elevated/30 p-4" open>
-          <summary className="cursor-pointer text-sm font-semibold text-fg">
-            Component options · eligibility restrictions applied
-          </summary>
+          <summary className="cursor-pointer text-sm font-semibold text-fg">Component options · catalogue eligibility is not production release</summary>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {CONFIGURATION_CATEGORIES.map(({ key, label }) => {
               const variant = MODELS.find((entry) => entry.id === draft.variantId)!;
               const choices = optionsFor(variant.tier, key);
-              const fixed = key === "groupset";
-              return (
-                <label key={key} className="text-xs text-muted">
-                  {label}
-                  <select
-                    value={draft.configuration[key] ?? ""}
-                    disabled={fixed}
-                    onChange={(event) =>
-                      setDraft({
-                        ...draft,
-                        configuration: {
-                          ...draft.configuration,
-                          [key]: event.target.value,
-                        } as ProductConfiguration,
-                      })
-                    }
-                    className="mt-1 w-full rounded-md border border-border bg-bg px-2 py-2 text-sm text-fg disabled:opacity-70"
-                  >
-                    {choices.map((choice) => (
-                      <option key={choice.id} value={choice.id}>
-                        {choice.brand} {choice.model} · ₹{choice.priceInr.toLocaleString("en-IN")} ·
-                        0 stock
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              );
+              return <Field key={key} label={label}><select value={draft.configuration[key] ?? ""} disabled={key === "groupset"} onChange={(e) => setDraft({ ...draft, configuration: { ...draft.configuration, [key]: e.target.value } as ProductConfiguration })} className="control mt-1 disabled:opacity-70">{choices.map((choice)=><option key={choice.id} value={choice.id}>{choice.brand} {choice.model} · {choice.sku}</option>)}</select></Field>;
             })}
           </div>
-          <p className="mt-3 text-xs text-warn">
-            All catalogue options currently show zero physical inventory. A confirmed order creates
-            SKU requirements and procurement shortages; it does not create stock.
-          </p>
+          <p className="mt-3 text-xs text-warn">A confirmed order does not create stock. Production release also requires an approved exact-variant BOM mapping for every selected option.</p>
         </details>
-        {jobCardMessage && (
-          <p className="mt-3 rounded-lg border border-border bg-bg-elevated/40 px-3 py-2 text-xs text-muted">
-            {jobCardMessage}
-          </p>
-        )}
-        {orders.length === 0 ? (
-          <p className="mt-4 text-sm text-muted">
-            No order-book entries yet. Add leads or confirmed demand here; the financial plan
-            remains unchanged.
-          </p>
-        ) : (
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[850px] text-sm">
-              <thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle">
-                <tr>
-                  <th className="px-3 py-3 text-left">Order</th>
-                  <th className="px-3 py-3">Month</th>
-                  <th className="px-3 py-3 text-left">Model / variant</th>
-                  <th className="px-3 py-3 text-right">Units</th>
-                  <th className="px-3 py-3 text-right">Value</th>
-                  <th className="px-3 py-3">Channel</th>
-                  <th className="px-3 py-3">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((order) => (
-                  <tr key={order.id} className="border-t border-border">
-                    <td className="px-3 py-3 text-xs text-muted">{order.id}</td>
-                    <td className="px-3 py-3">
-                      <input
-                        type="number"
-                        min="1"
-                        max="36"
-                        value={order.month}
-                        onChange={(event) =>
-                          updateOrder(order.id, "month", Number(event.target.value))
-                        }
-                        className="w-16 rounded border border-border bg-bg px-2 py-1 text-fg"
-                      />
-                    </td>
-                    <td className="px-3 py-3 text-fg">
-                      {order.variantName ??
-                        finance.productLines.find((product) => product.id === order.product)
-                          ?.label ??
-                        order.product}
-                      {order.modelTier ? (
-                        <span className="block text-[10px] uppercase text-subtle">
-                          {modelFamily(order.modelTier)} ·{" "}
-                          {Object.keys(order.configuration ?? {}).length} configured options
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="px-3 py-3 text-right">
-                      <input
-                        type="number"
-                        min="1"
-                        value={order.units}
-                        onChange={(event) =>
-                          updateOrder(order.id, "units", Number(event.target.value))
-                        }
-                        className="w-16 rounded border border-border bg-bg px-2 py-1 text-right text-fg"
-                      />
-                    </td>
-                    <td className="px-3 py-3 text-right tabular-nums">
-                      {lakh(order.units * order.aspLakh)}
-                    </td>
-                    <td className="px-3 py-3 text-center text-xs text-muted">{order.channel}</td>
-                    <td className="px-3 py-3">
-                      <select
-                        value={order.status}
-                        onChange={(event) => updateOrder(order.id, "status", event.target.value)}
-                        className="rounded border border-border bg-bg px-2 py-1 text-xs text-fg"
-                      >
-                        {statusOptions.map((status) => (
-                          <option key={status}>{status}</option>
-                        ))}
-                      </select>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+
+        {orders.length === 0 ? <p className="mt-4 text-sm text-muted">No centrally persisted orders yet.</p> : (
+          <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[900px] text-sm"><thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle"><tr><th className="px-3 py-3 text-left">Order</th><th className="px-3 py-3">Month</th><th className="px-3 py-3 text-left">Variant</th><th className="px-3 py-3 text-right">Units</th><th className="px-3 py-3 text-right">Value</th><th className="px-3 py-3">Channel</th><th className="px-3 py-3">Status</th></tr></thead><tbody>{orders.map((order)=><tr key={order.id} className="border-t border-border"><td className="px-3 py-3 font-mono text-xs text-muted">{order.id}</td><td className="px-3 py-3"><input disabled={busy} type="number" min="1" max="36" value={order.month} onChange={(e)=>void updateOrder(order.id,"month",Number(e.target.value))} className="w-16 rounded border border-border bg-bg px-2 py-1 text-fg" /></td><td className="px-3 py-3 text-fg">{order.variantName ?? order.variantId ?? order.product}{order.modelTier ? <span className="block text-[10px] uppercase text-subtle">{modelFamily(order.modelTier)} · {Object.keys(order.configuration ?? {}).length} options</span> : null}</td><td className="px-3 py-3 text-right"><input disabled={busy} type="number" min="1" value={order.units} onChange={(e)=>void updateOrder(order.id,"units",Number(e.target.value))} className="w-16 rounded border border-border bg-bg px-2 py-1 text-right text-fg" /></td><td className="px-3 py-3 text-right tabular-nums">{lakh(order.units * order.aspLakh)}</td><td className="px-3 py-3 text-center text-xs text-muted">{order.channel}</td><td className="px-3 py-3"><select disabled={busy} value={order.status} onChange={(e)=>void updateOrder(order.id,"status",e.target.value)} className="rounded border border-border bg-bg px-2 py-1 text-xs text-fg">{statusOptions.map((status)=><option key={status}>{status}</option>)}</select></td></tr>)}</tbody></table></div>
         )}
       </Panel>
 
       <details className="rounded-xl border border-border bg-surface/30 p-4">
-        <summary className="cursor-pointer text-sm font-semibold text-fg">
-          36-month revenue, collections & variance
-        </summary>
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[1050px] text-xs">
-            <thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle">
-              <tr>
-                <th className="px-3 py-3 text-left">Month</th>
-                <th className="px-3 py-3 text-right">Plan units</th>
-                <th className="px-3 py-3 text-right">Orders</th>
-                <th className="px-3 py-3 text-right">Actual units</th>
-                <th className="px-3 py-3 text-right">Plan revenue</th>
-                <th className="px-3 py-3 text-right">Orders value</th>
-                <th className="px-3 py-3 text-right">Actual revenue</th>
-                <th className="px-3 py-3 text-right">Variance</th>
-                <th className="px-3 py-3 text-right">Collections</th>
-                <th className="px-3 py-3 text-right">AR</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sales.map((month) => (
-                <tr key={month.m} className="border-t border-border">
-                  <td className="px-3 py-2 font-medium text-fg">M{month.m}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{month.plannedUnits}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{month.ordersUnits || "—"}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">
-                    {actuals[month.m]?.units ?? "—"}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums">
-                    {lakh(month.plannedRevenue)}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums">{lakh(month.ordersRevenue)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">
-                    {actuals[month.m]?.revenue == null ? "—" : lakh(actuals[month.m]?.revenue ?? 0)}
-                  </td>
-                  <td
-                    className={`px-3 py-2 text-right tabular-nums ${month.varianceRevenue < 0 ? "text-danger" : "text-ok"}`}
-                  >
-                    {actuals[month.m]?.revenue != null || month.ordersRevenue > 0
-                      ? lakh(month.varianceRevenue)
-                      : "—"}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-accent">
-                    {lakh(month.collections)}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums">
-                    {lakh(month.openReceivables)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <summary className="cursor-pointer text-sm font-semibold text-fg">36-month plan, commitments, actuals & collections</summary>
+        <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[950px] text-xs"><thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle"><tr><th className="px-3 py-3 text-left">Month</th><th className="px-3 py-3 text-right">Plan units</th><th className="px-3 py-3 text-right">Orders</th><th className="px-3 py-3 text-right">Actual units</th><th className="px-3 py-3 text-right">Plan revenue</th><th className="px-3 py-3 text-right">Orders value</th><th className="px-3 py-3 text-right">Actual revenue</th><th className="px-3 py-3 text-right">Collections</th></tr></thead><tbody>{sales.map((month)=><tr key={month.m} className="border-t border-border"><td className="px-3 py-2 font-medium">M{month.m}</td><td className="px-3 py-2 text-right">{month.plannedUnits}</td><td className="px-3 py-2 text-right">{month.ordersUnits || "—"}</td><td className="px-3 py-2 text-right">{actuals[month.m]?.units ?? "—"}</td><td className="px-3 py-2 text-right">{lakh(month.plannedRevenue)}</td><td className="px-3 py-2 text-right">{lakh(month.ordersRevenue)}</td><td className="px-3 py-2 text-right">{actuals[month.m]?.revenue == null ? "—" : lakh(actuals[month.m]?.revenue ?? 0)}</td><td className="px-3 py-2 text-right text-accent">{lakh(month.collections)}</td></tr>)}</tbody></table></div>
       </details>
 
-      <Panel title="Connected controls" kicker="One owner per concept">
-        <div className="flex flex-wrap gap-2">
-          <Link
-            to="/command/gtm"
-            className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent"
-          >
-            Go to market
-          </Link>
-          <Link
-            to="/command/market-survey"
-            className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent"
-          >
-            Market evidence
-          </Link>
-          <Link
-            to="/command/production-jobcards"
-            className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent"
-          >
-            Production handoff
-          </Link>
-          <Link
-            to="/command/finance-assumptions"
-            className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent"
-          >
-            Pricing / mix / launch
-          </Link>
-          <Link
-            to="/command/actuals"
-            className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent"
-          >
-            Actuals
-          </Link>
-        </div>
-      </Panel>
+      <Panel title="Connected controls" kicker="One owner per concept"><div className="flex flex-wrap gap-2"><Link to="/command/production-jobcards" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">Production handoff</Link><Link to="/command/procurement-planning" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">Procurement reconciliation</Link><Link to="/command/actuals" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">Actuals</Link><Link to="/command/finance-assumptions" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">Plan assumptions</Link></div></Panel>
     </div>
   );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return <label className="text-xs text-muted">{label}{children}</label>;
 }

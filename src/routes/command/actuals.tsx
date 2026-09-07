@@ -1,165 +1,33 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Kpi, Panel } from "@/components/kpi";
-import { buildModelWithInputs, type ScenarioId } from "@/lib/finance/model";
+import { buildModelWithInputs } from "@/lib/finance/model";
 import { useVeloxis } from "@/lib/store";
+import { clearMonthlyActual, listMonthlyActuals, saveMonthlyActual, type ActualField, type ActualsMap } from "@/lib/actuals-authority";
 
 export const Route = createFileRoute("/command/actuals")({ component: Actuals });
-type ActualField = "revenue" | "units" | "cogs" | "opex" | "closingCash" | "inventory" | "receivables" | "payables";
-type ActualMonth = Partial<Record<ActualField, number | null>>;
-type ActualsMap = Record<number, ActualMonth>;
-const STORAGE_KEY = "veloxis-actuals-v1";
-const fields: { key: ActualField; label: string; suffix: string }[] = [
-  { key: "revenue", label: "Revenue", suffix: "₹L" },
-  { key: "units", label: "Units sold", suffix: "units" },
-  { key: "cogs", label: "COGS", suffix: "₹L" },
-  { key: "opex", label: "Opex", suffix: "₹L" },
-  { key: "closingCash", label: "Closing cash", suffix: "₹L" },
-  { key: "inventory", label: "Inventory", suffix: "₹L" },
-  { key: "receivables", label: "Receivables", suffix: "₹L" },
-  { key: "payables", label: "Payables", suffix: "₹L" },
+const fields:{key:ActualField;label:string;suffix:string}[]=[
+  {key:"revenue",label:"Revenue",suffix:"₹L"},{key:"units",label:"Units sold",suffix:"units"},{key:"cogs",label:"COGS",suffix:"₹L"},{key:"opex",label:"Opex",suffix:"₹L"},
+  {key:"closingCash",label:"Closing cash",suffix:"₹L"},{key:"inventory",label:"Inventory",suffix:"₹L"},{key:"receivables",label:"Receivables",suffix:"₹L"},{key:"payables",label:"Payables",suffix:"₹L"},
 ];
-const money = (n: number) => `₹${n.toFixed(1)}L`;
-function Actuals() {
-  const scenario = useVeloxis((s) => s.scenario);
-  const drawStandby = useVeloxis((s) => s.drawStandby);
-  const finance = useVeloxis((s) => s.finance);
-  const [actuals, setActuals] = useState<ActualsMap>({});
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setActuals(JSON.parse(raw));
-    } catch {
-      // Missing or malformed local actuals start with an empty register.
-    }
-  }, []);
-  function save(next: ActualsMap) {
-    setActuals(next);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      // Storage may be unavailable; in-memory edits remain usable.
-    }
-  }
-  function update(month: number, key: ActualField, value: number | null) {
-    save({ ...actuals, [month]: { ...actuals[month], [key]: value } });
-  }
-  function clear(month: number) {
-    const next = { ...actuals };
-    delete next[month];
-    save(next);
-  }
-  const rows = useMemo(() => buildModelWithInputs(scenario, drawStandby, finance), [scenario, drawStandby, finance]);
-  const enteredMonths = Object.keys(actuals)
-    .map(Number)
-    .filter((m) => Object.values(actuals[m] ?? {}).some((v) => v !== null && v !== undefined))
-    .sort((a, b) => a - b);
-  const latestActual = enteredMonths.at(-1) ?? 0;
-  const entered = enteredMonths.length;
-  const rolling = useMemo(
-    () =>
-      rows.map((plan, i) => {
-        const a = actuals[i + 1] ?? {};
-        const has = Object.values(a).some((v) => v !== null && v !== undefined);
-        return { m: i + 1, plan, actual: a, has };
-      }),
-    [rows, actuals],
-  );
-  const blendedRevenue = rolling.reduce((sum, r) => sum + (r.m <= latestActual && r.has && r.actual.revenue != null ? r.actual.revenue : r.plan.revenue), 0);
-  const blendedUnits = rolling.reduce((sum, r) => sum + (r.m <= latestActual && r.has && r.actual.units != null ? r.actual.units : r.plan.units), 0);
-  const actualRevenue = enteredMonths.reduce((s, m) => s + (actuals[m]?.revenue ?? 0), 0);
-  const planThroughActual = enteredMonths.reduce((s, m) => s + (rows[m - 1]?.revenue ?? 0), 0);
-  const revenueVariance = actualRevenue - planThroughActual;
-  const pct = (n: number, d: number) => (d ? `${((n / d) * 100).toFixed(1)}%` : "—");
-  return (
-    <div className="space-y-6">
-      <header>
-        <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Finance · actual books</p>
-        <h1 className="font-display text-4xl">Actuals & rolling forecast</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">Enter verified monthly actuals. Completed months can be compared against Plan; the rolling view then uses Actual where available and the live model for future months.</p>
-      </header>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Actual months" value={`${entered}`} hint={latestActual ? `Through M${latestActual}` : "No actuals entered"} />
-        <Kpi label="Actual revenue" value={money(actualRevenue)} hint="Entered months" />
-        <Kpi label="Revenue variance" value={money(revenueVariance)} hint={`${pct(revenueVariance, planThroughActual)} vs plan`} tone={revenueVariance < 0 ? "danger" : "ok"} />
-        <Kpi label="Rolling 36M revenue" value={money(blendedRevenue)} hint="Actual through latest month" />
-      </div>
-      <Panel title="Actual vs Plan vs Rolling Forecast" kicker="Actual months are locked into the management forecast; future months remain model-driven">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1050px] text-left text-xs">
-            <thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle">
-              <tr>
-                <th className="px-3 py-3">Month</th>
-                <th className="px-3 py-3 text-right">Plan revenue</th>
-                <th className="px-3 py-3 text-right">Actual revenue</th>
-                <th className="px-3 py-3 text-right">Variance</th>
-                <th className="px-3 py-3 text-right">Plan units</th>
-                <th className="px-3 py-3 text-right">Actual units</th>
-                <th className="px-3 py-3">Forecast basis</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rolling.map((r) => {
-                const ar = r.actual.revenue;
-                const au = r.actual.units;
-                const variance = ar == null ? null : ar - r.plan.revenue;
-                return (
-                  <tr key={r.m} className="border-t border-border">
-                    <td className="px-3 py-2 font-medium">M{r.m}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{money(r.plan.revenue)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{ar == null ? "—" : money(ar)}</td>
-                    <td className={`px-3 py-2 text-right tabular-nums ${variance != null && variance < 0 ? "text-danger" : "text-ok"}`}>{variance == null ? "—" : money(variance)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{r.plan.units}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{au == null ? "—" : au}</td>
-                    <td className="px-3 py-2">{r.m <= latestActual && r.has ? <span className="text-accent">ACTUAL</span> : <span className="text-muted">FORECAST</span>}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-        <p className="mt-4 text-xs leading-5 text-muted">The rolling forecast does not overwrite the original Plan. It replaces only the completed, entered months with actuals and leaves future months linked to the selected live scenario and assumptions.</p>
-      </Panel>
-      <Panel title="Monthly actual entry" kicker={`${entered} month${entered === 1 ? "" : "s"} with data · ₹ lakh unless stated`}>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px] text-left text-sm">
-            <thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle">
-              <tr>
-                <th className="px-3 py-3">Month</th>
-                {fields.map((f) => (
-                  <th key={f.key} className="px-2 py-3 text-right">
-                    {f.label}
-                    <br />
-                    <span className="font-normal">{f.suffix}</span>
-                  </th>
-                ))}
-                <th className="px-3 py-3">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Array.from({ length: 36 }, (_, i) => i + 1).map((month) => (
-                <tr key={month} className="border-t border-border">
-                  <td className="px-3 py-2 font-medium">M{month}</td>
-                  {fields.map((field) => {
-                    const value = actuals[month]?.[field.key];
-                    return (
-                      <td key={field.key} className="px-2 py-2">
-                        <input aria-label={`M${month} ${field.label}`} type="number" min="0" step={field.key === "units" ? "1" : "0.1"} placeholder="—" value={value ?? ""} onChange={(e) => update(month, field.key, e.target.value === "" ? null : Number(e.target.value))} className="w-24 rounded-md border border-border bg-bg px-2 py-2 text-right text-sm tabular-nums text-fg outline-none focus:border-accent" />
-                      </td>
-                    );
-                  })}
-                  <td className="px-3 py-2">
-                    <button type="button" onClick={() => clear(month)} className="text-xs text-muted hover:text-danger">
-                      Clear
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="mt-4 rounded-md border border-border bg-surface p-3 text-xs leading-5 text-muted">Blank means “not entered”, not zero. Use verified books, bank records, invoices and inventory records. This is a management capture layer and must be reconciled to the CA ledger before statutory reporting.</p>
-      </Panel>
-    </div>
-  );
+const money=(n:number)=>`₹${n.toFixed(1)}L`;
+
+function Actuals(){
+  const scenario=useVeloxis((s)=>s.scenario); const drawStandby=useVeloxis((s)=>s.drawStandby); const finance=useVeloxis((s)=>s.finance);
+  const [actuals,setActuals]=useState<ActualsMap>({}); const [status,setStatus]=useState("Loading central actuals…"); const [busy,setBusy]=useState<number|null>(null);
+  useEffect(()=>{let active=true; void listMonthlyActuals().then((rows)=>{if(active){setActuals(rows);setStatus("Central actuals loaded");}}).catch((e)=>active&&setStatus(e instanceof Error?e.message:"Unable to load actuals")); return()=>{active=false;};},[]);
+  const plan=useMemo(()=>buildModelWithInputs(scenario,drawStandby,finance),[scenario,drawStandby,finance]);
+  const enteredMonths=Object.keys(actuals).map(Number).filter((m)=>fields.some(({key})=>actuals[m]?.[key]!=null)).sort((a,b)=>a-b);
+  const latest=enteredMonths.at(-1)??0; const actualRevenue=enteredMonths.reduce((s,m)=>s+(actuals[m]?.revenue??0),0); const planRevenue=enteredMonths.reduce((s,m)=>s+(plan[m-1]?.revenue??0),0);
+  const rollingRevenue=plan.reduce((s,row,i)=>s+((i+1)<=latest&&actuals[i+1]?.revenue!=null?(actuals[i+1]?.revenue??0):row.revenue),0);
+  function edit(month:number,key:ActualField,value:number|null){setActuals((current)=>({...current,[month]:{...current[month],[key]:value}}));setStatus(`M${month} edited · not yet posted`);}
+  function evidence(month:number,key:"sourceReference"|"verified",value:string|boolean){setActuals((current)=>({...current,[month]:{...current[month],[key]:value}}));setStatus(`M${month} edited · not yet posted`);}
+  async function save(month:number){const actual=actuals[month]??{}; if(!fields.some(({key})=>actual[key]!=null)){setStatus(`M${month}: enter at least one value.`);return;} if(!actual.sourceReference?.trim()){setStatus(`M${month}: source reference is required.`);return;} setBusy(month);try{await saveMonthlyActual({data:{month,actual}});setStatus(`M${month} posted centrally with source provenance.`);}catch(e){setStatus(e instanceof Error?e.message:`M${month} save failed`);}finally{setBusy(null);}}
+  async function clear(month:number){setBusy(month);try{await clearMonthlyActual({data:{month}});setActuals((current)=>{const next={...current};delete next[month];return next;});setStatus(`M${month} cleared centrally.`);}catch(e){setStatus(e instanceof Error?e.message:`M${month} clear failed`);}finally{setBusy(null);}}
+  return <div className="space-y-6">
+    <header><p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Finance · central actual books</p><h1 className="font-display text-4xl">Actuals & rolling forecast</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-muted">Actuals are server-backed, revisioned and evidence-referenced. They replace forecast only in completed months of the rolling view; they never overwrite the approved 36-month Plan.</p><p className="mt-2 text-xs text-subtle">{status}</p></header>
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Kpi label="Actual months" value={String(enteredMonths.length)} hint={latest?`Through M${latest}`:"No actuals posted"}/><Kpi label="Actual revenue" value={money(actualRevenue)} hint="Entered months"/><Kpi label="Revenue variance" value={money(actualRevenue-planRevenue)} hint="Actual vs plan" tone={actualRevenue-planRevenue<0?"danger":"ok"}/><Kpi label="Rolling 36M revenue" value={money(rollingRevenue)} hint="Actual + future forecast"/></div>
+    <Panel title="Monthly actual entry" kicker="Source reference is mandatory whenever a value is posted"><div className="overflow-x-auto"><table className="w-full min-w-[1450px] text-left text-sm"><thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle"><tr><th className="px-2 py-3">Month</th>{fields.map((f)=><th key={f.key} className="px-2 py-3 text-right">{f.label}<br/><span className="font-normal">{f.suffix}</span></th>)}<th className="px-2 py-3">Evidence / source</th><th className="px-2 py-3">Verified</th><th className="px-2 py-3">Action</th></tr></thead><tbody>{Array.from({length:36},(_,i)=>i+1).map((month)=>{const a=actuals[month]??{};return <tr key={month} className="border-t border-border"><td className="px-2 py-2 font-medium">M{month}</td>{fields.map((f)=><td key={f.key} className="px-2 py-2"><input aria-label={`M${month} ${f.label}`} type="number" min={f.key==="closingCash"?undefined:"0"} step={f.key==="units"?"1":"0.1"} value={a[f.key]??""} onChange={(e)=>edit(month,f.key,e.target.value===""?null:Number(e.target.value))} className="w-24 rounded-md border border-border bg-bg px-2 py-2 text-right text-sm text-fg"/></td>)}<td className="px-2 py-2"><input value={a.sourceReference??""} onChange={(e)=>evidence(month,"sourceReference",e.target.value)} placeholder="Invoice / bank / ledger ref" className="w-56 rounded-md border border-border bg-bg px-2 py-2 text-xs text-fg"/></td><td className="px-2 py-2 text-center"><input type="checkbox" checked={Boolean(a.verified)} onChange={(e)=>evidence(month,"verified",e.target.checked)} /></td><td className="px-2 py-2"><div className="flex gap-2"><button disabled={busy===month} onClick={()=>void save(month)} className="text-xs font-semibold text-accent disabled:opacity-50">Save</button><button disabled={busy===month} onClick={()=>void clear(month)} className="text-xs text-muted hover:text-danger disabled:opacity-50">Clear</button></div></td></tr>;})}</tbody></table></div><p className="mt-4 text-xs leading-5 text-muted">“Verified” is management verification status, not statutory audit. CA/statutory reporting remains reconciled separately to books and evidence.</p></Panel>
+    <Panel title="Rolling forecast basis" kicker="Plan remains immutable as baseline"><div className="overflow-x-auto"><table className="w-full min-w-[850px] text-xs"><thead className="border-b border-border text-[10px] uppercase tracking-wider text-subtle"><tr><th className="px-3 py-3 text-left">Month</th><th className="px-3 py-3 text-right">Plan revenue</th><th className="px-3 py-3 text-right">Actual revenue</th><th className="px-3 py-3">Basis</th><th className="px-3 py-3">Evidence</th></tr></thead><tbody>{plan.map((row,i)=>{const a=actuals[i+1];return <tr key={row.m} className="border-t border-border"><td className="px-3 py-2">M{row.m}</td><td className="px-3 py-2 text-right">{money(row.revenue)}</td><td className="px-3 py-2 text-right">{a?.revenue==null?"—":money(a.revenue)}</td><td className="px-3 py-2">{row.m<=latest&&a?.revenue!=null?<span className="text-accent">ACTUAL</span>:<span className="text-muted">FORECAST</span>}</td><td className="px-3 py-2 text-xs text-muted">{a?.sourceReference||"—"}</td></tr>;})}</tbody></table></div></Panel>
+  </div>;
 }
