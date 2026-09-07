@@ -14,6 +14,7 @@ const FINANCE_HOME_ROUTE = "/command/financial-cockpit";
 const SUPPLY_HOME_ROUTE = "/command/operations";
 const COMMERCIAL_HOME_ROUTE = "/command/sales";
 const ENGINEERING_HOME_ROUTE = "/command/engineering";
+const GOVERNANCE_HOME_ROUTE = "/command/governance";
 const EXECUTIVE_SUPPORT_ROUTES = new Set([
   "/command/control-tower",
   "/command/management-intelligence",
@@ -109,6 +110,20 @@ const ENGINEERING_CONTEXT_ROUTES = new Set([
   ...ENGINEERING_TABS.map((tab) => tab.to),
   "/command/phase-5",
 ]);
+const GOVERNANCE_SUPPORT_ROUTES = new Set([
+  "/command/risk",
+  "/command/legal",
+  "/command/qa-verification",
+  "/command/actions",
+]);
+const GOVERNANCE_TABS = [
+  { to: GOVERNANCE_HOME_ROUTE, label: "Approvals" },
+  { to: "/command/risk", label: "Risk" },
+  { to: "/command/legal", label: "Legal & IP" },
+  { to: "/command/qa-verification", label: "QA Verification" },
+  { to: "/command/actions", label: "Audit & Actions" },
+] as const;
+const GOVERNANCE_CONTEXT_ROUTES = new Set(GOVERNANCE_TABS.map((tab) => tab.to));
 const ICONS: Record<string, typeof Activity> = { command: Activity, finance: Wallet, manufacturing: Factory, inventory: Boxes, procurement: Boxes, engineering: DraftingCompass, epr: ClipboardCheck, knowledge: BookOpen, sales: LineChart, market: LineChart, legal: Scale, risk: AlertTriangle, leadership: Presentation };
 const DOMAIN_LABELS: Record<PageDomain, string> = { command: "Command", finance: "Finance", manufacturing: "Manufacturing", inventory: "Inventory", procurement: "Procurement", engineering: "Engineering", epr: "EPR", knowledge: "Knowledge", sales: "Sales", market: "Market", legal: "Legal", risk: "Risk", leadership: "Executive", admin: "Admin" };
 const DOMAIN_ORDER: PageDomain[] = ["command", "finance", "procurement", "inventory", "manufacturing", "engineering", "epr", "knowledge", "sales", "market", "legal", "risk", "leadership", "admin"];
@@ -116,7 +131,7 @@ const MODE_LABELS: Record<PageMode, string> = { understand: "UNDERSTAND", observ
 const MODE_DESCRIPTIONS: Record<PageMode, string> = { understand: "Knowledge and context", observe: "Truth and status", operate: "Execution and control", showcase: "External presentation" };
 
 function isPrimaryNavigationPage(page: RouteMeta) {
-  return !EXECUTIVE_SUPPORT_ROUTES.has(page.route) && !FINANCE_SUPPORT_ROUTES.has(page.route) && !SUPPLY_SUPPORT_ROUTES.has(page.route) && !COMMERCIAL_SUPPORT_ROUTES.has(page.route) && !ENGINEERING_SUPPORT_ROUTES.has(page.route);
+  return !EXECUTIVE_SUPPORT_ROUTES.has(page.route) && !FINANCE_SUPPORT_ROUTES.has(page.route) && !SUPPLY_SUPPORT_ROUTES.has(page.route) && !COMMERCIAL_SUPPORT_ROUTES.has(page.route) && !ENGINEERING_SUPPORT_ROUTES.has(page.route) && !GOVERNANCE_SUPPORT_ROUTES.has(page.route);
 }
 
 function PageLink({ page, role, compact = false }: { page: RouteMeta; role: CommandRole | null; compact?: boolean }) {
@@ -151,12 +166,13 @@ function ClassifiedMode({ mode, role }: { mode: PageMode; role: CommandRole | nu
 
 const COMMAND_ITEMS = [
   { to: "/command", label: "Command Centre", icon: Activity, exact: true },
-  { to: "/command/governance", label: "Governance", icon: ClipboardCheck },
+  { to: GOVERNANCE_HOME_ROUTE, label: "Governance", icon: ClipboardCheck },
 ];
 
 function CommandGroup({ role }: { role: CommandRole | null }) {
+  const location = useLocation();
   const items = COMMAND_ITEMS.filter((item) => canAccessPage(role, getRouteMeta(item.to)));
-  return <details open className="group/command"><summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-3 py-2 text-[11px] font-bold uppercase tracking-[0.18em] text-fg hover:bg-surface [&::-webkit-details-marker]:hidden"><Activity className="size-3.5" /><span className="flex-1">COMMAND</span><span className="text-[9px] font-normal tracking-normal text-muted">Decide & govern</span><ChevronDown className="size-3" /></summary><div className="ml-2 mt-1 space-y-0.5 border-l border-border pl-2">{items.map((item) => <Link key={item.to} to={item.to as never} activeOptions={item.exact ? { exact: true } : undefined} title={item.label} className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted hover:bg-surface hover:text-fg" activeProps={{ className: "bg-surface text-fg" }}><item.icon className="size-4" />{item.label}</Link>)}</div></details>;
+  return <details open className="group/command"><summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-3 py-2 text-[11px] font-bold uppercase tracking-[0.18em] text-fg hover:bg-surface [&::-webkit-details-marker]:hidden"><Activity className="size-3.5" /><span className="flex-1">COMMAND</span><span className="text-[9px] font-normal tracking-normal text-muted">Decide & govern</span><ChevronDown className="size-3" /></summary><div className="ml-2 mt-1 space-y-0.5 border-l border-border pl-2">{items.map((item) => { const governanceActive = item.to === GOVERNANCE_HOME_ROUTE && GOVERNANCE_CONTEXT_ROUTES.has(location.pathname); return <Link key={item.to} to={item.to as never} activeOptions={item.exact ? { exact: true } : undefined} title={item.label} className={cn("flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted hover:bg-surface hover:text-fg", governanceActive && "bg-surface text-fg")} activeProps={{ className: "bg-surface text-fg" }}><item.icon className="size-4" />{item.label}</Link>; })}</div></details>;
 }
 
 function PlanningGroup({ role }: { role: CommandRole | null }) {
@@ -190,6 +206,12 @@ function EngineeringWorkspaceTabs() {
   const location = useLocation();
   if (!ENGINEERING_CONTEXT_ROUTES.has(location.pathname)) return null;
   return <nav className="mb-6 overflow-x-auto rounded-xl border border-border bg-surface/50 p-1" aria-label="Engineering workspace"><div className="flex min-w-max gap-1">{ENGINEERING_TABS.map((tab) => <Link key={tab.to} to={tab.to as never} className={cn("rounded-lg px-4 py-2 text-xs font-semibold transition-colors", location.pathname === tab.to ? "bg-bg text-accent shadow-sm" : "text-muted hover:bg-bg/60 hover:text-fg")}>{tab.label}</Link>)}</div></nav>;
+}
+
+function GovernanceWorkspaceTabs() {
+  const location = useLocation();
+  if (!GOVERNANCE_CONTEXT_ROUTES.has(location.pathname)) return null;
+  return <nav className="mb-6 overflow-x-auto rounded-xl border border-border bg-surface/50 p-1" aria-label="Governance workspace"><div className="flex min-w-max gap-1">{GOVERNANCE_TABS.map((tab) => <Link key={tab.to} to={tab.to as never} className={cn("rounded-lg px-4 py-2 text-xs font-semibold transition-colors", location.pathname === tab.to ? "bg-bg text-accent shadow-sm" : "text-muted hover:bg-bg/60 hover:text-fg")}>{tab.label}</Link>)}</div></nav>;
 }
 
 function FlowGuide({ role }: { role: CommandRole | null }) {
@@ -254,5 +276,5 @@ export function CommandShell() {
   const viewer = role === "viewer";
   const allPages = useMemo<RouteMeta[]>(() => Object.values(navigationGroups).flat().filter((page) => (page.group !== "Planning" || page.route === MASTER_PLAN_ROUTE) && isPrimaryNavigationPage(page)), []);
   async function logout() { if (loggingOut) return; setLoggingOut(true); try { await lockCommand(); setRole(null); await navigate({ to: "/command-login" }); } finally { setLoggingOut(false); } }
-  return <div className="min-h-dvh bg-bg"><SiteHeader /><div className="mx-auto flex max-w-7xl"><aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-72 shrink-0 flex-col border-r border-border py-6 lg:flex"><p className="px-5 pb-3 text-[10px] uppercase tracking-[0.2em] text-subtle">VINDY 2.0 · Command</p><div className="px-3 pb-3"><div className="grid grid-cols-2 rounded-md border border-border bg-surface/40 p-0.5"><button type="button" onClick={() => setView("classified")} className={cn("rounded px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em]", view === "classified" ? "bg-bg text-fg shadow-sm" : "text-muted hover:text-fg")}>VINDY 2.0</button><button type="button" onClick={() => setView("all")} className={cn("rounded px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em]", view === "all" ? "bg-bg text-fg shadow-sm" : "text-muted hover:text-fg")}>All Pages</button></div></div><nav className="min-h-0 flex-1 space-y-2 overflow-y-auto px-2 pb-4 pr-1 [scrollbar-width:thin]">{view === "classified" ? <><CommandGroup role={role} /><PlanningGroup role={role} /><ClassifiedMode mode="understand" role={role} /><ClassifiedMode mode="observe" role={role} /><ClassifiedMode mode="operate" role={role} /><ClassifiedMode mode="showcase" role={role} /></> : <details open><summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-subtle"><Settings2 className="size-3.5" /><span className="flex-1">All Classified Pages</span><span className="text-[9px] text-muted">{allPages.length}</span></summary><div className="mt-2 space-y-1">{allPages.filter((p) => canAccessPage(role, p)).map((page) => <PageLink key={page.route} page={page} role={role} />)}</div></details>}</nav><div className="px-3 pt-3"><button type="button" onClick={logout} disabled={loggingOut} className="flex w-full items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted hover:bg-surface hover:text-fg disabled:opacity-50"><LogOut className="size-4" />{loggingOut ? "Logging out…" : `Log out${viewer ? " · User" : role === "admin" ? " · Admin" : ""}`}</button></div></aside><div className="min-w-0 flex-1"><MobileNavigation view={view} role={role} allPages={allPages} setView={setView} logout={logout} loggingOut={loggingOut} /><div className="px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8"><ContextBack /><FlowGuide role={role} /><FinanceWorkspaceTabs /><SupplyWorkspaceTabs /><CommercialWorkspaceTabs /><EngineeringWorkspaceTabs /><div className={cn(viewer && "pointer-events-none select-none opacity-95")}><fieldset disabled={viewer} className="m-0 min-w-0 border-0 p-0"><Outlet /></fieldset></div></div></div></div></div>;
+  return <div className="min-h-dvh bg-bg"><SiteHeader /><div className="mx-auto flex max-w-7xl"><aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-72 shrink-0 flex-col border-r border-border py-6 lg:flex"><p className="px-5 pb-3 text-[10px] uppercase tracking-[0.2em] text-subtle">VINDY 2.0 · Command</p><div className="px-3 pb-3"><div className="grid grid-cols-2 rounded-md border border-border bg-surface/40 p-0.5"><button type="button" onClick={() => setView("classified")} className={cn("rounded px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em]", view === "classified" ? "bg-bg text-fg shadow-sm" : "text-muted hover:text-fg")}>VINDY 2.0</button><button type="button" onClick={() => setView("all")} className={cn("rounded px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em]", view === "all" ? "bg-bg text-fg shadow-sm" : "text-muted hover:text-fg")}>All Pages</button></div></div><nav className="min-h-0 flex-1 space-y-2 overflow-y-auto px-2 pb-4 pr-1 [scrollbar-width:thin]">{view === "classified" ? <><CommandGroup role={role} /><PlanningGroup role={role} /><ClassifiedMode mode="understand" role={role} /><ClassifiedMode mode="observe" role={role} /><ClassifiedMode mode="operate" role={role} /><ClassifiedMode mode="showcase" role={role} /></> : <details open><summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-subtle"><Settings2 className="size-3.5" /><span className="flex-1">All Classified Pages</span><span className="text-[9px] text-muted">{allPages.length}</span></summary><div className="mt-2 space-y-1">{allPages.filter((p) => canAccessPage(role, p)).map((page) => <PageLink key={page.route} page={page} role={role} />)}</div></details>}</nav><div className="px-3 pt-3"><button type="button" onClick={logout} disabled={loggingOut} className="flex w-full items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted hover:bg-surface hover:text-fg disabled:opacity-50"><LogOut className="size-4" />{loggingOut ? "Logging out…" : `Log out${viewer ? " · User" : role === "admin" ? " · Admin" : ""}`}</button></div></aside><div className="min-w-0 flex-1"><MobileNavigation view={view} role={role} allPages={allPages} setView={setView} logout={logout} loggingOut={loggingOut} /><div className="px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8"><ContextBack /><FlowGuide role={role} /><FinanceWorkspaceTabs /><SupplyWorkspaceTabs /><CommercialWorkspaceTabs /><EngineeringWorkspaceTabs /><GovernanceWorkspaceTabs /><div className={cn(viewer && "pointer-events-none select-none opacity-95")}><fieldset disabled={viewer} className="m-0 min-w-0 border-0 p-0"><Outlet /></fieldset></div></div></div></div></div>;
 }
