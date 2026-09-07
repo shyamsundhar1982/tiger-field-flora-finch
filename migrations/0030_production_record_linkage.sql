@@ -71,10 +71,10 @@ declare
   v_engineering_revision text:=trim(coalesce(p_engineering_revision,''));
   v_supplier text:=trim(coalesce(p_supplier,''));
 begin
-  select id,sales_order_id,sales_order_revision,status,units,model_tier,variant_id,bom_revision
+  select jc.id,jc.sales_order_id,jc.sales_order_revision,jc.status,jc.units,jc.model_tier,jc.variant_id,jc.bom_revision
     into c
-    from epr_production_job_cards
-   where id=p_job_card_id
+    from epr_production_job_cards jc
+   where jc.id=p_job_card_id
    for update;
   if not found then raise exception 'Production job card not found.'; end if;
   if c.status not in ('released','in_progress') then
@@ -91,14 +91,14 @@ begin
   end if;
   if v_serial='' then raise exception 'Serial number is required.'; end if;
   if v_engineering_revision='' then raise exception 'Engineering revision is required.'; end if;
-  if exists(select 1 from epr_travellers where serial_number=v_serial) then
+  if exists(select 1 from epr_travellers tr where tr.serial_number=v_serial) then
     raise exception 'Serial number % already exists.',v_serial;
   end if;
 
   select count(*)::integer
     into v_active_count
-    from epr_travellers
-   where job_card_id=c.id and status<>'rejected';
+    from epr_travellers tr
+   where tr.job_card_id=c.id and tr.status<>'rejected';
   if v_active_count >= ceil(c.units)::integer then
     raise exception 'Job card % already has % active/completed traveller(s) for % unit(s).',c.id,v_active_count,c.units;
   end if;
