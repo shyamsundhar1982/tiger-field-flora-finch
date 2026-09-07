@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { BOARD_DECISIONS, DILIGENCE_ITEMS, INVESTOR_BOARD_STATUS, INVESTOR_MILESTONES, INVESTOR_NEXT_ACTIONS, INVESTOR_PROOF_POINTS, USE_OF_PROCEEDS } from "@/lib/data/investor-board";
 
 export const Route = createFileRoute("/command/investor-board")({ component: InvestorBoardPage });
@@ -14,7 +14,8 @@ function InvestorBoardPage() {
     <header>
       <p className="text-[10px] uppercase tracking-[0.2em] text-subtle">Stage 9 · Investor / Board</p>
       <h1 className="mt-2 text-2xl font-semibold tracking-tight">Capital, diligence & decisions</h1>
-      <p className="mt-2 max-w-3xl text-sm text-muted">{INVESTOR_BOARD_STATUS.headline} This layer converts the existing control registers into an investor-facing readiness and board-decision view.</p>
+      <p className="mt-2 max-w-3xl text-sm text-muted">{INVESTOR_BOARD_STATUS.headline} This read-only layer converts the existing control registers into an investor-facing readiness and board-decision view; it does not replace operational evidence.</p>
+      <div className="mt-3 flex flex-wrap gap-3 text-sm font-semibold"><Link to="/command/financial-cockpit" className="text-accent">Finance evidence →</Link><Link to="/command/inventory-truth" className="text-accent">Inventory evidence →</Link><Link to="/command/governance" className="text-accent">Governance register →</Link></div>
     </header>
 
     <section className="grid gap-3 sm:grid-cols-4">

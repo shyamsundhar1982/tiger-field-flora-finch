@@ -26,7 +26,7 @@ function PlatformWalkthrough() {
     <header>
       <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">VINDY · Showcase Mode</p>
       <h1 className="mt-1 font-display text-4xl">Platform Walkthrough</h1>
-      <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">A guided demonstration of how VINDY turns a business operating model into one connected command system — from knowledge and observation through execution, decision and governance.</p>
+      <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">A guided, read-only demonstration of how VINDY turns a business operating model into one connected command system — from knowledge and observation through execution, decision and governance. Follow the linked command controls for source evidence.</p>
       <div className="mt-4 flex flex-wrap gap-2"><span className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs">Showcase</span><span className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs">End-to-end</span><span className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs">Evidence-led</span></div>
     </header>
 

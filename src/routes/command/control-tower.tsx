@@ -17,6 +17,7 @@ function ControlTower() {
       <p className="text-[11px] uppercase tracking-[0.22em] text-green">VINDY · Vāyú Shastr · Executive overview</p>
       <h1 className="mt-2 font-display text-4xl text-accent">Control Tower</h1>
       <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">The cross-functional command screen: see what is blocking engineering, money, manufacturing, quality and release before moving the next gate.</p>
+      <div className="mt-3 flex flex-wrap gap-3 text-sm font-semibold"><Link to="/command/inventory-truth" className="text-accent">Inventory evidence →</Link><Link to="/command/financial-cockpit" className="text-accent">Finance evidence →</Link><Link to="/command/procurement" className="text-accent">Procurement queue →</Link></div>
     </header>
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <Kpi label="Current identity" value="VINDY" hint="VéLOXIS retired" />

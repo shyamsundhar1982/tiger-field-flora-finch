@@ -17,5 +17,11 @@ export const routeOwnership:Record<string,RouteOwnership>={
   '/command/financial-cockpit':{canonicalRoute:'/command/financial-cockpit',source:'planning',mutability:'read-only',notes:'Executive projection consuming planning assumptions and accounting model outputs.'},
   '/command/balance-sheet':{canonicalRoute:'/command/balance-sheet',source:'planning',mutability:'read-only',notes:'Management accounting projection requiring CA reconciliation before statutory use.'},
   '/command/cash':{canonicalRoute:'/command/cash',source:'planning',mutability:'editable',notes:'Scenario cash and working-capital projection; inventory facts remain in Inventory Truth.'},
+  '/command/control-tower':{canonicalRoute:'/command/control-tower',source:'operational',mutability:'read-only',notes:'Executive read model linking gate status to operational evidence.'},
+  '/command/management-intelligence':{canonicalRoute:'/command/management-intelligence',source:'planning',mutability:'read-only',notes:'Management projection; figures remain assumptions until evidence is reconciled.'},
+  '/command/investor-board':{canonicalRoute:'/command/investor-board',source:'showcase',mutability:'read-only',notes:'Board and investor decision read model over controlled registers.'},
+  '/command/investor-pitch':{canonicalRoute:'/command/investor-pitch',source:'showcase',mutability:'read-only',notes:'Presentation layer; planning outputs and claims require source-register evidence.'},
+  '/command/stakeholder-portal':{canonicalRoute:'/command/stakeholder-portal',source:'showcase',mutability:'read-only',notes:'External read-only narrative separating verified, modeled and pending states.'},
+  '/command/platform-walkthrough':{canonicalRoute:'/command/platform-walkthrough',source:'showcase',mutability:'read-only',notes:'Guided read-only demonstration linking back to command source evidence.'},
 };
 export const getRouteOwnership=(route:string)=>routeOwnership[route];
