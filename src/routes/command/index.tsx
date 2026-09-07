@@ -1,34 +1,148 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Kpi, Panel } from "@/components/kpi";
-import { TRANCHES } from "@/lib/data/company";
-import { ACTIONS } from "@/lib/data/actions";
+import { DECISION_PACKETS, DECISION_STATE_LABELS, decisionPriorityRank } from "@/lib/data/decision-engine";
+import { FOUNDER_ACTIONS, FOUNDER_GATES, FOUNDER_STATUS_LABELS } from "@/lib/data/founder-command";
 import { buildModel, minCash, totals } from "@/lib/finance/model";
 import { lakh } from "@/lib/format";
 import { useVeloxis } from "@/lib/store";
 
-export const Route = createFileRoute("/command/")({ component: Board });
+export const Route = createFileRoute("/command/")({ component: CommandCentre });
 
-const STAGES = [
-  { n: 1, label: "Command Board", to: "/command" as const }, { n: 2, label: "Knowledge Base", to: "/command/knowledge" as const }, { n: 3, label: "Engineering Control", to: "/command/technical" as const }, { n: 4, label: "Financial Planning Control · 36M", to: "/command/financial-cockpit" as const }, { n: 5, label: "Funding Intelligence", to: "/command/funding" as const }, { n: 6, label: "Legal / IP / CA Control", to: "/command/legal-control" as const }, { n: 7, label: "Manufacturing Control", to: "/command/manufacturing" as const }, { n: 8, label: "Founder Command", to: "/command/founder-command" as const }, { n: 9, label: "Investor / Board", to: "/command/investor-board" as const }, { n: 10, label: "AI / Knowledge", to: "/command/ai-knowledge" as const }, { n: 11, label: "QA / Verification", to: "/command/qa-verification" as const }, { n: 12, label: "Final Deployment Readiness", to: "/command/deployment-readiness" as const },
-];
-const FINANCE_WORKSPACES = [
-  { label: "Financial Cockpit", to: "/command/financial-cockpit" as const, note: "Cash safety, funding, burn, gross profit, break-even and the 36-month trajectory" }, { label: "Plan & Assumptions", to: "/command/finance-assumptions" as const, note: "Single source of truth for ASP, COGS, volume, mix, launch, opex, capex and funding" }, { label: "Scenarios", to: "/command/scenarios" as const, note: "Base, Delayed and Stress compared side-by-side without changing the underlying model" }, { label: "Cash & Working Capital", to: "/command/cash" as const, note: "Sources, uses, inventory cash, minimum cash policy, trough and runway" }, { label: "Master Financial Dashboard", to: "/command/master-finance" as const, note: "Consolidated Aluminium + Carbon production, sales, gross profit, funding, capex, inventory and cash" }, { label: "Portfolio Finance", to: "/command/finance-control" as const, note: "Editable 36-month portfolio model across Aluminium, Carbon and Premium Carbon" }, { label: "Aluminium Financial Vertical", to: "/command/aluminium-finance" as const, note: "Standalone entity: own ASP, COGS, launch, opex, capex, inventory, funding and cash" }, { label: "Balance Sheet", to: "/command/balance-sheet" as const, note: "36-month management position view + CA reconciliation checklist" }, { label: "CA Verification / Audit", to: "/command/ca-audit" as const, note: "Professional-review queue, evidence and sign-off protocol" }, { label: "Investor Pitch", to: "/command/investor-pitch" as const, note: "Controlled investor narrative and 24-month operating view" }, { label: "External Investor Pitch", to: "/command/investor-pitch-external" as const, note: "Dedicated investor presentation hosted on the approved external pitch destination" },
-];
-const OPERATIONS_WORKSPACES = [
-  { label: "Phase 4 · Sales & Revenue", to: "/command/phase-4" as const, note: "Recovered commercial gate: plan → orders → revenue → receivables → collections → cash" }, { label: "Sales Planning", to: "/command/sales" as const, note: "Detailed 36-month sales, order book, actuals, collections and AR surface" }, { label: "Phase 5 · Engineering + Tooling + Quality", to: "/command/phase-5" as const, note: "Recovered prerequisite gate before pilot: engineering, ECR, FEA, supplier, tooling, QC and ISO path" }, { label: "Engineering Control", to: "/command/engineering" as const, note: "Revision/ECR control connected to BOM, COGS, weight, production and inventory impact" }, { label: "Quality Control", to: "/command/quality" as const, note: "Inspection, NCR/CAPA, warranty and failure-analysis controls" }, { label: "Inventory Planning", to: "/command/inventory" as const, note: "Inventory as cash: reorder exposure, planned purchase draw, stock position and runway connection" }, { label: "Production Planning", to: "/command/production" as const, note: "Translate financial assumptions into monthly units, product mix, production spend and cash impact" }, { label: "Manufacturing Controls", to: "/command/manufacturing" as const, note: "Supplier, tooling, pilot, traceability, quality and release controls" }, { label: "Phase 6 · Pilot Production", to: "/command/phase-6" as const, note: "Controlled pilot transition with Vāyú branding and the corrected VéLOXIS engineering register" }, { label: "Phase 6A · EPR Execution", to: "/command/phase-6a" as const, note: "VINDY + Vāyú controlled pilot execution, evidence capture, deviation control and release gate" }, { label: "Component Control", to: "/command/inventory" as const, note: "Components, stock, reorder levels, tier eligibility and configuration availability" }, { label: "Market Survey", to: "/command/market-survey" as const, note: "India market evidence, material mix and VéLOXIS price-positioning framework" },
-];
-function Board() {
-  const scenario = useVeloxis((s) => s.scenario); const drawStandby = useVeloxis((s) => s.drawStandby); const actionState = useVeloxis((s) => s.actions); const rows = useMemo(() => buildModel(scenario, drawStandby), [scenario, drawStandby]); const cashRows = rows.slice(0, 24); const t = totals(rows); const trough = minCash(rows); const openActions = ACTIONS.filter((a) => a.window === "2w" && actionState[a.id] !== "done"); const m11 = rows[10];
-  return <div className="space-y-6"><div><p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Board pack · M1</p><h1 className="font-display text-4xl">VéLOXIS command</h1><p className="mt-2 max-w-2xl text-sm text-muted">The command layer now puts financial planning first: one live model, one assumptions surface, three scenarios and connected operating workspaces.</p></div>
-    <Panel title="Financial planning first" kicker="Start here"><div className="grid gap-3 md:grid-cols-3"><Link to="/command/financial-cockpit" className="rounded-xl border border-accent bg-accent/10 p-4"><p className="text-sm font-semibold text-fg">1 · Financial Cockpit</p><p className="mt-2 text-xs leading-5 text-muted">Are we safe? Cash, burn, funding, margin, break-even.</p></Link><Link to="/command/finance-assumptions" className="rounded-xl border border-border bg-surface p-4"><p className="text-sm font-semibold text-fg">2 · Plan & Assumptions</p><p className="mt-2 text-xs leading-5 text-muted">What can we change? ASP, COGS, volume, opex, capex.</p></Link><Link to="/command/scenarios" className="rounded-xl border border-border bg-surface p-4"><p className="text-sm font-semibold text-fg">3 · Scenarios</p><p className="mt-2 text-xs leading-5 text-muted">What happens if timing or costs move?</p></Link></div></Panel>
-    <Panel title="Recovered Phase 4 → Phase 6A execution chain" kicker="Historical continuity restored"><div className="grid gap-2 md:grid-cols-5">{[["04","Commercial","/command/phase-4"],["05","Engineering / Tooling / QC","/command/phase-5"],["06","Pilot Production","/command/phase-6"],["06A","EPR Execution","/command/phase-6a"],["DR","Evidence / Release","/command/deployment-readiness"]].map(([n,title,to])=><Link key={n} to={to as any} className="rounded-xl border border-border bg-bg-elevated/40 p-4 hover:border-accent"><span className="text-[10px] font-bold tracking-[0.16em] text-accent">{n}</span><p className="mt-2 text-sm font-semibold text-fg">{title}</p><p className="mt-1 text-xs leading-5 text-muted">Open controlled stage</p></Link>)}</div><p className="mt-3 text-xs leading-5 text-subtle">Phase 4 was previously implemented as the Sales & Revenue Engine; Phase 5 was implemented through engineering and quality control workspaces. The stage wrappers restore the missing execution continuity without duplicating the underlying engines.</p></Panel>
-    <Panel title="12-stage execution roadmap" kicker="Command architecture"><div className="rounded-xl border border-border bg-bg-elevated/30 p-3"><div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{STAGES.map((stage)=><Link key={stage.n} to={stage.to} activeOptions={{exact:stage.n===1}} className="group flex items-start gap-3 rounded-lg border border-border bg-bg-elevated/95 p-3 transition-colors duration-200 hover:border-accent/45 hover:bg-bg" activeProps={{className:"bg-bg border-accent"}}><span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-border text-xs tabular-nums text-accent">{stage.n}</span><span className="min-w-0"><span className="block text-[10px] uppercase tracking-[0.14em] text-subtle">Stage {stage.n}</span><span className="mt-0.5 block text-sm font-medium text-fg group-hover:text-accent">{stage.label}</span></span></Link>)}</div></div></Panel>
-    <Panel title="Dedicated finance & fundraising workspaces" kicker="Connected model surfaces"><div className="rounded-xl border border-border bg-bg-elevated/30 p-3"><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{FINANCE_WORKSPACES.map((page)=><Link key={page.to} to={page.to} className="group rounded-lg border border-border bg-bg-elevated/95 p-4 transition-colors duration-200 hover:border-accent/45 hover:bg-bg"><p className="text-sm font-medium text-fg group-hover:text-accent">{page.label}</p><p className="mt-2 text-xs leading-5 text-muted group-hover:text-fg/80">{page.note}</p></Link>)}</div></div></Panel>
-    <Panel title="Operations & market intelligence" kicker="Connected operating model"><div className="rounded-xl border border-border bg-bg-elevated/30 p-3"><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{OPERATIONS_WORKSPACES.map((page)=><Link key={page.to} to={page.to} className="group rounded-lg border border-border bg-bg-elevated/95 p-4 transition-colors duration-200 hover:border-accent/45 hover:bg-bg"><p className="text-sm font-medium text-fg group-hover:text-accent">{page.label}</p><p className="mt-2 text-xs leading-5 text-muted group-hover:text-fg/80">{page.note}</p></Link>)}</div></div></Panel>
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Kpi label="36-mo funding" value={lakh(t.funding,0)} hint={`${scenario} scenario`} /><Kpi label="Cash trough" value={lakh(trough.cash)} hint={`M${trough.m}`} tone={trough.cash<8?"danger":trough.cash<15?"warn":"ok"} /><Kpi label="M9–M11 gap" value={drawStandby?"Closed":"Open"} hint={drawStandby?`Standby on · M11 close ${lakh(m11.closing)}`:"Enable standby CN"} tone={drawStandby?"ok":"danger"} /><Kpi label="Units by M36" value={String(t.units)} hint={`Revenue ${lakh(t.revenue,0)}`} /></div>
-    <Panel title="Cash" kicker="Opening → close, ₹ L · 24 months"><div className="h-56"><ResponsiveContainer width="100%" height="100%"><AreaChart data={cashRows}><CartesianGrid stroke="rgba(236,234,228,0.06)" vertical={false}/><XAxis dataKey="m" tickFormatter={(v)=>`M${v}`} stroke="#8e8b84" fontSize={11}/><YAxis stroke="#8e8b84" fontSize={11}/><Tooltip contentStyle={{background:"#131316",border:"1px solid #2a2a2e",borderRadius:8}} labelFormatter={(v)=>`Month ${v}`} formatter={(v)=>lakh(Number(v))}/><Area type="monotone" dataKey="closing" stroke="#c9c4b8" fill="rgba(201,196,184,0.15)"/></AreaChart></ResponsiveContainer></div></Panel>
-    <div className="grid gap-4 lg:grid-cols-2"><Panel title="Tranches" kicker="Preserved architecture"><ol className="space-y-3">{TRANCHES.map((tr)=><li key={tr.id} className="flex gap-3 text-sm"><span className="w-12 shrink-0 tabular-nums text-accent">{tr.id}</span><span className="flex-1"><span className="text-fg">{tr.name} · {lakh(tr.amount,0)} · M{tr.month}</span><span className="mt-0.5 block text-xs text-muted">{tr.deliverable}</span></span></li>)}</ol></Panel><Panel title="This fortnight" kicker={`${openActions.length} open`}><ul className="space-y-3 text-sm">{openActions.slice(0,6).map((a)=><li key={a.id}><p className="text-fg">{a.title}</p><p className="text-xs text-muted">{a.why}</p></li>)}</ul><Link to="/command/actions" className="mt-4 inline-block text-sm text-accent hover:text-fg">Open action log</Link></Panel></div>
-  </div>;
+const PRIORITY_RANK = { critical: 0, high: 1, normal: 2 } as const;
+
+function CommandCentre() {
+  const scenario = useVeloxis((s) => s.scenario);
+  const drawStandby = useVeloxis((s) => s.drawStandby);
+  const rows = useMemo(() => buildModel(scenario, drawStandby), [scenario, drawStandby]);
+  const t = totals(rows);
+  const trough = minCash(rows);
+  const blockedActions = FOUNDER_ACTIONS.filter((action) => action.status === "blocked");
+  const activeActions = FOUNDER_ACTIONS.filter((action) => action.status === "active");
+  const nextActions = [...FOUNDER_ACTIONS]
+    .filter((action) => action.status !== "complete" && action.status !== "waiting")
+    .sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority]);
+  const decisions = [...DECISION_PACKETS]
+    .sort((a, b) => decisionPriorityRank[a.priority] - decisionPriorityRank[b.priority])
+    .slice(0, 5);
+  const approvals = DECISION_PACKETS.filter((packet) => packet.state === "approval").length;
+  const blockedDecisions = DECISION_PACKETS.filter((packet) => packet.state === "blocked").length;
+  const cashTone = trough.cash < 0 ? "danger" : trough.cash < 15 ? "warn" : "ok";
+
+  return (
+    <div className="space-y-6">
+      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.2em] text-green">VINDY · Executive operating view</p>
+          <h1 className="mt-1 font-display text-4xl text-accent">Command Centre</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">One screen for what needs attention now: financial health, blockers, decisions, accountable actions and the next operating gate. Detailed work stays in its specialist workspace.</p>
+        </div>
+        <div className="flex flex-wrap gap-3 text-sm font-semibold">
+          <Link to="/command/planning" className="text-accent hover:text-fg">Master Plan →</Link>
+          <Link to="/command/governance" className="text-accent hover:text-fg">Governance →</Link>
+          <Link to="/command/founder-command" className="text-muted hover:text-fg">Action & evidence ledger →</Link>
+        </div>
+      </header>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Kpi label="Cash trough" value={lakh(trough.cash)} hint={`M${trough.m} · ${scenario}`} tone={cashTone} />
+        <Kpi label="Blocked actions" value={String(blockedActions.length)} hint={`${activeActions.length} active`} tone={blockedActions.length ? "warn" : "ok"} />
+        <Kpi label="Decisions pending" value={String(approvals + blockedDecisions)} hint={`${approvals} approval · ${blockedDecisions} blocked`} tone={blockedDecisions ? "warn" : "ok"} />
+        <Kpi label="36M funding" value={lakh(t.funding, 0)} hint={`${t.units} planned units`} />
+      </div>
+
+      <Panel title="Needs attention" kicker="Exceptions only · highest priority first">
+        <div className="space-y-2">
+          {decisions.map((packet) => (
+            <div key={packet.id} className="grid gap-3 rounded-lg border border-border bg-surface p-4 lg:grid-cols-[7rem_1.3fr_1fr_auto] lg:items-center">
+              <div>
+                <p className="text-xs font-semibold text-accent">{packet.id}</p>
+                <p className="mt-1 text-[10px] uppercase tracking-wider text-subtle">{packet.priority}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-fg">{packet.title}</p>
+                <p className="mt-1 text-xs leading-5 text-muted">{packet.nextAction}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-subtle">State</p>
+                <p className="mt-1 text-xs text-muted">{DECISION_STATE_LABELS[packet.state]}</p>
+              </div>
+              <Link to={packet.source as never} className="text-xs font-semibold text-accent hover:text-fg">Open source →</Link>
+            </div>
+          ))}
+        </div>
+      </Panel>
+
+      <Panel title="Next accountable actions" kicker="Do · verify · close">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[52rem] text-left text-sm">
+            <thead className="text-[10px] uppercase tracking-[0.14em] text-subtle">
+              <tr><th className="py-2 pr-3">ID</th><th className="py-2 pr-3">Action</th><th className="py-2 pr-3">Owner</th><th className="py-2 pr-3">Stage</th><th className="py-2 pr-3">Status</th><th className="py-2">Dependency / outcome</th></tr>
+            </thead>
+            <tbody>
+              {nextActions.slice(0, 6).map((action) => (
+                <tr key={action.id} className="border-t border-border align-top">
+                  <td className="py-3 pr-3 text-accent">{action.id}</td>
+                  <td className="py-3 pr-3 font-medium text-fg">{action.title}</td>
+                  <td className="py-3 pr-3 text-muted">{action.owner}</td>
+                  <td className="py-3 pr-3 text-muted">{action.stage}</td>
+                  <td className="py-3 pr-3 text-muted">{FOUNDER_STATUS_LABELS[action.status]}</td>
+                  <td className="py-3 text-xs leading-5 text-muted">{action.dependency ?? action.outcome}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link to="/command/founder-command" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:border-accent hover:text-fg">Open full action & evidence ledger</Link>
+          <Link to="/command/actions" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:border-accent hover:text-fg">Action log</Link>
+        </div>
+      </Panel>
+
+      <Panel title="Operating gates" kicker="Advance only with evidence">
+        <div className="grid gap-3 md:grid-cols-5">
+          {FOUNDER_GATES.map((gate) => {
+            const gateActions = FOUNDER_ACTIONS.filter((action) => gate.controls.includes(action.id as never));
+            const blocked = gateActions.some((action) => action.status === "blocked");
+            const active = gateActions.some((action) => action.status === "active" || action.status === "next");
+            return (
+              <div key={gate.gate} className="rounded-lg border border-border p-4">
+                <div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold text-accent">{gate.gate}</span><span className={blocked ? "text-[10px] uppercase tracking-wider text-warn" : active ? "text-[10px] uppercase tracking-wider text-green" : "text-[10px] uppercase tracking-wider text-subtle"}>{blocked ? "Blocked" : active ? "Active" : "Waiting"}</span></div>
+                <p className="mt-2 text-sm font-medium text-fg">{gate.title}</p>
+                <p className="mt-1 text-xs text-muted">{gate.when} · {gate.controls.join(" · ")}</p>
+              </div>
+            );
+          })}
+        </div>
+      </Panel>
+
+      <Panel title="Go to the work" kicker="One canonical destination per function">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            ["Master Plan", "Roadmap, demand, procurement, production, finance and scenarios", "/command/planning"],
+            ["Finance", "Cash, assumptions, funding, balance sheet and CA verification", "/command/financial-cockpit"],
+            ["Supply & Production", "Procurement, inventory, production and quality", "/command/inventory"],
+            ["Engineering", "Product, BOM, revisions, tooling and validation", "/command/engineering"],
+            ["Commercial", "Demand, orders, sales forecast and GTM", "/command/sales"],
+            ["Governance", "Risks, approvals, evidence and audit trail", "/command/governance"],
+          ].map(([title, note, to]) => (
+            <Link key={to} to={to as never} className="rounded-lg border border-border p-4 transition-colors hover:border-accent/50 hover:bg-surface">
+              <p className="text-sm font-semibold text-fg">{title}</p>
+              <p className="mt-1 text-xs leading-5 text-muted">{note}</p>
+            </Link>
+          ))}
+        </div>
+      </Panel>
+
+      <details className="rounded-lg border border-border bg-surface/40 p-4">
+        <summary className="cursor-pointer text-sm font-medium text-fg">Support & methodology</summary>
+        <div className="mt-3 grid gap-2 text-xs text-muted sm:grid-cols-2 lg:grid-cols-3">
+          <Link to="/command/founder-command" className="rounded-md border border-border p-3 hover:border-accent hover:text-fg">Founder action & evidence ledger</Link>
+          <Link to="/command/investor-board" className="rounded-md border border-border p-3 hover:border-accent hover:text-fg">Investor / board evidence</Link>
+          <Link to="/command/classification" className="rounded-md border border-border p-3 hover:border-accent hover:text-fg">Classification register</Link>
+        </div>
+        <p className="mt-3 text-xs leading-5 text-subtle">Command Centre surfaces only information that changes a decision, triggers an action, records evidence or explains a material exception. Detailed calculations remain in their canonical functional workspaces.</p>
+      </details>
+    </div>
+  );
 }
