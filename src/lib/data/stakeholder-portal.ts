@@ -11,9 +11,9 @@ export const STAKEHOLDER_SECTIONS = [
   { id: "thesis", title: "Investment thesis", summary: "Indigenous carbon bicycle platform focused on Indian body geometry, controlled engineering and asset-light execution.", status: "ready" as StakeholderStatus, route: "/command/investor-pitch" },
   { id: "product", title: "Product & engineering", summary: "VAEA design language, controlled VEDM baseline, T700/T800 architecture and validation pathway.", status: "in-progress" as StakeholderStatus, route: "/command/engineering" },
   { id: "commercial", title: "Commercial model", summary: "Product tiers, launch sequence, unit economics and demand assumptions linked to the financial model.", status: "in-progress" as StakeholderStatus, route: "/command/sales" },
-  { id: "manufacturing", title: "Manufacturing", summary: "Controlled OEM qualification, pilot production, QC and evidence-led release gates.", status: "in-progress" as StakeholderStatus, route: "/command/phase-6" },
+  { id: "manufacturing", title: "Manufacturing", summary: "Controlled OEM qualification, pilot production, QC and evidence-led release gates.", status: "in-progress" as StakeholderStatus, route: "/command/operations" },
   { id: "finance", title: "Capital & financial controls", summary: "36-month model, cash guardrails, funding ladder and use-of-proceeds controls.", status: "ready" as StakeholderStatus, route: "/command/financial-cockpit" },
-  { id: "governance", title: "Governance & diligence", summary: "Decision gates, audit evidence, ownership controls and diligence readiness.", status: "in-progress" as StakeholderStatus, route: "/command/investor-board" },
+  { id: "governance", title: "Governance & diligence", summary: "Decision gates, audit evidence, ownership controls and diligence readiness.", status: "in-progress" as StakeholderStatus, route: "/command/governance" },
 ] as const;
 
 export const STAKEHOLDER_DISCLOSURES = [
