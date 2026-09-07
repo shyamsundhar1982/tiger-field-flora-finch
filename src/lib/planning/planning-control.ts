@@ -11,7 +11,7 @@ import {
   type OperatingPlan,
 } from "@/lib/planning/operating-plan";
 
-const monthSchema = z.number().int().min(1).max(36);
+const monthSchema = z.number().int().min(-120).max(36);
 const operatingPlanSchema = z.object({
   schemaVersion: z.literal(1),
   horizonStart: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
