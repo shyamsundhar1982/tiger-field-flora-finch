@@ -50,7 +50,7 @@ export const getPurchaseHistoryData = createServerFn({ method: "GET" }).handler(
         sum(i.gst_inr) filter (where i.status <> 'void') as gst_inr,
         sum(i.amount_ex_gst_inr + i.gst_inr) filter (where i.status <> 'void') as invoice_total_inr,
         sum(coalesce(pay.amount_paid_inr, 0)) filter (where i.status <> 'void') as amount_paid_inr,
-        max(i.due_on)::text filter (where i.status <> 'void') as latest_due_on,
+        (max(i.due_on) filter (where i.status <> 'void'))::text as latest_due_on,
         max(pay.last_paid_on) filter (where i.status <> 'void') as last_paid_on
       from vyndi_supplier_invoices i
       left join payment_summary pay on pay.supplier_invoice_id = i.id
