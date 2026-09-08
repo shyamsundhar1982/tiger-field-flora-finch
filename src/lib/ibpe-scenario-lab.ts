@@ -3,12 +3,11 @@ import { getSql, type Sql } from "@/lib/db";
 import { getCommandRole } from "@/lib/command-access";
 import { canPerform } from "@/lib/page-access";
 import {
-  runIntegratedBusinessPlanningEngine,
   type CashFlow,
-  type IntegratedPlanningInput,
   type IntegratedPlanningResult,
   type PlanningScenario,
 } from "@/lib/integrated-business-planning-engine";
+import { runRuntimeIbpe, type RuntimeIbpeInput } from "@/lib/ibpe-runtime-parity";
 
 export type IbpeScenarioRequest = PlanningScenario;
 
@@ -48,7 +47,7 @@ type SnapshotRow = {
   input_hash: string;
   source_sha: string;
   snapshot_at: string;
-  input_json: IntegratedPlanningInput;
+  input_json: RuntimeIbpeInput;
   result_json: IntegratedPlanningResult;
 };
 
@@ -77,14 +76,14 @@ function sanitizeScenario(value: IbpeScenarioRequest): IbpeScenarioRequest {
   };
 }
 
-function cloneInput(input: IntegratedPlanningInput): IntegratedPlanningInput {
-  return JSON.parse(JSON.stringify(input)) as IntegratedPlanningInput;
+function cloneInput(input: RuntimeIbpeInput): RuntimeIbpeInput {
+  return JSON.parse(JSON.stringify(input)) as RuntimeIbpeInput;
 }
 
 export function applyIbpeScenario(
-  source: IntegratedPlanningInput,
+  source: RuntimeIbpeInput,
   rawScenario: IbpeScenarioRequest,
-): IntegratedPlanningInput {
+): RuntimeIbpeInput {
   const scenario = sanitizeScenario(rawScenario);
   const input = cloneInput(source);
   const demandMultiplier = scenario.demandMultiplier ?? 1;
@@ -191,7 +190,7 @@ export async function evaluateScenario(sql: Sql, rawScenario: IbpeScenarioReques
   // The persisted result is the governed baseline. Do not silently regenerate it
   // under a different source revision and then call that regenerated value "baseline".
   const baseline = snapshot.result_json;
-  const result = runIntegratedBusinessPlanningEngine(scenarioInput, { horizonMonths: 36 });
+  const result = runRuntimeIbpe(scenarioInput, { horizonMonths: 36 });
   return {
     lineage: {
       governedRunId: snapshot.id,
