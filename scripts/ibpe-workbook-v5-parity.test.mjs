@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 import { pendingMigrations } from "./migration-plan.mjs";
-import { runIntegratedBusinessPlanningEngine } from "../src/lib/integrated-business-planning-engine.ts";
+import { runRuntimeIbpe } from "../src/lib/ibpe-runtime-parity.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const migrationsDir = join(here, "..", "migrations");
@@ -62,7 +62,7 @@ test("workbook v5 planning authorities reproduce the controlled supply/capacity 
   assert.equal(Number(capacity.rows[0].last_sequence), 80);
 });
 
-test("IBPE consumes lead time, MOQ/order multiple and explicit capacity without creating transactions", () => {
+test("Stage 2 IBPE applies lead time, MOQ/order multiple, payment lag and unique-month capacity semantics", () => {
   const input = {
     demand: [{
       id: "M4-aluminium",
@@ -98,12 +98,10 @@ test("IBPE consumes lead time, MOQ/order multiple and explicit capacity without 
     }],
     reservations: [],
     receipts: [],
-    capacity: [{
-      id: "WC-030-M4",
-      period: 4,
-      capacityUnits: 4,
-      sourceRef: "WORKBOOK-V5:WC-030",
-    }],
+    capacity: [
+      { id: "WC-030-M4", period: 4, capacityUnits: 4, sourceRef: "WORKBOOK-V5:WC-030" },
+      { id: "WC-040-M4", period: 4, capacityUnits: 3, sourceRef: "WORKBOOK-V5:WC-040" },
+    ],
     cashFlows: [],
     funding: {
       openingBankCashLakh: 10,
@@ -111,19 +109,45 @@ test("IBPE consumes lead time, MOQ/order multiple and explicit capacity without 
       restrictedCashLakh: 0,
       fundraisingLeadMonths: 3,
     },
+    runtimeControls: {
+      paymentLagBySku: { "SKU-PARITY": 1 },
+    },
   };
 
-  const result = runIntegratedBusinessPlanningEngine(input, { horizonMonths: 36 });
+  const result = runRuntimeIbpe(input, { horizonMonths: 36 });
   const buy = result.supply.find((row) => row.sku === "SKU-PARITY" && row.period === 4);
   assert.ok(buy);
   assert.equal(buy.grossRequirementQty, 5);
   assert.equal(buy.recommendedPurchaseQty, 6, "5 units rounds to the 2-unit order multiple and remains above MOQ 3");
   assert.equal(buy.orderByPeriod, 2, "M4 requirement with 2-month lead time must be ordered in M2");
-  assert.equal(result.cash.find((row) => row.period === 2).incrementalProcurementLakh, 0.06);
+  assert.equal(result.cash.find((row) => row.period === 2).incrementalProcurementLakh, 0, "payment lag must prevent cash leaving in the order month");
+  assert.equal(result.cash.find((row) => row.period === 3).incrementalProcurementLakh, 0.06, "one-month payment lag moves procurement cash from M2 to M3");
 
   const capacity = result.capacity.find((row) => row.id === "WC-030-M4");
   assert.ok(capacity);
   assert.equal(capacity.requiredUnits, 5);
   assert.equal(capacity.availableCapacityUnits, 4);
   assert.equal(capacity.shortfallUnits, 1);
+  assert.equal(result.runtimeParity.capacityShortfallConstraintRows, 2);
+  assert.equal(result.summary.capacityShortfallMonths, 1, "two constrained work centres in M4 still mean one affected month");
+  assert.equal(result.runtimeParity.paymentLagApplied, true);
+});
+
+test("Stage 2 carries procurement payments beyond M36 outside the active cash horizon", () => {
+  const input = {
+    demand: [{ id: "M36-x", productId: "x", period: 36, planQty: 1, forecastQty: 1, committedQty: 0, actualQty: 0 }],
+    bom: [{ id: "BOM-X", productId: "x", revisionId: "R1", approved: true, sku: "SKU-X", quantityPerUnit: 1 }],
+    inventory: [{ sku: "SKU-X", onHandQty: 0, unitCostLakh: 1, leadTimeMonths: 0, moq: 1, orderMultiple: 1 }],
+    reservations: [],
+    receipts: [],
+    capacity: [],
+    cashFlows: [],
+    funding: { openingBankCashLakh: 10, minimumOperatingReserveLakh: 0, restrictedCashLakh: 0, fundraisingLeadMonths: 3 },
+    runtimeControls: { paymentLagBySku: { "SKU-X": 1 } },
+  };
+
+  const result = runRuntimeIbpe(input, { horizonMonths: 36 });
+  assert.equal(result.supply.find((row) => row.sku === "SKU-X" && row.period === 36).purchaseCostLakh, 1);
+  assert.equal(result.cash.find((row) => row.period === 36).incrementalProcurementLakh, 0);
+  assert.equal(result.runtimeParity.deferredProcurementBeyondHorizonLakh, 1);
 });
