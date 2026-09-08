@@ -58,7 +58,7 @@ begin
     (id,sku,supplier_id,price_type,unit,unit_price_inr,currency,effective_from,effective_to,status,
      source_reference,notes,created_by,updated_by)
   values
-    (p_id,v_sku,v_supplier,p_price_type,vyndi_canonical_unit(p_unit),p_unit_price_inr,upper(trim(p_currency)),
+    (p_id,v_sku,v_supplier,p_price_type,vyndi_canonical_unit(p_unit),p_unit_price_inr,upper(trim(coalesce(p_currency,'INR'))),
      p_effective_from,p_effective_to,'draft',p_source_reference,coalesce(p_notes,''),p_actor_user_id,p_actor_user_id)
   on conflict (id) do update set
     sku=excluded.sku,supplier_id=excluded.supplier_id,price_type=excluded.price_type,unit=excluded.unit,
@@ -69,17 +69,17 @@ begin
   insert into vyndi_audit_events
     (id,entity_type,entity_id,action,actor_user_id,actor_role,source_reference,payload_json)
   values
-    ('AUD-'||p_id||'-DRAFT-'||replace(gen_random_uuid()::text,'-',''),'procurement_price',p_id,'drafted',
+    ('AUD-'||p_id||'-DRAFT-'||md5(random()::text||clock_timestamp()::text),'procurement_price',p_id,'drafted',
      p_actor_user_id,p_actor_role,p_source_reference,
      jsonb_build_object('sku',v_sku,'supplierId',v_supplier,'priceType',p_price_type,'unitPriceInr',p_unit_price_inr,
-       'currency',upper(trim(p_currency)),'effectiveFrom',p_effective_from,'effectiveTo',p_effective_to));
+       'currency',upper(trim(coalesce(p_currency,'INR'))),'effectiveFrom',p_effective_from,'effectiveTo',p_effective_to));
   return p_id;
 end; $$;
 
 create or replace function approve_vyndi_procurement_price(
   p_id text,p_source_reference text,p_actor_user_id text,p_actor_role text
 ) returns text language plpgsql as $$
-declare v rowtype; v_price vyndi_procurement_prices%rowtype;
+declare v_price vyndi_procurement_prices%rowtype;
 begin
   select * into v_price from vyndi_procurement_prices where id=p_id for update;
   if v_price.id is null then raise exception 'Procurement price not found.'; end if;
@@ -99,7 +99,7 @@ begin
   insert into vyndi_audit_events
     (id,entity_type,entity_id,action,actor_user_id,actor_role,source_reference,payload_json)
   values
-    ('AUD-'||p_id||'-APPROVE-'||replace(gen_random_uuid()::text,'-',''),'procurement_price',p_id,'approved',
+    ('AUD-'||p_id||'-APPROVE-'||md5(random()::text||clock_timestamp()::text),'procurement_price',p_id,'approved',
      p_actor_user_id,p_actor_role,p_source_reference,
      jsonb_build_object('sku',v_price.sku,'supplierId',v_price.supplier_id,'priceType',v_price.price_type,
        'unitPriceInr',v_price.unit_price_inr,'currency',v_price.currency));
@@ -118,7 +118,7 @@ begin
   insert into vyndi_audit_events
     (id,entity_type,entity_id,action,actor_user_id,actor_role,source_reference,payload_json)
   values
-    ('AUD-'||p_id||'-RETIRE-'||replace(gen_random_uuid()::text,'-',''),'procurement_price',p_id,'retired',
+    ('AUD-'||p_id||'-RETIRE-'||md5(random()::text||clock_timestamp()::text),'procurement_price',p_id,'retired',
      p_actor_user_id,p_actor_role,p_source_reference,'{}'::jsonb);
   return p_id;
 end; $$;
