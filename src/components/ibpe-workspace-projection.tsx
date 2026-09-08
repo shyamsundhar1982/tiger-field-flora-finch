@@ -8,7 +8,7 @@ const workspaceDomains: Array<{ routes:string[]; label:string; domains:string[] 
   { routes:["/command/operations","/command/procurement","/command/procurement-planning","/command/purchase-execution","/command/receiving","/command/inventory","/command/production","/command/production-jobcards","/command/manufacturing","/command/quality"], label:"Supply & Production", domains:["supply","inventory","procurement","capacity"] },
   { routes:["/command/sales","/command/gtm","/command/market-survey"], label:"Commercial", domains:["demand","planning"] },
   { routes:["/command/financial-cockpit","/command/finance","/command/cash","/command/payables","/command/receivables","/command/balance-sheet","/command/funding","/command/actuals"], label:"Finance", domains:["finance","funding","procurement"] },
-  { routes:["/command/governance","/command/risk","/command/legal","/command/qa-verification","/command/actions"], label:"Governance", domains:["governance","planning"] },
+  { routes:["/command/governance","/command/master-data","/command/bom-inventory-mapping","/command/risk","/command/legal","/command/qa-verification","/command/actions"], label:"Governance", domains:["governance","planning","supply"] },
   { routes:["/command","/command/control-tower","/command/decision-inbox","/command/founder-command","/command/management-intelligence","/command/decision-engine"], label:"Command", domains:["planning","demand","supply","inventory","procurement","capacity","finance","funding","governance"] },
 ];
 
@@ -30,6 +30,17 @@ function isUsableRun(value: unknown): value is IbpeRun {
     && Array.isArray(result.findings);
 }
 
+function isUsableReadiness(value: unknown): value is IbpeReadiness {
+  if (!value || typeof value !== "object") return false;
+  const readiness = value as Partial<IbpeReadiness>;
+  if (typeof readiness.ready !== "boolean" || !Array.isArray(readiness.checks) || !readiness.counts || typeof readiness.counts !== "object") return false;
+  return readiness.checks.every((check) => !!check
+    && typeof check === "object"
+    && typeof check.ready === "boolean"
+    && typeof check.label === "string"
+    && typeof check.actionTo === "string");
+}
+
 function readinessStatus(readiness: IbpeReadiness) {
   if (readiness.ready) return "Ready to create governed IBPE baseline";
   const labels = readiness.checks.filter((check) => !check.ready).map((check) => check.label);
@@ -49,6 +60,12 @@ export function IbpeWorkspaceProjection() {
     void Promise.all([getLatestIbpeRun(),getIbpeReadiness()])
       .then(([value,nextReadiness]) => {
         if (!live) return;
+        if (!isUsableReadiness(nextReadiness)) {
+          setReadiness(null);
+          if (isUsableRun(value)) setRun(value); else setRun(null);
+          setStatus("IBPE readiness response unavailable. Refresh or retry; the workspace remains usable.");
+          return;
+        }
         setReadiness(nextReadiness);
         if (value == null) {
           setRun(null);
@@ -66,6 +83,7 @@ export function IbpeWorkspaceProjection() {
       .catch((e) => {
         if (!live) return;
         setRun(null);
+        setReadiness(null);
         setStatus(e instanceof Error ? e.message : "IBPE unavailable");
       });
     return()=>{live=false;};
@@ -90,6 +108,7 @@ export function IbpeWorkspaceProjection() {
     setStatus("Checking governed IBPE readiness…");
     try {
       const nextReadiness=await getIbpeReadiness();
+      if (!isUsableReadiness(nextReadiness)) throw new Error("IBPE readiness response unavailable. Refresh and retry.");
       setReadiness(nextReadiness);
       if (!nextReadiness.ready) {
         setRun(null);
