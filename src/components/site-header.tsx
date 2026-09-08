@@ -11,30 +11,40 @@ const LINKS = [
 
 const VAYU_LOGO = "/brand/vayu-official.svg";
 
-export function SiteHeader({ ghost = false }: { ghost?: boolean }) {
+type SiteHeaderProps = {
+  ghost?: boolean;
+  showNavigation?: boolean;
+  brandHref?: string;
+};
+
+export function SiteHeader({ ghost = false, showNavigation = true, brandHref = "/" }: SiteHeaderProps) {
   const [open, setOpen] = useState(false);
   return (
     <header className={cn("sticky top-0 z-40 border-b border-border/80", ghost ? "bg-bg/95" : "bg-bg")}>
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:h-16 sm:px-6">
-        <Link to="/" className="flex items-center gap-3" aria-label="VINDY by Vāyú Shastr Pvt Ltd">
+        <a href={brandHref} className="flex items-center gap-3" aria-label="VINDY by Vāyú Shastr Pvt Ltd">
           <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-black sm:size-11">
             <img src={VAYU_LOGO} alt="Vāyú Shastr" className="size-full object-contain" />
           </span>
           <span className="h-6 w-px bg-border" aria-hidden="true" />
           <span className="text-xl font-bold tracking-tight text-accent sm:text-2xl">VINDY</span>
-        </Link>
-        <nav className="hidden items-center gap-8 md:flex">
-          {LINKS.map((l) => (
-            <Link key={l.to} to={l.to} className="text-sm text-muted transition-colors duration-150 hover:text-accent" activeProps={{ className: "text-accent" }}>
-              {l.label}
-            </Link>
-          ))}
-        </nav>
-        <button type="button" className="inline-flex size-11 items-center justify-center rounded-md md:hidden" aria-label={open ? "Close menu" : "Open menu"} onClick={() => setOpen((v) => !v)}>
-          {open ? <X className="size-5" /> : <Menu className="size-5" />}
-        </button>
+        </a>
+        {showNavigation ? (
+          <>
+            <nav className="hidden items-center gap-8 md:flex">
+              {LINKS.map((l) => (
+                <Link key={l.to} to={l.to} className="text-sm text-muted transition-colors duration-150 hover:text-accent" activeProps={{ className: "text-accent" }}>
+                  {l.label}
+                </Link>
+              ))}
+            </nav>
+            <button type="button" className="inline-flex size-11 items-center justify-center rounded-md md:hidden" aria-label={open ? "Close menu" : "Open menu"} onClick={() => setOpen((v) => !v)}>
+              {open ? <X className="size-5" /> : <Menu className="size-5" />}
+            </button>
+          </>
+        ) : null}
       </div>
-      {open ? (
+      {showNavigation && open ? (
         <nav className="border-t border-border px-4 py-3 md:hidden">
           {LINKS.map((l) => (
             <Link key={l.to} to={l.to} className="block py-3 text-base text-fg" onClick={() => setOpen(false)}>{l.label}</Link>

@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import {
   AlertTriangle,
   ArrowRight,
@@ -104,12 +104,12 @@ function DecisionInbox() {
                       </div>
                       <p className="mt-1 text-xs leading-5 text-muted">{text(item, "detail")}</p>
                     </div>
-                    <Link
-                      to={text(item, "route") as never}
+                    <a
+                      href={text(item, "route")}
                       className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-xs font-semibold text-fg hover:border-accent hover:text-accent"
                     >
-                      Open owner <ArrowRight className="size-4" />
-                    </Link>
+                      Open workspace <ArrowRight className="size-4" />
+                    </a>
                   </article>
                 );
               })}

@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { Kpi, Panel } from "@/components/kpi";
 import { DECISION_PACKETS, DECISION_STATE_LABELS, decisionPriorityRank } from "@/lib/data/decision-engine";
@@ -28,9 +28,13 @@ function CommandCentre() {
   const trough = minCash(rows);
   const blockedActions = founderActions.filter((action) => action.status === "blocked");
   const activeActions = founderActions.filter((action) => action.status === "active");
-  const nextActions = [...founderActions].filter((action) => action.status !== "complete" && action.status !== "waiting").sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority]);
+  const nextActions = [...founderActions]
+    .filter((action) => action.status !== "complete" && action.status !== "waiting")
+    .sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority]);
   const visibleDecisions = DECISION_PACKETS.filter((packet) => accessible(packet.source));
-  const decisions = [...visibleDecisions].sort((a, b) => decisionPriorityRank[a.priority] - decisionPriorityRank[b.priority]).slice(0, 5);
+  const decisions = [...visibleDecisions]
+    .sort((a, b) => decisionPriorityRank[a.priority] - decisionPriorityRank[b.priority])
+    .slice(0, 5);
   const approvals = visibleDecisions.filter((packet) => packet.state === "approval").length;
   const blockedDecisions = visibleDecisions.filter((packet) => packet.state === "blocked").length;
   const cashTone = trough.cash < 0 ? "danger" : trough.cash < 15 ? "warn" : "ok";
@@ -44,26 +48,10 @@ function CommandCentre() {
           <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">One screen for what needs attention now: financial health, blockers, decisions, accountable actions and the next operating gate. Detailed work stays in its specialist workspace.</p>
         </div>
         <div className="flex flex-wrap gap-3 text-sm font-semibold">
-          {accessible("/command/planning") && (
-            <Link to="/command/planning" className="text-accent hover:text-fg">
-              Master Plan →
-            </Link>
-          )}
-          {accessible("/command/decision-inbox") && (
-            <Link to="/command/decision-inbox" className="text-accent hover:text-fg">
-              Action Inbox →
-            </Link>
-          )}
-          {accessible("/command/governance") && (
-            <Link to="/command/governance" className="text-accent hover:text-fg">
-              Governance →
-            </Link>
-          )}
-          {accessible("/command/founder-command") && (
-            <Link to="/command/founder-command" className="text-muted hover:text-fg">
-              Action & evidence ledger →
-            </Link>
-          )}
+          {accessible("/command/planning") && <a href="/command/planning" className="text-accent hover:text-fg">Master Plan →</a>}
+          {accessible("/command/decision-inbox") && <a href="/command/decision-inbox" className="text-accent hover:text-fg">Action Inbox →</a>}
+          {accessible("/command/governance") && <a href="/command/governance" className="text-accent hover:text-fg">Governance →</a>}
+          {accessible("/command/founder-command") && <a href="/command/founder-command" className="text-muted hover:text-fg">Action & evidence ledger →</a>}
         </div>
       </header>
 
@@ -90,9 +78,7 @@ function CommandCentre() {
                 <p className="text-[10px] uppercase tracking-wider text-subtle">State</p>
                 <p className="mt-1 text-xs text-muted">{DECISION_STATE_LABELS[packet.state]}</p>
               </div>
-              <Link to={packet.source as never} className="text-xs font-semibold text-accent hover:text-fg">
-                Open source →
-              </Link>
+              <a href={packet.source} className="text-xs font-semibold text-accent hover:text-fg">Open workspace →</a>
             </div>
           ))}
         </div>
@@ -126,16 +112,8 @@ function CommandCentre() {
           </table>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          {accessible("/command/founder-command") && (
-            <Link to="/command/founder-command" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:border-accent hover:text-fg">
-              Open full action & evidence ledger
-            </Link>
-          )}
-          {accessible("/command/actions") && (
-            <Link to="/command/actions" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:border-accent hover:text-fg">
-              Action log
-            </Link>
-          )}
+          {accessible("/command/founder-command") && <a href="/command/founder-command" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:border-accent hover:text-fg">Open full action & evidence ledger</a>}
+          {accessible("/command/actions") && <a href="/command/actions" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:border-accent hover:text-fg">Action log</a>}
         </div>
       </Panel>
 
@@ -152,9 +130,7 @@ function CommandCentre() {
                   <span className={blocked ? "text-[10px] uppercase tracking-wider text-warn" : active ? "text-[10px] uppercase tracking-wider text-green" : "text-[10px] uppercase tracking-wider text-subtle"}>{blocked ? "Blocked" : active ? "Active" : "Waiting"}</span>
                 </div>
                 <p className="mt-2 text-sm font-medium text-fg">{gate.title}</p>
-                <p className="mt-1 text-xs text-muted">
-                  {gate.when} · {gate.controls.join(" · ")}
-                </p>
+                <p className="mt-1 text-xs text-muted">{gate.when} · {gate.controls.join(" · ")}</p>
               </div>
             );
           })}
@@ -173,10 +149,10 @@ function CommandCentre() {
           ]
             .filter(([, , to]) => accessible(to))
             .map(([title, note, to]) => (
-              <Link key={to} to={to as never} className="rounded-lg border border-border p-4 transition-colors hover:border-accent/50 hover:bg-surface">
+              <a key={to} href={to} className="rounded-lg border border-border p-4 transition-colors hover:border-accent/50 hover:bg-surface">
                 <p className="text-sm font-semibold text-fg">{title}</p>
                 <p className="mt-1 text-xs leading-5 text-muted">{note}</p>
-              </Link>
+              </a>
             ))}
         </div>
       </Panel>
@@ -191,9 +167,7 @@ function CommandCentre() {
           ]
             .filter(([, to]) => accessible(to))
             .map(([label, to]) => (
-              <Link key={to} to={to as never} className="rounded-md border border-border p-3 hover:border-accent hover:text-fg">
-                {label}
-              </Link>
+              <a key={to} href={to} className="rounded-md border border-border p-3 hover:border-accent hover:text-fg">{label}</a>
             ))}
         </div>
         <p className="mt-3 text-xs leading-5 text-subtle">Command Centre surfaces only information that changes a decision, triggers an action, records evidence or explains a material exception. Detailed calculations remain in their canonical functional workspaces.</p>
