@@ -1,0 +1,242 @@
+import { createHash } from "node:crypto";
+import { createServerFn } from "@tanstack/react-start";
+import { getSql, type JsonValue, type Sql } from "@/lib/db";
+import { getCommandRole } from "@/lib/command-access";
+import { canPerform } from "@/lib/page-access";
+import { requireBusinessActor } from "@/lib/business-actor";
+import { buildModelWithInputs, type FinanceAssumptions, type ProductLineId } from "@/lib/finance/model";
+import {
+  runIntegratedBusinessPlanningEngine,
+  type BomRequirement,
+  type CashFlow,
+  type DemandSignal,
+  type IntegratedPlanningInput,
+  type IntegratedPlanningResult,
+  type InventoryPosition,
+  type InventoryReceipt,
+  type InventoryReservation,
+} from "@/lib/integrated-business-planning-engine";
+
+export const IBPE_ENGINE_VERSION = "VYNDI-IBPE-1.0.0";
+export type IbpeValidation = Record<string, JsonValue>;
+
+export type IbpeRun = {
+  id: string;
+  engineVersion: string;
+  sourceSha: string;
+  inputHash: string;
+  approvedPlanId: string;
+  approvedPlanRevision: number;
+  scenario: "base" | "delayed" | "stress";
+  snapshotAt: string;
+  status: "complete" | "invalidated";
+  result: IntegratedPlanningResult;
+  validation: IbpeValidation;
+  createdAt: string;
+};
+
+type ApprovedPlanRow = {
+  id: string;
+  revision: number | string;
+  scenario: "base" | "delayed" | "stress";
+  draw_standby: boolean;
+  finance_json: FinanceAssumptions;
+};
+
+const PRODUCT_TIER: Record<ProductLineId, "core" | "pro" | "apex"> = {
+  aluminium: "core",
+  carbon: "pro",
+  premiumCarbon: "apex",
+};
+const TIER_PRODUCT: Record<string, ProductLineId> = { core: "aluminium", pro: "carbon", apex: "premiumCarbon" };
+
+function stable(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stable);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, stable(v)]));
+  }
+  return value;
+}
+function stableJson(value: unknown) { return JSON.stringify(stable(value)); }
+function sha256(value: unknown) { return createHash("sha256").update(stableJson(value)).digest("hex"); }
+function sourceSha() {
+  const sha = process.env.VERCEL_GIT_COMMIT_SHA || process.env.CF_PAGES_COMMIT_SHA || process.env.GITHUB_SHA || process.env.VYNDI_SOURCE_SHA;
+  if (!sha || sha.trim().length < 7) throw new Error("Governed IBPE run blocked: deployed source SHA is unavailable.");
+  return sha.trim();
+}
+
+async function approvedPlan(sql: Sql): Promise<ApprovedPlanRow> {
+  const rows = await sql.query<ApprovedPlanRow>(
+    `select id,revision,scenario,draw_standby,finance_json from vyndi_plan_revisions where status='approved' order by revision desc limit 2`,
+  );
+  if (rows.length !== 1) throw new Error(rows.length ? "Governed IBPE run blocked: more than one approved operating plan exists." : "Governed IBPE run blocked: no approved operating plan exists.");
+  return rows[0];
+}
+
+async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
+  const finance = plan.finance_json;
+  if (!finance?.operatingPlan) throw new Error("Governed IBPE run blocked: approved plan has no operatingPlan payload.");
+  const model = buildModelWithInputs(plan.scenario, Boolean(plan.draw_standby), finance);
+
+  const orders = await sql.query<{ plan_month:number|string; product_id:ProductLineId; confirmed:number|string }>(
+    `select plan_month,product_id,coalesce(sum(units),0) as confirmed from vyndi_sales_orders where status='confirmed' group by plan_month,product_id order by plan_month,product_id`,
+  );
+  const actualProductRows = await sql.query<{ plan_month:number|string; product_id:ProductLineId; actual_units:number|string }>(
+    `select i.plan_month,o.product_id,coalesce(sum(i.units),0) as actual_units
+       from vyndi_invoices i join vyndi_sales_orders o on o.id=i.sales_order_id
+      where i.status='issued'
+      group by i.plan_month,o.product_id
+      order by i.plan_month,o.product_id`,
+  );
+  const confirmed = new Map(orders.map((r) => [`${Number(r.plan_month)}|${r.product_id}`, Number(r.confirmed)]));
+  const actualByProduct = new Map(actualProductRows.map((r) => [`${Number(r.plan_month)}|${r.product_id}`, Number(r.actual_units)]));
+
+  const demand: DemandSignal[] = [];
+  for (const row of model) {
+    const planned: Record<ProductLineId, number> = { aluminium: row.aluminiumUnits, carbon: row.carbonUnits, premiumCarbon: row.premiumCarbonUnits };
+    for (const productId of Object.keys(PRODUCT_TIER) as ProductLineId[]) {
+      const planQty = planned[productId];
+      const committedQty = confirmed.get(`${row.m}|${productId}`) ?? 0;
+      const actualQty = actualByProduct.get(`${row.m}|${productId}`) ?? 0;
+      demand.push({
+        id: `M${row.m}-${productId}`,
+        productId,
+        period: row.m,
+        planQty,
+        forecastQty: Math.max(planQty, committedQty + actualQty),
+        committedQty,
+        actualQty,
+        confidence: actualQty > 0 || committedQty > 0 ? 1 : 0.7,
+        sourceRef: actualQty > 0 ? "ISSUED-INVOICE-LEDGER" : `PLAN-${plan.id}-R${plan.revision}`,
+      });
+    }
+  }
+
+  const mappingRows = await sql.query<{ model_id:string; bom_revision:string; bom_line_key:string; sku:string; quantity:number|string }>(
+    `select model_id,bom_revision,bom_line_key,sku,quantity from epr_bom_inventory_mappings
+      where model_id in ('core','pro','apex') and status='active' and configuration_option_id is null
+        and approved_by is not null and approved_at is not null and effective_from<=now() and (effective_to is null or effective_to>now())
+      order by model_id,bom_revision,bom_line_key,sku`,
+  );
+  const revisionByTier = new Map<string, Set<string>>();
+  for (const row of mappingRows) {
+    if (!revisionByTier.has(row.model_id)) revisionByTier.set(row.model_id, new Set());
+    revisionByTier.get(row.model_id)!.add(row.bom_revision);
+  }
+  for (const tier of ["core","pro","apex"]) {
+    const revisions = revisionByTier.get(tier) ?? new Set<string>();
+    if (revisions.size !== 1) throw new Error(`Governed IBPE run blocked: ${tier} requires exactly one approved planning BOM revision; found ${revisions.size}.`);
+  }
+  const bom: BomRequirement[] = mappingRows.map((r) => ({
+    id: `${r.model_id}:${r.bom_revision}:${r.bom_line_key}:${r.sku}`,
+    productId: TIER_PRODUCT[r.model_id],
+    revisionId: r.bom_revision,
+    approved: true,
+    sku: r.sku,
+    quantityPerUnit: Number(r.quantity),
+    sourceRef: `BOM-${r.bom_revision}`,
+  }));
+
+  const inventoryRows = await sql.query<{ sku:string; minimum_stock_level:number|string; physical_quantity:number|string; reserved_quantity:number|string; available_to_promise:number|string; unit_cost_inr:number|string|null }>(
+    `select i.sku,i.minimum_stock_level,coalesce(a.physical_quantity,0) as physical_quantity,
+            coalesce(a.reserved_quantity,0) as reserved_quantity,coalesce(a.available_to_promise,0) as available_to_promise,
+            coalesce((select sum(f.quantity_remaining*f.unit_cost_inr)/nullif(sum(f.quantity_remaining),0) from epr_inventory_fifo_layers f where f.sku=i.sku and f.quantity_remaining>0),0) as unit_cost_inr
+       from master_inventory_items i left join vyndi_inventory_available_to_promise a on a.sku=i.sku and a.unit=vyndi_canonical_unit(i.unit)
+      where i.active=true order by i.sku`,
+  );
+  if (!inventoryRows.length) throw new Error("Governed IBPE run blocked: canonical Master Inventory has no active items.");
+  const inventory: InventoryPosition[] = inventoryRows.map((r) => ({
+    sku:r.sku,onHandQty:Number(r.physical_quantity),reservedQty:Number(r.reserved_quantity),mslQty:Number(r.minimum_stock_level),
+    safetyStockQty:Number(r.minimum_stock_level),unitCostLakh:Number(r.unit_cost_inr ?? 0)/100000,sourceRef:"EPR-FIFO-ATP",
+  }));
+
+  const reservationRows = await sql.query<{ id:string; sku:string; quantity_reserved:number|string; status:"active"|"released"|"consumed"; plan_month:number|string }>(
+    `select r.id,r.sku,r.quantity_reserved,r.status,o.plan_month from epr_inventory_reservations r
+       join vyndi_sales_orders o on o.id=r.sales_order_id where r.status in ('active','released','consumed') order by o.plan_month,r.id`,
+  );
+  const reservations: InventoryReservation[] = reservationRows.map((r) => ({ id:r.id,sku:r.sku,period:Number(r.plan_month),quantity:Number(r.quantity_reserved),status:r.status,demandRef:r.id,sourceRef:"EPR-RESERVATION" }));
+
+  const poRows = await sql.query<{ requirement_month:number|string; sku:string; open_po_quantity:number|string }>(
+    `select requirement_month,sku,open_po_quantity from vyndi_open_purchase_orders where scenario=$1 and coalesce(open_po_quantity,0)>0 order by requirement_month,sku`, [plan.scenario],
+  );
+  const receipts: InventoryReceipt[] = poRows.map((r) => ({ id:`PO-M${r.requirement_month}-${r.sku}`,sku:r.sku,period:Number(r.requirement_month),quantity:Number(r.open_po_quantity),truth:"committed",sourceRef:"PROCUREMENT-OPEN-PO" }));
+
+  const cashFlows: CashFlow[] = [];
+  for (const row of model) {
+    cashFlows.push(
+      { id:`plan-sales-${row.m}`,businessKey:`sales-M${row.m}`,period:row.m,direction:"inflow",amountLakh:row.revenue,truth:"plan",category:"sales",sourceRef:`PLAN-${plan.id}-R${plan.revision}` },
+      { id:`plan-funding-${row.m}`,businessKey:`funding-M${row.m}`,period:row.m,direction:"inflow",amountLakh:row.funding,truth:"plan",category:"funding",sourceRef:`PLAN-${plan.id}-R${plan.revision}` },
+      { id:`plan-opex-${row.m}`,businessKey:`opex-M${row.m}`,period:row.m,direction:"outflow",amountLakh:row.opex,truth:"plan",category:"opex",sourceRef:`PLAN-${plan.id}-R${plan.revision}` },
+      { id:`plan-capex-${row.m}`,businessKey:`capex-M${row.m}`,period:row.m,direction:"outflow",amountLakh:row.capex,truth:"plan",category:"capex",sourceRef:`PLAN-${plan.id}-R${plan.revision}` },
+    );
+  }
+  const collectionRows = await sql.query<{ plan_month:number|string; amount:number|string }>(
+    `select plan_month,coalesce(sum(amount_lakh),0) as amount from vyndi_collections where status='posted' group by plan_month order by plan_month`,
+  );
+  for (const r of collectionRows) cashFlows.push({ id:`actual-sales-${r.plan_month}`,businessKey:`sales-M${r.plan_month}`,period:Number(r.plan_month),direction:"inflow",amountLakh:Number(r.amount),truth:"actual",category:"collections",sourceRef:"COLLECTION-LEDGER" });
+
+  const input: IntegratedPlanningInput = {
+    demand,bom,inventory,reservations,receipts,cashFlows,
+    funding:{ openingBankCashLakh:finance.openingCashLakh,minimumOperatingReserveLakh:finance.operatingPlan.cashFloorLakh,restrictedCashLakh:0,fundraisingLeadMonths:3 },
+  };
+  const validation: IbpeValidation = {
+    approvedPlan:`${plan.id}:R${plan.revision}`,
+    demandSignals:demand.length,
+    approvedBomRows:bom.length,
+    inventorySkus:inventory.length,
+    reservations:reservations.length,
+    committedReceipts:receipts.length,
+    cashFlows:cashFlows.length,
+    capacityAuthority:"not-configured-explicitly-optional",
+    transactionInputs:["vyndi_sales_orders","vyndi_invoices","epr_bom_inventory_mappings","vyndi_inventory_available_to_promise","epr_inventory_reservations","vyndi_open_purchase_orders","vyndi_collections"],
+  };
+  return { input, validation };
+}
+
+function mapRun(row: Record<string, unknown>): IbpeRun {
+  return {
+    id:String(row.id),engineVersion:String(row.engine_version),sourceSha:String(row.source_sha),inputHash:String(row.input_hash),
+    approvedPlanId:String(row.approved_plan_id),approvedPlanRevision:Number(row.approved_plan_revision),scenario:row.scenario as IbpeRun["scenario"],
+    snapshotAt:String(row.snapshot_at),status:row.status as IbpeRun["status"],result:row.result_json as IntegratedPlanningResult,
+    validation:(row.validation_json ?? {}) as IbpeValidation,createdAt:String(row.created_at),
+  };
+}
+
+export const runGovernedIbpe = createServerFn({ method:"POST" }).handler(async () => {
+  const actor = await requireBusinessActor("edit");
+  const sql = await getSql();
+  const plan = await approvedPlan(sql);
+  const { input, validation } = await buildGovernedInput(sql, plan);
+  const inputHash = sha256(input);
+  const result = runIntegratedBusinessPlanningEngine(input, { horizonMonths:36 });
+  const sha = sourceSha();
+  const snapshotAt = new Date().toISOString();
+  const id = `IBPE-${plan.revision}-${inputHash.slice(0,12)}-${sha.slice(0,7)}`;
+  const rows = await sql.query<{ id:string }>(
+    `select persist_vyndi_ibpe_run($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11::jsonb,$12,$13) as id`,
+    [id,IBPE_ENGINE_VERSION,sha,inputHash,plan.id,Number(plan.revision),plan.scenario,snapshotAt,stableJson(input),stableJson(result),stableJson(validation),actor.userId,actor.role],
+  );
+  return { id:rows[0]?.id ?? id,inputHash,sourceSha:sha,planRevision:Number(plan.revision),result,validation };
+});
+
+export const getLatestIbpeRun = createServerFn({ method:"GET" }).handler(async () => {
+  const role = await getCommandRole();
+  if (!role || !canPerform(role,"view")) throw new Error("IBPE view permission denied.");
+  const sql = await getSql();
+  const rows = await sql.query<Record<string,unknown>>(
+    `select id,engine_version,source_sha,input_hash,approved_plan_id,approved_plan_revision,scenario,snapshot_at::text,status,result_json,validation_json,created_at::text
+       from vyndi_ibpe_runs where status='complete' order by created_at desc limit 1`,
+  );
+  return rows[0] ? mapRun(rows[0]) : null;
+});
+
+export const listIbpeRuns = createServerFn({ method:"GET" }).handler(async () => {
+  const role = await getCommandRole();
+  if (!role || !canPerform(role,"view")) throw new Error("IBPE view permission denied.");
+  const sql = await getSql();
+  const rows = await sql.query<Record<string,unknown>>(
+    `select id,engine_version,source_sha,input_hash,approved_plan_id,approved_plan_revision,scenario,snapshot_at::text,status,result_json,validation_json,created_at::text
+       from vyndi_ibpe_runs order by created_at desc limit 20`,
+  );
+  return rows.map(mapRun);
+});
