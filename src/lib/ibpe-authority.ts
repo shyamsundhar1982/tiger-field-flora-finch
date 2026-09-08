@@ -35,6 +35,30 @@ export type IbpeRun = {
   createdAt: string;
 };
 
+export type IbpeReadinessCheck = {
+  key: string;
+  label: string;
+  ready: boolean;
+  detail: string;
+  actionTo: string;
+};
+
+export type IbpeReadiness = {
+  ready: boolean;
+  checks: IbpeReadinessCheck[];
+  counts: {
+    approvedPlans: number;
+    approvedInventoryMasters: number;
+    activeInventoryItems: number;
+    supplyPlanningRows: number;
+    capacityStandardRows: number;
+    completeRuns: number;
+    longitudeBomRevisions: number;
+    latitudeBomRevisions: number;
+    altitudeBomRevisions: number;
+  };
+};
+
 type ApprovedPlanRow = {
   id: string;
   revision: number | string;
@@ -71,6 +95,102 @@ async function approvedPlan(sql: Sql): Promise<ApprovedPlanRow> {
   );
   if (rows.length !== 1) throw new Error(rows.length ? "Governed IBPE run blocked: more than one approved operating plan exists." : "Governed IBPE run blocked: no approved operating plan exists.");
   return rows[0];
+}
+
+async function readIbpeReadiness(sql: Sql): Promise<IbpeReadiness> {
+  const [summary] = await sql.query<{
+    approved_plans: number | string;
+    approved_inventory_masters: number | string;
+    active_inventory_items: number | string;
+    supply_planning_rows: number | string;
+    capacity_standard_rows: number | string;
+    complete_runs: number | string;
+  }>(`select
+      (select count(*) from vyndi_plan_revisions where status='approved') as approved_plans,
+      (select count(*) from master_data_records where domain='inventory' and status='approved') as approved_inventory_masters,
+      (select count(*) from master_inventory_items where active=true) as active_inventory_items,
+      (select count(*) from vyndi_supply_planning_parameters where planning_status<>'retired') as supply_planning_rows,
+      (select count(*) from vyndi_capacity_standards where planning_status<>'retired') as capacity_standard_rows,
+      (select count(*) from vyndi_ibpe_runs where status='complete') as complete_runs`);
+  const bomRows = await sql.query<{ model_id:string; revisions:number|string }>(
+    `select model_id,count(distinct bom_revision) as revisions
+       from epr_bom_inventory_mappings
+      where model_id in ('core','pro','apex') and status='active'
+        and configuration_option_id is null and approved_by is not null and approved_at is not null
+        and effective_from<=now() and (effective_to is null or effective_to>now())
+      group by model_id`,
+  );
+  const bom = new Map(bomRows.map((row) => [row.model_id, Number(row.revisions)]));
+  const counts = {
+    approvedPlans: Number(summary?.approved_plans ?? 0),
+    approvedInventoryMasters: Number(summary?.approved_inventory_masters ?? 0),
+    activeInventoryItems: Number(summary?.active_inventory_items ?? 0),
+    supplyPlanningRows: Number(summary?.supply_planning_rows ?? 0),
+    capacityStandardRows: Number(summary?.capacity_standard_rows ?? 0),
+    completeRuns: Number(summary?.complete_runs ?? 0),
+    longitudeBomRevisions: bom.get("core") ?? 0,
+    latitudeBomRevisions: bom.get("pro") ?? 0,
+    altitudeBomRevisions: bom.get("apex") ?? 0,
+  };
+  const checks: IbpeReadinessCheck[] = [
+    {
+      key:"approved-plan",
+      label:"Approved operating plan",
+      ready:counts.approvedPlans===1,
+      detail:counts.approvedPlans===1 ? "One approved 36-month company plan is available." : counts.approvedPlans===0 ? "No approved operating plan exists." : `${counts.approvedPlans} approved plans exist; exactly one is required.`,
+      actionTo:"/command/planning",
+    },
+    {
+      key:"inventory-master",
+      label:"Approved Inventory Master",
+      ready:counts.approvedInventoryMasters>0,
+      detail:counts.approvedInventoryMasters>0 ? `${counts.approvedInventoryMasters} approved Inventory Master records.` : "Operational SKUs exist, but none are approved in Master Data governance.",
+      actionTo:"/command/master-data",
+    },
+    {
+      key:"longitude-bom",
+      label:"Longitude planning BOM",
+      ready:counts.longitudeBomRevisions===1,
+      detail:`${counts.longitudeBomRevisions} active approved planning revision(s); exactly one is required.`,
+      actionTo:"/command/bom-inventory-mapping",
+    },
+    {
+      key:"latitude-bom",
+      label:"Latitude planning BOM",
+      ready:counts.latitudeBomRevisions===1,
+      detail:`${counts.latitudeBomRevisions} active approved planning revision(s); exactly one is required.`,
+      actionTo:"/command/bom-inventory-mapping",
+    },
+    {
+      key:"altitude-bom",
+      label:"Altitude planning BOM",
+      ready:counts.altitudeBomRevisions===1,
+      detail:`${counts.altitudeBomRevisions} active approved planning revision(s); exactly one is required.`,
+      actionTo:"/command/bom-inventory-mapping",
+    },
+    {
+      key:"inventory",
+      label:"Master Inventory",
+      ready:counts.activeInventoryItems>0,
+      detail:`${counts.activeInventoryItems} active operational SKU(s).`,
+      actionTo:"/command/inventory",
+    },
+    {
+      key:"supply-parameters",
+      label:"Supply planning parameters",
+      ready:counts.supplyPlanningRows>0,
+      detail:`${counts.supplyPlanningRows} active planning parameter row(s).`,
+      actionTo:"/command/procurement-planning",
+    },
+    {
+      key:"capacity",
+      label:"Capacity standards",
+      ready:counts.capacityStandardRows>0,
+      detail:`${counts.capacityStandardRows} active capacity standard row(s).`,
+      actionTo:"/command/capacity",
+    },
+  ];
+  return { ready:checks.every((check) => check.ready), checks, counts };
 }
 
 async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
@@ -270,9 +390,24 @@ function mapRun(row: Record<string, unknown>): IbpeRun {
   };
 }
 
-export const runGovernedIbpe = createServerFn({ method:"POST" }).handler(async () => {
-  const actor = await requireBusinessActor("edit");
+export const getIbpeReadiness = createServerFn({ method:"GET" }).handler(async () => {
+  const role = await getCommandRole();
+  if (!role || !canPerform(role,"view")) throw new Error("IBPE view permission denied.");
   const sql = await getSql();
+  return readIbpeReadiness(sql);
+});
+
+export const runGovernedIbpe = createServerFn({ method:"POST" }).handler(async () => {
+  // Governed IBPE persists an advisory, reproducible decision packet only. It does
+  // not approve or mutate transaction truth, so an authorised Command session is
+  // sufficient; transaction mutations remain protected by edit/approve actors.
+  const actor = await requireBusinessActor("view");
+  const sql = await getSql();
+  const readiness = await readIbpeReadiness(sql);
+  if (!readiness.ready) {
+    const blockers = readiness.checks.filter((check) => !check.ready).map((check) => check.label);
+    throw new Error(`Governed IBPE setup incomplete: ${blockers.join(" · ")}.`);
+  }
   const plan = await approvedPlan(sql);
   const { input, validation } = await buildGovernedInput(sql, plan);
   const inputHash = sha256(input);
