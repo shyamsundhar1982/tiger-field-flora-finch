@@ -15,6 +15,21 @@ test("one bike / batch approval owns dependent production record creation", asyn
   assert.match(migration, /Purchase-order approval requires a different authorised user/);
 });
 
+test("PR42 production migration remains compatible with PR44 procurement authority", async () => {
+  const compat = await text("migrations/0037_a_prepare_purchase_order_view_compat.sql");
+  const reconcile = await text("migrations/0038_reconcile_production_procurement_authority.sql");
+
+  assert.match(compat, /drop view if exists vyndi_open_purchase_orders/);
+  assert.match(compat, /drop view if exists vyndi_purchase_order_status/);
+  assert.match(reconcile, /create or replace view vyndi_open_purchase_orders/);
+  assert.match(reconcile, /vyndi_procurement_cost_authority/);
+  assert.match(reconcile, /governedCostInr/);
+  assert.match(reconcile, /costAuthority/);
+  assert.match(reconcile, /Governed procurement cost is MISSING/);
+  assert.doesNotMatch(reconcile, /legacyPriceInr/);
+  assert.doesNotMatch(reconcile, /planningPriceInr/);
+});
+
 test("canonical family BOM may release only an unchanged default configuration", async () => {
   const source = await text("src/lib/production-job-card.ts");
   assert.match(source, /family-standard/);
