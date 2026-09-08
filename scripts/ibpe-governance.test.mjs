@@ -74,3 +74,17 @@ test("IBPE persistence rejects a non-approved plan revision", async (t) => {
     ["IBPE-DRAFT","VYNDI-IBPE-1.1.0","abcdef0123456789",hash(input),"PLAN-DRAFT",1,"base",new Date().toISOString(),JSON.stringify(input),JSON.stringify({}),JSON.stringify({paymentLagRuntimeParity:"applied-stage-2"}),"tester","operations"],
   ),/exact approved operating-plan revision/);
 });
+
+test("governed IBPE procurement cost uses actual FIFO then approved planning reference and never silent zero fallback", async () => {
+  const authority = await readFile(join(here, "..", "src", "lib", "ibpe-authority.ts"), "utf8");
+  assert.match(authority, /fifo_cost_inr/);
+  assert.match(authority, /master_data_records m/);
+  assert.match(authority, /m\.domain='inventory' and m\.status='approved'/);
+  assert.match(authority, /legacyPriceInr/);
+  assert.match(authority, /unitCostLakh:governedCostInr === undefined \? undefined : governedCostInr\/100000/);
+  assert.match(authority, /COST:\$\{costAuthority\}/);
+  assert.match(authority, /APPROVED-INVENTORY-MASTER/);
+  assert.match(authority, /missingControlledCostSkus/);
+  assert.match(authority, /inventoryCostAuthority/);
+  assert.doesNotMatch(authority, /unitCostLakh:Number\(r\.unit_cost_inr \?\? 0\)\/100000/);
+});

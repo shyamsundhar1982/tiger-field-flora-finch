@@ -83,6 +83,11 @@ function stable(value: unknown): unknown {
 }
 function stableJson(value: unknown) { return JSON.stringify(stable(value)); }
 function sha256(value: unknown) { return createHash("sha256").update(stableJson(value)).digest("hex"); }
+function positiveNumber(value: number | string | null | undefined) {
+  if (value == null) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
 function sourceSha() {
   const sha = process.env.VERCEL_GIT_COMMIT_SHA || process.env.CF_PAGES_COMMIT_SHA || process.env.GITHUB_SHA || process.env.VYNDI_SOURCE_SHA;
   if (!sha || sha.trim().length < 7) throw new Error("Governed IBPE run blocked: deployed source SHA is unavailable.");
@@ -273,29 +278,57 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
   );
   const supplyParameters = new Map(supplyParameterRows.map((r) => [r.sku, r]));
 
-  const inventoryRows = await sql.query<{ sku:string; minimum_stock_level:number|string; physical_quantity:number|string; reserved_quantity:number|string; available_to_promise:number|string; unit_cost_inr:number|string|null }>(
+  const inventoryRows = await sql.query<{
+    sku:string;
+    minimum_stock_level:number|string;
+    physical_quantity:number|string;
+    reserved_quantity:number|string;
+    available_to_promise:number|string;
+    fifo_cost_inr:number|string|null;
+    planning_cost_inr:number|string|null;
+  }>(
     `select i.sku,i.minimum_stock_level,coalesce(a.physical_quantity,0) as physical_quantity,
             coalesce(a.reserved_quantity,0) as reserved_quantity,coalesce(a.available_to_promise,0) as available_to_promise,
-            coalesce((select sum(f.quantity_remaining*f.unit_cost_inr)/nullif(sum(f.quantity_remaining),0) from epr_inventory_fifo_layers f where f.sku=i.sku and f.quantity_remaining>0),0) as unit_cost_inr
+            (select sum(f.quantity_remaining*f.unit_cost_inr)/nullif(sum(f.quantity_remaining),0)
+               from epr_inventory_fifo_layers f where f.sku=i.sku and f.quantity_remaining>0) as fifo_cost_inr,
+            (select nullif((m.attributes->>'legacyPriceInr')::numeric,0)
+               from master_data_records m
+              where m.domain='inventory' and m.status='approved' and m.code=i.sku
+              order by m.revision desc limit 1) as planning_cost_inr
        from master_inventory_items i left join vyndi_inventory_available_to_promise a on a.sku=i.sku and a.unit=vyndi_canonical_unit(i.unit)
       where i.active=true order by i.sku`,
   );
   if (!inventoryRows.length) throw new Error("Governed IBPE run blocked: canonical Master Inventory has no active items.");
-  const inventory: InventoryPosition[] = inventoryRows.map((r) => {
+  const costResolution = inventoryRows.map((r) => {
+    const fifoCostInr = positiveNumber(r.fifo_cost_inr);
+    const planningCostInr = positiveNumber(r.planning_cost_inr);
+    const governedCostInr = fifoCostInr ?? planningCostInr;
+    const costAuthority = fifoCostInr !== undefined
+      ? "EPR-FIFO-ACTUAL"
+      : planningCostInr !== undefined
+        ? "APPROVED-INVENTORY-MASTER"
+        : "MISSING";
+    return { row:r, fifoCostInr, planningCostInr, governedCostInr, costAuthority };
+  });
+  const inventory: InventoryPosition[] = costResolution.map(({ row:r, governedCostInr, costAuthority }) => {
     const planning = supplyParameters.get(r.sku);
+    const inventoryAuthority = planning ? `EPR-FIFO-ATP+${planning.source_ref}` : "EPR-FIFO-ATP";
     return {
       sku:r.sku,
       onHandQty:Number(r.physical_quantity),
       reservedQty:Number(r.reserved_quantity),
       mslQty:Number(r.minimum_stock_level),
       safetyStockQty:Number(r.minimum_stock_level),
-      unitCostLakh:Number(r.unit_cost_inr ?? 0)/100000,
+      unitCostLakh:governedCostInr === undefined ? undefined : governedCostInr/100000,
       leadTimeMonths:planning ? Number(planning.lead_time_months) : 0,
       moq:planning ? Number(planning.moq) : 0,
       orderMultiple:planning ? Number(planning.order_multiple) : 1,
-      sourceRef:planning ? `EPR-FIFO-ATP+${planning.source_ref}` : "EPR-FIFO-ATP",
+      sourceRef:`${inventoryAuthority}+COST:${costAuthority}`,
     };
   });
+  const fifoActualCostSkus = costResolution.filter((entry) => entry.fifoCostInr !== undefined).length;
+  const approvedMasterPlanningCostFallbackSkus = costResolution.filter((entry) => entry.fifoCostInr === undefined && entry.planningCostInr !== undefined).length;
+  const missingControlledCostSkus = costResolution.filter((entry) => entry.governedCostInr === undefined).map((entry) => entry.row.sku);
 
   const reservationRows = await sql.query<{ id:string; sku:string; quantity_reserved:number|string; status:"active"|"released"|"consumed"; plan_month:number|string }>(
     `select r.id,r.sku,r.quantity_reserved,r.status,o.plan_month from epr_inventory_reservations r
@@ -371,11 +404,15 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
     paymentLagParameters:supplyParameterRows.filter((r) => Number(r.payment_lag_months) > 0).length,
     paymentLagRuntimeParity:"applied-stage-2",
     paymentLagAuthority:"vyndi_supply_planning_parameters.payment_lag_months",
+    fifoActualCostSkus,
+    approvedMasterPlanningCostFallbackSkus,
+    missingControlledCostSkus:missingControlledCostSkus.join(","),
+    inventoryCostAuthority:"EPR FIFO weighted actual cost -> approved Inventory Master planning reference -> explicit missing-cost exception",
     capacityStandards:capacityStandardRows.length,
     capacityConstraints:capacity.length,
     capacityAuthority:"vyndi_capacity_standards",
     capacitySummarySemantics:"unique-shortfall-months-stage-2",
-    planningInputs:["vyndi_supply_planning_parameters","vyndi_capacity_standards"],
+    planningInputs:["vyndi_supply_planning_parameters","vyndi_capacity_standards","master_data_records:approved-inventory-planning-cost"],
     transactionInputs:["vyndi_sales_orders","vyndi_invoices","epr_bom_inventory_mappings","vyndi_inventory_available_to_promise","epr_inventory_reservations","vyndi_open_purchase_orders","vyndi_collections"],
   };
   return { input, validation };
