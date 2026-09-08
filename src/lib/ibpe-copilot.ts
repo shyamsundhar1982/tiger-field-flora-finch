@@ -29,6 +29,7 @@ export type IbpeCopilotResponse = {
   advisoryOnly: true;
 };
 
+type IbpeValidationContext = Record<string, unknown>;
 type LatestRunRow = {
   id: string;
   engine_version: string;
@@ -36,9 +37,10 @@ type LatestRunRow = {
   input_hash: string;
   source_sha: string;
   result_json: IntegratedPlanningResult;
+  validation_json: IbpeValidationContext;
 };
 
-const STAGE2_ENGINE_VERSION = "VYNDI-IBPE-1.1.0";
+const GOVERNED_COST_ENGINE_VERSION = "VYNDI-IBPE-1.2.0";
 
 const BASE_SCENARIO: Omit<IbpeScenarioRequest, "id" | "label"> = {
   demandMultiplier: 1,
@@ -129,6 +131,40 @@ function isCausalQuestion(question: string) {
   );
 }
 
+function csvValidation(value: unknown) {
+  if (Array.isArray(value)) return value.map(String).map((item) => item.trim()).filter(Boolean);
+  return String(value ?? "").split(",").map((item) => item.trim()).filter(Boolean);
+}
+
+function numericValidation(value: unknown) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function requestedExecutiveDomains(question: string) {
+  const q = question.toLowerCase();
+  const domains = new Set<string>();
+  const tests: Array<[string, RegExp]> = [
+    ["demand", /demand|expected\s+units?|forecast\s+units?|volume/],
+    ["procurement", /procure|purchase|material|mrp|supplier/],
+    ["shortage", /shortage|stock|inventory|atp|msl/],
+    ["capacity", /capacity|production|manufactur|bottleneck|work\s+centre|outsourc/],
+    ["liquidity", /cash|liquid|trough|runway|free\s+liquidity/],
+    ["funding", /fund|financ|budget|money/],
+    ["breakeven", /break[-\s]?even|breakeven/],
+    ["findings", /finding|health|risk|exception|issue/],
+    ["costs", /unresolved\s+cost|missing\s+cost|cost\s+authority|price\s+coverage|cost\s+coverage|bom\s+cost|cogs/],
+  ];
+  for (const [domain, test] of tests) if (test.test(q)) domains.add(domain);
+  return domains;
+}
+
+function isExecutiveAssessmentQuestion(question: string) {
+  const q = question.toLowerCase();
+  const domains = requestedExecutiveDomains(question);
+  return domains.size >= 3 || /executive\s+(assessment|summary)|complete\s+(assessment|summary)|full\s+(assessment|summary)|overall\s+(assessment|summary)/.test(q);
+}
+
 function compactResult(result: IntegratedPlanningResult) {
   const supply = [...result.supply]
     .filter((row) => row.committedFulfillmentShortageQty > 0 || row.recommendedPurchaseQty > 0)
@@ -158,9 +194,23 @@ function compactResult(result: IntegratedPlanningResult) {
   };
 }
 
+function compactValidation(validation: IbpeValidationContext) {
+  return {
+    activePlanningBomSkus: validation.activePlanningBomSkus,
+    activePlanningBomResolvedCostSkus: validation.activePlanningBomResolvedCostSkus,
+    activePlanningBomMissingCostSkus: validation.activePlanningBomMissingCostSkus,
+    activePlanningBomLegacyReferenceOnlySkus: validation.activePlanningBomLegacyReferenceOnlySkus,
+    procurementCostCoverageComplete: validation.procurementCostCoverageComplete,
+    inventoryCostAuthority: validation.inventoryCostAuthority,
+    bomCogsReconciliation: validation.bomCogsReconciliation,
+    commercialBreakEvenPeriod: validation.commercialBreakEvenPeriod,
+  };
+}
+
 function deterministicAnswer(
   question: string,
   result: IntegratedPlanningResult,
+  validation: IbpeValidationContext,
   scenarioLabel?: string,
   comparison?: IbpeScenarioComparison,
 ) {
@@ -181,7 +231,52 @@ function deterministicAnswer(
   const fundingNeed = result.funding.incrementalFundingNeedLakh;
   const asksAboutFunding = /cash|fund|liquid|budget|runway|money|finance/.test(q);
 
-  if (scenarioLabel && comparison && isCausalQuestion(question) && asksAboutFunding) {
+  if (isExecutiveAssessmentQuestion(question)) {
+    const activeBomSkus = numericValidation(validation.activePlanningBomSkus) ?? 0;
+    const resolvedCostSkus = numericValidation(validation.activePlanningBomResolvedCostSkus) ?? 0;
+    const missingCostSkus = csvValidation(validation.activePlanningBomMissingCostSkus);
+    const referenceOnlySkus = csvValidation(validation.activePlanningBomLegacyReferenceOnlySkus);
+    const breakEvenPeriod = numericValidation(validation.commercialBreakEvenPeriod);
+    const reconciliation = Array.isArray(validation.bomCogsReconciliation)
+      ? validation.bomCogsReconciliation as Array<Record<string, unknown>>
+      : [];
+
+    lines.push(
+      `IBPE Executive Assessment: ${prefix}business health is ${result.summary.businessHealthScore}/100 across ${result.summary.expectedUnits.toFixed(0)} expected units.`,
+      `Procurement & shortages: recommended procurement is ${money(result.summary.totalRecommendedProcurementLakh)}; ${result.summary.fulfillmentShortageSkuMonths} committed-supply shortage SKU-months are flagged.`,
+      `Capacity: ${result.summary.capacityShortfallMonths} capacity shortfall months are flagged in the active horizon.`,
+      `Cash & liquidity: minimum free liquidity after recommendations is ${money(result.summary.minimumFreeLiquidityAfterRecommendationsLakh)}${low ? `, with the trough at M${low.period}` : ""}.`,
+      `Funding: incremental funding need is ${money(fundingNeed)}; first post-recommendation liquidity breach is ${firstBreach ? `M${firstBreach}` : "not present in the 36-month horizon"}.`,
+      `Commercial EBITDA break-even: ${breakEvenPeriod ? `M${breakEvenPeriod}` : "not established inside the approved 36-month commercial model"}${scenarioLabel ? "; this marker comes from the approved commercial plan and Scenario Studio does not independently recompute P&L break-even" : ""}.`,
+      `Findings: ${result.summary.findingCounts.critical} critical, ${result.summary.findingCounts.high} high, ${result.summary.findingCounts.medium} medium and ${result.summary.findingCounts.low} low.`,
+    );
+
+    if (activeBomSkus > 0) {
+      lines.push(`Procurement cost authority: ${resolvedCostSkus}/${activeBomSkus} active planning-BOM SKUs have governed procurement cost coverage. ${missingCostSkus.length ? `Unresolved active-BOM costs: ${missingCostSkus.join(", ")}.` : "No active planning-BOM cost exceptions remain."}`);
+    }
+    if (referenceOnlySkus.length) {
+      lines.push(`Reference-price caution: ${referenceOnlySkus.join(", ")} have legacy/catalogue reference prices, but those references are intentionally excluded from procurement valuation until a controlled supplier/purchase/planning price is approved.`);
+    }
+    if (reconciliation.length) {
+      const rows = reconciliation.map((row) => {
+        const label = String(row.modelLabel ?? row.productId ?? "Model");
+        const target = numericValidation(row.targetCogsLakh) ?? 0;
+        const bottomUp = numericValidation(row.bottomUpBomCostLakh);
+        const variance = numericValidation(row.varianceLakh);
+        const missing = Array.isArray(row.missingSkus) ? row.missingSkus.map(String) : [];
+        if (bottomUp === undefined) return `${label}: target COGS ${money(target)}, bottom-up BOM cost unresolved (${missing.length} missing SKU${missing.length === 1 ? "" : "s"})`;
+        return `${label}: target COGS ${money(target)}, bottom-up BOM ${money(bottomUp)}, variance ${variance === undefined ? "n/a" : signedMoney(variance)}`;
+      });
+      lines.push(`COGS reconciliation: ${rows.join("; ")}.`);
+    }
+    if (scenarioLabel && comparison) {
+      lines.push(`Scenario deltas versus baseline: expected units ${signedNumber(comparison.expectedUnitsDelta)}; procurement ${signedMoney(comparison.procurementLakhDelta)}; minimum free liquidity ${signedMoney(comparison.minimumFreeLiquidityAfterRecommendationsDeltaLakh)}; funding need ${signedMoney(comparison.fundingNeedDeltaLakh)}.`);
+    }
+    if (uniqueIssues.length) lines.push(`Highest-priority findings: ${uniqueIssues.slice(0, 4).map((item) => `${item.title} — ${item.recommendedAction}`).join(" ")}`);
+    const nextActions = actions(["inventory", "supply", "procurement", "capacity", "finance", "funding", "planning"]);
+    if (nextActions.length) lines.push(`Controlled next actions: ${nextActions.join(" ")}`);
+    if (missingCostSkus.length) lines.push("Decision gate: do not treat the procurement valuation or derived funding recommendation as commercially complete until those active planning-BOM cost exceptions are governed.");
+  } else if (scenarioLabel && comparison && isCausalQuestion(question) && asksAboutFunding) {
     const fundingDelta = comparison.fundingNeedDeltaLakh;
     const baselineFundingNeed = fundingNeed - fundingDelta;
     const liquidityDelta = comparison.minimumFreeLiquidityAfterRecommendationsDeltaLakh;
@@ -209,7 +304,7 @@ function deterministicAnswer(
 
     if (result.summary.totalRecommendedProcurementLakh === 0 && relevant(["inventory", "supply", "procurement"]).length > 0) {
       lines.push(
-        "Data-quality caution: the packet contains supply/procurement findings but no recommended purchase value. The current smoke-test BOM/price coverage is insufficient to attribute a complete material-funding effect to this scenario.",
+        "Data-quality caution: the packet contains supply/procurement findings but no recommended purchase value. Govern active planning-BOM procurement prices before attributing a complete material-funding effect to this scenario.",
       );
     }
 
@@ -221,8 +316,9 @@ function deterministicAnswer(
       `Timing: the first post-recommendation liquidity breach is ${firstBreach ? `M${firstBreach}` : "not present in the 36-month horizon"}${low ? `; the lowest modelled point is ${money(low.freeLiquidityAfterRecommendationsLakh)} at M${low.period}` : ""}.`,
       `Procurement context: recommended procurement in this packet is ${money(result.summary.totalRecommendedProcurementLakh)}.`,
     );
-    if (result.summary.totalRecommendedProcurementLakh === 0 && relevant(["inventory", "supply", "procurement"]).length > 0) {
-      lines.push("Data-quality caution: the packet contains supply/procurement findings but no recommended purchase value. Verify complete BOM and purchase-price coverage before treating this as the full material-funding requirement.");
+    const missingCostSkus = csvValidation(validation.activePlanningBomMissingCostSkus);
+    if (missingCostSkus.length) {
+      lines.push(`Data-quality caution: ${missingCostSkus.length} active planning-BOM procurement cost${missingCostSkus.length === 1 ? " is" : "s are"} unresolved (${missingCostSkus.join(", ")}). Do not treat this as the complete material-funding requirement until those costs are governed.`);
     }
     const nextActions = actions(["finance", "funding", "procurement"]);
     if (nextActions.length) lines.push(`Controlled next actions: ${nextActions.join(" ")}`);
@@ -251,6 +347,8 @@ function deterministicAnswer(
     if (rows.length) {
       lines.push(`Priority material rows: ${rows.map((row) => `${row.sku} M${row.period}: shortage ${row.committedFulfillmentShortageQty.toFixed(1)}, recommended buy ${row.recommendedPurchaseQty.toFixed(1)}${row.purchaseCostLakh == null ? "" : ` (${money(row.purchaseCostLakh)})`}`).join("; ")}.`);
     }
+    const missingCostSkus = csvValidation(validation.activePlanningBomMissingCostSkus);
+    if (missingCostSkus.length) lines.push(`Unresolved active planning-BOM costs: ${missingCostSkus.join(", ")}. Legacy/catalogue prices do not satisfy procurement cost authority.`);
     const nextActions = actions(["inventory", "supply", "procurement"]);
     if (nextActions.length) lines.push(`Controlled next actions: ${nextActions.join(" ")}`);
   } else if (/capacity|production|manufactur|work centre|bottleneck|outsourc/.test(q)) {
@@ -279,6 +377,9 @@ function systemPrompt() {
     "Always distinguish plan, forecast, committed and actual truth. A scenario is hypothetical forecast analysis and must never be described as an approved plan or actual transaction.",
     "If the user explicitly names a scenario, answer that named scenario rather than a stale UI scenario context.",
     "For causal scenario questions, compare the scenario with the governed baseline and use the supplied deltas. Correct a false premise if the scenario did not actually increase the metric the user asks about.",
+    "For multi-metric executive questions, answer every requested domain rather than selecting only one intent.",
+    "Procurement cost authority is FIFO actual, then approved purchase/supplier price, then approved planning procurement price. Legacy/catalogue reference prices are not procurement authority.",
+    "When discussing unresolved costs, emphasize active approved planning-BOM SKUs from validation; do not flood the response with unrelated inventory-master cost gaps.",
     "Handle greetings and conversational small talk naturally and briefly instead of dumping the business-health packet.",
     "Never repeat an identical recommendation merely because several findings carry the same action.",
     "You may recommend actions, trade-offs and questions to investigate, but you must never claim that you created a purchase order, reservation, job card, accounting posting, funding draw, approval or plan revision.",
@@ -291,13 +392,13 @@ function systemPrompt() {
 async function latestRun() {
   const sql = await getSql();
   const rows = await sql.query<LatestRunRow>(
-    `select id,engine_version,approved_plan_revision,input_hash,source_sha,result_json
+    `select id,engine_version,approved_plan_revision,input_hash,source_sha,result_json,validation_json
        from vyndi_ibpe_runs where status='complete' order by created_at desc limit 1`,
   );
   const row = rows[0];
   if (!row) throw new Error("No governed IBPE run exists. Run governed IBPE first.");
-  if (row.engine_version !== STAGE2_ENGINE_VERSION) {
-    throw new Error("Latest governed IBPE run predates Stage 2 payment-lag parity. Run governed IBPE once before using Copilot.");
+  if (row.engine_version !== GOVERNED_COST_ENGINE_VERSION) {
+    throw new Error("Latest governed IBPE run predates the Procurement Cost Authority. Run governed IBPE once before using Copilot so catalogue/reference prices cannot masquerade as procurement cost.");
   }
   return { sql, row };
 }
@@ -340,15 +441,17 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
       sourceSha: row.source_sha,
     };
 
-    let answer = deterministicAnswer(data.question, result, scenarioLabel, scenarioComparison);
+    const executiveAssessment = isExecutiveAssessmentQuestion(data.question);
+    let answer = deterministicAnswer(data.question, result, row.validation_json ?? {}, scenarioLabel, scenarioComparison);
     let mode: "ai" | "deterministic" = "deterministic";
-    const apiKey = isSmallTalk(data.question) ? undefined : process.env.XAI_API_KEY;
+    const apiKey = isSmallTalk(data.question) || executiveAssessment ? undefined : process.env.XAI_API_KEY;
 
     if (apiKey) {
       const context = {
         lineage,
         scenario: scenarioContext,
         ibpe: compactResult(result),
+        validation: compactValidation(row.validation_json ?? {}),
       };
       try {
         const response = await fetch("https://api.x.ai/v1/chat/completions", {
@@ -395,7 +498,7 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
         actor.userId,
         actor.role,
         `IBPE:${row.input_hash.slice(0,12)}`,
-        JSON.stringify({ questionHash, scenarioId: scenarioId ?? null, mode, answerChars: answer.length }),
+        JSON.stringify({ questionHash, scenarioId: scenarioId ?? null, mode, executiveAssessment, answerChars: answer.length }),
       ],
     );
 
