@@ -40,7 +40,7 @@ function Governance() {
       <header className="border-b border-border pb-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">Governance · controlled decisions</p>
         <h1 className="mt-1 font-display text-4xl text-accent">Governance</h1>
-        <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">One control plane for approval gates, accountable owners, required evidence and audit visibility. Risk, Legal, QA and the Action Log remain specialist evidence owners behind this workspace.</p>
+        <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">One control plane for approval gates, accountable owners, required evidence and audit visibility. Master Data, Risk, Legal, QA and the Action Log remain specialist control owners behind this workspace.</p>
       </header>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -49,6 +49,17 @@ function Governance() {
         <Kpi label="Pending approval" value={String(pending)} hint="Authorised decision required" tone={pending ? "warn" : "ok"} />
         <Kpi label="Evidence gaps" value={String(evidenceGaps)} hint="Cannot advance yet" tone={evidenceGaps ? "danger" : "ok"} />
       </div>
+
+      <section className="rounded-xl border border-accent/25 bg-accent/5 p-5 sm:p-6">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-green">Governed master controls</p>
+        <h2 className="mt-1 font-display text-2xl text-accent">Master Data & planning BOM authority</h2>
+        <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">These are the controls required by IBPE before a governed planning baseline can be created. Inventory Master approval establishes controlled SKU identity; BOM → Inventory Mapping releases the Longitude, Latitude and Altitude planning BOMs.</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link to="/command/master-data" className="rounded-lg border border-accent/40 bg-bg px-4 py-2.5 text-sm font-semibold text-accent hover:bg-accent/10">Open Master Data Engine →</Link>
+          <Link to="/command/bom-inventory-mapping" className="rounded-lg border border-border bg-bg px-4 py-2.5 text-sm font-semibold text-fg hover:border-accent">Open BOM → Inventory Mapping →</Link>
+          <Link to="/command/planning" className="rounded-lg border border-border bg-bg px-4 py-2.5 text-sm font-semibold text-fg hover:border-accent">Open Master Plan →</Link>
+        </div>
+      </section>
 
       <section className="rounded-xl border border-border bg-surface/35 p-5 sm:p-6">
         <div className="flex items-end justify-between gap-4">
@@ -78,7 +89,7 @@ function Governance() {
 
       <section className="rounded-xl border border-border bg-surface/25 p-5">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-green">Evidence owners</p>
-        <div className="mt-3 flex flex-wrap gap-2"><Link to="/command/risk" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">Risk register</Link><Link to="/command/legal" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">Legal & IP</Link><Link to="/command/qa-verification" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">QA verification</Link><Link to="/command/actions" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">Action & audit log</Link><Link to="/command/ca-audit" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">CA evidence</Link><Link to="/command/epr-live" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">EPR evidence</Link></div>
+        <div className="mt-3 flex flex-wrap gap-2"><Link to="/command/master-data" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">Master Data Engine</Link><Link to="/command/risk" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">Risk register</Link><Link to="/command/legal" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">Legal & IP</Link><Link to="/command/qa-verification" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">QA verification</Link><Link to="/command/actions" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">Action & audit log</Link><Link to="/command/ca-audit" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">CA evidence</Link><Link to="/command/epr-live" className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">EPR evidence</Link></div>
         <p className="mt-4 text-xs leading-5 text-muted">This is the application governance/read model. It should not be represented as an immutable security-grade audit ledger until authenticated actor identity, server-side approval enforcement, durable event IDs and retention controls are in place.</p>
       </section>
     </div>
