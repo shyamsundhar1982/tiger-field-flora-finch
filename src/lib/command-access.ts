@@ -46,7 +46,7 @@ function getBootstrapAdminEmails(): string[] {
     .filter(Boolean);
 }
 
-async function getRoleForUser(userId: string, email?: string | null): Promise<CommandRole> {
+async function getRoleForUser(userId: string, email?: string | null): Promise<CommandRole | null> {
   const sql = await getSql();
   const normalizedEmail = email?.trim().toLowerCase();
 
@@ -61,8 +61,7 @@ async function getRoleForUser(userId: string, email?: string | null): Promise<Co
   const rows = await sql<{ role: string }>`
     select role from vindy_user_roles where user_id = ${userId} limit 1
   `;
-  const role = rows[0]?.role as CommandRole | undefined;
-  return role ?? "viewer";
+  return (rows[0]?.role as CommandRole | undefined) ?? null;
 }
 
 async function getLegacySession() {
@@ -91,13 +90,19 @@ async function getLegacyRole(): Promise<CommandRole | null> {
 }
 
 /**
- * Better Auth is authoritative whenever a signed-in identity exists.
- * The legacy command session is a bootstrap compatibility path only and is
- * consulted after Better Auth, never before it.
+ * An explicit Better Auth role assignment remains authoritative. During the
+ * migration period, an authenticated but not-yet-mapped Better Auth user may
+ * retain an already-authorised legacy Command role instead of being silently
+ * downgraded to viewer. With neither mapping nor legacy role, viewer remains the
+ * fail-closed default.
  */
 export const getCommandRole = createServerFn({ method: "GET" }).handler(async () => {
   const user = await getSessionUser();
-  if (user) return getRoleForUser(user.id, user.email);
+  if (user) {
+    const assignedRole = await getRoleForUser(user.id, user.email);
+    if (assignedRole) return assignedRole;
+    return (await getLegacyRole()) ?? "viewer";
+  }
 
   return getLegacyRole();
 });
