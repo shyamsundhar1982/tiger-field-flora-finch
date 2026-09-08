@@ -146,6 +146,11 @@ const transitionSchema = z.object({
   sourceRef: z.string().max(500).optional(),
 });
 
+const bulkApprovalSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(200),
+  note: z.string().max(500).optional(),
+});
+
 export const transitionMasterData = createServerFn({ method: "POST" })
   .validator(transitionSchema)
   .handler(async ({ data }) => {
@@ -162,6 +167,76 @@ export const transitionMasterData = createServerFn({ method: "POST" })
     await sql`update master_data_records set status=${data.toStatus}, approved_by=${data.toStatus === "approved" ? `command:${role}` : null}, approved_at=${data.toStatus === "approved" ? new Date() : null}, updated_at=now() where id=${data.id}`;
     await sql`insert into master_data_audit_events (id, master_data_id, event_type, actor_user_id, actor_role, from_status, to_status, note, source_ref) values (${crypto.randomUUID()}, ${data.id}, ${"MASTER_DATA_STATUS_CHANGED"}, ${`command:${role}`}, ${role}, ${fromStatus}, ${data.toStatus}, ${data.note ?? null}, ${data.sourceRef ?? null})`;
     return { ok: true, fromStatus, toStatus: data.toStatus };
+  });
+
+/**
+ * Governed bulk approval for the Master Data list.
+ * Only pending-approval records are eligible. The guarded CTE updates nothing
+ * if any selected ID is missing or has changed status, preventing partial bulk
+ * approval from a stale browser selection.
+ */
+export const bulkApproveMasterData = createServerFn({ method: "POST" })
+  .validator(bulkApprovalSchema)
+  .handler(async ({ data }) => {
+    await assertSameSiteRequest();
+    const role = await requirePermission("approve");
+    const sql = await getSql();
+    const ids = [...new Set(data.ids)];
+    const selectedRows = ids.map((id) => ({ id }));
+
+    const updated = await sql<{ id: string }>`
+      with selected as (
+        select s.id::uuid as id
+        from jsonb_to_recordset(${JSON.stringify(selectedRows)}::jsonb) as s(id text)
+      ), current_rows as (
+        select m.id, m.status
+        from master_data_records m
+        join selected s on s.id=m.id
+      ), guard as (
+        select
+          count(*)::int as found_count,
+          count(*) filter (where status='pending_approval')::int as eligible_count
+        from current_rows
+      ), updated as (
+        update master_data_records m
+        set
+          status='approved',
+          approved_by=${`command:${role}`},
+          approved_at=now(),
+          updated_at=now()
+        from selected s, guard g
+        where m.id=s.id
+          and m.status='pending_approval'
+          and g.found_count=${ids.length}
+          and g.eligible_count=${ids.length}
+        returning m.id::text as id
+      )
+      select id from updated
+    `;
+
+    const updatedRows = Array.isArray(updated) ? updated : [];
+    if (updatedRows.length !== ids.length) {
+      throw new Error("Bulk approval stopped because one or more selected records are missing or no longer pending approval. Refresh the register and select again.");
+    }
+
+    const auditRows = updatedRows.map((row) => ({
+      id: crypto.randomUUID(),
+      master_data_id: row.id,
+    }));
+    await sql`
+      insert into master_data_audit_events (
+        id, master_data_id, event_type, actor_user_id, actor_role,
+        from_status, to_status, note
+      )
+      select
+        a.id, a.master_data_id, 'MASTER_DATA_BULK_APPROVED',
+        ${`command:${role}`}, ${role}, 'pending_approval', 'approved',
+        ${data.note ?? "Bulk approval from Master Data Engine"}
+      from jsonb_to_recordset(${JSON.stringify(auditRows)}::jsonb)
+        as a(id uuid, master_data_id uuid)
+    `;
+
+    return { ok: true, approved: updatedRows.length, ids: updatedRows.map((row) => row.id) };
   });
 
 export const listMasterDataAudit = createServerFn({ method: "GET" }).handler(async () => {
