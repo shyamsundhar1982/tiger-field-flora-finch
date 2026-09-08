@@ -1,40 +1,26 @@
-import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
+import { Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import {
   Activity,
-  AlertTriangle,
-  BookOpen,
-  ChevronDown,
   ClipboardCheck,
-  Factory,
-  LogOut,
-  Presentation,
-  Wallet,
   DraftingCompass,
-  Scale,
-  Settings2,
-  Boxes,
+  Factory,
   LineChart,
+  LogOut,
+  Settings2,
+  Wallet,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { cn } from "@/lib/utils";
 import { getCommandRole, lockCommand } from "@/lib/command-access";
 import { canAccessPage, type CommandRole } from "@/lib/page-access";
-import {
-  getRouteMeta,
-  navigationGroups,
-  type PageDomain,
-  type PageMode,
-  type RouteMeta,
-} from "@/lib/page-metadata";
+import { getRouteMeta } from "@/lib/page-metadata";
 
-type NavigationView = "workspaces" | "more";
 type WorkspaceItem = {
   to: string;
   label: string;
   icon: typeof Activity;
   context: Set<string>;
-  exact?: boolean;
 };
 
 const MASTER_PLAN_ROUTE = "/command/planning";
@@ -44,29 +30,15 @@ const COMMERCIAL_HOME_ROUTE = "/command/sales";
 const ENGINEERING_HOME_ROUTE = "/command/engineering";
 const GOVERNANCE_HOME_ROUTE = "/command/governance";
 
-const COMMAND_TABS = [
-  { to: "/command", label: "Overview" },
-  { to: "/command/decision-inbox", label: "Action Inbox" },
-  { to: "/command/control-tower", label: "Control Tower" },
-] as const;
-
-const EXECUTIVE_SUPPORT_ROUTES = new Set<string>([
-  "/command/control-tower",
+const EXECUTIVE_CONTEXT_ROUTES = new Set<string>([
+  "/command",
+  "/command/decision-inbox",
   "/command/management-intelligence",
   "/command/founder-command",
   "/command/founder-control",
   "/command/decision-engine",
-  "/command/decision-inbox",
 ]);
-const FINANCE_SUPPORT_ROUTES = new Set<string>([
-  "/command/finance",
-  "/command/balance-sheet",
-  "/command/ca-audit",
-  "/command/cash",
-  "/command/finance-control",
-  "/command/master-finance",
-  "/command/aluminium-finance",
-]);
+
 const FINANCE_TABS = [
   { to: FINANCE_HOME_ROUTE, label: "Overview" },
   { to: "/command/finance-assumptions", label: "Plan" },
@@ -87,18 +59,6 @@ const FINANCE_CONTEXT_ROUTES = new Set<string>([
   "/command/actuals",
 ]);
 
-const SUPPLY_SUPPORT_ROUTES = new Set<string>([
-  "/command/procurement",
-  "/command/inventory",
-  "/command/production",
-  "/command/manufacturing",
-  "/command/quality",
-  "/command/ops",
-  "/command/actuals",
-  "/command/production-jobcards",
-  "/command/purchase-execution",
-  "/command/receiving",
-]);
 const SUPPLY_TABS = [
   { to: SUPPLY_HOME_ROUTE, label: "Overview" },
   { to: "/command/procurement-planning", label: "Plan" },
@@ -111,10 +71,10 @@ const SUPPLY_TABS = [
 ] as const;
 const SUPPLY_CONTEXT_ROUTES = new Set<string>([
   ...SUPPLY_TABS.map((tab) => tab.to),
+  "/command/procurement",
+  "/command/manufacturing",
   "/command/ops",
   "/command/actuals",
-  "/command/production-jobcards",
-  "/command/procurement-planning",
   "/command/inventory-truth",
   "/command/inventory-ledgers",
   "/command/inventory-master",
@@ -126,7 +86,6 @@ const SUPPLY_CONTEXT_ROUTES = new Set<string>([
   "/command/phase-6",
 ]);
 
-const COMMERCIAL_SUPPORT_ROUTES = new Set<string>(["/command/gtm", "/command/market-survey"]);
 const COMMERCIAL_TABS = [
   { to: COMMERCIAL_HOME_ROUTE, label: "Demand & Orders" },
   { to: "/command/gtm", label: "GTM" },
@@ -137,11 +96,6 @@ const COMMERCIAL_CONTEXT_ROUTES = new Set<string>([
   "/command/phase-4",
 ]);
 
-const ENGINEERING_SUPPORT_ROUTES = new Set<string>([
-  "/command/product",
-  "/command/bom",
-  "/command/bom-control",
-]);
 const ENGINEERING_TABS = [
   { to: ENGINEERING_HOME_ROUTE, label: "Overview" },
   { to: "/command/product", label: "Product & Validation" },
@@ -153,169 +107,70 @@ const ENGINEERING_CONTEXT_ROUTES = new Set<string>([
   "/command/phase-5",
 ]);
 
-const GOVERNANCE_SUPPORT_ROUTES = new Set<string>([
-  "/command/risk",
-  "/command/legal",
-  "/command/qa-verification",
-  "/command/actions",
-]);
 const GOVERNANCE_TABS = [
   { to: GOVERNANCE_HOME_ROUTE, label: "Approvals" },
   { to: "/command/risk", label: "Risk" },
   { to: "/command/legal", label: "Legal & IP" },
   { to: "/command/qa-verification", label: "QA Verification" },
   { to: "/command/actions", label: "Audit & Actions" },
+  { to: "/command/master-data", label: "Master Data" },
 ] as const;
-const GOVERNANCE_CONTEXT_ROUTES = new Set<string>(GOVERNANCE_TABS.map((tab) => tab.to));
+const GOVERNANCE_CONTEXT_ROUTES = new Set<string>([
+  ...GOVERNANCE_TABS.map((tab) => tab.to),
+  "/command/users",
+]);
 
-const PLAN_SUPPORT_ROUTES = new Set<string>([
+const PLAN_CONTEXT_ROUTES = new Set<string>([
+  MASTER_PLAN_ROUTE,
   "/command/finance-assumptions",
   "/command/scenarios",
   "/command/procurement-planning",
   "/command/funding",
 ]);
-const PLAN_CONTEXT_ROUTES = new Set<string>([MASTER_PLAN_ROUTE, ...PLAN_SUPPORT_ROUTES]);
-const LEGACY_ROUTES = new Set<string>([
-  "/command/phase-4",
-  "/command/phase-5",
-  "/command/phase-6",
-  "/command/phase-6a",
-]);
 
 const WORKSPACES: WorkspaceItem[] = [
-  {
-    to: "/command",
-    label: "Command Centre",
-    icon: Activity,
-    context: new Set<string>(["/command", ...EXECUTIVE_SUPPORT_ROUTES]),
-    exact: true,
-  },
+  { to: "/command", label: "Command Centre", icon: Activity, context: EXECUTIVE_CONTEXT_ROUTES },
   { to: MASTER_PLAN_ROUTE, label: "Master Plan", icon: LineChart, context: PLAN_CONTEXT_ROUTES },
-  {
-    to: ENGINEERING_HOME_ROUTE,
-    label: "Engineering",
-    icon: DraftingCompass,
-    context: ENGINEERING_CONTEXT_ROUTES,
-  },
-  {
-    to: SUPPLY_HOME_ROUTE,
-    label: "Supply & Production",
-    icon: Factory,
-    context: SUPPLY_CONTEXT_ROUTES,
-  },
-  {
-    to: COMMERCIAL_HOME_ROUTE,
-    label: "Commercial",
-    icon: LineChart,
-    context: COMMERCIAL_CONTEXT_ROUTES,
-  },
+  { to: ENGINEERING_HOME_ROUTE, label: "Engineering", icon: DraftingCompass, context: ENGINEERING_CONTEXT_ROUTES },
+  { to: SUPPLY_HOME_ROUTE, label: "Supply & Production", icon: Factory, context: SUPPLY_CONTEXT_ROUTES },
+  { to: COMMERCIAL_HOME_ROUTE, label: "Commercial", icon: LineChart, context: COMMERCIAL_CONTEXT_ROUTES },
   { to: FINANCE_HOME_ROUTE, label: "Finance", icon: Wallet, context: FINANCE_CONTEXT_ROUTES },
-  {
-    to: GOVERNANCE_HOME_ROUTE,
-    label: "Governance",
-    icon: ClipboardCheck,
-    context: GOVERNANCE_CONTEXT_ROUTES,
-  },
+  { to: GOVERNANCE_HOME_ROUTE, label: "Governance", icon: ClipboardCheck, context: GOVERNANCE_CONTEXT_ROUTES },
 ];
-const WORKSPACE_ROUTES = new Set<string>(WORKSPACES.map((item) => item.to));
-const SUPPORT_ROUTES = new Set<string>([
-  ...EXECUTIVE_SUPPORT_ROUTES,
-  ...FINANCE_SUPPORT_ROUTES,
-  ...SUPPLY_SUPPORT_ROUTES,
-  ...COMMERCIAL_SUPPORT_ROUTES,
-  ...ENGINEERING_SUPPORT_ROUTES,
-  ...GOVERNANCE_SUPPORT_ROUTES,
-  ...PLAN_SUPPORT_ROUTES,
-]);
 
-const ICONS: Record<string, typeof Activity> = {
-  command: Activity,
-  finance: Wallet,
-  manufacturing: Factory,
-  inventory: Boxes,
-  procurement: Boxes,
-  engineering: DraftingCompass,
-  epr: ClipboardCheck,
-  knowledge: BookOpen,
-  sales: LineChart,
-  market: LineChart,
-  legal: Scale,
-  risk: AlertTriangle,
-  leadership: Presentation,
-  admin: Settings2,
-};
-const DOMAIN_LABELS: Record<PageDomain, string> = {
-  command: "Command",
-  finance: "Finance",
-  manufacturing: "Manufacturing",
-  inventory: "Inventory",
-  procurement: "Procurement",
-  engineering: "Engineering",
-  epr: "EPR",
-  knowledge: "Knowledge",
-  sales: "Sales",
-  market: "Market",
-  legal: "Legal",
-  risk: "Risk",
-  leadership: "Executive",
-  admin: "Administration",
-};
-const DOMAIN_ORDER: PageDomain[] = [
-  "knowledge",
-  "epr",
-  "finance",
-  "procurement",
-  "inventory",
-  "manufacturing",
-  "engineering",
-  "sales",
-  "market",
-  "legal",
-  "risk",
-  "leadership",
-  "command",
-  "admin",
-];
-const MODE_LABELS: Record<PageMode, string> = {
-  understand: "REFERENCE",
-  observe: "MONITOR",
-  operate: "SPECIALIST",
-  showcase: "SHOWCASE",
-};
-const MODE_DESCRIPTIONS: Record<PageMode, string> = {
-  understand: "Knowledge & context",
-  observe: "Specialist status",
-  operate: "Deep controls",
-  showcase: "External presentation",
-};
-
-function isSecondaryNavigationPage(page: RouteMeta) {
-  return (
-    !WORKSPACE_ROUTES.has(page.route) &&
-    !SUPPORT_ROUTES.has(page.route) &&
-    !LEGACY_ROUTES.has(page.route)
-  );
+function isAccessible(role: CommandRole | null, route: string) {
+  return canAccessPage(role, getRouteMeta(route));
 }
 
-function PageLink({ page, role }: { page: RouteMeta; role: CommandRole | null }) {
-  if (!canAccessPage(role, page)) return null;
-  const Icon = ICONS[page.domain] ?? Activity;
+function CanonicalAnchor({
+  to,
+  label,
+  active = false,
+  className,
+  children,
+}: {
+  to: string;
+  label: string;
+  active?: boolean;
+  className?: string;
+  children?: React.ReactNode;
+}) {
   return (
-    <Link
-      to={page.route as never}
-      title={page.label}
-      className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted transition-colors hover:bg-surface hover:text-fg"
-      activeProps={{ className: "bg-surface text-fg" }}
+    <a
+      href={to}
+      title={label}
+      aria-current={active ? "page" : undefined}
+      className={className}
     >
-      <Icon className="size-4 shrink-0" />
-      {page.label}
-    </Link>
+      {children ?? label}
+    </a>
   );
 }
 
-function WorkspaceNavigation({ role }: { role: CommandRole | null }) {
+function WorkspaceNavigation({ role, onNavigate }: { role: CommandRole | null; onNavigate?: () => void }) {
   const location = useLocation();
-  const items = WORKSPACES.filter((item) => canAccessPage(role, getRouteMeta(item.to)));
+  const items = WORKSPACES.filter((item) => isAccessible(role, item.to));
+  const inboxAccessible = isAccessible(role, "/command/decision-inbox");
   return (
     <section className="rounded-xl border border-border bg-surface/30 p-2">
       <div className="flex items-center gap-2 px-2 pb-2 pt-1">
@@ -328,103 +183,51 @@ function WorkspaceNavigation({ role }: { role: CommandRole | null }) {
           const Icon = item.icon;
           const active = item.context.has(location.pathname);
           return (
-            <Link
-              key={item.to}
-              to={item.to as never}
-              activeOptions={item.exact ? { exact: true } : undefined}
-              title={item.label}
-              className={cn(
-                "flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-muted transition-colors hover:bg-bg hover:text-fg",
-                active && "bg-bg text-fg shadow-sm",
-              )}
-              activeProps={{ className: "bg-bg text-fg shadow-sm" }}
-            >
-              <Icon className={cn("size-4 shrink-0", active && "text-accent")} />
-              {item.label}
-            </Link>
+            <div key={item.to}>
+              <CanonicalAnchor
+                to={item.to}
+                label={item.label}
+                active={active}
+                className={cn(
+                  "flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-muted transition-colors hover:bg-bg hover:text-fg",
+                  active && "bg-bg text-fg shadow-sm",
+                )}
+              >
+                <Icon className={cn("size-4 shrink-0", active && "text-accent")} />
+                {item.label}
+              </CanonicalAnchor>
+              {item.to === "/command" && inboxAccessible ? (
+                <a
+                  href="/command/decision-inbox"
+                  onClick={onNavigate}
+                  className={cn(
+                    "ml-9 block rounded-md px-2 py-1.5 text-xs text-subtle hover:bg-bg hover:text-fg",
+                    location.pathname === "/command/decision-inbox" && "text-accent",
+                  )}
+                >
+                  Action Inbox
+                </a>
+              ) : null}
+            </div>
           );
         })}
       </div>
       {role === "admin" ? (
         <div className="mt-2 border-t border-border pt-2">
-          <Link
-            to="/command/users"
-            className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-muted transition-colors hover:bg-bg hover:text-fg"
-            activeProps={{ className: "bg-bg text-fg shadow-sm" }}
+          <a
+            href="/command/users"
+            onClick={onNavigate}
+            className={cn(
+              "flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-muted transition-colors hover:bg-bg hover:text-fg",
+              location.pathname === "/command/users" && "bg-bg text-fg shadow-sm",
+            )}
           >
             <Settings2 className="size-4 shrink-0 text-accent" />
             User Creation & Access
-          </Link>
+          </a>
         </div>
       ) : null}
     </section>
-  );
-}
-
-function SecondaryDomainGroup({
-  domain,
-  mode,
-  role,
-}: {
-  domain: PageDomain;
-  mode: PageMode;
-  role: CommandRole | null;
-}) {
-  const group =
-    mode === "showcase" ? "Showcase" : mode === "observe" ? "Observe" : mode === "operate" ? "Operate" : "Understand";
-  const pages = navigationGroups[group].filter(
-    (page) => page.domain === domain && isSecondaryNavigationPage(page) && canAccessPage(role, page),
-  );
-  if (!pages.length) return null;
-  const Icon = ICONS[domain] ?? Activity;
-  return (
-    <details className="group/domain">
-      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-subtle hover:bg-surface hover:text-fg [&::-webkit-details-marker]:hidden">
-        <Icon className="size-3.5" />
-        <span className="flex-1">{DOMAIN_LABELS[domain]}</span>
-        <span className="text-[9px] font-normal tracking-normal text-muted">{pages.length}</span>
-        <ChevronDown className="size-3" />
-      </summary>
-      <div className="ml-2 mt-1 space-y-0.5 border-l border-border pl-2">
-        {pages.map((page) => <PageLink key={page.route} page={page} role={role} />)}
-      </div>
-    </details>
-  );
-}
-
-function SecondaryMode({ mode, role }: { mode: PageMode; role: CommandRole | null }) {
-  const location = useLocation();
-  const group =
-    mode === "showcase" ? "Showcase" : mode === "observe" ? "Observe" : mode === "operate" ? "Operate" : "Understand";
-  const pages = navigationGroups[group].filter((page) => isSecondaryNavigationPage(page) && canAccessPage(role, page));
-  if (!pages.length) return null;
-  const active = pages.some((page) => location.pathname === page.route || location.pathname.startsWith(`${page.route}/`));
-  return (
-    <details open={active} className="group/mode">
-      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-3 py-2 text-[11px] font-bold uppercase tracking-[0.18em] text-fg hover:bg-surface [&::-webkit-details-marker]:hidden">
-        <span className="flex-1">{MODE_LABELS[mode]}</span>
-        <span className="mr-1 text-[9px] font-normal tracking-normal text-muted">{MODE_DESCRIPTIONS[mode]}</span>
-        <ChevronDown className="size-3" />
-      </summary>
-      <div className="ml-2 mt-1 space-y-1 border-l border-border pl-2">
-        {DOMAIN_ORDER.map((domain) => <SecondaryDomainGroup key={domain} domain={domain} mode={mode} role={role} />)}
-      </div>
-    </details>
-  );
-}
-
-function MoreNavigation({ role }: { role: CommandRole | null }) {
-  return (
-    <div className="space-y-1">
-      <div className="flex items-center gap-2 px-3 pb-2 text-[10px] uppercase tracking-[0.16em] text-subtle">
-        <Settings2 className="size-3.5" />
-        Reference, specialist, showcase & administration
-      </div>
-      <SecondaryMode mode="understand" role={role} />
-      <SecondaryMode mode="observe" role={role} />
-      <SecondaryMode mode="operate" role={role} />
-      <SecondaryMode mode="showcase" role={role} />
-    </div>
   );
 }
 
@@ -441,59 +244,69 @@ function WorkspaceTabs({
 }) {
   const location = useLocation();
   if (!context.has(location.pathname)) return null;
-  const accessibleRoutes = routes.filter((tab) => canAccessPage(role, getRouteMeta(tab.to)));
-  if (!accessibleRoutes.length) return null;
+  const accessibleRoutes = routes.filter((tab) => isAccessible(role, tab.to));
+  if (accessibleRoutes.length < 2) return null;
   return (
     <nav className="mb-6 overflow-x-auto rounded-xl border border-border bg-surface/50 p-1 [scrollbar-width:thin]" aria-label={label}>
       <div className="flex min-w-max gap-1">
-        {accessibleRoutes.map((tab) => (
-          <Link
-            key={tab.to}
-            to={tab.to as never}
-            className={cn(
-              "rounded-lg px-4 py-2 text-xs font-semibold transition-colors",
-              location.pathname === tab.to
-                ? "border border-accent/35 bg-accent/10 text-accent"
-                : "border border-transparent text-muted hover:bg-bg/60 hover:text-fg",
-            )}
-          >
-            {tab.label}
-          </Link>
-        ))}
+        {accessibleRoutes.map((tab) => {
+          const active = location.pathname === tab.to;
+          return (
+            <a
+              key={tab.to}
+              href={tab.to}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "rounded-lg px-4 py-2 text-xs font-semibold transition-colors",
+                active
+                  ? "border border-accent/35 bg-accent/10 text-accent"
+                  : "border border-transparent text-muted hover:bg-bg/60 hover:text-fg",
+              )}
+            >
+              {tab.label}
+            </a>
+          );
+        })}
       </div>
     </nav>
   );
 }
 
-function NavigationBody({ view, role }: { view: NavigationView; role: CommandRole | null }) {
-  return view === "workspaces" ? <WorkspaceNavigation role={role} /> : <MoreNavigation role={role} />;
-}
-
 function MobileNavigation({
-  view,
   role,
-  setView,
   logout,
   loggingOut,
 }: {
-  view: NavigationView;
   role: CommandRole | null;
-  setView: (view: NavigationView) => void;
   logout: () => void;
   loggingOut: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="border-b border-border px-3 py-2 lg:hidden">
-      <div className="flex items-center gap-2">
-        <div className="grid min-w-0 flex-1 grid-cols-2 gap-1 rounded-md border border-border bg-surface/40 p-0.5">
-          <button type="button" onClick={() => setView("workspaces")} className={cn("rounded px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em]", view === "workspaces" ? "bg-bg text-fg shadow-sm" : "text-muted hover:text-fg")}>Workspaces</button>
-          <button type="button" onClick={() => setView("more")} className={cn("rounded px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em]", view === "more" ? "bg-bg text-fg shadow-sm" : "text-muted hover:text-fg")}>More</button>
-        </div>
-        <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} className="rounded-md border border-border px-3 py-2 text-xs font-semibold text-muted hover:bg-surface hover:text-fg">{open ? "Close" : "Browse"}</button>
-      </div>
-      {open ? <nav className="mt-2 max-h-[58dvh] overflow-y-auto pb-1"><NavigationBody view={view} role={role} /></nav> : null}
-      <button type="button" onClick={logout} disabled={loggingOut} className="mt-2 w-full rounded-md border border-border px-3 py-2 text-xs text-muted hover:bg-surface hover:text-fg">{loggingOut ? "Logging out…" : "Log out"}</button>
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        className="w-full rounded-md border border-border px-3 py-2 text-xs font-semibold text-muted hover:bg-surface hover:text-fg"
+      >
+        {open ? "Close workspace menu" : "Open workspace menu"}
+      </button>
+      {open ? (
+        <nav className="mt-2 max-h-[58dvh] overflow-y-auto pb-1">
+          <WorkspaceNavigation role={role} onNavigate={() => setOpen(false)} />
+        </nav>
+      ) : null}
+      {open ? (
+        <button
+          type="button"
+          onClick={logout}
+          disabled={loggingOut}
+          className="mt-2 w-full rounded-md border border-border px-3 py-2 text-xs text-muted hover:bg-surface hover:text-fg"
+        >
+          {loggingOut ? "Logging out…" : "Log out"}
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -502,11 +315,13 @@ export function CommandShell() {
   const navigate = useNavigate();
   const [role, setRole] = useState<CommandRole | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [view, setView] = useState<NavigationView>("workspaces");
+
   useEffect(() => {
     getCommandRole().then(setRole).catch(() => setRole(null));
   }, []);
+
   const viewer = role === "viewer";
+
   async function logout() {
     if (loggingOut) return;
     setLoggingOut(true);
@@ -518,30 +333,31 @@ export function CommandShell() {
       setLoggingOut(false);
     }
   }
+
   return (
     <div className="min-h-dvh bg-bg">
-      <SiteHeader />
+      <SiteHeader showNavigation={false} brandHref="/command" />
       <div className="mx-auto flex max-w-7xl">
         <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-72 shrink-0 flex-col border-r border-border py-6 lg:flex">
           <p className="px-5 pb-3 text-[10px] uppercase tracking-[0.2em] text-subtle">VINDY 2.0 · Operating System</p>
-          <div className="px-3 pb-3">
-            <div className="grid grid-cols-2 rounded-md border border-border bg-surface/40 p-0.5">
-              <button type="button" onClick={() => setView("workspaces")} className={cn("rounded px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em]", view === "workspaces" ? "bg-bg text-fg shadow-sm" : "text-muted hover:text-fg")}>Workspaces</button>
-              <button type="button" onClick={() => setView("more")} className={cn("rounded px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em]", view === "more" ? "bg-bg text-fg shadow-sm" : "text-muted hover:text-fg")}>More</button>
-            </div>
-          </div>
-          <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-4 pr-1 [scrollbar-width:thin]"><NavigationBody view={view} role={role} /></nav>
+          <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-4 pr-1 [scrollbar-width:thin]">
+            <WorkspaceNavigation role={role} />
+          </nav>
           <div className="px-3 pt-3">
-            <button type="button" onClick={logout} disabled={loggingOut} className="flex w-full items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted hover:bg-surface hover:text-fg disabled:opacity-50">
+            <button
+              type="button"
+              onClick={logout}
+              disabled={loggingOut}
+              className="flex w-full items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted hover:bg-surface hover:text-fg disabled:opacity-50"
+            >
               <LogOut className="size-4" />
               {loggingOut ? "Logging out…" : `Log out${viewer ? " · User" : role === "admin" ? " · Admin" : ""}`}
             </button>
           </div>
         </aside>
         <div className="min-w-0 flex-1">
-          <MobileNavigation view={view} role={role} setView={setView} logout={logout} loggingOut={loggingOut} />
+          <MobileNavigation role={role} logout={logout} loggingOut={loggingOut} />
           <div className="px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
-            <WorkspaceTabs role={role} routes={COMMAND_TABS} context={WORKSPACES[0].context} label="Command Centre workspace" />
             <WorkspaceTabs role={role} routes={FINANCE_TABS} context={FINANCE_CONTEXT_ROUTES} label="Finance workspace" />
             <WorkspaceTabs role={role} routes={SUPPLY_TABS} context={SUPPLY_CONTEXT_ROUTES} label="Supply and Production workspace" />
             <WorkspaceTabs role={role} routes={COMMERCIAL_TABS} context={COMMERCIAL_CONTEXT_ROUTES} label="Commercial workspace" />
