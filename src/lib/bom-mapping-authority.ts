@@ -37,7 +37,7 @@ function assertModelScope(modelId: string) {
 export const listControlledBomMappings = createServerFn({ method: "GET" }).handler(async () => {
   await requireAdminView();
   const sql = await getSql();
-  return sql`
+  const rows = await sql`
     select id,venture,model_id,bom_revision,bom_line_key,sku,quantity,unit,status,
            configuration_category,configuration_option_id,approved_by,approved_at::text as approved_at,
            effective_from::text as effective_from,effective_to::text as effective_to,notes,created_by,created_at::text as created_at
@@ -45,6 +45,7 @@ export const listControlledBomMappings = createServerFn({ method: "GET" }).handl
      order by venture,model_id,bom_revision,bom_line_key,configuration_option_id nulls first,created_at desc
      limit 3000
   `;
+  return Array.isArray(rows) ? [...rows] : [];
 });
 
 export const createControlledBomMapping = createServerFn({ method: "POST" })
