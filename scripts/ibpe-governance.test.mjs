@@ -75,16 +75,26 @@ test("IBPE persistence rejects a non-approved plan revision", async (t) => {
   ),/exact approved operating-plan revision/);
 });
 
-test("governed IBPE procurement cost uses actual FIFO then approved planning reference and never silent zero fallback", async () => {
+test("governed IBPE procurement cost excludes catalogue references and scopes cost exceptions to the active planning BOM", async () => {
   const authority = await readFile(join(here, "..", "src", "lib", "ibpe-authority.ts"), "utf8");
-  assert.match(authority, /fifo_cost_inr/);
-  assert.match(authority, /master_data_records m/);
-  assert.match(authority, /m\.domain='inventory' and m\.status='approved'/);
-  assert.match(authority, /legacyPriceInr/);
-  assert.match(authority, /unitCostLakh:governedCostInr === undefined \? undefined : governedCostInr\/100000/);
-  assert.match(authority, /COST:\$\{costAuthority\}/);
-  assert.match(authority, /APPROVED-INVENTORY-MASTER/);
-  assert.match(authority, /missingControlledCostSkus/);
-  assert.match(authority, /inventoryCostAuthority/);
+  const migration = await readFile(join(migrationsDir, "0036_procurement_cost_authority.sql"), "utf8");
+
+  assert.match(authority, /VYNDI-IBPE-1\.2\.0/);
+  assert.match(authority, /vyndi_procurement_cost_authority/);
+  assert.match(authority, /activePlanningBomMissingCostSkus/);
+  assert.match(authority, /missingControlledCostScope:"active-approved-planning-bom-only"/);
+  assert.match(authority, /bomCogsReconciliation/);
+  assert.match(authority, /commercialBreakEvenPeriod/);
+  assert.match(authority, /legacy catalogue\/reference price excluded/);
+  assert.doesNotMatch(authority, /attributes->>'legacyPriceInr'/);
   assert.doesNotMatch(authority, /unitCostLakh:Number\(r\.unit_cost_inr \?\? 0\)\/100000/);
+
+  assert.match(migration, /create table if not exists vyndi_procurement_prices/);
+  assert.match(migration, /price_type in \('supplier','planning'\)/);
+  assert.match(migration, /coalesce\(fifo\.unit_cost_inr,po\.unit_price_inr,supplier\.unit_price_inr,planning\.unit_price_inr\) as governed_cost_inr/);
+  assert.match(migration, /legacy\.unit_price_inr as legacy_reference_price_inr/);
+  assert.match(migration, /legacy_reference_price_inr is visible for reconciliation only and is never selected as governed_cost_inr/);
+  assert.match(migration, /APPROVED-PURCHASE-ORDER/);
+  assert.match(migration, /APPROVED-SUPPLIER-PRICE/);
+  assert.match(migration, /APPROVED-PLANNING-PROCUREMENT-PRICE/);
 });

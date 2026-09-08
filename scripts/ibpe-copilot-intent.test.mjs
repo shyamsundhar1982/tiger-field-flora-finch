@@ -43,3 +43,27 @@ test("IBPE causal scenario questions use governed baseline deltas", () => {
   assert.match(copilot, /Scenario impact:/);
   assert.match(copilot, /Funding effect:/);
 });
+
+test("single multi-metric prompt returns complete governed executive assessment", () => {
+  assert.match(copilot, /function requestedExecutiveDomains/);
+  assert.match(copilot, /function isExecutiveAssessmentQuestion/);
+  assert.match(copilot, /IBPE Executive Assessment:/);
+  assert.match(copilot, /Procurement & shortages:/);
+  assert.match(copilot, /Capacity:/);
+  assert.match(copilot, /Cash & liquidity:/);
+  assert.match(copilot, /Commercial EBITDA break-even:/);
+  assert.match(copilot, /Procurement cost authority:/);
+  assert.match(copilot, /activePlanningBomMissingCostSkus/);
+  assert.match(copilot, /bomCogsReconciliation/);
+  assert.match(copilot, /questions\.length === 1 && isExecutiveAssessmentQuestion/);
+  assert.match(copilot, /isSmallTalk\(data\.question\) \|\| executiveAssessment \? undefined : process\.env\.XAI_API_KEY/);
+  const executiveBranch = copilot.indexOf("if (isExecutiveAssessmentQuestion(question))");
+  const fundingBranch = copilot.indexOf("else if (/fund(?:ing)?");
+  assert.ok(executiveBranch >= 0 && fundingBranch > executiveBranch, "multi-metric executive routing must precede single-domain funding routing");
+});
+
+test("Copilot refuses stale pre-procurement-cost-authority packets", () => {
+  assert.match(copilot, /VYNDI-IBPE-1\.2\.0/);
+  assert.match(copilot, /predates the Procurement Cost Authority/);
+  assert.match(copilot, /catalogue\/reference prices cannot masquerade as procurement cost/);
+});
