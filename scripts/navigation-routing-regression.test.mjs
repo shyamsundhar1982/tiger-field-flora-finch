@@ -16,7 +16,7 @@ test("command workspace exposes one canonical navigation layer", () => {
   assert.doesNotMatch(shell, />Workspaces</);
   assert.doesNotMatch(shell, />More</);
   assert.doesNotMatch(shell, /\/command\/control-tower/);
-  assert.match(shell, /href=\{item\.to\}/);
+  assert.match(shell, /<CanonicalAnchor[\s\S]{0,240}to=\{item\.to\}/);
   assert.match(shell, /href="\/command\/decision-inbox"/);
 });
 
