@@ -98,8 +98,6 @@ export function applyIbpeScenario(
     const residualForecast = Math.max(0, row.forecastQty - actual - committed);
     return {
       ...row,
-      // Approved plan, actuals and contractual commitments are never rewritten by a scenario.
-      // Only the uncommitted forecast/pipeline is flexed.
       forecastQty: actual + committed + residualForecast * demandMultiplier,
       weightedPipelineQty: Math.max(0, row.weightedPipelineQty ?? 0) * demandMultiplier,
       sourceRef: `${row.sourceRef ?? "IBPE"}|SCN:${scenario.id}`,
@@ -121,8 +119,6 @@ export function applyIbpeScenario(
 
   input.receipts = (input.receipts ?? []).flatMap((row) => {
     const delayedPeriod = row.period + receiptDelayMonths;
-    // A receipt delayed beyond M36 is outside the active planning horizon; do not
-    // pull it back into M36, because that would understate the scenario shortage.
     if (delayedPeriod > 36) return [];
     return [{
       ...row,
@@ -173,8 +169,12 @@ async function latestSnapshot(sql: Sql): Promise<SnapshotRow> {
     `select id,approved_plan_id,approved_plan_revision,input_hash,source_sha,snapshot_at::text,input_json,result_json
        from vyndi_ibpe_runs where status='complete' order by created_at desc limit 1`,
   );
-  if (!rows[0]) throw new Error("No governed IBPE run exists. Run governed IBPE first.");
-  return rows[0];
+  const snapshot = rows[0];
+  if (!snapshot) throw new Error("No governed IBPE run exists. Run governed IBPE first.");
+  if (!snapshot.input_json?.runtimeControls?.paymentLagBySku) {
+    throw new Error("Latest governed IBPE run predates Stage 2 payment-lag parity. Run governed IBPE once to create a Stage 2 snapshot before exploring scenarios.");
+  }
+  return snapshot;
 }
 
 async function requireView() {
@@ -187,8 +187,6 @@ export async function evaluateScenario(sql: Sql, rawScenario: IbpeScenarioReques
   const snapshot = await latestSnapshot(sql);
   const scenario = sanitizeScenario(rawScenario);
   const scenarioInput = applyIbpeScenario(snapshot.input_json, scenario);
-  // The persisted result is the governed baseline. Do not silently regenerate it
-  // under a different source revision and then call that regenerated value "baseline".
   const baseline = snapshot.result_json;
   const result = runRuntimeIbpe(scenarioInput, { horizonMonths: 36 });
   return {
