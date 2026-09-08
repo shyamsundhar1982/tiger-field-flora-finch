@@ -82,6 +82,63 @@
   }
 }
 
+/* Production forecast: convert the unique monthly card grid into a compact list without changing planning logic. */
+.mt-5.grid.gap-2.sm\:grid-cols-2.lg\:grid-cols-3.xl\:grid-cols-4 {
+  display: block !important;
+  max-height: 30rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 0.01);
+}
+
+.mt-5.grid.gap-2.sm\:grid-cols-2.lg\:grid-cols-3.xl\:grid-cols-4 > div {
+  display: grid;
+  grid-template-columns: minmax(7rem, 0.8fr) minmax(0, 3.2fr);
+  align-items: center;
+  gap: 1rem;
+  padding: 0.72rem 0.9rem;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.mt-5.grid.gap-2.sm\:grid-cols-2.lg\:grid-cols-3.xl\:grid-cols-4 > div:nth-child(even) {
+  background: rgb(255 255 255 / 0.012);
+}
+
+.mt-5.grid.gap-2.sm\:grid-cols-2.lg\:grid-cols-3.xl\:grid-cols-4 > div:last-child {
+  border-bottom: 0;
+}
+
+.mt-5.grid.gap-2.sm\:grid-cols-2.lg\:grid-cols-3.xl\:grid-cols-4 > div > div:first-child {
+  min-width: 0;
+}
+
+.mt-5.grid.gap-2.sm\:grid-cols-2.lg\:grid-cols-3.xl\:grid-cols-4 > div > div:nth-child(2) {
+  margin-top: 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.mt-5.grid.gap-2.sm\:grid-cols-2.lg\:grid-cols-3.xl\:grid-cols-4 > div > div:nth-child(2) > div {
+  min-width: 0;
+}
+
+@media (max-width: 639px) {
+  .mt-5.grid.gap-2.sm\:grid-cols-2.lg\:grid-cols-3.xl\:grid-cols-4 > div {
+    grid-template-columns: 1fr;
+    gap: 0.45rem;
+  }
+
+  .mt-5.grid.gap-2.sm\:grid-cols-2.lg\:grid-cols-3.xl\:grid-cols-4 > div > div:nth-child(2) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
