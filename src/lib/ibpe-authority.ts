@@ -8,6 +8,7 @@ import { buildModelWithInputs, type FinanceAssumptions, type ProductLineId } fro
 import {
   runIntegratedBusinessPlanningEngine,
   type BomRequirement,
+  type CapacityPosition,
   type CashFlow,
   type DemandSignal,
   type IntegratedPlanningInput,
@@ -137,6 +138,22 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
     sourceRef: `BOM-${r.bom_revision}`,
   }));
 
+  const supplyParameterRows = await sql.query<{
+    sku:string;
+    lead_time_months:number|string;
+    moq:number|string;
+    order_multiple:number|string;
+    payment_lag_months:number|string;
+    planning_status:string;
+    source_ref:string;
+  }>(
+    `select sku,lead_time_months,moq,order_multiple,payment_lag_months,planning_status,source_ref
+       from vyndi_supply_planning_parameters
+      where planning_status <> 'retired'
+      order by sku`,
+  );
+  const supplyParameters = new Map(supplyParameterRows.map((r) => [r.sku, r]));
+
   const inventoryRows = await sql.query<{ sku:string; minimum_stock_level:number|string; physical_quantity:number|string; reserved_quantity:number|string; available_to_promise:number|string; unit_cost_inr:number|string|null }>(
     `select i.sku,i.minimum_stock_level,coalesce(a.physical_quantity,0) as physical_quantity,
             coalesce(a.reserved_quantity,0) as reserved_quantity,coalesce(a.available_to_promise,0) as available_to_promise,
@@ -145,10 +162,21 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
       where i.active=true order by i.sku`,
   );
   if (!inventoryRows.length) throw new Error("Governed IBPE run blocked: canonical Master Inventory has no active items.");
-  const inventory: InventoryPosition[] = inventoryRows.map((r) => ({
-    sku:r.sku,onHandQty:Number(r.physical_quantity),reservedQty:Number(r.reserved_quantity),mslQty:Number(r.minimum_stock_level),
-    safetyStockQty:Number(r.minimum_stock_level),unitCostLakh:Number(r.unit_cost_inr ?? 0)/100000,sourceRef:"EPR-FIFO-ATP",
-  }));
+  const inventory: InventoryPosition[] = inventoryRows.map((r) => {
+    const planning = supplyParameters.get(r.sku);
+    return {
+      sku:r.sku,
+      onHandQty:Number(r.physical_quantity),
+      reservedQty:Number(r.reserved_quantity),
+      mslQty:Number(r.minimum_stock_level),
+      safetyStockQty:Number(r.minimum_stock_level),
+      unitCostLakh:Number(r.unit_cost_inr ?? 0)/100000,
+      leadTimeMonths:planning ? Number(planning.lead_time_months) : 0,
+      moq:planning ? Number(planning.moq) : 0,
+      orderMultiple:planning ? Number(planning.order_multiple) : 1,
+      sourceRef:planning ? `EPR-FIFO-ATP+${planning.source_ref}` : "EPR-FIFO-ATP",
+    };
+  });
 
   const reservationRows = await sql.query<{ id:string; sku:string; quantity_reserved:number|string; status:"active"|"released"|"consumed"; plan_month:number|string }>(
     `select r.id,r.sku,r.quantity_reserved,r.status,o.plan_month from epr_inventory_reservations r
@@ -160,6 +188,35 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
     `select requirement_month,sku,open_po_quantity from vyndi_open_purchase_orders where scenario=$1 and coalesce(open_po_quantity,0)>0 order by requirement_month,sku`, [plan.scenario],
   );
   const receipts: InventoryReceipt[] = poRows.map((r) => ({ id:`PO-M${r.requirement_month}-${r.sku}`,sku:r.sku,period:Number(r.requirement_month),quantity:Number(r.open_po_quantity),truth:"committed",sourceRef:"PROCUREMENT-OPEN-PO" }));
+
+  const capacityStandardRows = await sql.query<{
+    work_centre_id:string;
+    available_hours_per_month:number|string;
+    efficiency:number|string;
+    standard_hours_per_unit:number|string;
+    planning_status:string;
+    source_ref:string;
+  }>(
+    `select work_centre_id,available_hours_per_month,efficiency,standard_hours_per_unit,planning_status,source_ref
+       from vyndi_capacity_standards
+      where planning_status <> 'retired'
+      order by sequence,work_centre_id`,
+  );
+  const capacity: CapacityPosition[] = [];
+  for (const standard of capacityStandardRows) {
+    const standardHours = Number(standard.standard_hours_per_unit);
+    const capacityUnits = standardHours > 0
+      ? Number(standard.available_hours_per_month) * Number(standard.efficiency) / standardHours
+      : 0;
+    for (let period = 1; period <= 36; period += 1) {
+      capacity.push({
+        id:`${standard.work_centre_id}-M${period}`,
+        period,
+        capacityUnits,
+        sourceRef:`${standard.source_ref}:${standard.work_centre_id}`,
+      });
+    }
+  }
 
   const cashFlows: CashFlow[] = [];
   for (const row of model) {
@@ -176,7 +233,7 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
   for (const r of collectionRows) cashFlows.push({ id:`actual-sales-${r.plan_month}`,businessKey:`sales-M${r.plan_month}`,period:Number(r.plan_month),direction:"inflow",amountLakh:Number(r.amount),truth:"actual",category:"collections",sourceRef:"COLLECTION-LEDGER" });
 
   const input: IntegratedPlanningInput = {
-    demand,bom,inventory,reservations,receipts,cashFlows,
+    demand,bom,inventory,reservations,receipts,capacity,cashFlows,
     funding:{ openingBankCashLakh:finance.openingCashLakh,minimumOperatingReserveLakh:finance.operatingPlan.cashFloorLakh,restrictedCashLakh:0,fundraisingLeadMonths:3 },
   };
   const validation: IbpeValidation = {
@@ -187,7 +244,14 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
     reservations:reservations.length,
     committedReceipts:receipts.length,
     cashFlows:cashFlows.length,
-    capacityAuthority:"not-configured-explicitly-optional",
+    supplyPlanningParameters:supplyParameterRows.length,
+    supplyPlanningDefaults:supplyParameterRows.filter((r) => r.planning_status === "planning-default").length,
+    paymentLagParameters:supplyParameterRows.filter((r) => Number(r.payment_lag_months) > 0).length,
+    paymentLagRuntimeParity:"recorded-not-applied-stage-1",
+    capacityStandards:capacityStandardRows.length,
+    capacityConstraints:capacity.length,
+    capacityAuthority:"vyndi_capacity_standards",
+    planningInputs:["vyndi_supply_planning_parameters","vyndi_capacity_standards"],
     transactionInputs:["vyndi_sales_orders","vyndi_invoices","epr_bom_inventory_mappings","vyndi_inventory_available_to_promise","epr_inventory_reservations","vyndi_open_purchase_orders","vyndi_collections"],
   };
   return { input, validation };
