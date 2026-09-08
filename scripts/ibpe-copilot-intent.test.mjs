@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const copilot = await readFile(new URL("../src/lib/ibpe-copilot.ts", import.meta.url), "utf8");
+const scenarioLab = await readFile(new URL("../src/lib/ibpe-scenario-lab.ts", import.meta.url), "utf8");
 
 test("IBPE Copilot resolves named scenarios ahead of stale UI scenario context", () => {
   assert.match(copilot, /function namedScenarioFromQuestion/);
@@ -12,25 +13,32 @@ test("IBPE Copilot resolves named scenarios ahead of stale UI scenario context",
   assert.match(copilot, /const effectiveScenario = namedScenario \?\? \(explicitlyRequestsBaseline/);
 });
 
-test("IBPE deterministic fallback remains conversational and deduplicated", () => {
-  assert.match(copilot, /function isSmallTalk/);
-  assert.match(copilot, /IBPE Copilot is online and connected/);
-  assert.match(copilot, /new Set\(relevant\(domains\)\.map/);
-  assert.match(copilot, /new Map\(findings\.map/);
+test("IBPE Copilot supports product-family demand overrides", () => {
+  assert.match(copilot, /longitude-growth-25/);
+  assert.match(copilot, /demandMultiplierByProduct: \{ \[familyGrowth\.productId\]: 1\.25 \}/);
+  assert.match(scenarioLab, /demandMultiplierByProduct\?: Record<string, number>/);
+  assert.match(scenarioLab, /const rowDemandMultiplier = demandMultiplierByProduct\[row\.productId\] \?\? demandMultiplier/);
 });
 
-test("IBPE funding requests use a dedicated diagnostic path", () => {
-  assert.match(copilot, /Funding requirement:/);
-  assert.match(copilot, /Data-quality caution:/);
-  assert.match(copilot, /Minimum modelled intervention:/);
-  assert.match(copilot, /full material-funding requirement/);
+test("IBPE Copilot answers multi-question prompts separately", () => {
+  assert.match(copilot, /function splitQuestions/);
+  assert.match(copilot, /if \(questions\.length > 1\)/);
+  assert.match(copilot, /for \(const \[index, question\] of questions\.entries\(\)\)/);
+  assert.match(copilot, /Each numbered answer uses the governed baseline unless that question explicitly requests/);
 });
 
-test("IBPE causal questions use scenario-versus-baseline deltas and correct false premises", () => {
+test("IBPE deterministic fallback covers executive diagnostics", () => {
+  assert.match(copilot, /Biggest constraint:/);
+  assert.match(copilot, /Next-12-month funding requirement:/);
+  assert.match(copilot, /Largest cash-risk month:/);
+  assert.match(copilot, /Funding reduction without delaying launch:/);
+  assert.match(copilot, /Buy first:/);
+});
+
+test("IBPE causal scenario questions use governed baseline deltas", () => {
   assert.match(copilot, /type IbpeScenarioComparison/);
-  assert.match(copilot, /scenarioComparison = packet\.comparison/);
   assert.match(copilot, /fundingNeedDeltaLakh/);
   assert.match(copilot, /minimumFreeLiquidityAfterRecommendationsDeltaLakh/);
-  assert.match(copilot, /does not create additional modelled funding need versus the governed baseline/);
-  assert.match(copilot, /Scenario deltas versus baseline:/);
+  assert.match(copilot, /Scenario impact:/);
+  assert.match(copilot, /Funding effect:/);
 });
