@@ -17,6 +17,7 @@ export type ActualField =
 export type ActualMonth = Partial<Record<ActualField, number | null>> & {
   sourceReference?: string;
   verified?: boolean;
+  transactionDerived?: boolean;
 };
 export type ActualsMap = Record<number, ActualMonth>;
 
@@ -32,48 +33,56 @@ const actualSchema = z.object({
     receivables: z.number().min(0).nullable().optional(),
     payables: z.number().min(0).nullable().optional(),
     sourceReference: z.string().trim().max(500).default(""),
-    verified: z.boolean().default(false),
-  }).superRefine((actual, context) => {
-    const hasValue = [actual.revenue, actual.units, actual.cogs, actual.opex, actual.closingCash, actual.inventory, actual.receivables, actual.payables]
-      .some((value) => value !== null && value !== undefined);
-    if (hasValue && !actual.sourceReference.trim()) {
-      context.addIssue({ code: "custom", path: ["sourceReference"], message: "Actuals require a source reference (bank/invoice/ledger/evidence)." });
-    }
+    verified: z.boolean().optional(),
   }),
 });
+
+const nearlyEqual = (a: number, b: number) => Math.abs(a - b) < 0.0001;
 
 export const listMonthlyActuals = createServerFn({ method: "GET" }).handler(async () => {
   const role = await getCommandRole();
   if (!role || !canPerform(role, "view")) throw new Error("Actuals view permission denied.");
   const sql = await getSql();
-  const rows = await sql<{
+  const rows = await sql.query<{
     plan_month: number | string;
-    revenue: number | string | null;
-    units: number | string | null;
+    revenue: number | string;
+    units: number | string;
     cogs: number | string | null;
     opex: number | string | null;
     closing_cash: number | string | null;
     inventory: number | string | null;
-    receivables: number | string | null;
+    receivables: number | string;
     payables: number | string | null;
-    source_reference: string;
-    verified: boolean;
-  }>`select plan_month,revenue,units,cogs,opex,closing_cash,inventory,receivables,payables,source_reference,verified
-       from vyndi_monthly_actuals order by plan_month`;
+    source_reference: string | null;
+    stored_verified: boolean | null;
+    has_transaction: boolean;
+    has_stored: boolean;
+  }>(`
+    select t.plan_month,t.revenue,t.units,a.cogs,a.opex,a.closing_cash,a.inventory,t.receivables,a.payables,
+           a.source_reference,a.verified as stored_verified,
+           (t.revenue<>0 or t.units<>0 or t.receivables<>0) as has_transaction,
+           (a.plan_month is not null) as has_stored
+      from vyndi_monthly_transaction_actuals t
+      left join vyndi_monthly_actuals a on a.plan_month=t.plan_month
+     where a.plan_month is not null or t.revenue<>0 or t.units<>0 or t.receivables<>0
+     order by t.plan_month
+  `);
   const actuals: ActualsMap = {};
   const num = (value: number | string | null) => (value == null ? null : Number(value));
   for (const row of rows) {
+    const transactionDerived = Boolean(row.has_transaction);
     actuals[Number(row.plan_month)] = {
-      revenue: num(row.revenue),
-      units: num(row.units),
+      revenue: Number(row.revenue),
+      units: Number(row.units),
       cogs: num(row.cogs),
       opex: num(row.opex),
       closingCash: num(row.closing_cash),
       inventory: num(row.inventory),
-      receivables: num(row.receivables),
+      receivables: Number(row.receivables),
       payables: num(row.payables),
-      sourceReference: row.source_reference,
-      verified: Boolean(row.verified),
+      sourceReference: row.source_reference || (transactionDerived ? `transaction-ledger:M${row.plan_month}` : ""),
+      verified: transactionDerived || Boolean(row.stored_verified),
+      transactionDerived,
     };
   }
   return actuals;
@@ -85,13 +94,43 @@ export const saveMonthlyActual = createServerFn({ method: "POST" })
     const actor = await requireBusinessActor("edit");
     const sql = await getSql();
     const a = data.actual;
+    const rows = await sql.query<{ revenue:number|string; units:number|string; receivables:number|string }>(
+      `select revenue,units,receivables from vyndi_monthly_transaction_actuals where plan_month=$1`,
+      [data.month],
+    );
+    const truth = rows[0];
+    if (!truth) throw new Error("Transaction-derived monthly truth is unavailable. Apply Stage 2 migration before posting actuals.");
+    const revenue = Number(truth.revenue);
+    const units = Number(truth.units);
+    const receivables = Number(truth.receivables);
+
+    const protectedInputs: Array<[string, number | null | undefined, number]> = [
+      ["Revenue", a.revenue, revenue],
+      ["Units", a.units, units],
+      ["Receivables", a.receivables, receivables],
+    ];
+    for (const [label, supplied, canonical] of protectedInputs) {
+      if (supplied != null && !nearlyEqual(supplied, canonical)) {
+        throw new Error(`${label} is transaction-controlled. Posted value ${supplied} does not reconcile to canonical ${canonical}.`);
+      }
+    }
+
+    const hasManualValue = [a.cogs,a.opex,a.closingCash,a.inventory,a.payables].some((value) => value != null);
+    if (hasManualValue && !a.sourceReference?.trim()) {
+      throw new Error("Manual management actuals require a bank/ledger/evidence source reference.");
+    }
+    const source = [
+      `transaction-ledger:M${data.month}`,
+      a.sourceReference?.trim() || "",
+    ].filter(Boolean).join("; ");
+
     await sql.query(
       `select save_vyndi_monthly_actual($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-      [data.month,a.revenue ?? null,a.units ?? null,a.cogs ?? null,a.opex ?? null,a.closingCash ?? null,
-       a.inventory ?? null,a.receivables ?? null,a.payables ?? null,a.sourceReference ?? "",a.verified ?? false,
+      [data.month,revenue,units,a.cogs ?? null,a.opex ?? null,a.closingCash ?? null,
+       a.inventory ?? null,receivables,a.payables ?? null,source,true,
        actor.userId,actor.role],
     );
-    return { ok: true, month: data.month };
+    return { ok:true, month:data.month, revenue, units, receivables, verified:true, transactionDerived:true };
   });
 
 export const clearMonthlyActual = createServerFn({ method: "POST" })
@@ -103,5 +142,5 @@ export const clearMonthlyActual = createServerFn({ method: "POST" })
       `select clear_vyndi_monthly_actual($1,$2,$3) as revision`,
       [data.month, actor.userId, actor.role],
     );
-    return { ok: true, month: data.month, revision: Number(rows[0]?.revision ?? 0) };
+    return { ok: true, month: data.month, revision: Number(rows[0]?.revision ?? 0), note:"Transaction-derived revenue, units and receivables remain authoritative." };
   });
