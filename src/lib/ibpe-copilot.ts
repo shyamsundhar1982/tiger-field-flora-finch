@@ -27,11 +27,14 @@ export type IbpeCopilotResponse = {
 
 type LatestRunRow = {
   id: string;
+  engine_version: string;
   approved_plan_revision: number | string;
   input_hash: string;
   source_sha: string;
   result_json: IntegratedPlanningResult;
 };
+
+const STAGE2_ENGINE_VERSION = "VYNDI-IBPE-1.1.0";
 
 function sanitizeQuestion(value: unknown) {
   return String(value ?? "").trim().slice(0, 1800);
@@ -100,7 +103,7 @@ function deterministicAnswer(question: string, result: IntegratedPlanningResult,
     if (items.length) lines.push(`Controlled actions: ${items.map((item) => item.recommendedAction).join(" ")}`);
   } else if (/capacity|production|manufactur|work centre|bottleneck|outsourc/.test(q)) {
     const rows = [...result.capacity].filter((row) => row.shortfallUnits > 0).sort((a, b) => b.shortfallUnits - a.shortfallUnits).slice(0, 5);
-    lines.push(`Assessment: ${prefix}${result.summary.capacityShortfallMonths} capacity constraint-months are flagged in the active horizon.`);
+    lines.push(`Assessment: ${prefix}${result.summary.capacityShortfallMonths} capacity shortfall months are flagged in the active horizon.`);
     if (rows.length) lines.push(`Largest shortfalls: ${rows.map((row) => `${row.id} M${row.period}: ${row.shortfallUnits.toFixed(1)} units`).join("; ")}.`);
     const items = relevant(["capacity", "planning"]);
     if (items.length) lines.push(`Controlled actions: ${items.map((item) => item.recommendedAction).join(" ")}`);
@@ -132,11 +135,15 @@ function systemPrompt() {
 async function latestRun() {
   const sql = await getSql();
   const rows = await sql.query<LatestRunRow>(
-    `select id,approved_plan_revision,input_hash,source_sha,result_json
+    `select id,engine_version,approved_plan_revision,input_hash,source_sha,result_json
        from vyndi_ibpe_runs where status='complete' order by created_at desc limit 1`,
   );
-  if (!rows[0]) throw new Error("No governed IBPE run exists. Run governed IBPE first.");
-  return { sql, row: rows[0] };
+  const row = rows[0];
+  if (!row) throw new Error("No governed IBPE run exists. Run governed IBPE first.");
+  if (row.engine_version !== STAGE2_ENGINE_VERSION) {
+    throw new Error("Latest governed IBPE run predates Stage 2 payment-lag parity. Run governed IBPE once before using Copilot.");
+  }
+  return { sql, row };
 }
 
 export const askIbpeCopilot = createServerFn({ method: "POST" })
