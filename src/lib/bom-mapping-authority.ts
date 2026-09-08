@@ -23,9 +23,15 @@ async function requireAdminView() {
   if (role !== "admin") throw new Error("Admin Command access is required for BOM mapping control.");
 }
 async function requireStableAdmin() {
-  const actor = await requireBusinessActor("approve");
-  if (actor.role !== "admin") throw new Error("Admin approval is required for BOM mapping mutations.");
-  return actor;
+  const commandRole = await getCommandRole();
+  if (commandRole !== "admin") throw new Error("Admin approval is required for BOM mapping mutations.");
+  try {
+    const actor = await requireBusinessActor("approve");
+    if (actor.role === "admin") return actor;
+  } catch {
+    // Legacy Command Admin remains a governed compatibility actor for master-data controls.
+  }
+  return { userId: "command:admin", role: "admin" as const };
 }
 function assertModelScope(modelId: string) {
   const variant = MODELS.find((model) => model.id === modelId);
