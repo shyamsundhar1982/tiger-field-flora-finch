@@ -95,6 +95,22 @@ Keep normal navigation centered on these seven workspaces:
 
 Do not add another top-level workspace or restore legacy phase pages to primary navigation unless explicitly requested.
 
+### Closed-loop transaction surfaces
+
+Keep execution inside the owning canonical workspace:
+
+- `/command/decision-inbox` — permission-filtered derived action queue; it does not own business truth;
+- `/command/purchase-execution` — authorised supplier and purchase-order commitments under Supply & Production;
+- `/command/receiving` — GRN, inspection, quarantine disposition and accepted FIFO receipt under Supply & Production;
+- `/command/payables` — three-way-matched supplier invoices, approval and payment under Finance;
+- `/command/receivables` — shipment-derived invoices and bank-evidenced collections under Finance.
+
+The controlled loop is:
+
+`IBPE recommendation → authorised transaction → operational ledger → new business truth → next IBPE run`.
+
+IBPE remains advisory. It must not directly approve a plan, create or issue a purchase order, receive inventory, release production, approve an invoice, post a payment or alter an accounting actual. Each transaction requires a stable authorised user, source evidence and an audit event.
+
 ## Finance & analytics
 
 Canonical finance is `/command/financial-cockpit`, with Plan, Cash, Balance Sheet, CA Audit, and Scenarios as specialist tabs/routes.
