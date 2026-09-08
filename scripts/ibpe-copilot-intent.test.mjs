@@ -25,3 +25,12 @@ test("IBPE funding requests use a dedicated diagnostic path", () => {
   assert.match(copilot, /Minimum modelled intervention:/);
   assert.match(copilot, /full material-funding requirement/);
 });
+
+test("IBPE causal questions use scenario-versus-baseline deltas and correct false premises", () => {
+  assert.match(copilot, /type IbpeScenarioComparison/);
+  assert.match(copilot, /scenarioComparison = packet\.comparison/);
+  assert.match(copilot, /fundingNeedDeltaLakh/);
+  assert.match(copilot, /minimumFreeLiquidityAfterRecommendationsDeltaLakh/);
+  assert.match(copilot, /does not create additional modelled funding need versus the governed baseline/);
+  assert.match(copilot, /Scenario deltas versus baseline:/);
+});
