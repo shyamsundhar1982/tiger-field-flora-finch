@@ -17,7 +17,7 @@ import {
 } from "@/lib/integrated-business-planning-engine";
 import { runRuntimeIbpe, type RuntimeIbpeInput } from "@/lib/ibpe-runtime-parity";
 
-export const IBPE_ENGINE_VERSION = "VYNDI-IBPE-1.1.0";
+export const IBPE_ENGINE_VERSION = "VYNDI-IBPE-1.2.0";
 export type IbpeValidation = Record<string, JsonValue>;
 
 export type IbpeRun = {
@@ -284,32 +284,38 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
     physical_quantity:number|string;
     reserved_quantity:number|string;
     available_to_promise:number|string;
-    fifo_cost_inr:number|string|null;
-    planning_cost_inr:number|string|null;
+    active_planning_bom:boolean|null;
+    fifo_actual_cost_inr:number|string|null;
+    approved_purchase_price_inr:number|string|null;
+    approved_supplier_price_inr:number|string|null;
+    approved_planning_price_inr:number|string|null;
+    legacy_reference_price_inr:number|string|null;
+    governed_cost_inr:number|string|null;
+    cost_authority:string|null;
   }>(
     `select i.sku,i.minimum_stock_level,coalesce(a.physical_quantity,0) as physical_quantity,
             coalesce(a.reserved_quantity,0) as reserved_quantity,coalesce(a.available_to_promise,0) as available_to_promise,
-            (select sum(f.quantity_remaining*f.unit_cost_inr)/nullif(sum(f.quantity_remaining),0)
-               from epr_inventory_fifo_layers f where f.sku=i.sku and f.quantity_remaining>0) as fifo_cost_inr,
-            (select nullif((m.attributes->>'legacyPriceInr')::numeric,0)
-               from master_data_records m
-              where m.domain='inventory' and m.status='approved' and m.code=i.sku
-              order by m.revision desc limit 1) as planning_cost_inr
-       from master_inventory_items i left join vyndi_inventory_available_to_promise a on a.sku=i.sku and a.unit=vyndi_canonical_unit(i.unit)
+            c.active_planning_bom,c.fifo_actual_cost_inr,c.approved_purchase_price_inr,c.approved_supplier_price_inr,
+            c.approved_planning_price_inr,c.legacy_reference_price_inr,c.governed_cost_inr,c.cost_authority
+       from master_inventory_items i
+       left join vyndi_inventory_available_to_promise a on a.sku=i.sku and a.unit=vyndi_canonical_unit(i.unit)
+       left join vyndi_procurement_cost_authority c on c.sku=i.sku
       where i.active=true order by i.sku`,
   );
   if (!inventoryRows.length) throw new Error("Governed IBPE run blocked: canonical Master Inventory has no active items.");
-  const costResolution = inventoryRows.map((r) => {
-    const fifoCostInr = positiveNumber(r.fifo_cost_inr);
-    const planningCostInr = positiveNumber(r.planning_cost_inr);
-    const governedCostInr = fifoCostInr ?? planningCostInr;
-    const costAuthority = fifoCostInr !== undefined
-      ? "EPR-FIFO-ACTUAL"
-      : planningCostInr !== undefined
-        ? "APPROVED-INVENTORY-MASTER"
-        : "MISSING";
-    return { row:r, fifoCostInr, planningCostInr, governedCostInr, costAuthority };
-  });
+
+  const costResolution = inventoryRows.map((r) => ({
+    row:r,
+    activePlanningBom:Boolean(r.active_planning_bom),
+    fifoActualCostInr:positiveNumber(r.fifo_actual_cost_inr),
+    approvedPurchasePriceInr:positiveNumber(r.approved_purchase_price_inr),
+    approvedSupplierPriceInr:positiveNumber(r.approved_supplier_price_inr),
+    approvedPlanningPriceInr:positiveNumber(r.approved_planning_price_inr),
+    legacyReferencePriceInr:positiveNumber(r.legacy_reference_price_inr),
+    governedCostInr:positiveNumber(r.governed_cost_inr),
+    costAuthority:r.cost_authority || "MISSING",
+  }));
+
   const inventory: InventoryPosition[] = costResolution.map(({ row:r, governedCostInr, costAuthority }) => {
     const planning = supplyParameters.get(r.sku);
     const inventoryAuthority = planning ? `EPR-FIFO-ATP+${planning.source_ref}` : "EPR-FIFO-ATP";
@@ -326,9 +332,44 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
       sourceRef:`${inventoryAuthority}+COST:${costAuthority}`,
     };
   });
-  const fifoActualCostSkus = costResolution.filter((entry) => entry.fifoCostInr !== undefined).length;
-  const approvedMasterPlanningCostFallbackSkus = costResolution.filter((entry) => entry.fifoCostInr === undefined && entry.planningCostInr !== undefined).length;
-  const missingControlledCostSkus = costResolution.filter((entry) => entry.governedCostInr === undefined).map((entry) => entry.row.sku);
+
+  const activePlanningCosts = costResolution.filter((entry) => entry.activePlanningBom);
+  const activePlanningBomSkus = activePlanningCosts.length;
+  const activePlanningBomResolvedCostSkus = activePlanningCosts.filter((entry) => entry.governedCostInr !== undefined).length;
+  const activePlanningBomFifoActualCostSkus = activePlanningCosts.filter((entry) => entry.costAuthority === "EPR-FIFO-ACTUAL").length;
+  const activePlanningBomApprovedPurchasePriceSkus = activePlanningCosts.filter((entry) => entry.costAuthority === "APPROVED-PURCHASE-ORDER").length;
+  const activePlanningBomApprovedSupplierPriceSkus = activePlanningCosts.filter((entry) => entry.costAuthority === "APPROVED-SUPPLIER-PRICE").length;
+  const activePlanningBomApprovedPlanningPriceSkus = activePlanningCosts.filter((entry) => entry.costAuthority === "APPROVED-PLANNING-PROCUREMENT-PRICE").length;
+  const activePlanningBomMissingCostSkus = activePlanningCosts.filter((entry) => entry.governedCostInr === undefined).map((entry) => entry.row.sku);
+  const activePlanningBomLegacyReferenceOnlySkus = activePlanningCosts
+    .filter((entry) => entry.governedCostInr === undefined && entry.legacyReferencePriceInr !== undefined)
+    .map((entry) => entry.row.sku);
+  const nonPlanningBomMissingCostSkuCount = costResolution.filter((entry) => !entry.activePlanningBom && entry.governedCostInr === undefined).length;
+  const governedCostBySku = new Map(costResolution.map((entry) => [entry.row.sku, entry.governedCostInr]));
+  const targetCogsByProduct = new Map(finance.productLines.map((line) => [line.id, Number(line.cogsLakh)]));
+  const labelByProduct = new Map(finance.productLines.map((line) => [line.id, line.label]));
+  const bomCogsReconciliation = (Object.keys(PRODUCT_TIER) as ProductLineId[]).map((productId) => {
+    const rows = bom.filter((row) => row.productId === productId);
+    const missingSkus = [...new Set(rows.filter((row) => governedCostBySku.get(row.sku) === undefined).map((row) => row.sku))].sort();
+    const targetCogsLakh = targetCogsByProduct.get(productId) ?? 0;
+    const bottomUpBomCostLakh = missingSkus.length
+      ? null
+      : rows.reduce((sum, row) => sum + row.quantityPerUnit * Number(governedCostBySku.get(row.sku)), 0) / 100000;
+    const varianceLakh = bottomUpBomCostLakh == null ? null : bottomUpBomCostLakh - targetCogsLakh;
+    const variancePct = varianceLakh == null || targetCogsLakh <= 0 ? null : (varianceLakh / targetCogsLakh) * 100;
+    return {
+      productId,
+      modelId:PRODUCT_TIER[productId],
+      modelLabel:labelByProduct.get(productId) ?? productId,
+      targetCogsLakh,
+      bottomUpBomCostLakh,
+      varianceLakh,
+      variancePct,
+      coverage:missingSkus.length ? "INCOMPLETE" : "COMPLETE",
+      missingSkus,
+    };
+  });
+  const commercialBreakEvenPeriod = model.find((row) => row.ebitda >= 0)?.m ?? null;
 
   const reservationRows = await sql.query<{ id:string; sku:string; quantity_reserved:number|string; status:"active"|"released"|"consumed"; plan_month:number|string }>(
     `select r.id,r.sku,r.quantity_reserved,r.status,o.plan_month from epr_inventory_reservations r
@@ -404,16 +445,28 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
     paymentLagParameters:supplyParameterRows.filter((r) => Number(r.payment_lag_months) > 0).length,
     paymentLagRuntimeParity:"applied-stage-2",
     paymentLagAuthority:"vyndi_supply_planning_parameters.payment_lag_months",
-    fifoActualCostSkus,
-    approvedMasterPlanningCostFallbackSkus,
-    missingControlledCostSkus:missingControlledCostSkus.join(","),
-    inventoryCostAuthority:"EPR FIFO weighted actual cost -> approved Inventory Master planning reference -> explicit missing-cost exception",
+    activePlanningBomSkus,
+    activePlanningBomResolvedCostSkus,
+    activePlanningBomFifoActualCostSkus,
+    activePlanningBomApprovedPurchasePriceSkus,
+    activePlanningBomApprovedSupplierPriceSkus,
+    activePlanningBomApprovedPlanningPriceSkus,
+    activePlanningBomMissingCostSkus:activePlanningBomMissingCostSkus.join(","),
+    activePlanningBomLegacyReferenceOnlySkus:activePlanningBomLegacyReferenceOnlySkus.join(","),
+    nonPlanningBomMissingCostSkuCount,
+    missingControlledCostSkus:activePlanningBomMissingCostSkus.join(","),
+    missingControlledCostScope:"active-approved-planning-bom-only",
+    procurementCostCoverageComplete:activePlanningBomMissingCostSkus.length === 0,
+    procurementCostAuthority:"vyndi_procurement_cost_authority",
+    inventoryCostAuthority:"EPR FIFO actual -> approved purchase order/supplier price -> approved planning procurement price -> explicit missing-cost exception; legacy catalogue/reference price excluded",
+    bomCogsReconciliation,
+    commercialBreakEvenPeriod,
     capacityStandards:capacityStandardRows.length,
     capacityConstraints:capacity.length,
     capacityAuthority:"vyndi_capacity_standards",
     capacitySummarySemantics:"unique-shortfall-months-stage-2",
-    planningInputs:["vyndi_supply_planning_parameters","vyndi_capacity_standards","master_data_records:approved-inventory-planning-cost"],
-    transactionInputs:["vyndi_sales_orders","vyndi_invoices","epr_bom_inventory_mappings","vyndi_inventory_available_to_promise","epr_inventory_reservations","vyndi_open_purchase_orders","vyndi_collections"],
+    planningInputs:["vyndi_supply_planning_parameters","vyndi_capacity_standards","vyndi_procurement_prices"],
+    transactionInputs:["vyndi_sales_orders","vyndi_invoices","epr_bom_inventory_mappings","vyndi_inventory_available_to_promise","epr_inventory_reservations","vyndi_purchase_orders","vyndi_open_purchase_orders","vyndi_collections"],
   };
   return { input, validation };
 }
