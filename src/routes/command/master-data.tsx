@@ -7,6 +7,10 @@ export const Route = createFileRoute("/command/master-data")({ component: Master
 
 const statusOrder: MasterDataStatus[] = ["draft", "pending_approval", "approved", "superseded"];
 
+function asArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
 function MasterDataEngine() {
   const [records, setRecords] = useState<MasterDataRecord[]>([]);
   const [audit, setAudit] = useState<Array<Record<string, string | null>>>([]);
@@ -21,8 +25,14 @@ function MasterDataEngine() {
     setLoading(true);
     try {
       const [rows, events] = await Promise.all([listMasterData(), listMasterDataAudit()]);
-      setRecords(rows as unknown as MasterDataRecord[]);
-      setAudit(events as Array<Record<string, string | null>>);
+      const nextRecords = asArray<MasterDataRecord>(rows);
+      const nextAudit = asArray<Record<string, string | null>>(events);
+      setRecords(nextRecords);
+      setAudit(nextAudit);
+      return { records: nextRecords, audit: nextAudit };
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Master data refresh failed.");
+      return { records: [], audit: [] };
     } finally {
       setLoading(false);
     }
@@ -55,8 +65,8 @@ function MasterDataEngine() {
     setMessage("");
     try {
       const result = await importLegacyInventoryAsDrafts();
-      setMessage(`Legacy catalogue bridge complete: ${result.created} new draft inventory records created; ${result.existing} already present. Nothing was approved or posted.`);
-      await refresh();
+      const refreshed = await refresh();
+      setMessage(`Legacy catalogue bridge complete: ${result.created} new draft inventory records created; ${result.existing} already present. ${refreshed.records.length} master records are now visible. Nothing was approved or posted.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Legacy catalogue import failed.");
     } finally {

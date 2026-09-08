@@ -41,7 +41,8 @@ export const listMasterData = createServerFn({ method: "GET" }).handler(async ()
   await assertSameSiteRequest();
   await requirePermission("view");
   const sql = await getSql();
-  return sql`select id, domain, code, name, revision, status, owner_role, approver_role, effective_from::text, source_ref, attributes, created_by, approved_by, approved_at::text, created_at::text, updated_at::text from master_data_records order by domain, code, revision desc limit 500`;
+  const rows = await sql`select id, domain, code, name, revision, status, owner_role as "ownerRole", approver_role as "approverRole", effective_from::text as "effectiveFrom", source_ref as "sourceRef", attributes, created_by as "createdBy", approved_by as "approvedBy", approved_at::text as "approvedAt", created_at::text as "createdAt", updated_at::text as "updatedAt" from master_data_records order by domain, code, revision desc limit 500`;
+  return Array.isArray(rows) ? [...rows] : [];
 });
 
 export const createMasterData = createServerFn({ method: "POST" })
@@ -66,21 +67,13 @@ export const importLegacyInventoryAsDrafts = createServerFn({ method: "POST" }).
   await assertSameSiteRequest();
   const role = await requirePermission("edit");
   const sql = await getSql();
-  let created = 0;
-  let existing = 0;
 
-  for (const item of SEED_INVENTORY) {
-    const sourceRef = `SEED_INVENTORY:${item.sku}`;
-    const found = await sql<{
-      id: string;
-    }>`select id from master_data_records where domain='inventory' and source_ref=${sourceRef} limit 1`;
-    if (found[0]) {
-      existing += 1;
-      continue;
-    }
-
-    const id = crypto.randomUUID();
-    const attributes = {
+  const candidates = SEED_INVENTORY.map((item) => ({
+    id: crypto.randomUUID(),
+    code: item.sku,
+    name: `${item.brand} ${item.model}`.trim(),
+    source_ref: `SEED_INVENTORY:${item.sku}`,
+    attributes: {
       legacyId: item.id,
       category: item.category,
       subcategory: item.subcategory,
@@ -96,14 +89,54 @@ export const importLegacyInventoryAsDrafts = createServerFn({ method: "POST" }).
       legacySource: item.source,
       legacyNotes: item.notes,
       controlState: "migration_candidate",
-    };
+    },
+  }));
 
-    await sql`insert into master_data_records (id, domain, code, name, revision, status, owner_role, approver_role, effective_from, source_ref, attributes, created_by) values (${id}, 'inventory', ${item.sku}, ${`${item.brand} ${item.model}`.trim()}, 1, 'draft', 'operations', 'operations', null, ${sourceRef}, ${JSON.stringify(attributes)}::jsonb, ${`command:${role}`})`;
-    await sql`insert into master_data_audit_events (id, master_data_id, event_type, actor_user_id, actor_role, to_status, source_ref, note) values (${crypto.randomUUID()}, ${id}, 'LEGACY_CATALOGUE_IMPORTED_AS_DRAFT', ${`command:${role}`}, ${role}, 'draft', ${sourceRef}, 'Explicit migration candidate import; no approval or inventory posting performed.')`;
-    created += 1;
+  const inserted = await sql<{ id: string; source_ref: string }>`
+    with candidates as (
+      select *
+      from jsonb_to_recordset(${JSON.stringify(candidates)}::jsonb)
+        as c(id uuid, code text, name text, source_ref text, attributes jsonb)
+    )
+    insert into master_data_records (
+      id, domain, code, name, revision, status, owner_role, approver_role,
+      effective_from, source_ref, attributes, created_by
+    )
+    select
+      c.id, 'inventory', c.code, c.name, 1, 'draft', 'operations', 'operations',
+      null, c.source_ref, c.attributes, ${`command:${role}`}
+    from candidates c
+    where not exists (
+      select 1
+      from master_data_records m
+      where m.domain='inventory' and m.source_ref=c.source_ref
+    )
+    returning id::text as id, source_ref
+  `;
+
+  const insertedRows = Array.isArray(inserted) ? inserted : [];
+  if (insertedRows.length > 0) {
+    const auditRows = insertedRows.map((row) => ({
+      id: crypto.randomUUID(),
+      master_data_id: row.id,
+      source_ref: row.source_ref,
+    }));
+    await sql`
+      insert into master_data_audit_events (
+        id, master_data_id, event_type, actor_user_id, actor_role,
+        to_status, source_ref, note
+      )
+      select
+        a.id, a.master_data_id, 'LEGACY_CATALOGUE_IMPORTED_AS_DRAFT',
+        ${`command:${role}`}, ${role}, 'draft', a.source_ref,
+        'Explicit migration candidate import; no approval or inventory posting performed.'
+      from jsonb_to_recordset(${JSON.stringify(auditRows)}::jsonb)
+        as a(id uuid, master_data_id uuid, source_ref text)
+    `;
   }
 
-  return { ok: true, created, existing, total: SEED_INVENTORY.length };
+  const created = insertedRows.length;
+  return { ok: true, created, existing: Math.max(0, SEED_INVENTORY.length - created), total: SEED_INVENTORY.length };
 });
 
 const transitionSchema = z.object({
@@ -135,5 +168,6 @@ export const listMasterDataAudit = createServerFn({ method: "GET" }).handler(asy
   await assertSameSiteRequest();
   await requirePermission("view");
   const sql = await getSql();
-  return sql`select id, master_data_id, event_type, actor_user_id, actor_role, from_status, to_status, note, source_ref, created_at::text from master_data_audit_events order by created_at desc limit 100`;
+  const rows = await sql`select id, master_data_id, event_type, actor_user_id, actor_role, from_status, to_status, note, source_ref, created_at::text from master_data_audit_events order by created_at desc limit 100`;
+  return Array.isArray(rows) ? [...rows] : [];
 });
