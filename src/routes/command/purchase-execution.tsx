@@ -2,16 +2,24 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { ArrowRight, CheckCircle2, FileCheck2, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Kpi, Panel } from "@/components/kpi";
+import { PurchaseHistoryLedger } from "@/components/purchase-history-ledger";
 import {
   createPurchaseOrder,
   getPurchaseExecutionData,
   saveSupplier,
   transitionPurchaseOrder,
 } from "@/lib/procure-to-pay-authority";
+import { getPurchaseHistoryData } from "@/lib/purchase-history-ledger";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/command/purchase-execution")({
-  loader: () => getPurchaseExecutionData(),
+  loader: async () => {
+    const [execution, purchaseHistory] = await Promise.all([
+      getPurchaseExecutionData(),
+      getPurchaseHistoryData(),
+    ]);
+    return { ...execution, purchaseHistory };
+  },
   component: PurchaseExecution,
 });
 
@@ -191,7 +199,8 @@ function PurchaseExecution() {
           <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
             Convert an IBPE-backed requirement into a controlled supplier commitment. A
             recommendation never becomes a PO until it is submitted, independently approved and
-            issued here.
+            issued here. The Purchase History Ledger below reconciles every downstream GRN,
+            inventory posting, supplier invoice, GST and payment back to this single entry point.
           </p>
         </div>
         <Link
@@ -225,6 +234,7 @@ function PurchaseExecution() {
           hint={`${data.suppliers.length} supplier records`}
         />
       </div>
+
       {message ? (
         <div
           role="status"
@@ -256,7 +266,7 @@ function PurchaseExecution() {
             <input
               className="control mt-1.5 uppercase"
               value={purchase.id}
-              onChange={(e) => setPurchase({ ...purchase, id: e.target.value })}
+              onChange={(event) => setPurchase({ ...purchase, id: event.target.value })}
               placeholder="PO-2026-001"
             />
           </Field>
@@ -264,13 +274,13 @@ function PurchaseExecution() {
             <select
               className="control mt-1.5"
               value={purchase.supplierId}
-              onChange={(e) => {
+              onChange={(event) => {
                 const selected = data.suppliers.find(
-                  (row) => rowText(row, "id") === e.target.value,
+                  (row) => rowText(row, "id") === event.target.value,
                 );
                 setPurchase({
                   ...purchase,
-                  supplierId: e.target.value,
+                  supplierId: event.target.value,
                   paymentTermsDays: selected
                     ? rowNumber(selected, "payment_terms_days")
                     : purchase.paymentTermsDays,
@@ -292,8 +302,8 @@ function PurchaseExecution() {
               min="1"
               max="36"
               value={purchase.requirementMonth}
-              onChange={(e) =>
-                setPurchase({ ...purchase, requirementMonth: Number(e.target.value) })
+              onChange={(event) =>
+                setPurchase({ ...purchase, requirementMonth: Number(event.target.value) })
               }
             />
           </Field>
@@ -301,13 +311,13 @@ function PurchaseExecution() {
             <select
               className="control mt-1.5"
               value={purchase.sku}
-              onChange={(e) => {
+              onChange={(event) => {
                 const item = data.inventoryItems.find(
-                  (row) => rowText(row, "sku") === e.target.value,
+                  (row) => rowText(row, "sku") === event.target.value,
                 );
                 setPurchase({
                   ...purchase,
-                  sku: e.target.value,
+                  sku: event.target.value,
                   unit: item ? rowText(item, "unit") : purchase.unit,
                 });
               }}
@@ -327,7 +337,7 @@ function PurchaseExecution() {
               min="0.01"
               step="0.01"
               value={purchase.quantity}
-              onChange={(e) => setPurchase({ ...purchase, quantity: Number(e.target.value) })}
+              onChange={(event) => setPurchase({ ...purchase, quantity: Number(event.target.value) })}
             />
           </Field>
           <Field label="Unit price · INR">
@@ -337,7 +347,9 @@ function PurchaseExecution() {
               min="0"
               step="0.01"
               value={purchase.unitPriceInr}
-              onChange={(e) => setPurchase({ ...purchase, unitPriceInr: Number(e.target.value) })}
+              onChange={(event) =>
+                setPurchase({ ...purchase, unitPriceInr: Number(event.target.value) })
+              }
             />
           </Field>
           <Field label="Payment terms · days">
@@ -347,8 +359,8 @@ function PurchaseExecution() {
               min="0"
               max="365"
               value={purchase.paymentTermsDays}
-              onChange={(e) =>
-                setPurchase({ ...purchase, paymentTermsDays: Number(e.target.value) })
+              onChange={(event) =>
+                setPurchase({ ...purchase, paymentTermsDays: Number(event.target.value) })
               }
             />
           </Field>
@@ -357,7 +369,7 @@ function PurchaseExecution() {
               className="control mt-1.5"
               type="date"
               value={purchase.orderDate}
-              onChange={(e) => setPurchase({ ...purchase, orderDate: e.target.value })}
+              onChange={(event) => setPurchase({ ...purchase, orderDate: event.target.value })}
             />
           </Field>
           <Field label="Expected receipt">
@@ -365,14 +377,18 @@ function PurchaseExecution() {
               className="control mt-1.5"
               type="date"
               value={purchase.expectedReceiptOn}
-              onChange={(e) => setPurchase({ ...purchase, expectedReceiptOn: e.target.value })}
+              onChange={(event) =>
+                setPurchase({ ...purchase, expectedReceiptOn: event.target.value })
+              }
             />
           </Field>
           <Field label="RFQ / quotation reference">
             <input
               className="control mt-1.5"
               value={purchase.sourceReference}
-              onChange={(e) => setPurchase({ ...purchase, sourceReference: e.target.value })}
+              onChange={(event) =>
+                setPurchase({ ...purchase, sourceReference: event.target.value })
+              }
               placeholder="RFQ / quote / approval pack"
             />
           </Field>
@@ -380,7 +396,7 @@ function PurchaseExecution() {
             <input
               className="control mt-1.5"
               value={purchase.notes}
-              onChange={(e) => setPurchase({ ...purchase, notes: e.target.value })}
+              onChange={(event) => setPurchase({ ...purchase, notes: event.target.value })}
               placeholder="Commercial terms or exception"
             />
           </Field>
@@ -488,13 +504,15 @@ function PurchaseExecution() {
         )}
       </Panel>
 
+      <PurchaseHistoryLedger rows={data.purchaseHistory} />
+
       <Panel title="Supplier register" kicker="Qualified source control">
         <div className="grid gap-4 rounded-xl border border-border bg-bg-elevated/30 p-4 md:grid-cols-2 xl:grid-cols-5">
           <Field label="Supplier ID">
             <input
               className="control mt-1.5 uppercase"
               value={supplier.id}
-              onChange={(e) => setSupplier({ ...supplier, id: e.target.value })}
+              onChange={(event) => setSupplier({ ...supplier, id: event.target.value })}
               placeholder="SUP-001"
             />
           </Field>
@@ -502,7 +520,7 @@ function PurchaseExecution() {
             <input
               className="control mt-1.5"
               value={supplier.name}
-              onChange={(e) => setSupplier({ ...supplier, name: e.target.value })}
+              onChange={(event) => setSupplier({ ...supplier, name: event.target.value })}
             />
           </Field>
           <Field label="Lead time · days">
@@ -510,7 +528,9 @@ function PurchaseExecution() {
               className="control mt-1.5"
               type="number"
               value={supplier.leadTimeDays}
-              onChange={(e) => setSupplier({ ...supplier, leadTimeDays: Number(e.target.value) })}
+              onChange={(event) =>
+                setSupplier({ ...supplier, leadTimeDays: Number(event.target.value) })
+              }
             />
           </Field>
           <Field label="Payment terms · days">
@@ -518,8 +538,8 @@ function PurchaseExecution() {
               className="control mt-1.5"
               type="number"
               value={supplier.paymentTermsDays}
-              onChange={(e) =>
-                setSupplier({ ...supplier, paymentTermsDays: Number(e.target.value) })
+              onChange={(event) =>
+                setSupplier({ ...supplier, paymentTermsDays: Number(event.target.value) })
               }
             />
           </Field>
@@ -527,7 +547,9 @@ function PurchaseExecution() {
             <input
               className="control mt-1.5"
               value={supplier.sourceReference}
-              onChange={(e) => setSupplier({ ...supplier, sourceReference: e.target.value })}
+              onChange={(event) =>
+                setSupplier({ ...supplier, sourceReference: event.target.value })
+              }
               placeholder="Vendor qualification file"
             />
           </Field>
@@ -584,6 +606,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     </label>
   );
 }
+
 function Empty({ text }: { text: string }) {
   return (
     <div className="rounded-xl border border-dashed border-border p-6 text-sm text-muted">
