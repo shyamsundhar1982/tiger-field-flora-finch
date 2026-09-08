@@ -9,7 +9,7 @@ import {
   Settings2,
   Wallet,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { cn } from "@/lib/utils";
 import { getCommandRole, lockCommand } from "@/lib/command-access";
@@ -153,15 +153,10 @@ function CanonicalAnchor({
   label: string;
   active?: boolean;
   className?: string;
-  children?: React.ReactNode;
+  children?: ReactNode;
 }) {
   return (
-    <a
-      href={to}
-      title={label}
-      aria-current={active ? "page" : undefined}
-      className={className}
-    >
+    <a href={to} title={label} aria-current={active ? "page" : undefined} className={className}>
       {children ?? label}
     </a>
   );
