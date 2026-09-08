@@ -36,12 +36,77 @@ type LatestRunRow = {
 
 const STAGE2_ENGINE_VERSION = "VYNDI-IBPE-1.1.0";
 
+const BASE_SCENARIO: Omit<IbpeScenarioRequest, "id" | "label"> = {
+  demandMultiplier: 1,
+  capacityMultiplier: 1,
+  procurementCostMultiplier: 1,
+  leadTimeMultiplier: 1,
+  receiptDelayMonths: 0,
+  cashInjectionLakh: 0,
+  cashInjectionPeriod: 6,
+};
+
 function sanitizeQuestion(value: unknown) {
   return String(value ?? "").trim().slice(0, 1800);
 }
 
 function money(value: number) {
   return `₹${Number(value || 0).toFixed(1)}L`;
+}
+
+function namedScenarioFromQuestion(question: string): IbpeScenarioRequest | undefined {
+  const q = question.toLowerCase();
+  const build = (id: string, label: string, patch: Partial<IbpeScenarioRequest>): IbpeScenarioRequest => ({
+    ...BASE_SCENARIO,
+    ...patch,
+    id,
+    label,
+  });
+
+  if (/growth\s*\+?\s*25|25%\s*growth/.test(q)) {
+    return build("growth-25", "Growth +25%", { demandMultiplier: 1.25 });
+  }
+  if (/supply\s*shock/.test(q)) {
+    return build("supply-shock", "Supply shock", {
+      leadTimeMultiplier: 1.5,
+      receiptDelayMonths: 2,
+      procurementCostMultiplier: 1.12,
+    });
+  }
+  if (/capacity\s*lift/.test(q)) {
+    return build("capacity-lift", "Capacity lift", { capacityMultiplier: 1.3 });
+  }
+  if (/cash\s*protect/.test(q)) {
+    return build("cash-protect", "Cash protect", {
+      demandMultiplier: 0.85,
+      procurementCostMultiplier: 0.95,
+    });
+  }
+  if (/funding\s*bridge/.test(q)) {
+    return build("funding-bridge", "Funding bridge", {
+      cashInjectionLakh: 50,
+      cashInjectionPeriod: 6,
+    });
+  }
+  if (/severe\s*stress/.test(q)) {
+    return build("severe-stress", "Severe stress", {
+      demandMultiplier: 0.65,
+      procurementCostMultiplier: 1.2,
+      leadTimeMultiplier: 1.6,
+      receiptDelayMonths: 3,
+      capacityMultiplier: 0.85,
+    });
+  }
+  return undefined;
+}
+
+function explicitlyRequestsBaseline(question: string) {
+  return /\b(governed|approved)?\s*baseline\b|\bbase\s+case\b/.test(question.toLowerCase());
+}
+
+function isSmallTalk(question: string) {
+  const q = question.toLowerCase().trim().replace(/[!?.,]+$/g, "").trim();
+  return /^(hi|hello|hey|good morning|good afternoon|good evening|how are you|how r you)$/.test(q);
 }
 
 function compactResult(result: IntegratedPlanningResult) {
@@ -77,17 +142,44 @@ function deterministicAnswer(question: string, result: IntegratedPlanningResult,
   const q = question.toLowerCase();
   const prefix = scenarioLabel ? `Scenario: ${scenarioLabel}. ` : "Governed baseline. ";
   const findings = result.findings;
-  const relevant = (domains: string[]) => findings.filter((finding) => domains.includes(finding.domain)).slice(0, 4);
+  const relevant = (domains: string[]) => findings.filter((finding) => domains.includes(finding.domain)).slice(0, 8);
+  const actions = (domains: string[]) => [...new Set(relevant(domains).map((item) => item.recommendedAction).filter(Boolean))].slice(0, 4);
+  const uniqueIssues = [...new Map(findings.map((item) => [`${item.title}|${item.recommendedAction}`, item])).values()];
   const lines: string[] = [];
 
-  if (/cash|fund|liquid|budget|runway|money|finance/.test(q)) {
-    const low = [...result.cash].sort((a, b) => a.freeLiquidityAfterRecommendationsLakh - b.freeLiquidityAfterRecommendationsLakh)[0];
+  if (isSmallTalk(question)) {
+    return `Hi. IBPE Copilot is online and connected to the ${scenarioLabel ? `${scenarioLabel} scenario` : "governed baseline"}. Ask me about cash, funding, demand, materials, procurement, capacity, or a named scenario.`;
+  }
+
+  const low = [...result.cash].sort((a, b) => a.freeLiquidityAfterRecommendationsLakh - b.freeLiquidityAfterRecommendationsLakh)[0];
+  const firstBreach = result.funding.firstLiquidityBreachAfterRecommendationsPeriod;
+  const fundingNeed = result.funding.incrementalFundingNeedLakh;
+
+  if (/fund(?:ing)?\s+(requirement|requirements|need|needs)|how much.*fund|additional fund|incremental fund/.test(q)) {
     lines.push(
-      `Assessment: ${prefix}minimum free liquidity after recommended procurement is ${money(result.summary.minimumFreeLiquidityAfterRecommendationsLakh)}${low ? `, with the lowest modelled month at M${low.period}` : ""}. Incremental funding need is ${money(result.funding.incrementalFundingNeedLakh)}.`,
-      `Main drivers: recommended procurement totals ${money(result.summary.totalRecommendedProcurementLakh)}; the first post-recommendation liquidity breach is ${result.funding.firstLiquidityBreachAfterRecommendationsPeriod ? `M${result.funding.firstLiquidityBreachAfterRecommendationsPeriod}` : "not present in the 36-month horizon"}.`,
+      `Funding requirement: ${prefix}${money(fundingNeed)} of incremental liquidity is required in the current model to prevent free liquidity from remaining negative.`,
+      `Timing: the first post-recommendation liquidity breach is ${firstBreach ? `M${firstBreach}` : "not present in the 36-month horizon"}${low ? `; the lowest modelled point is ${money(low.freeLiquidityAfterRecommendationsLakh)} at M${low.period}` : ""}.`,
+      `Procurement context: recommended procurement in this packet is ${money(result.summary.totalRecommendedProcurementLakh)}.`,
     );
-    const items = relevant(["finance", "funding", "procurement"]);
-    if (items.length) lines.push(`Controlled actions: ${items.map((item) => item.recommendedAction).join(" ")}`);
+    if (result.summary.totalRecommendedProcurementLakh === 0 && relevant(["inventory", "supply", "procurement"]).length > 0) {
+      lines.push("Data-quality caution: the packet contains supply/procurement findings but no recommended purchase value. Verify complete BOM and purchase-price coverage before treating this as the full material-funding requirement.");
+    }
+    const nextActions = actions(["finance", "funding", "procurement"]);
+    if (nextActions.length) lines.push(`Controlled next actions: ${nextActions.join(" ")}`);
+  } else if (/cash|fund|liquid|budget|runway|money|finance/.test(q)) {
+    if (/prevent|avoid|becoming negative|stay positive|keep.*positive|above zero/.test(q)) {
+      lines.push(
+        `Minimum modelled intervention: ${prefix}secure at least ${money(fundingNeed)} of incremental liquidity effective no later than ${firstBreach ? `M${firstBreach}` : "the first projected breach"}, or preserve the same amount through controlled cost/pace actions.`,
+        `${low ? `The current trough is ${money(low.freeLiquidityAfterRecommendationsLakh)} at M${low.period}. ` : ""}This amount prevents negative modeled free liquidity; a higher reserve-floor target may require more funding than the packet's incremental-need figure.`,
+      );
+    } else {
+      lines.push(
+        `Assessment: ${prefix}minimum free liquidity after recommended procurement is ${money(result.summary.minimumFreeLiquidityAfterRecommendationsLakh)}${low ? `, with the lowest modelled month at M${low.period}` : ""}. Incremental funding need is ${money(fundingNeed)}.`,
+        `Main drivers: recommended procurement totals ${money(result.summary.totalRecommendedProcurementLakh)}; the first post-recommendation liquidity breach is ${firstBreach ? `M${firstBreach}` : "not present in the 36-month horizon"}.`,
+      );
+    }
+    const nextActions = actions(["finance", "funding", "procurement"]);
+    if (nextActions.length) lines.push(`Controlled next actions: ${nextActions.join(" ")}`);
   } else if (/material|inventory|stock|purchase|procure|mrp|supplier|shortage|atp|msl/.test(q)) {
     const rows = [...result.supply]
       .filter((row) => row.committedFulfillmentShortageQty > 0 || row.recommendedPurchaseQty > 0)
@@ -99,20 +191,20 @@ function deterministicAnswer(question: string, result: IntegratedPlanningResult,
     if (rows.length) {
       lines.push(`Priority material rows: ${rows.map((row) => `${row.sku} M${row.period}: shortage ${row.committedFulfillmentShortageQty.toFixed(1)}, recommended buy ${row.recommendedPurchaseQty.toFixed(1)}${row.purchaseCostLakh == null ? "" : ` (${money(row.purchaseCostLakh)})`}`).join("; ")}.`);
     }
-    const items = relevant(["inventory", "supply", "procurement"]);
-    if (items.length) lines.push(`Controlled actions: ${items.map((item) => item.recommendedAction).join(" ")}`);
+    const nextActions = actions(["inventory", "supply", "procurement"]);
+    if (nextActions.length) lines.push(`Controlled next actions: ${nextActions.join(" ")}`);
   } else if (/capacity|production|manufactur|work centre|bottleneck|outsourc/.test(q)) {
     const rows = [...result.capacity].filter((row) => row.shortfallUnits > 0).sort((a, b) => b.shortfallUnits - a.shortfallUnits).slice(0, 5);
     lines.push(`Assessment: ${prefix}${result.summary.capacityShortfallMonths} capacity shortfall months are flagged in the active horizon.`);
     if (rows.length) lines.push(`Largest shortfalls: ${rows.map((row) => `${row.id} M${row.period}: ${row.shortfallUnits.toFixed(1)} units`).join("; ")}.`);
-    const items = relevant(["capacity", "planning"]);
-    if (items.length) lines.push(`Controlled actions: ${items.map((item) => item.recommendedAction).join(" ")}`);
+    const nextActions = actions(["capacity", "planning"]);
+    if (nextActions.length) lines.push(`Controlled next actions: ${nextActions.join(" ")}`);
   } else {
     lines.push(
       `Assessment: ${prefix}business health is ${result.summary.businessHealthScore}/100 across ${result.summary.expectedUnits.toFixed(0)} expected units. Recommended procurement is ${money(result.summary.totalRecommendedProcurementLakh)} and minimum free liquidity after recommendations is ${money(result.summary.minimumFreeLiquidityAfterRecommendationsLakh)}.`,
       `Exceptions: ${result.summary.findingCounts.critical} critical, ${result.summary.findingCounts.high} high, ${result.summary.findingCounts.medium} medium and ${result.summary.findingCounts.low} low findings.`,
     );
-    if (findings.length) lines.push(`Highest-priority issues: ${findings.slice(0, 4).map((item) => `${item.title} — ${item.recommendedAction}`).join(" ")}`);
+    if (uniqueIssues.length) lines.push(`Highest-priority issues: ${uniqueIssues.slice(0, 4).map((item) => `${item.title} — ${item.recommendedAction}`).join(" ")}`);
   }
 
   lines.push("Evidence: deterministic VYNDI IBPE decision packet. This is advisory analysis only; approvals and transactions remain in their owning workspaces.");
@@ -125,6 +217,9 @@ function systemPrompt() {
     "You are an advisory exploration agent sitting on top of a deterministic Integrated Business Planning Engine.",
     "The deterministic IBPE packet is the authority for quantities, cash, MRP, ATP/MSL, capacity, funding and scenario deltas. Never invent or recompute numbers outside the supplied packet.",
     "Always distinguish plan, forecast, committed and actual truth. A scenario is hypothetical forecast analysis and must never be described as an approved plan or actual transaction.",
+    "If the user explicitly names a scenario, answer that named scenario rather than a stale UI scenario context.",
+    "Handle greetings and conversational small talk naturally and briefly instead of dumping the business-health packet.",
+    "Never repeat an identical recommendation merely because several findings carry the same action.",
     "You may recommend actions, trade-offs and questions to investigate, but you must never claim that you created a purchase order, reservation, job card, accounting posting, funding draw, approval or plan revision.",
     "When data is insufficient, say exactly what is missing.",
     "Prefer concise executive reasoning with: Assessment; Main drivers; Feasible options; Recommended controlled next action; Evidence.",
@@ -161,8 +256,11 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
     let scenarioId: string | undefined;
     let scenarioLabel: string | undefined;
 
-    if (data.scenario) {
-      const packet = await evaluateScenario(sql, data.scenario);
+    const namedScenario = namedScenarioFromQuestion(data.question);
+    const effectiveScenario = namedScenario ?? (explicitlyRequestsBaseline(data.question) ? undefined : data.scenario);
+
+    if (effectiveScenario) {
+      const packet = await evaluateScenario(sql, effectiveScenario);
       result = packet.result;
       scenarioId = packet.scenario.id;
       scenarioLabel = packet.scenario.label;
@@ -181,7 +279,7 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
 
     let answer = deterministicAnswer(data.question, result, scenarioLabel);
     let mode: "ai" | "deterministic" = "deterministic";
-    const apiKey = process.env.XAI_API_KEY;
+    const apiKey = isSmallTalk(data.question) ? undefined : process.env.XAI_API_KEY;
 
     if (apiKey) {
       const context = {
