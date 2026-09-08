@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
-import { getSql, type Sql } from "@/lib/db";
+import { getSql, type JsonValue, type Sql } from "@/lib/db";
 import { getCommandRole } from "@/lib/command-access";
 import { canPerform } from "@/lib/page-access";
 import { requireBusinessActor } from "@/lib/business-actor";
@@ -18,6 +18,7 @@ import {
 } from "@/lib/integrated-business-planning-engine";
 
 export const IBPE_ENGINE_VERSION = "VYNDI-IBPE-1.0.0";
+export type IbpeValidation = Record<string, JsonValue>;
 
 export type IbpeRun = {
   id: string;
@@ -30,7 +31,7 @@ export type IbpeRun = {
   snapshotAt: string;
   status: "complete" | "invalidated";
   result: IntegratedPlanningResult;
-  validation: Record<string, unknown>;
+  validation: IbpeValidation;
   createdAt: string;
 };
 
@@ -80,12 +81,15 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
   const orders = await sql.query<{ plan_month:number|string; product_id:ProductLineId; confirmed:number|string }>(
     `select plan_month,product_id,coalesce(sum(units),0) as confirmed from vyndi_sales_orders where status='confirmed' group by plan_month,product_id order by plan_month,product_id`,
   );
-  const transactionActuals = await sql.query<{ plan_month:number|string; units:number|string; revenue:number|string; receivables:number|string }>(
-    `select plan_month,units,revenue,receivables from vyndi_monthly_transaction_actuals order by plan_month`,
+  const actualProductRows = await sql.query<{ plan_month:number|string; product_id:ProductLineId; actual_units:number|string }>(
+    `select i.plan_month,o.product_id,coalesce(sum(i.units),0) as actual_units
+       from vyndi_invoices i join vyndi_sales_orders o on o.id=i.sales_order_id
+      where i.status='issued'
+      group by i.plan_month,o.product_id
+      order by i.plan_month,o.product_id`,
   );
   const confirmed = new Map(orders.map((r) => [`${Number(r.plan_month)}|${r.product_id}`, Number(r.confirmed)]));
-  const actualUnits = new Map<number, number>();
-  for (const r of transactionActuals) actualUnits.set(Number(r.plan_month), Number(r.units));
+  const actualByProduct = new Map(actualProductRows.map((r) => [`${Number(r.plan_month)}|${r.product_id}`, Number(r.actual_units)]));
 
   const demand: DemandSignal[] = [];
   for (const row of model) {
@@ -93,9 +97,7 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
     for (const productId of Object.keys(PRODUCT_TIER) as ProductLineId[]) {
       const planQty = planned[productId];
       const committedQty = confirmed.get(`${row.m}|${productId}`) ?? 0;
-      const totalActual = actualUnits.get(row.m) ?? 0;
-      const productPlanShare = row.units > 0 ? planQty / row.units : 0;
-      const actualQty = totalActual * productPlanShare;
+      const actualQty = actualByProduct.get(`${row.m}|${productId}`) ?? 0;
       demand.push({
         id: `M${row.m}-${productId}`,
         productId,
@@ -104,8 +106,8 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
         forecastQty: Math.max(planQty, committedQty + actualQty),
         committedQty,
         actualQty,
-        confidence: committedQty > 0 ? 1 : 0.7,
-        sourceRef: `PLAN-${plan.id}-R${plan.revision}`,
+        confidence: actualQty > 0 || committedQty > 0 ? 1 : 0.7,
+        sourceRef: actualQty > 0 ? "ISSUED-INVOICE-LEDGER" : `PLAN-${plan.id}-R${plan.revision}`,
       });
     }
   }
@@ -177,7 +179,7 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
     demand,bom,inventory,reservations,receipts,cashFlows,
     funding:{ openingBankCashLakh:finance.openingCashLakh,minimumOperatingReserveLakh:finance.operatingPlan.cashFloorLakh,restrictedCashLakh:0,fundraisingLeadMonths:3 },
   };
-  const validation = {
+  const validation: IbpeValidation = {
     approvedPlan:`${plan.id}:R${plan.revision}`,
     demandSignals:demand.length,
     approvedBomRows:bom.length,
@@ -186,7 +188,7 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
     committedReceipts:receipts.length,
     cashFlows:cashFlows.length,
     capacityAuthority:"not-configured-explicitly-optional",
-    transactionInputs:["vyndi_sales_orders","vyndi_monthly_transaction_actuals","epr_bom_inventory_mappings","vyndi_inventory_available_to_promise","epr_inventory_reservations","vyndi_open_purchase_orders","vyndi_collections"],
+    transactionInputs:["vyndi_sales_orders","vyndi_invoices","epr_bom_inventory_mappings","vyndi_inventory_available_to_promise","epr_inventory_reservations","vyndi_open_purchase_orders","vyndi_collections"],
   };
   return { input, validation };
 }
@@ -196,7 +198,7 @@ function mapRun(row: Record<string, unknown>): IbpeRun {
     id:String(row.id),engineVersion:String(row.engine_version),sourceSha:String(row.source_sha),inputHash:String(row.input_hash),
     approvedPlanId:String(row.approved_plan_id),approvedPlanRevision:Number(row.approved_plan_revision),scenario:row.scenario as IbpeRun["scenario"],
     snapshotAt:String(row.snapshot_at),status:row.status as IbpeRun["status"],result:row.result_json as IntegratedPlanningResult,
-    validation:(row.validation_json ?? {}) as Record<string,unknown>,createdAt:String(row.created_at),
+    validation:(row.validation_json ?? {}) as IbpeValidation,createdAt:String(row.created_at),
   };
 }
 
