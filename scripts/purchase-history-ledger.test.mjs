@@ -26,7 +26,7 @@ test("purchase history remains a derived read model over governed transaction tr
 test("purchase execution is the single entry point and exposes the derived audit ledger", () => {
   assert.match(page, /getPurchaseExecutionData\(\)/);
   assert.match(page, /getPurchaseHistoryData\(\)/);
-  assert.match(page, /<PurchaseHistoryLedger rows=\{data\.purchaseHistory\} \/>/);
+  assert.match(page, /<PurchaseHistoryLedger\s+rows=\{data\.purchaseHistory\}\s*\/>/);
   assert.match(component, /Purchase History Ledger/);
   assert.match(component, /PO → GRN → Inventory → Invoice \/ GST → Payment/);
   assert.match(component, /Export CSV/);
