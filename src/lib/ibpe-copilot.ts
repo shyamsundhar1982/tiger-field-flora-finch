@@ -14,6 +14,7 @@ export type IbpeCopilotResponse = {
   ok: boolean;
   answer?: string;
   error?: string;
+  mode?: "ai" | "deterministic";
   lineage?: {
     governedRunId: string;
     approvedPlanRevision: number;
@@ -34,6 +35,10 @@ type LatestRunRow = {
 
 function sanitizeQuestion(value: unknown) {
   return String(value ?? "").trim().slice(0, 1800);
+}
+
+function money(value: number) {
+  return `₹${Number(value || 0).toFixed(1)}L`;
 }
 
 function compactResult(result: IntegratedPlanningResult) {
@@ -63,6 +68,52 @@ function compactResult(result: IntegratedPlanningResult) {
     capacity,
     lowestLiquidityMonths: cash,
   };
+}
+
+function deterministicAnswer(question: string, result: IntegratedPlanningResult, scenarioLabel?: string) {
+  const q = question.toLowerCase();
+  const prefix = scenarioLabel ? `Scenario: ${scenarioLabel}. ` : "Governed baseline. ";
+  const findings = result.findings;
+  const relevant = (domains: string[]) => findings.filter((finding) => domains.includes(finding.domain)).slice(0, 4);
+  const lines: string[] = [];
+
+  if (/cash|fund|liquid|budget|runway|money|finance/.test(q)) {
+    const low = [...result.cash].sort((a, b) => a.freeLiquidityAfterRecommendationsLakh - b.freeLiquidityAfterRecommendationsLakh)[0];
+    lines.push(
+      `Assessment: ${prefix}minimum free liquidity after recommended procurement is ${money(result.summary.minimumFreeLiquidityAfterRecommendationsLakh)}${low ? `, with the lowest modelled month at M${low.period}` : ""}. Incremental funding need is ${money(result.funding.incrementalFundingNeedLakh)}.`,
+      `Main drivers: recommended procurement totals ${money(result.summary.totalRecommendedProcurementLakh)}; the first post-recommendation liquidity breach is ${result.funding.firstLiquidityBreachAfterRecommendationsPeriod ? `M${result.funding.firstLiquidityBreachAfterRecommendationsPeriod}` : "not present in the 36-month horizon"}.`,
+    );
+    const items = relevant(["finance", "funding", "procurement"]);
+    if (items.length) lines.push(`Controlled actions: ${items.map((item) => item.recommendedAction).join(" ")}`);
+  } else if (/material|inventory|stock|purchase|procure|mrp|supplier|shortage|atp|msl/.test(q)) {
+    const rows = [...result.supply]
+      .filter((row) => row.committedFulfillmentShortageQty > 0 || row.recommendedPurchaseQty > 0)
+      .sort((a, b) => b.committedFulfillmentShortageQty - a.committedFulfillmentShortageQty)
+      .slice(0, 5);
+    lines.push(
+      `Assessment: ${prefix}${result.summary.fulfillmentShortageSkuMonths} SKU-months have committed-supply shortages and recommended procurement totals ${money(result.summary.totalRecommendedProcurementLakh)}.`,
+    );
+    if (rows.length) {
+      lines.push(`Priority material rows: ${rows.map((row) => `${row.sku} M${row.period}: shortage ${row.committedFulfillmentShortageQty.toFixed(1)}, recommended buy ${row.recommendedPurchaseQty.toFixed(1)}${row.purchaseCostLakh == null ? "" : ` (${money(row.purchaseCostLakh)})`}`).join("; ")}.`);
+    }
+    const items = relevant(["inventory", "supply", "procurement"]);
+    if (items.length) lines.push(`Controlled actions: ${items.map((item) => item.recommendedAction).join(" ")}`);
+  } else if (/capacity|production|manufactur|work centre|bottleneck|outsourc/.test(q)) {
+    const rows = [...result.capacity].filter((row) => row.shortfallUnits > 0).sort((a, b) => b.shortfallUnits - a.shortfallUnits).slice(0, 5);
+    lines.push(`Assessment: ${prefix}${result.summary.capacityShortfallMonths} capacity constraint-months are flagged in the active horizon.`);
+    if (rows.length) lines.push(`Largest shortfalls: ${rows.map((row) => `${row.id} M${row.period}: ${row.shortfallUnits.toFixed(1)} units`).join("; ")}.`);
+    const items = relevant(["capacity", "planning"]);
+    if (items.length) lines.push(`Controlled actions: ${items.map((item) => item.recommendedAction).join(" ")}`);
+  } else {
+    lines.push(
+      `Assessment: ${prefix}business health is ${result.summary.businessHealthScore}/100 across ${result.summary.expectedUnits.toFixed(0)} expected units. Recommended procurement is ${money(result.summary.totalRecommendedProcurementLakh)} and minimum free liquidity after recommendations is ${money(result.summary.minimumFreeLiquidityAfterRecommendationsLakh)}.`,
+      `Exceptions: ${result.summary.findingCounts.critical} critical, ${result.summary.findingCounts.high} high, ${result.summary.findingCounts.medium} medium and ${result.summary.findingCounts.low} low findings.`,
+    );
+    if (findings.length) lines.push(`Highest-priority issues: ${findings.slice(0, 4).map((item) => `${item.title} — ${item.recommendedAction}`).join(" ")}`);
+  }
+
+  lines.push("Evidence: deterministic VYNDI IBPE decision packet. This is advisory analysis only; approvals and transactions remain in their owning workspaces.");
+  return lines.join("\n\n");
 }
 
 function systemPrompt() {
@@ -97,62 +148,72 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
     const actor = await requireBusinessActor("view");
     if (!data.question) return { ok: false, error: "Ask a question first.", advisoryOnly: true };
 
-    const apiKey = process.env.XAI_API_KEY;
-    if (!apiKey) return { ok: false, error: "AI assistance is unavailable in this environment.", advisoryOnly: true };
-
     const { sql, row } = await latestRun();
     let result = row.result_json;
     let scenarioContext: unknown = null;
     let scenarioId: string | undefined;
+    let scenarioLabel: string | undefined;
 
     if (data.scenario) {
       const packet = await evaluateScenario(sql, data.scenario);
       result = packet.result;
       scenarioId = packet.scenario.id;
+      scenarioLabel = packet.scenario.label;
       scenarioContext = {
         scenario: packet.scenario,
         comparisonVsGovernedBaseline: packet.comparison,
       };
     }
 
-    const context = {
-      lineage: {
-        governedRunId: row.id,
-        approvedPlanRevision: Number(row.approved_plan_revision),
-        inputHash: row.input_hash,
-        sourceSha: row.source_sha,
-      },
-      scenario: scenarioContext,
-      ibpe: compactResult(result),
+    const lineage = {
+      governedRunId: row.id,
+      approvedPlanRevision: Number(row.approved_plan_revision),
+      inputHash: row.input_hash,
+      sourceSha: row.source_sha,
     };
 
-    const response = await fetch("https://api.x.ai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "grok-4.5",
-        temperature: 0.2,
-        max_tokens: 900,
-        messages: [
-          { role: "system", content: systemPrompt() },
-          {
-            role: "user",
-            content: `Question: ${data.question}\n\nGoverned IBPE context:\n${JSON.stringify(context)}`,
+    let answer = deterministicAnswer(data.question, result, scenarioLabel);
+    let mode: "ai" | "deterministic" = "deterministic";
+    const apiKey = process.env.XAI_API_KEY;
+
+    if (apiKey) {
+      const context = {
+        lineage,
+        scenario: scenarioContext,
+        ibpe: compactResult(result),
+      };
+      try {
+        const response = await fetch("https://api.x.ai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
           },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      return { ok: false, error: `AI service error ${response.status}.`, advisoryOnly: true };
+          body: JSON.stringify({
+            model: "grok-4.5",
+            temperature: 0.2,
+            max_tokens: 900,
+            messages: [
+              { role: "system", content: systemPrompt() },
+              {
+                role: "user",
+                content: `Question: ${data.question}\n\nGoverned IBPE context:\n${JSON.stringify(context)}`,
+              },
+            ],
+          }),
+        });
+        if (response.ok) {
+          const body = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+          const aiAnswer = body.choices?.[0]?.message?.content?.trim() ?? "";
+          if (aiAnswer) {
+            answer = aiAnswer;
+            mode = "ai";
+          }
+        }
+      } catch {
+        // Deterministic IBPE explanation remains available if the external AI service fails.
+      }
     }
-
-    const body = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const answer = body.choices?.[0]?.message?.content?.trim() ?? "";
-    if (!answer) return { ok: false, error: "AI returned no analysis.", advisoryOnly: true };
 
     const questionHash = createHash("sha256").update(data.question).digest("hex");
     await sql.query(
@@ -166,19 +227,15 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
         actor.userId,
         actor.role,
         `IBPE:${row.input_hash.slice(0,12)}`,
-        JSON.stringify({ questionHash, scenarioId: scenarioId ?? null, answerChars: answer.length }),
+        JSON.stringify({ questionHash, scenarioId: scenarioId ?? null, mode, answerChars: answer.length }),
       ],
     );
 
     return {
       ok: true,
       answer,
-      lineage: {
-        governedRunId: row.id,
-        approvedPlanRevision: Number(row.approved_plan_revision),
-        inputHash: row.input_hash,
-        sourceSha: row.source_sha,
-      },
+      mode,
+      lineage,
       scenarioId,
       advisoryOnly: true,
     };
