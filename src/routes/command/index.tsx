@@ -49,6 +49,11 @@ function CommandCentre() {
               Master Plan →
             </Link>
           )}
+          {accessible("/command/decision-inbox") && (
+            <Link to="/command/decision-inbox" className="text-accent hover:text-fg">
+              Action Inbox →
+            </Link>
+          )}
           {accessible("/command/governance") && (
             <Link to="/command/governance" className="text-accent hover:text-fg">
               Governance →
@@ -161,7 +166,7 @@ function CommandCentre() {
           {[
             ["Master Plan", "Roadmap, demand, procurement, production, finance and scenarios", "/command/planning"],
             ["Finance", "Cash, assumptions, funding, balance sheet and CA verification", "/command/financial-cockpit"],
-            ["Supply & Production", "Procurement, inventory, production and quality", "/command/inventory"],
+            ["Supply & Production", "Plan, buy, receive, inventory, release, production and quality", "/command/operations"],
             ["Engineering", "Product, BOM, revisions, tooling and validation", "/command/engineering"],
             ["Commercial", "Demand, orders, sales forecast and GTM", "/command/sales"],
             ["Governance", "Risks, approvals, evidence and audit trail", "/command/governance"],

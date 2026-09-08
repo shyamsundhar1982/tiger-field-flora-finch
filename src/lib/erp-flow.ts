@@ -43,7 +43,7 @@ export const ERP_FLOW: ErpFlowStep[] = [
     purpose: "Manage item controls, receipts, stock health and FIFO audit in one workspace.",
     inputs: "Item demand, MSL and dated receipts",
     outputs: "Available quantity, replenishment timing and FIFO evidence",
-    routes: ["/command/inventory", "/command/inventory-ledgers"],
+    routes: ["/command/inventory", "/command/inventory-ledgers", "/command/receiving"],
   },
   {
     id: "operations",
@@ -53,6 +53,9 @@ export const ERP_FLOW: ErpFlowStep[] = [
     outputs: "Controlled procurement, production and quality activity",
     routes: [
       "/command/operations",
+      "/command/procurement-planning",
+      "/command/purchase-execution",
+      "/command/production-jobcards",
       "/command/production",
       "/command/manufacturing",
       "/command/quality",
@@ -86,6 +89,8 @@ export const ERP_FLOW: ErpFlowStep[] = [
       "/command/cash",
       "/command/funding",
       "/command/scenarios",
+      "/command/payables",
+      "/command/receivables",
     ],
   },
   {
@@ -100,6 +105,7 @@ export const ERP_FLOW: ErpFlowStep[] = [
       "/command/management-intelligence",
       "/command/investor-board",
       "/command/actions",
+      "/command/decision-inbox",
     ],
   },
 ];

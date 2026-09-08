@@ -56,6 +56,22 @@ test("normal navigation exposes one inventory workspace and hides legacy pages",
   assert.equal(routeRegistry["/command/inventory-ledgers"].navHidden, true);
 });
 
+test("closed-loop transaction surfaces stay inside their canonical workspaces", () => {
+  assert.equal(getRouteOwnership("/command/purchase-execution")?.source, "operational");
+  assert.equal(getRouteOwnership("/command/receiving")?.canonicalRoute, "/command/receiving");
+  assert.equal(getRouteOwnership("/command/payables")?.source, "operational");
+  assert.equal(getRouteOwnership("/command/receivables")?.source, "operational");
+  assert.equal(getRouteOwnership("/command/decision-inbox")?.mutability, "read-only");
+
+  assert.equal(canAccessRoute("operations", "/command/purchase-execution"), true);
+  assert.equal(canAccessRoute("operations", "/command/receiving"), true);
+  assert.equal(canAccessRoute("operations", "/command/payables"), false);
+  assert.equal(canAccessRoute("finance", "/command/payables"), true);
+  assert.equal(canAccessRoute("finance", "/command/receivables"), true);
+  assert.equal(canAccessRoute("viewer", "/command/purchase-execution"), false);
+  assert.equal(canAccessRoute("viewer", "/command/decision-inbox"), true);
+});
+
 test("public and compatibility route contracts remain registered", () => {
   assert.deepEqual(PUBLIC_REFERENCE_ROUTES, [
     "/",

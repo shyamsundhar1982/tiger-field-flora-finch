@@ -44,12 +44,19 @@ const COMMERCIAL_HOME_ROUTE = "/command/sales";
 const ENGINEERING_HOME_ROUTE = "/command/engineering";
 const GOVERNANCE_HOME_ROUTE = "/command/governance";
 
+const COMMAND_TABS = [
+  { to: "/command", label: "Overview" },
+  { to: "/command/decision-inbox", label: "Action Inbox" },
+  { to: "/command/control-tower", label: "Control Tower" },
+] as const;
+
 const EXECUTIVE_SUPPORT_ROUTES = new Set<string>([
   "/command/control-tower",
   "/command/management-intelligence",
   "/command/founder-command",
   "/command/founder-control",
   "/command/decision-engine",
+  "/command/decision-inbox",
 ]);
 const FINANCE_SUPPORT_ROUTES = new Set<string>([
   "/command/finance",
@@ -64,6 +71,8 @@ const FINANCE_TABS = [
   { to: FINANCE_HOME_ROUTE, label: "Overview" },
   { to: "/command/finance-assumptions", label: "Plan" },
   { to: "/command/cash", label: "Cash" },
+  { to: "/command/payables", label: "Payables" },
+  { to: "/command/receivables", label: "Receivables" },
   { to: "/command/balance-sheet", label: "Balance Sheet" },
   { to: "/command/ca-audit", label: "CA Audit" },
   { to: "/command/scenarios", label: "Scenarios" },
@@ -75,6 +84,7 @@ const FINANCE_CONTEXT_ROUTES = new Set<string>([
   "/command/master-finance",
   "/command/aluminium-finance",
   "/command/funding",
+  "/command/actuals",
 ]);
 
 const SUPPLY_SUPPORT_ROUTES = new Set<string>([
@@ -86,13 +96,17 @@ const SUPPLY_SUPPORT_ROUTES = new Set<string>([
   "/command/ops",
   "/command/actuals",
   "/command/production-jobcards",
+  "/command/purchase-execution",
+  "/command/receiving",
 ]);
 const SUPPLY_TABS = [
   { to: SUPPLY_HOME_ROUTE, label: "Overview" },
-  { to: "/command/procurement", label: "Procurement" },
+  { to: "/command/procurement-planning", label: "Plan" },
+  { to: "/command/purchase-execution", label: "Buy" },
+  { to: "/command/receiving", label: "Receive" },
   { to: "/command/inventory", label: "Inventory" },
+  { to: "/command/production-jobcards", label: "Release" },
   { to: "/command/production", label: "Production" },
-  { to: "/command/manufacturing", label: "Manufacturing" },
   { to: "/command/quality", label: "Quality" },
 ] as const;
 const SUPPLY_CONTEXT_ROUTES = new Set<string>([
@@ -527,6 +541,7 @@ export function CommandShell() {
         <div className="min-w-0 flex-1">
           <MobileNavigation view={view} role={role} setView={setView} logout={logout} loggingOut={loggingOut} />
           <div className="px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
+            <WorkspaceTabs role={role} routes={COMMAND_TABS} context={WORKSPACES[0].context} label="Command Centre workspace" />
             <WorkspaceTabs role={role} routes={FINANCE_TABS} context={FINANCE_CONTEXT_ROUTES} label="Finance workspace" />
             <WorkspaceTabs role={role} routes={SUPPLY_TABS} context={SUPPLY_CONTEXT_ROUTES} label="Supply and Production workspace" />
             <WorkspaceTabs role={role} routes={COMMERCIAL_TABS} context={COMMERCIAL_CONTEXT_ROUTES} label="Commercial workspace" />

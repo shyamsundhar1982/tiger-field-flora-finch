@@ -1,18 +1,26 @@
 import { getCommandRole } from "@/lib/command-access";
-import { requireUserId } from "@/lib/auth/verify.server";
+import { getSessionUser, requireUserId } from "@/lib/auth/verify.server";
 import { canPerform, type CommandPermission, type CommandRole } from "@/lib/page-access";
 
 export type BusinessActor = { userId: string; role: CommandRole };
 
 /**
- * Critical business mutations require a stable Better Auth identity in addition
- * to the VINDY role. This deliberately prevents the legacy shared-password
- * compatibility session from creating new order/plan/inventory commitments.
+ * Read-only advisory exploration may be performed through an authorised legacy
+ * Command session. Mutating permissions still require a stable Better Auth
+ * identity so a shared-password compatibility session can never create or
+ * approve business commitments.
  */
 export async function requireBusinessActor(permission: CommandPermission): Promise<BusinessActor> {
-  const [role, userId] = await Promise.all([getCommandRole(), requireUserId()]);
+  const role = await getCommandRole();
   if (!role || !canPerform(role, permission)) {
     throw new Error(`Business ${permission} permission denied.`);
   }
+
+  if (permission === "view") {
+    const user = await getSessionUser();
+    return { userId: user?.id ?? `legacy-command:${role}`, role };
+  }
+
+  const userId = await requireUserId();
   return { userId, role };
 }

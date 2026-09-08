@@ -222,14 +222,20 @@ function MasterInventory() {
             one category and one auditable ledger.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setEntryOpen((open) => !open)}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-bg"
-        >
-          <PackagePlus className="size-4" />
-          {entryOpen ? "Close entry" : "Add item / receipt"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <Link to="/command/receiving" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-bg">
+            <PackagePlus className="size-4" />
+            Receive against PO
+          </Link>
+          <button
+            type="button"
+            onClick={() => setEntryOpen((open) => !open)}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-semibold text-fg hover:border-accent"
+          >
+            <PackagePlus className="size-4" />
+            {entryOpen ? "Close entry" : "Item / manual receipt"}
+          </button>
+        </div>
       </header>
 
       {entryOpen ? (
@@ -245,8 +251,8 @@ function MasterInventory() {
               <h2 className="mt-1 font-display text-xl">Save to a ledger</h2>
             </div>
             <p className="max-w-md text-xs leading-5 text-muted">
-              An existing SKU updates its MSL and plan. A quantity above zero also creates a dated
-              receipt lot for FIFO.
+              Use this for master-data setup and evidenced non-PO adjustments. Supplier deliveries
+              should enter through Receiving so PO, inspection, FIFO and payables stay linked.
             </p>
           </div>
           <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
