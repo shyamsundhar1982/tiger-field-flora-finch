@@ -14,7 +14,8 @@ test("IBPE Copilot resolves named scenarios ahead of stale UI scenario context",
 });
 
 test("IBPE Copilot supports product-family demand overrides", () => {
-  assert.match(copilot, /longitude-growth-25/);
+  assert.match(copilot, /familyGrowth\.family}-growth-25/);
+  assert.match(copilot, /family: "longitude", productId: "aluminium", label: "Longitude"/);
   assert.match(copilot, /demandMultiplierByProduct: \{ \[familyGrowth\.productId\]: 1\.25 \}/);
   assert.match(scenarioLab, /demandMultiplierByProduct\?: Record<string, number>/);
   assert.match(scenarioLab, /const rowDemandMultiplier = demandMultiplierByProduct\[row\.productId\] \?\? demandMultiplier/);
