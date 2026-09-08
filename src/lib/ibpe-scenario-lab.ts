@@ -120,11 +120,17 @@ export function applyIbpeScenario(
     sourceRef: `${row.sourceRef ?? "IBPE"}|SCN:${scenario.id}`,
   }));
 
-  input.receipts = (input.receipts ?? []).map((row) => ({
-    ...row,
-    period: Math.min(36, Math.max(1, row.period + receiptDelayMonths)),
-    sourceRef: `${row.sourceRef ?? "IBPE"}|SCN:${scenario.id}`,
-  }));
+  input.receipts = (input.receipts ?? []).flatMap((row) => {
+    const delayedPeriod = row.period + receiptDelayMonths;
+    // A receipt delayed beyond M36 is outside the active planning horizon; do not
+    // pull it back into M36, because that would understate the scenario shortage.
+    if (delayedPeriod > 36) return [];
+    return [{
+      ...row,
+      period: Math.max(1, delayedPeriod),
+      sourceRef: `${row.sourceRef ?? "IBPE"}|SCN:${scenario.id}`,
+    }];
+  });
 
   if ((scenario.cashInjectionLakh ?? 0) > 0) {
     const cashFlow: CashFlow = {
