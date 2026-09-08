@@ -9,7 +9,10 @@ import {
 } from "@/lib/integrated-business-planning-engine";
 import { runRuntimeIbpe, type RuntimeIbpeInput } from "@/lib/ibpe-runtime-parity";
 
-export type IbpeScenarioRequest = PlanningScenario;
+export type IbpeScenarioRequest = PlanningScenario & {
+  /** Optional product-line demand overrides. Keys use runtime product IDs: aluminium, carbon, premiumCarbon. */
+  demandMultiplierByProduct?: Record<string, number>;
+};
 
 export type IbpeScenarioComparison = {
   expectedUnitsDelta: number;
@@ -60,6 +63,16 @@ function clamp(value: unknown, min: number, max: number, fallback: number) {
   return Math.min(max, Math.max(min, finite(value, fallback)));
 }
 
+function sanitizeProductDemandMultipliers(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const allowed = new Set(["aluminium", "carbon", "premiumCarbon"]);
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([productId]) => allowed.has(productId))
+      .map(([productId, multiplier]) => [productId, clamp(multiplier, 0.1, 3, 1)]),
+  );
+}
+
 function sanitizeScenario(value: IbpeScenarioRequest): IbpeScenarioRequest {
   const id = String(value.id || "scenario").slice(0, 64);
   const label = String(value.label || "Scenario").slice(0, 80);
@@ -67,6 +80,7 @@ function sanitizeScenario(value: IbpeScenarioRequest): IbpeScenarioRequest {
     id,
     label,
     demandMultiplier: clamp(value.demandMultiplier, 0.1, 3, 1),
+    demandMultiplierByProduct: sanitizeProductDemandMultipliers(value.demandMultiplierByProduct),
     capacityMultiplier: clamp(value.capacityMultiplier, 0.1, 3, 1),
     procurementCostMultiplier: clamp(value.procurementCostMultiplier, 0.25, 3, 1),
     leadTimeMultiplier: clamp(value.leadTimeMultiplier, 0.25, 3, 1),
@@ -87,6 +101,7 @@ export function applyIbpeScenario(
   const scenario = sanitizeScenario(rawScenario);
   const input = cloneInput(source);
   const demandMultiplier = scenario.demandMultiplier ?? 1;
+  const demandMultiplierByProduct = scenario.demandMultiplierByProduct ?? {};
   const capacityMultiplier = scenario.capacityMultiplier ?? 1;
   const procurementCostMultiplier = scenario.procurementCostMultiplier ?? 1;
   const leadTimeMultiplier = scenario.leadTimeMultiplier ?? 1;
@@ -96,10 +111,11 @@ export function applyIbpeScenario(
     const actual = Math.max(0, row.actualQty);
     const committed = Math.max(0, row.committedQty);
     const residualForecast = Math.max(0, row.forecastQty - actual - committed);
+    const rowDemandMultiplier = demandMultiplierByProduct[row.productId] ?? demandMultiplier;
     return {
       ...row,
-      forecastQty: actual + committed + residualForecast * demandMultiplier,
-      weightedPipelineQty: Math.max(0, row.weightedPipelineQty ?? 0) * demandMultiplier,
+      forecastQty: actual + committed + residualForecast * rowDemandMultiplier,
+      weightedPipelineQty: Math.max(0, row.weightedPipelineQty ?? 0) * rowDemandMultiplier,
       sourceRef: `${row.sourceRef ?? "IBPE"}|SCN:${scenario.id}`,
     };
   });

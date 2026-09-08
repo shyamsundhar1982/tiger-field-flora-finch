@@ -68,6 +68,14 @@ function signedNumber(value: number, digits = 0) {
   return `${amount >= 0 ? "+" : ""}${amount.toFixed(digits)}`;
 }
 
+function splitQuestions(question: string) {
+  const clean = question.replace(/[“”]/g, '"').trim();
+  const questionMarks = clean.match(/[^?]+\?/g)?.map((part) => part.replace(/^\s*["']+|["']+\s*$/g, "").trim()).filter(Boolean) ?? [];
+  if (questionMarks.length > 1) return questionMarks.slice(0, 8);
+  const lines = clean.split(/\n+|;\s+/).map((part) => part.replace(/^\s*["']+|["']+\s*$/g, "").trim()).filter(Boolean);
+  return lines.length > 1 ? lines.slice(0, 8) : [question];
+}
+
 function namedScenarioFromQuestion(question: string): IbpeScenarioRequest | undefined {
   const q = question.toLowerCase();
   const build = (id: string, label: string, patch: Partial<IbpeScenarioRequest>): IbpeScenarioRequest => ({
@@ -77,7 +85,18 @@ function namedScenarioFromQuestion(question: string): IbpeScenarioRequest | unde
     label,
   });
 
-  if (/growth\s*\+?\s*25|25%\s*growth/.test(q)) {
+  const familyGrowth = [
+    { family: "longitude", productId: "aluminium", label: "Longitude" },
+    { family: "latitude", productId: "carbon", label: "Latitude" },
+    { family: "altitude", productId: "premiumCarbon", label: "Altitude" },
+  ].find(({ family }) => q.includes(family) && /25\s*%/.test(q) && /demand|sales|units|growth|increase|increases|increased|higher/.test(q));
+
+  if (familyGrowth) {
+    return build(`${familyGrowth.family}-growth-25`, `${familyGrowth.label} demand +25%`, {
+      demandMultiplierByProduct: { [familyGrowth.productId]: 1.25 },
+    });
+  }
+  if (/growth\s*\+?\s*25|25%\s*growth|demand\s+(?:increase|increases|increased).*25\s*%/.test(q)) {
     return build("growth-25", "Growth +25%", { demandMultiplier: 1.25 });
   }
   if (/supply\s*shock/.test(q)) {
@@ -124,7 +143,7 @@ function isSmallTalk(question: string) {
 }
 
 function isCausalQuestion(question: string) {
-  return /\b(why|cause|caused|create|created|increase|increased|change|changed|impact|effect|affect|affected)\b/.test(
+  return /\b(why|cause|caused|create|created|increase|increased|increases|change|changed|impact|effect|affect|affected|happens)\b/.test(
     question.toLowerCase(),
   );
 }
@@ -163,13 +182,16 @@ function deterministicAnswer(
   result: IntegratedPlanningResult,
   scenarioLabel?: string,
   comparison?: IbpeScenarioComparison,
+  includeEvidence = true,
 ) {
   const q = question.toLowerCase();
   const prefix = scenarioLabel ? `Scenario: ${scenarioLabel}. ` : "Governed baseline. ";
   const findings = result.findings;
   const relevant = (domains: string[]) => findings.filter((finding) => domains.includes(finding.domain)).slice(0, 8);
   const actions = (domains: string[]) => [...new Set(relevant(domains).map((item) => item.recommendedAction).filter(Boolean))].slice(0, 4);
-  const uniqueIssues = [...new Map(findings.map((item) => [`${item.title}|${item.recommendedAction}`, item])).values()];
+  const severityRank = { critical: 0, high: 1, medium: 2, low: 3 } as const;
+  const uniqueIssues = [...new Map(findings.map((item) => [`${item.title}|${item.recommendedAction}`, item])).values()]
+    .sort((a, b) => severityRank[a.severity] - severityRank[b.severity]);
   const lines: string[] = [];
 
   if (isSmallTalk(question)) {
@@ -177,43 +199,62 @@ function deterministicAnswer(
   }
 
   const low = [...result.cash].sort((a, b) => a.freeLiquidityAfterRecommendationsLakh - b.freeLiquidityAfterRecommendationsLakh)[0];
+  const low12 = [...result.cash]
+    .filter((row) => row.period <= 12)
+    .sort((a, b) => a.freeLiquidityAfterRecommendationsLakh - b.freeLiquidityAfterRecommendationsLakh)[0];
   const firstBreach = result.funding.firstLiquidityBreachAfterRecommendationsPeriod;
   const fundingNeed = result.funding.incrementalFundingNeedLakh;
+  const fundingNeed12 = Math.max(0, -(low12?.freeLiquidityAfterRecommendationsLakh ?? 0));
   const asksAboutFunding = /cash|fund|liquid|budget|runway|money|finance/.test(q);
+  const asksBiggestConstraint = /biggest|main|primary|largest/.test(q) && /constraint|bottleneck|risk|problem|issue/.test(q) && /plan|business|approved/.test(q);
+  const asksNext12Funding = asksAboutFunding && /next\s*12|12\s*months|coming\s*12|one\s*year/.test(q);
+  const asksLargestCashMonth = /which\s+month|what\s+month|largest\s+cash\s+risk|lowest\s+(?:cash|liquid)|cash\s+trough/.test(q) && /cash|liquid|risk|trough/.test(q);
+  const asksReduceFundingNoDelay = /reduce|lower|cut|minimi[sz]e/.test(q) && /fund|cash|liquid/.test(q) && /without.*delay|not.*delay|without delaying|launch/.test(q);
 
-  if (scenarioLabel && comparison && isCausalQuestion(question) && asksAboutFunding) {
+  if (asksBiggestConstraint) {
+    const top = uniqueIssues[0];
+    lines.push(
+      top
+        ? `Biggest constraint: ${prefix}${top.title}. ${top.problem}`
+        : `Biggest constraint: ${prefix}no discrete governed finding is currently ranked above the rest; business health is ${result.summary.businessHealthScore}/100.`,
+    );
+    if (top?.businessImpact) lines.push(`Business impact: ${top.businessImpact}`);
+    if (top?.recommendedAction) lines.push(`Controlled next action: ${top.recommendedAction}`);
+  } else if (asksNext12Funding) {
+    lines.push(
+      `Next-12-month funding requirement: ${prefix}${money(fundingNeed12)} of incremental liquidity is required to keep modelled free liquidity at or above zero through M12.`,
+      low12
+        ? `The weakest point inside the next 12 months is ${money(low12.freeLiquidityAfterRecommendationsLakh)} at M${low12.period}.`
+        : "No next-12-month cash rows are available in the governed packet.",
+      `For comparison, the full 36-month model requires ${money(fundingNeed)} of incremental liquidity.`,
+    );
+  } else if (asksLargestCashMonth) {
+    lines.push(
+      low
+        ? `Largest cash-risk month: ${prefix}M${low.period}, where free liquidity after recommended procurement reaches ${money(low.freeLiquidityAfterRecommendationsLakh)}.`
+        : `Largest cash-risk month: ${prefix}the governed packet does not contain a cash row.`,
+      `The first post-recommendation liquidity breach is ${firstBreach ? `M${firstBreach}` : "not present in the 36-month horizon"}.`,
+    );
+  } else if (asksReduceFundingNoDelay) {
+    const controlled = actions(["finance", "funding", "procurement", "inventory"]);
+    lines.push(
+      `Funding reduction without delaying launch: ${prefix}protect the launch date and reduce the pre-launch cash load rather than slowing the programme.`,
+      `Highest-value levers to test are: phase procurement to the actual order-by periods, reduce supplier/unit procurement cost, improve payment terms where commercially available, and avoid non-critical early commitments. A funding bridge improves liquidity timing but does not reduce the underlying operating cash requirement.`,
+    );
+    if (controlled.length) lines.push(`Packet-backed controlled actions: ${controlled.join(" ")}`);
+    lines.push(`Current model reference: incremental funding need ${money(fundingNeed)}; recommended procurement ${money(result.summary.totalRecommendedProcurementLakh)}.`);
+  } else if (scenarioLabel && comparison && isCausalQuestion(question)) {
     const fundingDelta = comparison.fundingNeedDeltaLakh;
     const baselineFundingNeed = fundingNeed - fundingDelta;
     const liquidityDelta = comparison.minimumFreeLiquidityAfterRecommendationsDeltaLakh;
     const procurementDelta = comparison.procurementLakhDelta;
-    const effectivelyZeroFundingDelta = Math.abs(fundingDelta) < 0.05;
-
-    if (effectivelyZeroFundingDelta) {
-      lines.push(
-        `Causal assessment: Scenario: ${scenarioLabel}. This scenario does not create additional modelled funding need versus the governed baseline. Both currently require ${money(fundingNeed)} of incremental liquidity.`,
-      );
-    } else if (fundingDelta > 0) {
-      lines.push(
-        `Causal assessment: Scenario: ${scenarioLabel}. The scenario increases modelled funding need by ${money(fundingDelta)}, from ${money(baselineFundingNeed)} in the governed baseline to ${money(fundingNeed)}.`,
-      );
-    } else {
-      lines.push(
-        `Causal assessment: Scenario: ${scenarioLabel}. The scenario reduces modelled funding need by ${money(Math.abs(fundingDelta))}, from ${money(baselineFundingNeed)} in the governed baseline to ${money(fundingNeed)}.`,
-      );
-    }
 
     lines.push(
-      `Scenario deltas versus baseline: expected units ${signedNumber(comparison.expectedUnitsDelta)}; recommended procurement ${signedMoney(procurementDelta)}; minimum free liquidity after recommendations ${signedMoney(liquidityDelta)}.`,
+      `Scenario impact: ${scenarioLabel} changes expected units by ${signedNumber(comparison.expectedUnitsDelta)} versus the governed baseline. Recommended procurement changes by ${signedMoney(procurementDelta)} and minimum free liquidity after recommendations changes by ${signedMoney(liquidityDelta)}.`,
+      `Funding effect: ${money(baselineFundingNeed)} baseline → ${money(fundingNeed)} scenario (${signedMoney(fundingDelta)}).`,
       `Liquidity timing: baseline first breach ${comparison.baseFirstLiquidityBreachPeriod ? `M${comparison.baseFirstLiquidityBreachPeriod}` : "none"}; scenario first breach ${comparison.scenarioFirstLiquidityBreachPeriod ? `M${comparison.scenarioFirstLiquidityBreachPeriod}` : "none"}${low ? `; scenario trough ${money(low.freeLiquidityAfterRecommendationsLakh)} at M${low.period}` : ""}.`,
     );
-
-    if (result.summary.totalRecommendedProcurementLakh === 0 && relevant(["inventory", "supply", "procurement"]).length > 0) {
-      lines.push(
-        "Data-quality caution: the packet contains supply/procurement findings but no recommended purchase value. The current smoke-test BOM/price coverage is insufficient to attribute a complete material-funding effect to this scenario.",
-      );
-    }
-
-    const nextActions = actions(["finance", "funding", "procurement"]);
+    const nextActions = actions(["demand", "planning", "finance", "funding", "procurement", "capacity"]);
     if (nextActions.length) lines.push(`Controlled next actions: ${nextActions.join(" ")}`);
   } else if (/fund(?:ing)?\s+(requirement|requirements|need|needs)|how much.*fund|additional fund|incremental fund/.test(q)) {
     lines.push(
@@ -230,7 +271,7 @@ function deterministicAnswer(
     if (/prevent|avoid|becoming negative|stay positive|keep.*positive|above zero/.test(q)) {
       lines.push(
         `Minimum modelled intervention: ${prefix}secure at least ${money(fundingNeed)} of incremental liquidity effective no later than ${firstBreach ? `M${firstBreach}` : "the first projected breach"}, or preserve the same amount through controlled cost/pace actions.`,
-        `${low ? `The current trough is ${money(low.freeLiquidityAfterRecommendationsLakh)} at M${low.period}. ` : ""}This amount prevents negative modeled free liquidity; a higher reserve-floor target may require more funding than the packet's incremental-need figure.`,
+        `${low ? `The current trough is ${money(low.freeLiquidityAfterRecommendationsLakh)} at M${low.period}. ` : ""}This amount prevents negative modelled free liquidity; a higher reserve-floor target may require more funding than the packet's incremental-need figure.`,
       );
     } else {
       lines.push(
@@ -243,13 +284,21 @@ function deterministicAnswer(
   } else if (/material|inventory|stock|purchase|procure|mrp|supplier|shortage|atp|msl/.test(q)) {
     const rows = [...result.supply]
       .filter((row) => row.committedFulfillmentShortageQty > 0 || row.recommendedPurchaseQty > 0)
-      .sort((a, b) => b.committedFulfillmentShortageQty - a.committedFulfillmentShortageQty)
+      .sort((a, b) =>
+        Number(b.recommendationIsLate) - Number(a.recommendationIsLate) ||
+        a.orderByPeriod - b.orderByPeriod ||
+        b.committedFulfillmentShortageQty - a.committedFulfillmentShortageQty ||
+        (b.purchaseCostLakh ?? 0) - (a.purchaseCostLakh ?? 0),
+      )
       .slice(0, 5);
     lines.push(
-      `Assessment: ${prefix}${result.summary.fulfillmentShortageSkuMonths} SKU-months have committed-supply shortages and recommended procurement totals ${money(result.summary.totalRecommendedProcurementLakh)}.`,
+      `Material priority: ${prefix}${result.summary.fulfillmentShortageSkuMonths} SKU-months have committed-supply shortages and recommended procurement totals ${money(result.summary.totalRecommendedProcurementLakh)}.`,
     );
     if (rows.length) {
-      lines.push(`Priority material rows: ${rows.map((row) => `${row.sku} M${row.period}: shortage ${row.committedFulfillmentShortageQty.toFixed(1)}, recommended buy ${row.recommendedPurchaseQty.toFixed(1)}${row.purchaseCostLakh == null ? "" : ` (${money(row.purchaseCostLakh)})`}`).join("; ")}.`);
+      lines.push(`Buy first: ${rows.map((row) => {
+        const timing = row.recommendationIsLate || row.orderByPeriod < 1 ? "late / immediate" : `order by M${row.orderByPeriod}`;
+        return `${row.sku} for M${row.period}: ${timing}, shortage ${row.committedFulfillmentShortageQty.toFixed(1)}, recommended buy ${row.recommendedPurchaseQty.toFixed(1)}${row.purchaseCostLakh == null ? "" : ` (${money(row.purchaseCostLakh)})`}`;
+      }).join("; ")}.`);
     }
     const nextActions = actions(["inventory", "supply", "procurement"]);
     if (nextActions.length) lines.push(`Controlled next actions: ${nextActions.join(" ")}`);
@@ -267,7 +316,7 @@ function deterministicAnswer(
     if (uniqueIssues.length) lines.push(`Highest-priority issues: ${uniqueIssues.slice(0, 4).map((item) => `${item.title} — ${item.recommendedAction}`).join(" ")}`);
   }
 
-  lines.push("Evidence: deterministic VYNDI IBPE decision packet. This is advisory analysis only; approvals and transactions remain in their owning workspaces.");
+  if (includeEvidence) lines.push("Evidence: deterministic VYNDI IBPE decision packet. This is advisory analysis only; approvals and transactions remain in their owning workspaces.");
   return lines.join("\n\n");
 }
 
@@ -277,6 +326,7 @@ function systemPrompt() {
     "You are an advisory exploration agent sitting on top of a deterministic Integrated Business Planning Engine.",
     "The deterministic IBPE packet is the authority for quantities, cash, MRP, ATP/MSL, capacity, funding and scenario deltas. Never invent or recompute numbers outside the supplied packet.",
     "Always distinguish plan, forecast, committed and actual truth. A scenario is hypothetical forecast analysis and must never be described as an approved plan or actual transaction.",
+    "If the user asks multiple distinct questions, answer every question separately and in the same order.",
     "If the user explicitly names a scenario, answer that named scenario rather than a stale UI scenario context.",
     "For causal scenario questions, compare the scenario with the governed baseline and use the supplied deltas. Correct a false premise if the scenario did not actually increase the metric the user asks about.",
     "Handle greetings and conversational small talk naturally and briefly instead of dumping the business-health packet.",
@@ -312,74 +362,111 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
     if (!data.question) return { ok: false, error: "Ask a question first.", advisoryOnly: true };
 
     const { sql, row } = await latestRun();
-    let result = row.result_json;
-    let scenarioContext: unknown = null;
-    let scenarioId: string | undefined;
-    let scenarioLabel: string | undefined;
-    let scenarioComparison: IbpeScenarioComparison | undefined;
-
-    const namedScenario = namedScenarioFromQuestion(data.question);
-    const effectiveScenario = namedScenario ?? (explicitlyRequestsBaseline(data.question) ? undefined : data.scenario);
-
-    if (effectiveScenario) {
-      const packet = await evaluateScenario(sql, effectiveScenario);
-      result = packet.result;
-      scenarioId = packet.scenario.id;
-      scenarioLabel = packet.scenario.label;
-      scenarioComparison = packet.comparison;
-      scenarioContext = {
-        scenario: packet.scenario,
-        comparisonVsGovernedBaseline: packet.comparison,
-      };
-    }
-
     const lineage = {
       governedRunId: row.id,
       approvedPlanRevision: Number(row.approved_plan_revision),
       inputHash: row.input_hash,
       sourceSha: row.source_sha,
     };
+    const questions = splitQuestions(data.question);
+    const scenarioCache = new Map<string, Awaited<ReturnType<typeof evaluateScenario>>>();
 
-    let answer = deterministicAnswer(data.question, result, scenarioLabel, scenarioComparison);
-    let mode: "ai" | "deterministic" = "deterministic";
-    const apiKey = isSmallTalk(data.question) ? undefined : process.env.XAI_API_KEY;
-
-    if (apiKey) {
-      const context = {
-        lineage,
-        scenario: scenarioContext,
-        ibpe: compactResult(result),
+    async function resolveQuestion(question: string) {
+      const namedScenario = namedScenarioFromQuestion(question);
+      const effectiveScenario = namedScenario ?? (explicitlyRequestsBaseline(question) ? undefined : data.scenario);
+      if (!effectiveScenario) {
+        return {
+          result: row.result_json,
+          scenarioId: undefined as string | undefined,
+          scenarioLabel: undefined as string | undefined,
+          scenarioComparison: undefined as IbpeScenarioComparison | undefined,
+          scenarioContext: null as unknown,
+        };
+      }
+      const key = JSON.stringify(effectiveScenario);
+      let packet = scenarioCache.get(key);
+      if (!packet) {
+        packet = await evaluateScenario(sql, effectiveScenario);
+        scenarioCache.set(key, packet);
+      }
+      return {
+        result: packet.result,
+        scenarioId: packet.scenario.id,
+        scenarioLabel: packet.scenario.label,
+        scenarioComparison: packet.comparison,
+        scenarioContext: {
+          scenario: packet.scenario,
+          comparisonVsGovernedBaseline: packet.comparison,
+        } as unknown,
       };
-      try {
-        const response = await fetch("https://api.x.ai/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model: "grok-4.5",
-            temperature: 0.2,
-            max_tokens: 900,
-            messages: [
-              { role: "system", content: systemPrompt() },
-              {
-                role: "user",
-                content: `Question: ${data.question}\n\nGoverned IBPE context:\n${JSON.stringify(context)}`,
-              },
-            ],
-          }),
-        });
-        if (response.ok) {
-          const body = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
-          const aiAnswer = body.choices?.[0]?.message?.content?.trim() ?? "";
-          if (aiAnswer) {
-            answer = aiAnswer;
-            mode = "ai";
+    }
+
+    let answer = "";
+    let mode: "ai" | "deterministic" = "deterministic";
+    let scenarioId: string | undefined;
+    const scenarioIds = new Set<string>();
+
+    if (questions.length > 1) {
+      const sections: string[] = [];
+      for (const [index, question] of questions.entries()) {
+        const resolved = await resolveQuestion(question);
+        if (resolved.scenarioId) scenarioIds.add(resolved.scenarioId);
+        sections.push(
+          `${index + 1}. ${question.replace(/\?\s*$/, "")}\n${deterministicAnswer(
+            question,
+            resolved.result,
+            resolved.scenarioLabel,
+            resolved.scenarioComparison,
+            false,
+          )}`,
+        );
+      }
+      if (scenarioIds.size === 1) scenarioId = [...scenarioIds][0];
+      answer = `${sections.join("\n\n")}\n\nEvidence: deterministic VYNDI IBPE decision packet. Each numbered answer uses the governed baseline unless that question explicitly requests, or the UI supplies, a scenario. This is advisory analysis only; approvals and transactions remain in their owning workspaces.`;
+    } else {
+      const resolved = await resolveQuestion(data.question);
+      scenarioId = resolved.scenarioId;
+      if (scenarioId) scenarioIds.add(scenarioId);
+      answer = deterministicAnswer(data.question, resolved.result, resolved.scenarioLabel, resolved.scenarioComparison);
+      const apiKey = isSmallTalk(data.question) ? undefined : process.env.XAI_API_KEY;
+
+      if (apiKey) {
+        const context = {
+          lineage,
+          scenario: resolved.scenarioContext,
+          ibpe: compactResult(resolved.result),
+        };
+        try {
+          const response = await fetch("https://api.x.ai/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model: "grok-4.5",
+              temperature: 0.2,
+              max_tokens: 900,
+              messages: [
+                { role: "system", content: systemPrompt() },
+                {
+                  role: "user",
+                  content: `Question: ${data.question}\n\nGoverned IBPE context:\n${JSON.stringify(context)}`,
+                },
+              ],
+            }),
+          });
+          if (response.ok) {
+            const body = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+            const aiAnswer = body.choices?.[0]?.message?.content?.trim() ?? "";
+            if (aiAnswer) {
+              answer = aiAnswer;
+              mode = "ai";
+            }
           }
+        } catch {
+          // Deterministic IBPE explanation remains available if the external AI service fails.
         }
-      } catch {
-        // Deterministic IBPE explanation remains available if the external AI service fails.
       }
     }
 
@@ -395,7 +482,14 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
         actor.userId,
         actor.role,
         `IBPE:${row.input_hash.slice(0,12)}`,
-        JSON.stringify({ questionHash, scenarioId: scenarioId ?? null, mode, answerChars: answer.length }),
+        JSON.stringify({
+          questionHash,
+          questionCount: questions.length,
+          scenarioId: scenarioId ?? null,
+          scenarioIds: [...scenarioIds],
+          mode,
+          answerChars: answer.length,
+        }),
       ],
     );
 
