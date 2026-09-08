@@ -22,6 +22,26 @@ export type ProcurementCostAuthorityRow = {
   costAuthority: "EPR-FIFO-ACTUAL" | "APPROVED-PURCHASE-ORDER" | "APPROVED-SUPPLIER-PRICE" | "APPROVED-PLANNING-PROCUREMENT-PRICE" | "MISSING";
 };
 
+export type ProcurementPriceRecord = {
+  id: string;
+  sku: string;
+  supplierId: string | null;
+  priceType: "supplier" | "planning";
+  unit: string;
+  unitPriceInr: number;
+  currency: string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  status: "draft" | "approved";
+  sourceReference: string;
+  notes: string;
+  createdBy: string;
+  approvedBy: string | null;
+  approvedAt: string | null;
+  updatedBy: string;
+  updatedAt: string;
+};
+
 export type ProcurementCogsReconciliation = {
   modelId: "core" | "pro" | "apex";
   modelLabel: "Longitude" | "Latitude" | "Altitude";
@@ -32,6 +52,26 @@ export type ProcurementCogsReconciliation = {
   variancePct?: number;
   coverageComplete: boolean;
   missingSkus: string[];
+};
+
+type ProcurementPriceDbRow = {
+  id: string;
+  sku: string;
+  supplier_id: string | null;
+  price_type: "supplier" | "planning";
+  unit: string;
+  unit_price_inr: number | string;
+  currency: string;
+  effective_from: string;
+  effective_to: string | null;
+  status: "draft" | "approved";
+  source_reference: string;
+  notes: string;
+  created_by: string;
+  approved_by: string | null;
+  approved_at: string | null;
+  updated_by: string;
+  updated_at: string;
 };
 
 function positive(value: unknown) {
@@ -54,6 +94,28 @@ function mapCostRow(row: Record<string, unknown>): ProcurementCostAuthorityRow {
     legacyReferencePriceInr: positive(row.legacy_reference_price_inr),
     governedCostInr: positive(row.governed_cost_inr),
     costAuthority: String(row.cost_authority) as ProcurementCostAuthorityRow["costAuthority"],
+  };
+}
+
+function mapPriceRow(row: ProcurementPriceDbRow): ProcurementPriceRecord {
+  return {
+    id: row.id,
+    sku: row.sku,
+    supplierId: row.supplier_id,
+    priceType: row.price_type,
+    unit: row.unit,
+    unitPriceInr: Number(row.unit_price_inr),
+    currency: row.currency,
+    effectiveFrom: row.effective_from,
+    effectiveTo: row.effective_to,
+    status: row.status,
+    sourceReference: row.source_reference,
+    notes: row.notes,
+    createdBy: row.created_by,
+    approvedBy: row.approved_by,
+    approvedAt: row.approved_at,
+    updatedBy: row.updated_by,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -80,7 +142,7 @@ export const getProcurementCostAuthorityReport = createServerFn({ method: "GET" 
     sql.query<{ finance_json: FinanceAssumptions }>(
       `select finance_json from vyndi_plan_revisions where status='approved' order by revision desc limit 1`,
     ),
-    sql.query<Record<string, unknown>>(
+    sql.query<ProcurementPriceDbRow>(
       `select id,sku,supplier_id,price_type,unit,unit_price_inr,currency,effective_from::text,effective_to::text,
               status,source_reference,notes,created_by,approved_by,approved_at::text,updated_by,updated_at::text
          from vyndi_procurement_prices
@@ -90,6 +152,7 @@ export const getProcurementCostAuthorityReport = createServerFn({ method: "GET" 
   ]);
 
   const costs = costRows.map(mapCostRow);
+  const prices = priceRows.map(mapPriceRow);
   const costBySku = new Map(costs.map((row) => [row.sku, row]));
   const finance = planRows[0]?.finance_json;
   const targets = new Map((finance?.productLines ?? []).map((line) => [line.id, Number(line.cogsLakh)]));
@@ -112,7 +175,7 @@ export const getProcurementCostAuthorityReport = createServerFn({ method: "GET" 
 
   return {
     costs,
-    prices: priceRows,
+    prices,
     reconciliation,
     summary: {
       activePlanningBomSkus: costs.length,
