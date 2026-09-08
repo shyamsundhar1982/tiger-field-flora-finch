@@ -7,7 +7,7 @@ import {
   type PlanningEngineOptions,
   type PlanningFinding,
   type PlanningSeverity,
-} from "@/lib/integrated-business-planning-engine";
+} from "./integrated-business-planning-engine.ts";
 
 /**
  * Workbook/runtime controls that must participate in the governed input hash.
