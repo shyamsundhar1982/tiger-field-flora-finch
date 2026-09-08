@@ -22,6 +22,12 @@ export type ProcurementCostAuthorityRow = {
   costAuthority: "EPR-FIFO-ACTUAL" | "APPROVED-PURCHASE-ORDER" | "APPROVED-SUPPLIER-PRICE" | "APPROVED-PLANNING-PROCUREMENT-PRICE" | "MISSING";
 };
 
+export type ProcurementSupplierOption = {
+  id: string;
+  name: string;
+  currency: string;
+};
+
 export type ProcurementPriceRecord = {
   id: string;
   sku: string;
@@ -127,7 +133,7 @@ async function requireView() {
 export const getProcurementCostAuthorityReport = createServerFn({ method: "GET" }).handler(async () => {
   await requireView();
   const sql = await getSql();
-  const [costRows, mappingRows, planRows, priceRows] = await Promise.all([
+  const [costRows, mappingRows, planRows, priceRows, supplierRows] = await Promise.all([
     sql.query<Record<string, unknown>>(
       `select * from vyndi_procurement_cost_authority where active_planning_bom=true order by sku`,
     ),
@@ -148,6 +154,9 @@ export const getProcurementCostAuthorityReport = createServerFn({ method: "GET" 
          from vyndi_procurement_prices
         where status<>'retired' and sku in (select sku from vyndi_procurement_cost_authority where active_planning_bom=true)
         order by sku,price_type,status,updated_at desc`,
+    ),
+    sql.query<ProcurementSupplierOption>(
+      `select id,name,currency from vyndi_suppliers where active=true and approval_status='approved' order by name,id`,
     ),
   ]);
 
@@ -176,6 +185,7 @@ export const getProcurementCostAuthorityReport = createServerFn({ method: "GET" 
   return {
     costs,
     prices,
+    suppliers: supplierRows,
     reconciliation,
     summary: {
       activePlanningBomSkus: costs.length,
