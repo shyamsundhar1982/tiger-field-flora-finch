@@ -6,19 +6,18 @@ import { canPerform } from "@/lib/page-access";
 import { requireBusinessActor } from "@/lib/business-actor";
 import { buildModelWithInputs, type FinanceAssumptions, type ProductLineId } from "@/lib/finance/model";
 import {
-  runIntegratedBusinessPlanningEngine,
   type BomRequirement,
   type CapacityPosition,
   type CashFlow,
   type DemandSignal,
-  type IntegratedPlanningInput,
   type IntegratedPlanningResult,
   type InventoryPosition,
   type InventoryReceipt,
   type InventoryReservation,
 } from "@/lib/integrated-business-planning-engine";
+import { runRuntimeIbpe, type RuntimeIbpeInput } from "@/lib/ibpe-runtime-parity";
 
-export const IBPE_ENGINE_VERSION = "VYNDI-IBPE-1.0.0";
+export const IBPE_ENGINE_VERSION = "VYNDI-IBPE-1.1.0";
 export type IbpeValidation = Record<string, JsonValue>;
 
 export type IbpeRun = {
@@ -232,9 +231,12 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
   );
   for (const r of collectionRows) cashFlows.push({ id:`actual-sales-${r.plan_month}`,businessKey:`sales-M${r.plan_month}`,period:Number(r.plan_month),direction:"inflow",amountLakh:Number(r.amount),truth:"actual",category:"collections",sourceRef:"COLLECTION-LEDGER" });
 
-  const input: IntegratedPlanningInput = {
+  const input: RuntimeIbpeInput = {
     demand,bom,inventory,reservations,receipts,capacity,cashFlows,
     funding:{ openingBankCashLakh:finance.openingCashLakh,minimumOperatingReserveLakh:finance.operatingPlan.cashFloorLakh,restrictedCashLakh:0,fundraisingLeadMonths:3 },
+    runtimeControls:{
+      paymentLagBySku:Object.fromEntries(supplyParameterRows.map((row) => [row.sku, Number(row.payment_lag_months)])),
+    },
   };
   const validation: IbpeValidation = {
     approvedPlan:`${plan.id}:R${plan.revision}`,
@@ -247,10 +249,12 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
     supplyPlanningParameters:supplyParameterRows.length,
     supplyPlanningDefaults:supplyParameterRows.filter((r) => r.planning_status === "planning-default").length,
     paymentLagParameters:supplyParameterRows.filter((r) => Number(r.payment_lag_months) > 0).length,
-    paymentLagRuntimeParity:"recorded-not-applied-stage-1",
+    paymentLagRuntimeParity:"applied-stage-2",
+    paymentLagAuthority:"vyndi_supply_planning_parameters.payment_lag_months",
     capacityStandards:capacityStandardRows.length,
     capacityConstraints:capacity.length,
     capacityAuthority:"vyndi_capacity_standards",
+    capacitySummarySemantics:"unique-shortfall-months-stage-2",
     planningInputs:["vyndi_supply_planning_parameters","vyndi_capacity_standards"],
     transactionInputs:["vyndi_sales_orders","vyndi_invoices","epr_bom_inventory_mappings","vyndi_inventory_available_to_promise","epr_inventory_reservations","vyndi_open_purchase_orders","vyndi_collections"],
   };
@@ -272,7 +276,7 @@ export const runGovernedIbpe = createServerFn({ method:"POST" }).handler(async (
   const plan = await approvedPlan(sql);
   const { input, validation } = await buildGovernedInput(sql, plan);
   const inputHash = sha256(input);
-  const result = runIntegratedBusinessPlanningEngine(input, { horizonMonths:36 });
+  const result = runRuntimeIbpe(input, { horizonMonths:36 });
   const sha = sourceSha();
   const snapshotAt = new Date().toISOString();
   const id = `IBPE-${plan.revision}-${inputHash.slice(0,12)}-${sha.slice(0,7)}`;

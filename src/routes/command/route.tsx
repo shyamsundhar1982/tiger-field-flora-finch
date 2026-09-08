@@ -1,5 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { CommandShell } from "@/components/command-shell";
+import { IbpeCopilot } from "@/components/ibpe-copilot";
 import { IbpeWorkspaceProjection } from "@/components/ibpe-workspace-projection";
 import { getCommandAccess, getCommandRole } from "@/lib/command-access";
 import { canAccessRoute } from "@/lib/page-access";
@@ -23,5 +24,5 @@ export const Route = createFileRoute("/command")({
 
 function CommandRoot() {
   useOperatingPlanSync();
-  return <><IbpeWorkspaceProjection /><CommandShell /></>;
+  return <><IbpeWorkspaceProjection /><CommandShell /><IbpeCopilot /></>;
 }
