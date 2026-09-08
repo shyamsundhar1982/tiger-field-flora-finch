@@ -11,18 +11,25 @@ export const getProductionJobCardView = createServerFn({ method: "GET" }).handle
   const [orders, cards, lines, travellers] = await Promise.all([
     sql`
       select o.id,o.revision,o.plan_month,o.units,o.variant_id,o.variant_name,o.status,
-             c.id as job_card_id,c.status as job_card_status,c.sales_order_revision as job_card_revision
+             c.id as job_card_id,c.status as job_card_status,c.sales_order_revision as job_card_revision,
+             c.batch_code,c.approved_at::text as job_card_approved_at
         from vyndi_sales_orders o
         left join epr_production_job_cards c on c.sales_order_id=o.id
        where o.status='confirmed'
        order by o.plan_month,o.id
     `,
     sql`
-      select id,sales_order_id,sales_order_revision,product_id,product_label,units,bom_tier,due_month,status,
-             production_owner,created_by,model_tier,variant_id,configuration,bom_revision,released_mapping_set,
-             created_at::text as created_at,updated_at::text as updated_at
-        from epr_production_job_cards
-       order by due_month asc,created_at desc limit 500
+      select c.id,c.sales_order_id,c.sales_order_revision,c.product_id,c.product_label,c.units,c.bom_tier,c.due_month,c.status,
+             c.production_owner,c.created_by,c.model_tier,c.variant_id,c.configuration,c.bom_revision,c.released_mapping_set,
+             c.batch_code,c.approved_by,c.approved_at::text as approved_at,
+             coalesce(p.po_draft_count,0)::int as po_draft_count,
+             c.created_at::text as created_at,c.updated_at::text as updated_at
+        from epr_production_job_cards c
+        left join (
+          select job_card_id,count(*) filter (where status='draft') as po_draft_count
+            from vyndi_purchase_orders where auto_generated=true group by job_card_id
+        ) p on p.job_card_id=c.id
+       order by c.due_month asc,c.created_at desc limit 500
     `,
     sql`
       select l.id,l.job_card_id,l.stage_no,l.stage_code,l.stage_name,l.line_type,l.source_bom_line,
@@ -43,7 +50,7 @@ export const getProductionJobCardView = createServerFn({ method: "GET" }).handle
              t.created_by,t.created_at::text as created_at,t.updated_at::text as updated_at
         from epr_travellers t
         left join epr_production_job_cards c on c.id=t.job_card_id
-       order by t.created_at desc,t.serial_number asc limit 250
+       order by t.created_at desc,t.serial_number asc limit 500
     `,
   ]);
   return { orders, cards, lines, travellers };
