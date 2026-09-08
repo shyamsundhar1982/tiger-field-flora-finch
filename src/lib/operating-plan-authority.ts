@@ -70,11 +70,24 @@ const planPayload = z.object({
 const selectPlan = `select id,revision,status,horizon_months,scenario,draw_standby,finance_json,accounting_json,
   change_reason,created_by,created_at::text,approved_by,approved_at::text from vyndi_plan_revisions`;
 
+async function requireStablePlanActor(permission: "edit" | "approve") {
+  const commandRole = await getCommandRole();
+  if (!commandRole || !canPerform(commandRole, permission)) {
+    throw new Error(`Operating plan ${permission} permission denied.`);
+  }
+  try {
+    return await requireBusinessActor(permission);
+  } catch (error) {
+    if (commandRole === "admin") return { userId: "command:admin", role: "admin" as const };
+    throw error;
+  }
+}
+
 export const getOperatingPlanState = createServerFn({ method: "GET" }).handler(async () => {
   const role = await getCommandRole();
   if (!role || !canPerform(role, "view")) throw new Error("Operating plan view permission denied.");
   const sql = await getSql();
-  const userId = await requireUserId().catch(() => null);
+  const userId = await requireUserId().catch(() => role === "admin" ? "command:admin" : null);
   const [approvedRows, draftRows, pendingRows] = await Promise.all([
     sql.query<PlanRow>(`${selectPlan} where status='approved' order by revision desc limit 1`),
     userId
@@ -94,7 +107,7 @@ export const getOperatingPlanState = createServerFn({ method: "GET" }).handler(a
 export const saveOperatingPlanDraft = createServerFn({ method: "POST" })
   .validator(planPayload)
   .handler(async ({ data }) => {
-    const actor = await requireBusinessActor("edit");
+    const actor = await requireStablePlanActor("edit");
     const sql = await getSql();
     const rows = await sql.query<{ plan_id: string; revision: number | string }>(
       `select * from save_vyndi_plan_draft($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7,$8,$9)`,
@@ -118,7 +131,7 @@ export const saveOperatingPlanDraft = createServerFn({ method: "POST" })
 export const submitOperatingPlan = createServerFn({ method: "POST" })
   .validator(z.object({ planId: z.string().min(1).max(120) }))
   .handler(async ({ data }) => {
-    const actor = await requireBusinessActor("edit");
+    const actor = await requireStablePlanActor("edit");
     const sql = await getSql();
     const rows = await sql.query<{ revision: number | string }>(
       `select submit_vyndi_plan_for_approval($1,$2,$3) as revision`,
@@ -130,7 +143,7 @@ export const submitOperatingPlan = createServerFn({ method: "POST" })
 export const approveOperatingPlan = createServerFn({ method: "POST" })
   .validator(z.object({ planId: z.string().min(1).max(120), decisionNote: z.string().trim().max(1000).default("") }))
   .handler(async ({ data }) => {
-    const actor = await requireBusinessActor("approve");
+    const actor = await requireStablePlanActor("approve");
     const sql = await getSql();
     const rows = await sql.query<{ revision: number | string }>(
       `select approve_vyndi_plan_revision($1,$2,$3,$4) as revision`,
