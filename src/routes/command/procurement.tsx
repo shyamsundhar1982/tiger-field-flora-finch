@@ -32,8 +32,8 @@ function Procurement() {
             automatically.
           </p>
         </div>
-        <Link to="/command/inventory-truth" className="text-sm font-semibold text-accent">
-          Inventory truth →
+        <Link to="/command/purchase-execution" className="text-sm font-semibold text-accent">
+          Purchase execution →
         </Link>
       </div>
 
@@ -48,10 +48,10 @@ function Procurement() {
       </div>
       <div className="mt-8 flex flex-wrap gap-2 text-xs">
         <Link
-          to="/command/inventory-truth"
+          to="/command/inventory"
           className="rounded-lg border border-border px-3 py-2 font-semibold text-muted hover:border-accent hover:text-accent"
         >
-          Verify posted balance →
+          Verify stock & ATP →
         </Link>
         <Link
           to="/command/procurement-planning"

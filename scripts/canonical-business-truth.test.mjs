@@ -141,3 +141,56 @@ test("Stage 2 order → shipment → invoice → receivable → collection gate 
   const audit=await db.query(`select action from vyndi_audit_events where entity_id in ('SHIP-STAGE2','INV-STAGE2','COL-STAGE2') order by created_at`);
   assert.deepEqual(audit.rows.map((row)=>row.action).sort(),["issued","posted","posted","reversed","reversed","voided"].sort());
 });
+
+test("recommendation → PO approval → GRN/FIFO → three-way match → payment is controlled", async (t) => {
+  const db=await createCanonicalDb(); t.after(()=>db.close());
+  await db.query(`insert into master_inventory_items
+    (id,ledger_id,sku,name,category,unit,minimum_stock_level,planned_monthly_use,created_by,updated_by)
+    values ('ITEM-P2P','components','P2P-SKU','Controlled P2P item','test','ea',1,1,'test','test')`);
+  await db.query(`select upsert_vyndi_supplier($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+    ['SUP-P2P','Controlled Supplier','INR',30,30,'approved',95,94,'QUAL-P2P','approver','operations','AUD-SUP-P2P']);
+  const supplierAudit=await db.query(`select action from vyndi_audit_events where id='AUD-SUP-P2P'`);
+  assert.equal(supplierAudit.rows[0].action,'upserted');
+
+  const po=await db.query(`select create_vyndi_purchase_order($1,$2,$3,$4,$5,$6,$7,$8,$9::date,$10::date,$11,$12,$13,$14,$15) as id`,
+    ['PO-P2P','SUP-P2P','',4,'P2P-SKU','ea',10,100,'2026-01-01','2026-02-01',30,'QUOTE-P2P','test order','buyer-1','operations']);
+  assert.equal(po.rows[0].id,'PO-P2P');
+  await assert.rejects(()=>db.query(`select transition_vyndi_purchase_order($1,$2,$3,$4,$5)`,['PO-P2P','approved','APP-P2P','buyer-1','operations']),/different authorised user/);
+  await db.query(`select transition_vyndi_purchase_order($1,$2,$3,$4,$5)`,['PO-P2P','approved','APP-P2P','approver-2','operations']);
+  await db.query(`select transition_vyndi_purchase_order($1,$2,$3,$4,$5)`,['PO-P2P','issued','ISSUE-P2P','buyer-1','operations']);
+
+  await db.query(`select post_vyndi_goods_receipt($1,$2,$3::date,$4,$5,$6,$7,$8,$9,$10,$11)`,
+    ['GRN-P2P-Q','PO-P2P','2026-01-31',2,0,0,'quarantine','DN-P2P-Q','awaiting disposition','receiver-1','operations']);
+  const quarantined=await db.query(`select quantity_quarantined,inventory_movement_id from vyndi_goods_receipts where id='GRN-P2P-Q'`);
+  assert.equal(Number(quarantined.rows[0].quantity_quarantined),2); assert.equal(quarantined.rows[0].inventory_movement_id,null);
+  await db.query(`select resolve_vyndi_goods_receipt($1,$2,$3::date,$4,$5,$6)`,
+    ['GRN-P2P-Q','rejected','2026-02-01','NCR-P2P-Q','qa-user','operations']);
+  const disposition=await db.query(`select inspection_status,quantity_quarantined,quantity_rejected from vyndi_goods_receipts where id='GRN-P2P-Q'`);
+  assert.equal(disposition.rows[0].inspection_status,'rejected'); assert.equal(Number(disposition.rows[0].quantity_quarantined),0); assert.equal(Number(disposition.rows[0].quantity_rejected),2);
+
+  await db.query(`select post_vyndi_goods_receipt($1,$2,$3::date,$4,$5,$6,$7,$8,$9,$10,$11)`,
+    ['GRN-P2P','PO-P2P','2026-02-01',5,5,0,'accepted','DN-P2P','accepted batch','receiver-1','operations']);
+  const stock=await db.query(`select physical_quantity,available_to_promise from vyndi_inventory_available_to_promise where sku='P2P-SKU' and unit='ea'`);
+  assert.equal(Number(stock.rows[0].physical_quantity),5); assert.equal(Number(stock.rows[0].available_to_promise),5);
+  const openPo=await db.query(`select open_po_quantity from vyndi_open_purchase_orders where sku='P2P-SKU' and unit='ea'`);
+  assert.equal(Number(openPo.rows[0].open_po_quantity),5);
+
+  const invoice=await db.query(`select * from post_vyndi_supplier_invoice($1,$2,$3,$4::date,$5,$6,$7,$8,$9,$10)`,
+    ['AP-P2P','PO-P2P','SUPINV-P2P','2026-02-02',5,500,90,'INVFILE-P2P','ap-user-1','finance']);
+  assert.equal(invoice.rows[0].match_status,'matched');
+  await assert.rejects(()=>db.query(`select approve_vyndi_supplier_invoice($1,$2,$3)`,['AP-P2P','ap-user-1','finance']),/different authorised user/);
+  await db.query(`select approve_vyndi_supplier_invoice($1,$2,$3)`,['AP-P2P','ap-approver-2','finance']);
+  await db.query(`select post_vyndi_supplier_payment($1,$2,$3::date,$4,$5,$6,$7)`,['PAY-P2P','AP-P2P','2026-03-04',590,'BANK-P2P','ap-user-1','finance']);
+  const payable=await db.query(`select status,amount_open_inr from vyndi_accounts_payable where id='AP-P2P'`);
+  assert.equal(payable.rows[0].status,'paid'); assert.equal(Number(payable.rows[0].amount_open_inr),0);
+
+  await db.query(`select post_vyndi_goods_receipt($1,$2,$3::date,$4,$5,$6,$7,$8,$9,$10,$11)`,
+    ['GRN-P2P-MIXED','PO-P2P','2026-02-03',6,5,1,'accepted','DN-P2P-MIXED','replacement plus rejection','receiver-1','operations']);
+  const completedPo=await db.query(`select status,quantity_accepted,quantity_received from vyndi_purchase_order_status where id='PO-P2P'`);
+  assert.equal(completedPo.rows[0].status,'received'); assert.equal(Number(completedPo.rows[0].quantity_accepted),10); assert.equal(Number(completedPo.rows[0].quantity_received),13);
+
+  const blocked=await db.query(`select * from post_vyndi_supplier_invoice($1,$2,$3,$4::date,$5,$6,$7,$8,$9,$10)`,
+    ['AP-P2P-BLOCK','PO-P2P','SUPINV-P2P-BLOCK','2026-02-02',6,600,108,'INVFILE-P2P-BLOCK','ap-user-1','finance']);
+  assert.equal(blocked.rows[0].match_status,'blocked');
+  await assert.rejects(()=>db.query(`select approve_vyndi_supplier_invoice($1,$2,$3)`,['AP-P2P-BLOCK','ap-approver-2','finance']),/three-way-matched/);
+});

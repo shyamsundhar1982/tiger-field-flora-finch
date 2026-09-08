@@ -39,7 +39,7 @@ function SupplyProduction() {
       tone: item.status === "critical" ? "danger" : "warn",
       title: `${item.sku} · ${item.status === "critical" ? "stockout" : "below MSL"}`,
       detail: `${Number(item.quantity_balance)} on hand · MSL ${Number(item.minimum_stock_level)} · shortfall ${Number(item.shortage_quantity)}`,
-      to: "/command/procurement",
+      to: "/command/procurement-planning",
     })),
     ...(openManufacturing.length
       ? [{
@@ -73,7 +73,7 @@ function SupplyProduction() {
       signal: stockAlerts ? `${stockAlerts} MSL alert${stockAlerts === 1 ? "" : "s"}` : "No MSL alerts",
       status: stockAlerts ? "Attention" : "Healthy",
       rule: "Validate supplier, MOQ, lead time, price and approval before PO release.",
-      to: "/command/procurement",
+      to: "/command/purchase-execution",
     },
     {
       area: "Inventory",
@@ -81,6 +81,13 @@ function SupplyProduction() {
       status: critical ? "Attention" : "Controlled",
       rule: "Receipts create FIFO layers; issues consume oldest available stock first.",
       to: "/command/inventory",
+    },
+    {
+      area: "Receiving",
+      signal: "Issued PO → GRN → incoming inspection",
+      status: "Controlled",
+      rule: "Only accepted GRN quantity creates FIFO stock; quarantine and rejection stay outside ATP.",
+      to: "/command/receiving",
     },
     {
       area: "Production",

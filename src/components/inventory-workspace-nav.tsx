@@ -4,6 +4,7 @@ import { INVENTORY_CONTROL_PAGES, MASTER_INVENTORY_LEDGER_PAGES } from "@/lib/in
 export function InventoryWorkspaceNav({ active }: { active?: string }) {
   const stockLedgers = MASTER_INVENTORY_LEDGER_PAGES.filter((page) => page.group === "Stock");
   const assetLedgers = MASTER_INVENTORY_LEDGER_PAGES.filter((page) => page.group === "Assets");
+  const showControlSetup = INVENTORY_CONTROL_PAGES.some((page) => page.id === active);
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-subtle">
@@ -15,7 +16,7 @@ export function InventoryWorkspaceNav({ active }: { active?: string }) {
           Ledger control
         </Link>
       </div>
-      <div>
+      {showControlSetup ? <div>
         <p className="mb-1 text-[10px] uppercase tracking-[0.14em] text-subtle">Control setup</p>
         <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Inventory control pages">
           {INVENTORY_CONTROL_PAGES.map((page) => (
@@ -28,7 +29,7 @@ export function InventoryWorkspaceNav({ active }: { active?: string }) {
             </Link>
           ))}
         </div>
-      </div>
+      </div> : null}
       <div>
         <p className="mb-1 text-[10px] uppercase tracking-[0.14em] text-subtle">
           Stock & replenishment
