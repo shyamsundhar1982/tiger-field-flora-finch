@@ -182,7 +182,9 @@ export async function evaluateScenario(sql: Sql, rawScenario: IbpeScenarioReques
   const snapshot = await latestSnapshot(sql);
   const scenario = sanitizeScenario(rawScenario);
   const scenarioInput = applyIbpeScenario(snapshot.input_json, scenario);
-  const baseline = runIntegratedBusinessPlanningEngine(snapshot.input_json, { horizonMonths: 36 });
+  // The persisted result is the governed baseline. Do not silently regenerate it
+  // under a different source revision and then call that regenerated value "baseline".
+  const baseline = snapshot.result_json;
   const result = runIntegratedBusinessPlanningEngine(scenarioInput, { horizonMonths: 36 });
   return {
     lineage: {
