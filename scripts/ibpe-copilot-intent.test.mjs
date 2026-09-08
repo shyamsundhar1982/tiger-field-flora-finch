@@ -46,7 +46,7 @@ test("IBPE multi-metric questions return a deterministic executive assessment be
   assert.match(copilot, /Procurement cost authority:/);
   assert.match(copilot, /activePlanningBomMissingCostSkus/);
   assert.match(copilot, /bomCogsReconciliation/);
-  assert.match(copilot, /executiveAssessment \? undefined : process\.env\.XAI_API_KEY/);
+  assert.match(copilot, /isSmallTalk\(data\.question\) \|\| executiveAssessment \? undefined : process\.env\.XAI_API_KEY/);
   const executiveBranch = copilot.indexOf("if (isExecutiveAssessmentQuestion(question))");
   const singleFundingBranch = copilot.indexOf("else if (/fund(?:ing)?");
   assert.ok(executiveBranch >= 0 && singleFundingBranch > executiveBranch, "executive routing must precede single-domain funding routing");
