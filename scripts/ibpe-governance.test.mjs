@@ -48,7 +48,7 @@ test("Stage 2 IBPE is deterministic and governed run persistence is idempotent/a
   const args=["IBPE-TEST-1","VYNDI-IBPE-1.1.0","abcdef0123456789",inputHash,"PLAN-TEST",1,"base",new Date("2026-09-08T00:00:00Z").toISOString(),JSON.stringify(input),JSON.stringify(first),JSON.stringify({gate:"stage-2-test",paymentLagRuntimeParity:"applied-stage-2"}),"tester","operations"];
   const stored=await pg.query(`select persist_vyndi_ibpe_run($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11::jsonb,$12,$13) as id`,args);
   assert.equal(stored.rows[0].id,"IBPE-TEST-1");
-  const duplicate=await pg.query(`select persist_vyndi_ibpe_run($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12,$13) as id`,[...args.slice(0,0),"IBPE-TEST-DUP",...args.slice(1)]).catch(async () => pg.query(`select persist_vyndi_ibpe_run($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11::jsonb,$12,$13) as id`,[...args.slice(0,0),"IBPE-TEST-DUP",...args.slice(1)]));
+  const duplicate=await pg.query(`select persist_vyndi_ibpe_run($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11::jsonb,$12,$13) as id`,[...args.slice(0,0),"IBPE-TEST-DUP",...args.slice(1)]);
   assert.equal(duplicate.rows[0].id,"IBPE-TEST-1","same engine/SHA/hash/plan revision must resolve to original run");
   const runRows=await pg.query(`select engine_version,input_hash,approved_plan_revision,status,input_json,validation_json from vyndi_ibpe_runs`);
   assert.equal(runRows.rows.length,1);
