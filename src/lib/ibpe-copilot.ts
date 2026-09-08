@@ -2,7 +2,11 @@ import { createHash } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { getSql } from "@/lib/db";
 import { requireBusinessActor } from "@/lib/business-actor";
-import { evaluateScenario, type IbpeScenarioRequest } from "@/lib/ibpe-scenario-lab";
+import {
+  evaluateScenario,
+  type IbpeScenarioComparison,
+  type IbpeScenarioRequest,
+} from "@/lib/ibpe-scenario-lab";
 import type { IntegratedPlanningResult } from "@/lib/integrated-business-planning-engine";
 
 export type IbpeCopilotRequest = {
@@ -52,6 +56,16 @@ function sanitizeQuestion(value: unknown) {
 
 function money(value: number) {
   return `₹${Number(value || 0).toFixed(1)}L`;
+}
+
+function signedMoney(value: number) {
+  const amount = Number(value || 0);
+  return `${amount >= 0 ? "+" : "−"}₹${Math.abs(amount).toFixed(1)}L`;
+}
+
+function signedNumber(value: number, digits = 0) {
+  const amount = Number(value || 0);
+  return `${amount >= 0 ? "+" : ""}${amount.toFixed(digits)}`;
 }
 
 function namedScenarioFromQuestion(question: string): IbpeScenarioRequest | undefined {
@@ -109,6 +123,12 @@ function isSmallTalk(question: string) {
   return /^(hi|hello|hey|good morning|good afternoon|good evening|how are you|how r you)$/.test(q);
 }
 
+function isCausalQuestion(question: string) {
+  return /\b(why|cause|caused|create|created|increase|increased|change|changed|impact|effect|affect|affected)\b/.test(
+    question.toLowerCase(),
+  );
+}
+
 function compactResult(result: IntegratedPlanningResult) {
   const supply = [...result.supply]
     .filter((row) => row.committedFulfillmentShortageQty > 0 || row.recommendedPurchaseQty > 0)
@@ -138,7 +158,12 @@ function compactResult(result: IntegratedPlanningResult) {
   };
 }
 
-function deterministicAnswer(question: string, result: IntegratedPlanningResult, scenarioLabel?: string) {
+function deterministicAnswer(
+  question: string,
+  result: IntegratedPlanningResult,
+  scenarioLabel?: string,
+  comparison?: IbpeScenarioComparison,
+) {
   const q = question.toLowerCase();
   const prefix = scenarioLabel ? `Scenario: ${scenarioLabel}. ` : "Governed baseline. ";
   const findings = result.findings;
@@ -154,8 +179,43 @@ function deterministicAnswer(question: string, result: IntegratedPlanningResult,
   const low = [...result.cash].sort((a, b) => a.freeLiquidityAfterRecommendationsLakh - b.freeLiquidityAfterRecommendationsLakh)[0];
   const firstBreach = result.funding.firstLiquidityBreachAfterRecommendationsPeriod;
   const fundingNeed = result.funding.incrementalFundingNeedLakh;
+  const asksAboutFunding = /cash|fund|liquid|budget|runway|money|finance/.test(q);
 
-  if (/fund(?:ing)?\s+(requirement|requirements|need|needs)|how much.*fund|additional fund|incremental fund/.test(q)) {
+  if (scenarioLabel && comparison && isCausalQuestion(question) && asksAboutFunding) {
+    const fundingDelta = comparison.fundingNeedDeltaLakh;
+    const baselineFundingNeed = fundingNeed - fundingDelta;
+    const liquidityDelta = comparison.minimumFreeLiquidityAfterRecommendationsDeltaLakh;
+    const procurementDelta = comparison.procurementLakhDelta;
+    const effectivelyZeroFundingDelta = Math.abs(fundingDelta) < 0.05;
+
+    if (effectivelyZeroFundingDelta) {
+      lines.push(
+        `Causal assessment: Scenario: ${scenarioLabel}. This scenario does not create additional modelled funding need versus the governed baseline. Both currently require ${money(fundingNeed)} of incremental liquidity.`,
+      );
+    } else if (fundingDelta > 0) {
+      lines.push(
+        `Causal assessment: Scenario: ${scenarioLabel}. The scenario increases modelled funding need by ${money(fundingDelta)}, from ${money(baselineFundingNeed)} in the governed baseline to ${money(fundingNeed)}.`,
+      );
+    } else {
+      lines.push(
+        `Causal assessment: Scenario: ${scenarioLabel}. The scenario reduces modelled funding need by ${money(Math.abs(fundingDelta))}, from ${money(baselineFundingNeed)} in the governed baseline to ${money(fundingNeed)}.`,
+      );
+    }
+
+    lines.push(
+      `Scenario deltas versus baseline: expected units ${signedNumber(comparison.expectedUnitsDelta)}; recommended procurement ${signedMoney(procurementDelta)}; minimum free liquidity after recommendations ${signedMoney(liquidityDelta)}.`,
+      `Liquidity timing: baseline first breach ${comparison.baseFirstLiquidityBreachPeriod ? `M${comparison.baseFirstLiquidityBreachPeriod}` : "none"}; scenario first breach ${comparison.scenarioFirstLiquidityBreachPeriod ? `M${comparison.scenarioFirstLiquidityBreachPeriod}` : "none"}${low ? `; scenario trough ${money(low.freeLiquidityAfterRecommendationsLakh)} at M${low.period}` : ""}.`,
+    );
+
+    if (result.summary.totalRecommendedProcurementLakh === 0 && relevant(["inventory", "supply", "procurement"]).length > 0) {
+      lines.push(
+        "Data-quality caution: the packet contains supply/procurement findings but no recommended purchase value. The current smoke-test BOM/price coverage is insufficient to attribute a complete material-funding effect to this scenario.",
+      );
+    }
+
+    const nextActions = actions(["finance", "funding", "procurement"]);
+    if (nextActions.length) lines.push(`Controlled next actions: ${nextActions.join(" ")}`);
+  } else if (/fund(?:ing)?\s+(requirement|requirements|need|needs)|how much.*fund|additional fund|incremental fund/.test(q)) {
     lines.push(
       `Funding requirement: ${prefix}${money(fundingNeed)} of incremental liquidity is required in the current model to prevent free liquidity from remaining negative.`,
       `Timing: the first post-recommendation liquidity breach is ${firstBreach ? `M${firstBreach}` : "not present in the 36-month horizon"}${low ? `; the lowest modelled point is ${money(low.freeLiquidityAfterRecommendationsLakh)} at M${low.period}` : ""}.`,
@@ -166,7 +226,7 @@ function deterministicAnswer(question: string, result: IntegratedPlanningResult,
     }
     const nextActions = actions(["finance", "funding", "procurement"]);
     if (nextActions.length) lines.push(`Controlled next actions: ${nextActions.join(" ")}`);
-  } else if (/cash|fund|liquid|budget|runway|money|finance/.test(q)) {
+  } else if (asksAboutFunding) {
     if (/prevent|avoid|becoming negative|stay positive|keep.*positive|above zero/.test(q)) {
       lines.push(
         `Minimum modelled intervention: ${prefix}secure at least ${money(fundingNeed)} of incremental liquidity effective no later than ${firstBreach ? `M${firstBreach}` : "the first projected breach"}, or preserve the same amount through controlled cost/pace actions.`,
@@ -218,6 +278,7 @@ function systemPrompt() {
     "The deterministic IBPE packet is the authority for quantities, cash, MRP, ATP/MSL, capacity, funding and scenario deltas. Never invent or recompute numbers outside the supplied packet.",
     "Always distinguish plan, forecast, committed and actual truth. A scenario is hypothetical forecast analysis and must never be described as an approved plan or actual transaction.",
     "If the user explicitly names a scenario, answer that named scenario rather than a stale UI scenario context.",
+    "For causal scenario questions, compare the scenario with the governed baseline and use the supplied deltas. Correct a false premise if the scenario did not actually increase the metric the user asks about.",
     "Handle greetings and conversational small talk naturally and briefly instead of dumping the business-health packet.",
     "Never repeat an identical recommendation merely because several findings carry the same action.",
     "You may recommend actions, trade-offs and questions to investigate, but you must never claim that you created a purchase order, reservation, job card, accounting posting, funding draw, approval or plan revision.",
@@ -255,6 +316,7 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
     let scenarioContext: unknown = null;
     let scenarioId: string | undefined;
     let scenarioLabel: string | undefined;
+    let scenarioComparison: IbpeScenarioComparison | undefined;
 
     const namedScenario = namedScenarioFromQuestion(data.question);
     const effectiveScenario = namedScenario ?? (explicitlyRequestsBaseline(data.question) ? undefined : data.scenario);
@@ -264,6 +326,7 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
       result = packet.result;
       scenarioId = packet.scenario.id;
       scenarioLabel = packet.scenario.label;
+      scenarioComparison = packet.comparison;
       scenarioContext = {
         scenario: packet.scenario,
         comparisonVsGovernedBaseline: packet.comparison,
@@ -277,7 +340,7 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
       sourceSha: row.source_sha,
     };
 
-    let answer = deterministicAnswer(data.question, result, scenarioLabel);
+    let answer = deterministicAnswer(data.question, result, scenarioLabel, scenarioComparison);
     let mode: "ai" | "deterministic" = "deterministic";
     const apiKey = isSmallTalk(data.question) ? undefined : process.env.XAI_API_KEY;
 
