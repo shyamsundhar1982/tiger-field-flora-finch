@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "@tanstack/react-router";
-import { getLatestIbpeRun, runGovernedIbpe, type IbpeRun } from "@/lib/ibpe-authority";
+import { getIbpeReadiness, getLatestIbpeRun, runGovernedIbpe, type IbpeReadiness, type IbpeRun } from "@/lib/ibpe-authority";
 
 const workspaceDomains: Array<{ routes:string[]; label:string; domains:string[] }> = [
   { routes:["/command/planning","/command/finance-assumptions","/command/scenarios"], label:"Planning", domains:["planning","demand","funding"] },
@@ -30,21 +30,29 @@ function isUsableRun(value: unknown): value is IbpeRun {
     && Array.isArray(result.findings);
 }
 
+function readinessStatus(readiness: IbpeReadiness) {
+  if (readiness.ready) return "Ready to create governed IBPE baseline";
+  const labels = readiness.checks.filter((check) => !check.ready).map((check) => check.label);
+  return `Setup required: ${labels.join(" · ")}`;
+}
+
 export function IbpeWorkspaceProjection() {
   const { pathname } = useLocation();
   const current = workspace(pathname);
   const [run,setRun] = useState<IbpeRun|null>(null);
+  const [readiness,setReadiness] = useState<IbpeReadiness|null>(null);
   const [status,setStatus] = useState("Loading IBPE decision packet…");
   const [busy,setBusy] = useState(false);
 
   useEffect(() => {
     let live=true;
-    void getLatestIbpeRun()
-      .then((value) => {
+    void Promise.all([getLatestIbpeRun(),getIbpeReadiness()])
+      .then(([value,nextReadiness]) => {
         if (!live) return;
+        setReadiness(nextReadiness);
         if (value == null) {
           setRun(null);
-          setStatus("No governed IBPE run yet");
+          setStatus(readinessStatus(nextReadiness));
           return;
         }
         if (!isUsableRun(value)) {
@@ -71,10 +79,24 @@ export function IbpeWorkspaceProjection() {
       .slice(0,3);
   }, [run,current]);
 
+  const blockerActions = useMemo(() => {
+    if (!readiness || readiness.ready) return [];
+    const seen = new Set<string>();
+    return readiness.checks.filter((check) => !check.ready && !seen.has(check.actionTo) && seen.add(check.actionTo));
+  }, [readiness]);
+
   async function execute() {
     setBusy(true);
-    setStatus("Building governed database snapshot…");
+    setStatus("Checking governed IBPE readiness…");
     try {
+      const nextReadiness=await getIbpeReadiness();
+      setReadiness(nextReadiness);
+      if (!nextReadiness.ready) {
+        setRun(null);
+        setStatus(readinessStatus(nextReadiness));
+        return;
+      }
+      setStatus("Building governed database snapshot…");
       await runGovernedIbpe();
       const latest=await getLatestIbpeRun();
       if (isUsableRun(latest)) {
@@ -99,9 +121,10 @@ export function IbpeWorkspaceProjection() {
         <span className="text-muted">R{run.approvedPlanRevision} · {run.inputHash.slice(0,8)} · {run.sourceSha.slice(0,7)}</span>
         <span className="text-muted">Health {run.result.summary.businessHealthScore}/100</span>
         <span className="text-muted">{findings.length > 0 ? findings.map((f)=>f.title).filter(Boolean).join(" · ") : "No workspace findings"}</span>
-      </> : <span className="text-muted">{status}</span>}
-      <button type="button" disabled={busy} onClick={()=>void execute()} className="ml-auto font-semibold text-accent disabled:opacity-50">{busy?"Running…":"Run governed IBPE"}</button>
-      {run ? <span className="w-full text-[10px] text-subtle">{status} · Advisory only — decisions require authorised action in the owning transaction workspace.</span> : null}
+      </> : <span className={readiness && !readiness.ready ? "text-warn" : "text-muted"}>{status}</span>}
+      {!run && blockerActions.map((check)=><a key={check.actionTo} href={check.actionTo} className="font-semibold text-accent hover:underline">Fix {check.label} →</a>)}
+      <button type="button" disabled={busy} onClick={()=>void execute()} className="ml-auto font-semibold text-accent disabled:opacity-50">{busy?"Checking…":"Run governed IBPE"}</button>
+      {run ? <span className="w-full text-[10px] text-subtle">{status} · Advisory only — decisions require authorised action in the owning transaction workspace.</span> : readiness && !readiness.ready ? <span className="w-full text-[10px] text-subtle">The engine is authorised. Complete the highlighted governed prerequisites before a baseline can be persisted.</span> : null}
     </div>
   </div>;
 }
