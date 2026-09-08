@@ -53,5 +53,29 @@ export const getProductionJobCardView = createServerFn({ method: "GET" }).handle
        order by t.created_at desc,t.serial_number asc limit 500
     `,
   ]);
-  return { orders, cards, lines, travellers };
+
+  // These columns are scalar database identifiers/labels. Normalize them at the
+  // server boundary so the client never receives generic JsonValue for values
+  // rendered by React or passed into the FIFO issue command.
+  const normalizedTravellers = travellers.map((row) => ({
+    id: String(row.id ?? ""),
+    venture: String(row.venture ?? ""),
+    model_id: String(row.model_id ?? ""),
+    model_name: String(row.model_name ?? ""),
+    sku: String(row.sku ?? ""),
+    bom_revision: String(row.bom_revision ?? ""),
+    engineering_revision: String(row.engineering_revision ?? ""),
+    serial_number: String(row.serial_number ?? ""),
+    status: String(row.status ?? ""),
+    supplier: String(row.supplier ?? ""),
+    job_card_id: String(row.job_card_id ?? ""),
+    job_card_revision: Number(row.job_card_revision ?? 0),
+    sales_order_id: String(row.sales_order_id ?? ""),
+    job_card_product_label: String(row.job_card_product_label ?? ""),
+    created_by: String(row.created_by ?? ""),
+    created_at: String(row.created_at ?? ""),
+    updated_at: String(row.updated_at ?? ""),
+  }));
+
+  return { orders, cards, lines, travellers: normalizedTravellers };
 });
