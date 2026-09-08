@@ -340,15 +340,14 @@ function deterministicAnswer(
   } else if (scenarioLabel && comparison && isCausalQuestion(question)) {
     const fundingDelta = comparison.fundingNeedDeltaLakh;
     const baselineFundingNeed = fundingNeed - fundingDelta;
-    const liquidityDelta = comparison.minimumFreeLiquidityAfterRecommendationsLakh;
+    const liquidityDelta = comparison.minimumFreeLiquidityAfterRecommendationsDeltaLakh;
     const procurementDelta = comparison.procurementLakhDelta;
 
     lines.push(
-      `Scenario impact: ${scenarioLabel} changes expected units by ${signedNumber(comparison.expectedUnitsDelta)} versus the governed baseline. Recommended procurement changes by ${signedMoney(procurementDelta)} and minimum free liquidity after recommendations changes by ${signedMoney(comparison.minimumFreeLiquidityAfterRecommendationsDeltaLakh)}.`,
+      `Scenario impact: ${scenarioLabel} changes expected units by ${signedNumber(comparison.expectedUnitsDelta)} versus the governed baseline. Recommended procurement changes by ${signedMoney(procurementDelta)} and minimum free liquidity after recommendations changes by ${signedMoney(liquidityDelta)}.`,
       `Funding effect: ${money(baselineFundingNeed)} baseline → ${money(fundingNeed)} scenario (${signedMoney(fundingDelta)}).`,
       `Liquidity timing: baseline first breach ${comparison.baseFirstLiquidityBreachPeriod ? `M${comparison.baseFirstLiquidityBreachPeriod}` : "none"}; scenario first breach ${comparison.scenarioFirstLiquidityBreachPeriod ? `M${comparison.scenarioFirstLiquidityBreachPeriod}` : "none"}${low ? `; scenario trough ${money(low.freeLiquidityAfterRecommendationsLakh)} at M${low.period}` : ""}.`,
     );
-    void liquidityDelta;
     const nextActions = actions(["demand", "planning", "finance", "funding", "procurement", "capacity"]);
     if (nextActions.length) lines.push(`Controlled next actions: ${nextActions.join(" ")}`);
   } else if (/fund(?:ing)?\s+(requirement|requirements|need|needs)|how much.*fund|additional fund|incremental fund/.test(q)) {
