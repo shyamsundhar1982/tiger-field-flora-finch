@@ -3,7 +3,9 @@
   "private": true,
   "sideEffects": false,
   "type": "module",
-  "overrides": { "nf3": "0.3.17" },
+  "overrides": {
+    "nf3": "0.3.17"
+  },
   "scripts": {
     "dev": "node scripts/with-app-env.mjs vite dev --host 0.0.0.0 --port 8080",
     "build": "node scripts/with-app-env.mjs vite build && npm run db:migrate",
@@ -46,6 +48,7 @@
     "@tanstack/react-router": "^1.170.0",
     "@tanstack/react-start": "^1.168.0",
     "@tanstack/react-table": "^8.21.0",
+    "@tanstack/router-plugin": "^1.168.0",
     "@vercel/analytics": "^2.0.1",
     "better-auth": "~1.6.30",
     "class-variance-authority": "^0.7.1",
@@ -80,10 +83,11 @@
     "eslint": "^9.20.0",
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-prettier": "^5.2.6",
-    "eslint-plugin-react-hooks": "^6.1.1",
+    "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^15.15.0",
     "lightningcss": "^1.28.0",
+    "nitro": "3.0.260610-beta",
     "playwright": "^1.62.0",
     "prettier": "^3.4.0",
     "typescript": "^5.7.0",
