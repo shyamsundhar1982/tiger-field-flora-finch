@@ -35,12 +35,22 @@ test("signup honors Better Auth autoSignIn false contract", () => {
 });
 
 test("individual identity never inherits a legacy shared-password role", () => {
-  const start = commandAccess.indexOf("export const getCommandRole");
+  const start = commandAccess.indexOf("export const getCommandAuthorization");
   const end = commandAccess.indexOf("export const getCommandIdentity");
   const roleAuthority = commandAccess.slice(start, end);
-  assert.match(roleAuthority, /getAssignedCommandRole/);
-  assert.match(roleAuthority, /\?\? "viewer"/);
+  assert.match(roleAuthority, /resolveCommandAuthorization/);
+  assert.match(commandAccess, /\?\? "viewer"/);
   assert.doesNotMatch(roleAuthority, /getLegacyRole\(\).*\?\? "viewer"/s);
+});
+
+test("Command route resolves access and role atomically and cannot redirect its landing page to itself", () => {
+  assert.match(commandAccess, /export const getCommandAuthorization/);
+  assert.match(commandRoute, /const authorization = await getCommandAuthorization\(\)/);
+  assert.doesNotMatch(commandRoute, /await getCommandAccess\(\)/);
+  assert.doesNotMatch(commandRoute, /await getCommandRole\(\)/);
+  assert.match(commandRoute, /const routePath = normalizeCommandPath\(location\.pathname\)/);
+  assert.match(commandRoute, /if \(routePath === "\/command"\) return/);
+  assert.match(commandRoute, /normalizeCommandPath\(preferredTarget\) === routePath \? "\/command" : preferredTarget/);
 });
 
 test("command logout clears legacy compatibility and canonical individual session", () => {
