@@ -81,11 +81,13 @@ test("Commercial business writes require an individual identity and prove persis
   assert.match(actor, /signedIn: Boolean\(user\)/);
   assert.match(actor, /canEdit: Boolean\(role && user && canPerform\(role, "edit"\)\)/);
 
+  assert.match(authority, /getSalesOrderWriteReadiness/);
   assert.match(authority, /vyndi_sales_order_revisions/);
   assert.match(authority, /Sales-order persistence verification failed/);
   assert.match(authority, /persisted: true as const/);
 
-  assert.match(sales, /getBusinessWriteReadiness/);
+  assert.match(sales, /getSalesOrderWriteReadiness/);
+  assert.doesNotMatch(sales, /from "@\/lib\/business-actor"/);
   assert.match(sales, /Order was NOT saved/);
   assert.match(sales, /IS persisted in Commercial, but Production synchronization failed/);
   assert.match(sales, /Sign in to create order/);
