@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import { IBPE_ENGINE_VERSION, getIbpeReadiness, getLatestIbpeRun, runGovernedIbpe, type IbpeReadiness, type IbpeRun } from "@/lib/ibpe-authority";
+import { IBPE_CORE_LABEL, VIBPE_COPILOT_LABEL } from "@/lib/ibpe-brand";
 
 const workspaceDomains: Array<{ routes:string[]; label:string; domains:string[] }> = [
   { routes:["/command/planning","/command/finance-assumptions","/command/scenarios"], label:"Planning", domains:["planning","demand","funding"] },
@@ -136,13 +137,13 @@ export function IbpeWorkspaceProjection() {
 
   return <div className="border-b border-border bg-surface/50 px-4 py-2 text-xs">
     <div className="mx-auto flex max-w-[1800px] flex-wrap items-center gap-x-3 gap-y-1">
-      <span className="font-semibold text-fg">IBPE 1.3 · {current?.label ?? "Command"}</span>
+      <span className="font-semibold text-fg">{VIBPE_COPILOT_LABEL} · {IBPE_CORE_LABEL} · {current?.label ?? "Command"}</span>
       {run ? <>
         <span className="text-muted">R{run.approvedPlanRevision} · {run.inputHash.slice(0,8)} · {run.sourceSha.slice(0,7)}</span>
         <span className="text-muted">Health {run.result.summary.businessHealthScore}/100</span>
         <span className="text-muted">{findings.length > 0 ? findings.map((f)=>f.title).filter(Boolean).join(" · ") : "No workspace findings"}</span>
       </> : <span className={readiness && !readiness.ready ? "text-warn" : "text-muted"}>{status}</span>}
-      {!run && blockerActions.map((check)=><a key={check.actionTo} href={check.actionTo} className="font-semibold text-accent hover:underline">Fix {check.label} →</a>)}
+      {!run && blockerActions.map((check)=><Link key={check.actionTo} to={check.actionTo as never} className="font-semibold text-accent hover:underline">Fix {check.label} →</Link>)}
       <button type="button" disabled={busy} onClick={()=>void execute()} className="ml-auto font-semibold text-accent disabled:opacity-50">{busy?"Checking…":"Run governed IBPE"}</button>
       {run ? <span className="w-full text-[10px] text-subtle">{status} · Advisory only — decisions require authorised action in the owning transaction workspace.</span> : readiness && !readiness.ready ? <span className="w-full text-[10px] text-subtle">The engine is authorised. Complete the highlighted governed prerequisites before a baseline can be persisted.</span> : null}
     </div>
