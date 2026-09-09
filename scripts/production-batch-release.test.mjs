@@ -72,6 +72,22 @@ test("Production exposes confirmed-order to current job-card reconciliation inst
   assert.doesNotMatch(production, /const committedUnits = cards\.reduce/);
 });
 
+test("Production job card owns the material requisition and traveller-linked FIFO issue record", async () => {
+  const production = await text("src/routes/command/production.tsx");
+  const view = await text("src/lib/production-job-card-view.ts");
+
+  assert.match(production, /Material Requisition &amp; Issue/);
+  assert.match(production, /MR-\$\{String\(card\.batch_code \?\? card\.id\)/);
+  assert.match(production, /Requested by/);
+  assert.match(production, /Approved by/);
+  assert.match(production, /Print requisition \/ issue record/);
+  assert.match(production, /Issue reserved FIFO/);
+  assert.match(production, /consumed_by/);
+  assert.match(view, /reservation\.job_card_line_id=l\.id/);
+  assert.match(view, /r\.consumed_by,r\.consumed_at/);
+  assert.doesNotMatch(production, /to="\/command\/stores-requisition"/);
+});
+
 test("Commercial business writes require an individual identity and prove persistence before Production sync", async () => {
   const actor = await text("src/lib/business-actor.ts");
   const authority = await text("src/lib/sales-order-authority.ts");
