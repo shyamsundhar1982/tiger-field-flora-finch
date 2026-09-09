@@ -31,6 +31,24 @@ jobs:
       - name: Apply deterministic sanitation
         run: node scripts/apply-pr68-final-sanitization.mjs
 
+      - name: Correct generated compatibility assertions
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from "node:fs";
+          const path = "scripts/check-route-invariants.mjs";
+          let source = readFileSync(path, "utf8");
+          const replacement = `for (const [route, target] of [["phase-4", "/command/sales"], ["phase-5", "/command/engineering"], ["phase-6", "/command/operations"], ["phase-6a", "/command/epr-execution"], ["management-intelligence", "/command"]]) {
+            const aliasSource = read(\`src/routes/command/\${route}.tsx\`);
+            assert.ok(aliasSource.includes(\`redirect({ to: "\${target}" })\`), \`\${route} must remain a compatibility redirect\`);
+          }
+
+          const ops =`;
+          const pattern = /for \(const \[route, target\] of \[\["phase-4"[\s\S]*?\n\}\n\nconst ops =/;
+          if (!pattern.test(source)) throw new Error("generated route alias assertion block not found");
+          source = source.replace(pattern, replacement);
+          writeFileSync(path, source, "utf8");
+          NODE
+
       - name: Install dependencies
         run: npm ci
 
