@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getSql } from "@/lib/db";
-import { requireBusinessActor } from "@/lib/business-actor";
+import { getBusinessWriteReadiness, requireBusinessActor } from "@/lib/business-actor";
 import { getCommandRole } from "@/lib/command-access";
 import { canPerform } from "@/lib/page-access";
 import type { SalesOrder } from "@/lib/finance/sales-engine";
@@ -49,6 +49,10 @@ function toSalesOrder(row: Record<string, unknown>): SalesOrder {
     configuration: (row.configuration ?? undefined) as SalesOrder["configuration"],
   };
 }
+
+export const getSalesOrderWriteReadiness = createServerFn({ method: "GET" }).handler(async () =>
+  getBusinessWriteReadiness(),
+);
 
 export const listSalesOrders = createServerFn({ method: "GET" }).handler(async () => {
   const role = await getCommandRole();
