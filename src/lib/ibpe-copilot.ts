@@ -10,6 +10,7 @@ import {
 import type { IntegratedPlanningResult } from "@/lib/integrated-business-planning-engine";
 import { VIBPE_COPILOT_NAME } from "@/lib/ibpe-brand";
 import { RUNTIME_IBPE_ENGINE_VERSION } from "@/lib/ibpe-runtime-parity";
+import { runVibpeCopilot2 } from "@/lib/vibpe-copilot-2";
 
 export type IbpeCopilotRequest = {
   question: string;
@@ -513,8 +514,19 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
     let scenarioId: string | undefined;
     const scenarioIds = new Set<string>();
     const executiveAssessment = questions.length === 1 && isExecutiveAssessmentQuestion(data.question);
+    const vibpe2 = questions.length === 1
+      ? await runVibpeCopilot2(sql, data.question, row.result_json, {
+          sessionKey: actor.userId,
+          uiScenario: data.scenario,
+        })
+      : undefined;
+    const handledByVibpe2 = Boolean(vibpe2?.answer);
 
-    if (questions.length > 1) {
+    if (handledByVibpe2 && vibpe2?.answer) {
+      answer = vibpe2.answer;
+      scenarioId = vibpe2.scenario?.id;
+      if (scenarioId) scenarioIds.add(scenarioId);
+    } else if (questions.length > 1) {
       const sections: string[] = [];
       for (const [index, question] of questions.entries()) {
         const resolved = await resolveQuestion(question);
@@ -600,6 +612,7 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
           mode,
           executiveAssessment,
           answerChars: answer.length,
+          copilotVersion: handledByVibpe2 ? "2.0" : "legacy-fallback",
         }),
       ],
     );
