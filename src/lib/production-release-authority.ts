@@ -1,12 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { authMiddleware } from "@/lib/auth/middleware";
 import { requireBusinessActor } from "@/lib/business-actor";
 import { getSql } from "@/lib/db";
 
 export const approveProductionBatch = createServerFn({ method: "POST" })
   .validator(z.object({ jobCardId: z.string().min(1).max(160) }))
-  .handler(async ({ data }) => {
-    const actor = await requireBusinessActor("approve");
+  .middleware([authMiddleware])
+  .handler(async ({ data, context }) => {
+    const actor = await requireBusinessActor("approve", { userId: context.userId, email: context.userEmail });
     const sql = await getSql();
     const rows = await sql.query<{
       job_card_id: string;
