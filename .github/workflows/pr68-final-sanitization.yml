@@ -50,16 +50,8 @@ jobs:
 
           for (const path of activeWorkflowFiles) {
             const source = read(path);
-            assert.equal(
-              hasQuotedRoute(source, "/command/production-jobcards"),
-              false,
-              `${path}: active workflow must use canonical /command/production`,
-            );
-            assert.equal(
-              hasQuotedRoute(source, "/command/management-intelligence"),
-              false,
-              `${path}: compatibility Management Intelligence must not remain in active workflow metadata`,
-            );
+            assert.equal(hasQuotedRoute(source, "/command/production-jobcards"), false, `${path}: active workflow must use canonical /command/production`);
+            assert.equal(hasQuotedRoute(source, "/command/management-intelligence"), false, `${path}: compatibility Management Intelligence must not remain in active workflow metadata`);
           }
 
           const shell = read("src/components/command-shell-v2.tsx");
@@ -162,7 +154,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm scripts/apply-pr68-final-sanitization.mjs .github/workflows/pr68-final-sanitization.yml
+          git restore --source=HEAD -- .github/workflows/ci.yml .github/workflows/pr68-final-sanitization.yml
+          git rm scripts/apply-pr68-final-sanitization.mjs
           git add -A
           git diff --cached --check
           git commit -m "Sanitize legacy workflow routes and runtime contracts"
