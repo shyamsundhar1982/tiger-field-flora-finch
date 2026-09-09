@@ -115,6 +115,7 @@ export const saveSalesOrder = createServerFn({ method: "POST" })
         throw new Error("Order delivery cannot be posted until Production marks the linked job card complete.");
       }
     }
+
     const rows = await sql.query<{ sales_order_id: string; revision: number; created: boolean }>(
       `select * from save_vyndi_sales_order($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13,$14)`,
       [
@@ -136,5 +137,34 @@ export const saveSalesOrder = createServerFn({ method: "POST" })
     );
     const row = rows[0];
     if (!row) throw new Error("Sales-order write did not return a revision.");
-    return { id: row.sales_order_id, revision: Number(row.revision), created: Boolean(row.created) };
+
+    const [persisted] = await sql.query<{
+      id: string;
+      revision: number | string;
+      status: string;
+      units: number | string;
+      variant_id: string | null;
+    }>(
+      `select id,revision,status,units,variant_id from vyndi_sales_orders where id=$1 limit 1`,
+      [row.sales_order_id],
+    );
+    const [revisionReceipt] = await sql.query<{ revision: number | string }>(
+      `select revision from vyndi_sales_order_revisions where sales_order_id=$1 and revision=$2 limit 1`,
+      [row.sales_order_id, Number(row.revision)],
+    );
+
+    if (!persisted || Number(persisted.revision) !== Number(row.revision) || !revisionReceipt) {
+      throw new Error("Sales-order persistence verification failed; no committed order receipt was found.");
+    }
+
+    return {
+      id: row.sales_order_id,
+      revision: Number(row.revision),
+      created: Boolean(row.created),
+      persisted: true as const,
+      status: persisted.status,
+      units: Number(persisted.units),
+      variantId: persisted.variant_id,
+      actorRole: actor.role,
+    };
   });
