@@ -514,12 +514,20 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
     let scenarioId: string | undefined;
     const scenarioIds = new Set<string>();
     const executiveAssessment = questions.length === 1 && isExecutiveAssessmentQuestion(data.question);
-    const vibpe2 = questions.length === 1
-      ? await runVibpeCopilot2(sql, data.question, row.result_json, {
+    let vibpe2: Awaited<ReturnType<typeof runVibpeCopilot2>> | undefined;
+    let vibpe2FallbackReason: "runtime-error" | undefined;
+    if (questions.length === 1) {
+      try {
+        vibpe2 = await runVibpeCopilot2(sql, data.question, row.result_json, {
           sessionKey: actor.userId,
           uiScenario: data.scenario,
-        })
-      : undefined;
+        });
+      } catch {
+        // VIBPE 2.0 is advisory: a runtime-specific failure must not take down
+        // the governed deterministic/AI Co-Pilot response path.
+        vibpe2FallbackReason = "runtime-error";
+      }
+    }
     const handledByVibpe2 = Boolean(vibpe2?.answer);
 
     if (handledByVibpe2 && vibpe2?.answer) {
@@ -613,6 +621,7 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
           executiveAssessment,
           answerChars: answer.length,
           copilotVersion: handledByVibpe2 ? "2.0" : "legacy-fallback",
+          vibpe2FallbackReason: vibpe2FallbackReason ?? null,
         }),
       ],
     );
