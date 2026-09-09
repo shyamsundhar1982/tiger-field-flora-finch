@@ -6,13 +6,19 @@ import { lockCommand, unlockCommand } from "@/lib/command-access";
 
 export const Route = createFileRoute("/command-login")({ component: CommandLogin });
 
+const BEARER_KEY = "grok-auth.bearer-token";
+
 async function clearBetterAuthSession() {
   try {
     await authClient.signOut();
   } catch {
-    // Legacy authentication remains authoritative even if an old Better Auth
-    // session cannot be cleared. The server-side role resolver also prefers the
-    // legacy command session.
+    // The local bearer is cleared below even if the remote sign-out cannot settle.
+  } finally {
+    try {
+      window.sessionStorage.removeItem(BEARER_KEY);
+    } catch {
+      // Storage unavailable — cookie/session handling remains server-controlled.
+    }
   }
 }
 
@@ -41,29 +47,39 @@ function CommandLogin() {
       const identity = username.trim();
 
       // VINDY-managed individual users are Better Auth accounts. Clear any
-      // previous legacy command session first so an old admin/role cookie cannot
-      // override the newly authenticated user's assigned VINDY permissions.
+      // previous legacy command session first so an old role cookie cannot
+      // override the newly authenticated user's assigned permissions.
       if (identity.includes("@")) {
         await clearLegacyCommandSession();
 
         const normalizedEmail = identity.toLowerCase();
-        const result = await authClient.signIn.email({
-          email: normalizedEmail,
-          password,
-        });
+        const result = await authClient.signIn.email(
+          { email: normalizedEmail, password },
+          {
+            onSuccess(ctx) {
+              const token = ctx.response.headers.get("set-auth-token");
+              if (token) window.sessionStorage.setItem(BEARER_KEY, token);
+            },
+          },
+        );
 
         if (result.error) {
           setError(result.error.message ?? "Incorrect email or password.");
           return;
         }
 
+        try {
+          await authClient.getSession();
+        } catch {
+          // Server-function middleware will use the transported bearer when the
+          // preview hostname cannot retain the Better Auth cookie reliably.
+        }
         await navigate({ to: "/command" });
         return;
       }
 
-      // Legacy command credentials remain a first-class authentication path and
-      // retain their original authority. Clear any Better Auth identity first
-      // so an individual VINDY account cannot leak into a legacy login.
+      // Legacy command credentials remain a compatibility path. Clear any
+      // Better Auth identity and its bearer first so identities cannot mix.
       await clearBetterAuthSession();
       const result = await unlockCommand({ data: { username: identity, password } });
       if (!result.ok) {
