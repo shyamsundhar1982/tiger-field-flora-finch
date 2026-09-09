@@ -56,14 +56,14 @@ jobs:
             1,
             'assert.ok(inventoryNav.includes(\'to="/command/inventory-ledgers/$ledger"\'));',
             'assert.ok(inventoryNav.includes(\'params={{ ledger: "components" }}\'));',
-            'assert.ok(inventoryNav.includes(\'search={{}}\'));',
+            'assert.ok(inventoryNav.includes(\'search={{ sku: undefined }}\'));',
           );
           writeFileSync(checkPath, lines.join("\n"), "utf8");
 
           const navPath = "src/components/inventory-workspace-nav.tsx";
           let nav = readFileSync(navPath, "utf8");
           const oldNav = '<Link to="/command/inventory-ledgers/components" className="hover:text-accent">';
-          const newNav = '<Link to="/command/inventory-ledgers/$ledger" params={{ ledger: "components" }} search={{}} className="hover:text-accent">';
+          const newNav = '<Link to="/command/inventory-ledgers/$ledger" params={{ ledger: "components" }} search={{ sku: undefined }} className="hover:text-accent">';
           if (!nav.includes(oldNav)) throw new Error("generated inventory breadcrumb target not found");
           nav = nav.replace(oldNav, newNav);
           writeFileSync(navPath, nav, "utf8");
