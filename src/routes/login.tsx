@@ -4,6 +4,8 @@ import { authClient } from "@/lib/auth/client";
 
 export const Route = createFileRoute("/login")({ component: LoginPage });
 
+const BEARER_KEY = "grok-auth.bearer-token";
+
 function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
@@ -16,11 +18,24 @@ function LoginPage() {
     setBusy(true);
     setError("");
     const normalizedEmail = email.trim().toLowerCase();
-    const result = await authClient.signIn.email({ email: normalizedEmail, password });
+    const result = await authClient.signIn.email(
+      { email: normalizedEmail, password },
+      {
+        onSuccess(ctx) {
+          const token = ctx.response.headers.get("set-auth-token");
+          if (token) window.sessionStorage.setItem(BEARER_KEY, token);
+        },
+      },
+    );
     if (result.error) {
       setError(result.error.message ?? "Sign-in failed.");
       setBusy(false);
       return;
+    }
+    try {
+      await authClient.getSession();
+    } catch {
+      // The transported bearer is authoritative if a preview cookie is unavailable.
     }
     await navigate({ to: "/command" });
   }
