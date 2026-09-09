@@ -3,9 +3,9 @@ import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { hashPassword, verifyPassword } from "better-auth/crypto";
 import type { CommandRole } from "@/lib/page-access";
-import { getCommandRole } from "@/lib/command-access";
-import { getSessionUser } from "@/lib/auth/verify.server";
+import { authMiddleware, optionalAuthMiddleware } from "@/lib/auth/middleware";
 import { auth } from "@/lib/auth/server";
+import { getAssignedCommandRole } from "@/lib/command-user-role.server";
 import { getSql } from "@/lib/db";
 
 const roles: CommandRole[] = ["admin", "management", "board", "finance", "operations", "engineering", "qa", "compliance", "viewer"];
@@ -21,34 +21,39 @@ function isBootstrapAdminEmail(email: string | null | undefined): boolean {
     .includes(normalizedEmail);
 }
 
-async function requireAdmin() {
-  const role = await getCommandRole();
+async function requireAdmin(userId: string, email?: string | null) {
+  const role = await getAssignedCommandRole(userId, email);
   if (role !== "admin") throw new Error("Admin access is required.");
   return role;
 }
 
-export const getVindyUserContext = createServerFn({ method: "GET" }).handler(async () => {
-  const user = await getSessionUser();
-  const role = await getCommandRole();
-  return { id: user?.id ?? null, email: user?.email ?? null, role: isRole(role) ? role : null };
-});
+export const getVindyUserContext = createServerFn({ method: "GET" })
+  .middleware([optionalAuthMiddleware])
+  .handler(async ({ context }) => {
+    const role = context.userId
+      ? await getAssignedCommandRole(context.userId, context.userEmail)
+      : null;
+    return { id: context.userId ?? null, email: context.userEmail ?? null, role: isRole(role) ? role : null };
+  });
 
-export const listVindyUsers = createServerFn({ method: "GET" }).handler(async () => {
-  await requireAdmin();
-  const sql = await getSql();
-  return sql<{
+export const listVindyUsers = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    await requireAdmin(context.userId, context.userEmail);
+    const sql = await getSql();
+    return sql<{
     id: string;
     name: string | null;
     email: string | null;
     role: string | null;
     created_at: string;
-  }>`
+    }>`
     select u.id, u.name, u.email, r.role, u."createdAt" as created_at
     from "user" u
     left join vindy_user_roles r on r.user_id = u.id
     order by u."createdAt" desc
-  `;
-});
+    `;
+  });
 
 async function ensureCredentialPassword(sql: Awaited<ReturnType<typeof getSql>>, userId: string, password: string) {
   const passwordHash = await hashPassword(password);
@@ -147,8 +152,9 @@ export const createVindyUser = createServerFn({ method: "POST" })
       role: z.enum(["admin", "management", "board", "finance", "operations", "engineering", "qa", "compliance", "viewer"]),
     }),
   )
-  .handler(async ({ data }) => {
-    await requireAdmin();
+  .middleware([authMiddleware])
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.userId, context.userEmail);
     const sql = await getSql();
     const name = data.name.trim();
     const email = data.email.trim().toLowerCase();
@@ -187,8 +193,9 @@ export const createVindyUser = createServerFn({ method: "POST" })
 
 export const resetVindyUserPassword = createServerFn({ method: "POST" })
   .validator(z.object({ userId: z.string().min(1).max(200), password: z.string().min(8).max(128) }))
-  .handler(async ({ data }) => {
-    await requireAdmin();
+  .middleware([authMiddleware])
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.userId, context.userEmail);
     const sql = await getSql();
     const existing = await sql<{ id: string }>`
       select id from "user" where id = ${data.userId} limit 1
@@ -206,8 +213,9 @@ export const setVindyUserRole = createServerFn({ method: "POST" })
       role: z.enum(["admin", "management", "board", "finance", "operations", "engineering", "qa", "compliance", "viewer"]),
     }),
   )
-  .handler(async ({ data }) => {
-    await requireAdmin();
+  .middleware([authMiddleware])
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.userId, context.userEmail);
     const sql = await getSql();
     const target = await sql<{ email: string | null }>`
       select email from "user" where id = ${data.userId} limit 1
@@ -225,10 +233,10 @@ export const setVindyUserRole = createServerFn({ method: "POST" })
 
 export const deleteVindyUser = createServerFn({ method: "POST" })
   .validator(z.object({ userId: z.string().min(1).max(200) }))
-  .handler(async ({ data }) => {
-    await requireAdmin();
-    const current = await getSessionUser();
-    if (current?.id === data.userId) throw new Error("You cannot delete the account currently in use.");
+  .middleware([authMiddleware])
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.userId, context.userEmail);
+    if (context.userId === data.userId) throw new Error("You cannot delete the account currently in use.");
     const sql = await getSql();
     const target = await sql<{ email: string | null }>`
       select email from "user" where id = ${data.userId} limit 1
