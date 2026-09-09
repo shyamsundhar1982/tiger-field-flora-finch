@@ -78,8 +78,10 @@ test("Commercial business writes require an individual identity and prove persis
   const sales = await text("src/routes/command/sales.tsx");
 
   assert.match(actor, /getBusinessWriteReadiness/);
+  assert.match(actor, /getAssignedBusinessIdentity/);
   assert.match(actor, /signedIn: Boolean\(user\)/);
-  assert.match(actor, /canEdit: Boolean\(role && user && canPerform\(role, "edit"\)\)/);
+  assert.match(actor, /canEdit: Boolean\(role && canPerform\(role, "edit"\)\)/);
+  assert.doesNotMatch(actor, /requireUserId/);
 
   assert.match(authority, /getSalesOrderWriteReadiness/);
   assert.match(authority, /vyndi_sales_order_revisions/);
@@ -96,6 +98,22 @@ test("Commercial business writes require an individual identity and prove persis
     /write = await saveSalesOrder\([\s\S]*?const projection = await syncProductionJobCard/,
     "Commercial must persist the order before synchronizing Production",
   );
+});
+
+test("business mutation actor resolves verified identity and assigned role in one request context", async () => {
+  const actor = await text("src/lib/business-actor.ts");
+  const assignedRole = await text("src/lib/command-user-role.server.ts");
+  const commandAccess = await text("src/lib/command-access.ts");
+
+  assert.match(actor, /const \{ user, role \} = await getAssignedBusinessIdentity\(\)/);
+  assert.match(actor, /if \(!user\) throw new UnauthorizedError\(\)/);
+  assert.match(actor, /return \{ userId: user\.id, role \}/);
+  assert.doesNotMatch(actor, /const role = await getCommandRole\(\);[\s\S]*?requireUserId/);
+
+  assert.match(assignedRole, /getAssignedCommandRole/);
+  assert.match(assignedRole, /select role from vindy_user_roles/);
+  assert.match(assignedRole, /VINDY_ADMIN_EMAILS/);
+  assert.match(commandAccess, /getAssignedCommandRole\(user\.id, user\.email\)/);
 });
 
 test("Commercial revisions are buffered and synchronize only on explicit save", async () => {
@@ -128,6 +146,7 @@ test("legacy Command admin can maintain internal Governance action status withou
   assert.match(actions, /requireOperatingActionActor/);
   assert.match(actions, /command:admin/);
   assert.match(actions, /role === "admin"/);
-  assert.match(actor, /const userId = await requireUserId\(\)/);
-  assert.doesNotMatch(actor, /if \(role === "admin"\) return \{ userId: "command:admin"/);
+  assert.match(actor, /getAssignedBusinessIdentity/);
+  assert.match(actor, /if \(!user\) throw new UnauthorizedError\(\)/);
+  assert.doesNotMatch(actor, /return \{ userId: "command:admin"/);
 });
