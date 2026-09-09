@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 const intent = await readFile(new URL("../src/lib/vibpe-intent.ts", import.meta.url), "utf8");
 const doctrine = await readFile(new URL("../src/lib/vibpe-business-operator.ts", import.meta.url), "utf8");
 const architecture = await readFile(new URL("../docs/VIBPE-COPILOT-2-ARCHITECTURE.md", import.meta.url), "utf8");
+const productionCopilot = await readFile(new URL("../src/lib/ibpe-copilot.ts", import.meta.url), "utf8");
 
 test("VIBPE recognizes conversational closing instead of returning baseline assessment", () => {
   assert.match(intent, /bye\|goodbye\|see you\|thanks\|thank you/);
@@ -44,4 +45,12 @@ test("Business Operator doctrine protects transaction boundaries", () => {
 test("architecture separates deterministic truth from advisory reasoning", () => {
   assert.match(architecture, /IBPE engine.*deterministic business truth/i);
   assert.match(architecture, /External knowledge.*reference context only/i);
+});
+
+
+test("VIBPE 2.0 is active ahead of the legacy production fallback", () => {
+  assert.match(productionCopilot, /import \{ runVibpeCopilot2 \}/);
+  assert.match(productionCopilot, /await runVibpeCopilot2\(/);
+  assert.match(productionCopilot, /if \(handledByVibpe2 && vibpe2\?\.answer\)/);
+  assert.match(productionCopilot, /copilotVersion: handledByVibpe2 \? "2\.0" : "legacy-fallback"/);
 });
