@@ -1,10 +1,5 @@
 import { createMiddleware } from "@tanstack/react-start";
 
-async function forwardBearer(next: (args: { sendContext: { bearerToken?: string } }) => Promise<unknown>) {
-  const { getBearerToken } = await import("./client");
-  return next({ sendContext: { bearerToken: getBearerToken() ?? undefined } });
-}
-
 /**
  * Required auth transport for business mutations. The client forwards the
  * session bearer token when one is available (including rotating Vercel preview
@@ -12,12 +7,15 @@ async function forwardBearer(next: (args: { sendContext: { bearerToken?: string 
  * one stable verified identity to the handler.
  */
 export const authMiddleware = createMiddleware({ type: "function" })
-  .client(async ({ next }) => forwardBearer(next))
+  .client(async ({ next }) => {
+    const { getBearerToken } = await import("./client");
+    return next({ sendContext: { bearerToken: getBearerToken() ?? undefined } });
+  })
   .server(async ({ next, context }) => {
     const { assertSameSiteRequest } = await import("./isolation.server");
     const { getSessionUser, UnauthorizedError } = await import("./verify.server");
     assertSameSiteRequest();
-    const user = await getSessionUser(context.bearerToken);
+    const user = await getSessionUser(context?.bearerToken);
     if (!user) throw new UnauthorizedError();
     return next({ context: { userId: user.id, userEmail: user.email } });
   });
@@ -29,12 +27,15 @@ export const authMiddleware = createMiddleware({ type: "function" })
  * transport used by mutations.
  */
 export const optionalAuthMiddleware = createMiddleware({ type: "function" })
-  .client(async ({ next }) => forwardBearer(next))
+  .client(async ({ next }) => {
+    const { getBearerToken } = await import("./client");
+    return next({ sendContext: { bearerToken: getBearerToken() ?? undefined } });
+  })
   .server(async ({ next, context }) => {
     const { assertSameSiteRequest } = await import("./isolation.server");
     const { getSessionUser } = await import("./verify.server");
     assertSameSiteRequest();
-    const user = await getSessionUser(context.bearerToken);
+    const user = await getSessionUser(context?.bearerToken);
     return next({
       context: {
         userId: user?.id,
