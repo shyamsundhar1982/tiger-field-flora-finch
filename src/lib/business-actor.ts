@@ -4,16 +4,19 @@ import { getAssignedCommandRole } from "@/lib/command-user-role.server";
 import { canPerform, type CommandPermission, type CommandRole } from "@/lib/page-access";
 
 export type BusinessActor = { userId: string; role: CommandRole };
+export type VerifiedBusinessIdentity = { userId: string; email?: string | null };
 
-async function getAssignedBusinessIdentity() {
-  const user = await getSessionUser();
+async function getAssignedBusinessIdentity(verified?: VerifiedBusinessIdentity) {
+  const user = verified
+    ? { id: verified.userId, email: verified.email ?? null }
+    : await getSessionUser();
   if (!user) return { user: null, role: null as CommandRole | null };
   const role = await getAssignedCommandRole(user.id, user.email);
   return { user, role };
 }
 
-export async function getBusinessWriteReadiness() {
-  const { user, role } = await getAssignedBusinessIdentity();
+export async function getBusinessWriteReadiness(verified?: VerifiedBusinessIdentity) {
+  const { user, role } = await getAssignedBusinessIdentity(verified);
   return {
     role,
     signedIn: Boolean(user),
@@ -25,14 +28,16 @@ export async function getBusinessWriteReadiness() {
 
 /**
  * Read-only advisory exploration may still use an authorised legacy Command
- * session. Mutating business commitments resolve the verified Better Auth user
- * and that same user's explicit role assignment inside ONE request context.
- * This prevents a readiness GET from succeeding while a later POST loses the
- * identity after a nested server-function role lookup.
+ * session. Mutating business commitments use the identity already verified by
+ * authMiddleware when supplied, so a server-function transport cannot lose the
+ * user between readiness, persistence, synchronization and approval.
  */
-export async function requireBusinessActor(permission: CommandPermission): Promise<BusinessActor> {
+export async function requireBusinessActor(
+  permission: CommandPermission,
+  verified?: VerifiedBusinessIdentity,
+): Promise<BusinessActor> {
   if (permission === "view") {
-    const { user, role: assignedRole } = await getAssignedBusinessIdentity();
+    const { user, role: assignedRole } = await getAssignedBusinessIdentity(verified);
     if (user && assignedRole && canPerform(assignedRole, permission)) {
       return { userId: user.id, role: assignedRole };
     }
@@ -44,7 +49,7 @@ export async function requireBusinessActor(permission: CommandPermission): Promi
     return { userId: `legacy-command:${legacyRole}`, role: legacyRole };
   }
 
-  const { user, role } = await getAssignedBusinessIdentity();
+  const { user, role } = await getAssignedBusinessIdentity(verified);
   if (!user) throw new UnauthorizedError();
   if (!role || !canPerform(role, permission)) {
     throw new Error(`Business ${permission} permission denied.`);
