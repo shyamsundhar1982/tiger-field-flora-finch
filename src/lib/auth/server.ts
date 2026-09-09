@@ -15,6 +15,7 @@ import {
   PREVIEW_CLIENT_ID,
   PREVIEW_CLIENT_SECRET,
 } from "./preview";
+import { AUTH_TRUSTED_ORIGINS, resolveAuthBaseURL, resolveAuthSecret } from "./runtime-config";
 
 void ensureDbReady();
 
@@ -35,7 +36,9 @@ function validHttpUrl(value: string | undefined): string | undefined {
   if (!value) return undefined;
   try {
     const parsed = new URL(value);
-    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.toString().replace(/\/$/, "") : undefined;
+    return parsed.protocol === "http:" || parsed.protocol === "https:"
+      ? parsed.toString().replace(/\/$/, "")
+      : undefined;
   } catch {
     return undefined;
   }
@@ -46,51 +49,30 @@ const grokIssuer = validHttpUrl(env("GROK_AUTH_ISSUER")) ?? GROK_ISSUER_DEFAULT;
 const grokClientId = env("GROK_AUTH_CLIENT_ID") ?? PREVIEW_CLIENT_ID;
 const grokClientSecret = env("GROK_AUTH_CLIENT_SECRET") ?? PREVIEW_CLIENT_SECRET;
 
-export const authConfigured =
-  !authDisabled && Boolean(grokClientId && grokClientSecret);
+export const authConfigured = !authDisabled && Boolean(grokClientId && grokClientSecret);
 
 const explicitBaseURL = validHttpUrl(env("BETTER_AUTH_URL"));
 const previewAllowedHosts: string[] = [...PREVIEW_ALLOWED_HOSTS];
-const LOCAL_DEV_ORIGINS: string[] = [
-  "http://localhost:8080",
-  "http://127.0.0.1:8080",
-  "http://[::1]:8080",
-];
-
-// Vercel can create multiple deployment hostnames for the same application.
-// Trust this application's actual Vercel domains, including deployment previews.
-const VERCEL_APP_ORIGINS: string[] = [
-  "https://vindy-architecture.vercel.app",
-  "https://vindy-architecture-*.vercel.app",
-  "https://vindy-architecture-the-final3.vercel.app",
-  "https://vindy-architecture-git-main-the-final3.vercel.app",
-  "https://vindy-architecture-*-the-final3.vercel.app",
-  "https://tiger-field-flora-finch-*.vercel.app",
-];
-
-// Cloudflare Workers is the declared production deployment surface. Unlike
-// Vercel, its workers.dev hostname is stable, so explicitly trust the live
-// production origin used by the VINDY application.
-const CLOUDFLARE_APP_ORIGINS: string[] = [
-  "https://tiger-field-flora-finch.shyamsundhar1982.workers.dev",
-];
-
-// Better Auth's server API methods require a URL string here. Prefer the
-// configured URL; otherwise use the stable VINDY production hostname rather
-// than localhost, which would make production auth construct incorrect URLs.
-const baseURL = explicitBaseURL ?? "https://vindy-architecture.vercel.app";
+// Resolve the concrete base URL from each incoming request. Cloudflare,
+// Vercel production aliases and Vercel previews therefore issue host-local
+// cookies and callbacks even if BETTER_AUTH_URL is missing or was scoped to a
+// different deployment target.
+const baseURL = resolveAuthBaseURL(explicitBaseURL);
 
 const trustedOrigins: string[] = [
-  baseURL,
-  ...(explicitBaseURL ? [] : []),
-  ...VERCEL_APP_ORIGINS,
-  ...CLOUDFLARE_APP_ORIGINS,
+  ...AUTH_TRUSTED_ORIGINS,
+  ...(explicitBaseURL ? [explicitBaseURL] : []),
   ...previewAllowedHosts,
   ...previewAllowedHosts.flatMap((host) => [`https://${host}`, `http://${host}`]),
-  ...LOCAL_DEV_ORIGINS,
 ];
 
 const databaseUrl = env("DATABASE_URL");
+const authSecret = resolveAuthSecret({
+  configuredSecret: env("BETTER_AUTH_SECRET"),
+  databaseUrl,
+  authDisabled,
+  previewSecret: previewAuthSecret,
+});
 const issuerBase = grokIssuer.replace(/\/+$/, "");
 const grokAuthorizationUrl = `${issuerBase}/api/auth/oauth2/authorize`;
 const grokTokenUrl = `${issuerBase}/api/auth/oauth2/token`;
@@ -119,7 +101,7 @@ const grokOAuthPlugin = authConfigured
 
 export const auth = betterAuth({
   baseURL,
-  secret: env("BETTER_AUTH_SECRET") ?? previewAuthSecret(),
+  secret: authSecret,
   database,
   trustedOrigins,
 
@@ -127,10 +109,7 @@ export const auth = betterAuth({
     encryptOAuthTokens: true,
     accountLinking: {
       enabled: true,
-      trustedProviders: [
-        ...GROK_PROVIDERS.map((p) => p.providerId),
-        GATE_PROVIDER_ID,
-      ],
+      trustedProviders: [...GROK_PROVIDERS.map((p) => p.providerId), GATE_PROVIDER_ID],
       requireLocalEmailVerified: false,
     },
   },
@@ -141,9 +120,7 @@ export const auth = betterAuth({
   // NEVER sign the administrator into the newly-created account. Better Auth's
   // email/password sign-up auto-signs users in by default; disabling that here
   // prevents the admin session cookie from being replaced during user creation.
-  ...(emailAndPasswordEnabled
-    ? { emailAndPassword: { enabled: true, autoSignIn: false } }
-    : {}),
+  ...(emailAndPasswordEnabled ? { emailAndPassword: { enabled: true, autoSignIn: false } } : {}),
 
   advanced: {
     useSecureCookies: false,
