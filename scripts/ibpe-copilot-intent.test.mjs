@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 const copilot = await readFile(new URL("../src/lib/ibpe-copilot.ts", import.meta.url), "utf8");
 const scenarioLab = await readFile(new URL("../src/lib/ibpe-scenario-lab.ts", import.meta.url), "utf8");
 
-test("VIBpE Co-Pilot resolves named scenarios ahead of stale UI scenario context", () => {
+test("VIBPE Co-Pilot resolves named scenarios ahead of stale UI scenario context", () => {
   assert.match(copilot, /function namedScenarioFromQuestion/);
   assert.match(copilot, /growth-25/);
   assert.match(copilot, /cash-protect/);
@@ -13,7 +13,7 @@ test("VIBpE Co-Pilot resolves named scenarios ahead of stale UI scenario context
   assert.match(copilot, /const effectiveScenario = namedScenario \?\? \(explicitlyRequestsBaseline/);
 });
 
-test("VIBpE Co-Pilot supports product-family demand overrides", () => {
+test("VIBPE Co-Pilot supports product-family demand overrides", () => {
   assert.match(copilot, /familyGrowth\.family}-growth-25/);
   assert.match(copilot, /family: "longitude", productId: "aluminium", label: "Longitude"/);
   assert.match(copilot, /demandMultiplierByProduct: \{ \[familyGrowth\.productId\]: 1\.25 \}/);
@@ -21,7 +21,7 @@ test("VIBpE Co-Pilot supports product-family demand overrides", () => {
   assert.match(scenarioLab, /const rowDemandMultiplier = demandMultiplierByProduct\[row\.productId\] \?\? demandMultiplier/);
 });
 
-test("VIBpE Co-Pilot answers multi-question prompts separately", () => {
+test("VIBPE Co-Pilot answers multi-question prompts separately", () => {
   assert.match(copilot, /function splitQuestions/);
   assert.match(copilot, /if \(questions\.length > 1\)/);
   assert.match(copilot, /for \(const \[index, question\] of questions\.entries\(\)\)/);
@@ -62,7 +62,7 @@ test("single multi-metric prompt returns complete governed executive assessment"
   assert.ok(executiveBranch >= 0 && fundingBranch > executiveBranch, "multi-metric executive routing must precede single-domain funding routing");
 });
 
-test("VIBpE Co-Pilot refuses packets that predate exact committed-material reconciliation", () => {
+test("VIBPE Co-Pilot refuses packets that predate exact committed-material reconciliation", () => {
   assert.match(copilot, /RUNTIME_IBPE_ENGINE_VERSION/);
   assert.match(copilot, /predates exact committed-material reconciliation/);
   assert.match(copilot, /released job-card requirements participate in procurement and funding analysis/);

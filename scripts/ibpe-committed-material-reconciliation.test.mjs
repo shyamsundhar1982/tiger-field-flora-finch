@@ -117,11 +117,11 @@ test("workspace rejects stale engine packets and Scenario Studio exposes materia
   assert.match(scenarioStudio, /committedRequirementQty/);
 });
 
-test("the assistant has one canonical VIBpE Co-Pilot display name", async () => {
+test("the assistant has one canonical VIBPE Co-Pilot display name", async () => {
   const brand = await readFile(new URL("../src/lib/ibpe-brand.ts", import.meta.url), "utf8");
   const component = await readFile(new URL("../src/components/ibpe-copilot.tsx", import.meta.url), "utf8");
   const scenarioStudio = await readFile(new URL("../src/routes/command/scenarios.tsx", import.meta.url), "utf8");
-  assert.match(brand, /VIBpE Co-Pilot/);
+  assert.match(brand, /VIBPE Co-Pilot/);
   assert.match(component, /VIBPE_COPILOT_NAME/);
   assert.match(scenarioStudio, /VIBPE_COPILOT_NAME/);
 });

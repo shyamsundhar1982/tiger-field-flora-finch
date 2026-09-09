@@ -2,7 +2,7 @@
 
 ## Outcome
 
-IBPE 1.3 closes the gap between aggregate planning-BOM demand and the exact material configuration released through production job cards. Procurement, cash, scenario and VIBpE Co-Pilot outputs now share the same governed SKU-month demand basis.
+IBPE 1.3 closes the gap between aggregate planning-BOM demand and the exact material configuration released through production job cards. Procurement, cash, scenario and VIBPE Co-Pilot outputs now share the same governed SKU-month demand basis.
 
 This is a prerequisite release for the Plan → Forecast → Actual → Variance learning loop. It does not claim that WAPE, bias or plan-attainment learning is complete.
 
@@ -14,7 +14,7 @@ This is a prerequisite release for the Plan → Forecast → Actual → Variance
    - planned material demand exploded through the approved planning BOM;
    - exact committed material demand already exploded by the released job card.
 4. The larger quantity governs each SKU-month. The signals are not added, which prevents the same customer demand from being counted twice.
-5. ATP, shortages, purchase recommendations, procurement cash and VIBpE Co-Pilot explanations use that reconciled requirement.
+5. ATP, shortages, purchase recommendations, procurement cash and VIBPE Co-Pilot explanations use that reconciled requirement.
 
 ## Controls
 
@@ -29,7 +29,7 @@ This is a prerequisite release for the Plan → Forecast → Actual → Variance
 
 ## Operator sequence
 
-If the readiness strip reports a committed-order projection blocker, reconcile the confirmed order and production job card in `/command/production`. Then create a new governed IBPE run. Use Scenario Studio and VIBpE Co-Pilot only after the 1.3 snapshot is persisted.
+If the readiness strip reports a committed-order projection blocker, reconcile the confirmed order and production job card in `/command/production`. Then create a new governed IBPE run. Use Scenario Studio and VIBPE Co-Pilot only after the 1.3 snapshot is persisted.
 
 ## Next build sequence
 
