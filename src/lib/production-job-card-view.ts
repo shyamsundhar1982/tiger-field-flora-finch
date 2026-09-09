@@ -1,12 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getCommandRole } from "@/lib/command-access";
+import { optionalAuthMiddleware } from "@/lib/auth/middleware";
+import { requireBusinessActor } from "@/lib/business-actor";
 import { getSql } from "@/lib/db";
-import { canPerform } from "@/lib/page-access";
 
 /** Read-only adapter over confirmed demand, canonical job cards, live ATP and linked traveller genealogy. */
-export const getProductionJobCardView = createServerFn({ method: "GET" }).handler(async () => {
-  const role = await getCommandRole();
-  if (!role || !canPerform(role, "view")) throw new Error("Production view permission denied.");
+export const getProductionJobCardView = createServerFn({ method: "GET" })
+  .middleware([optionalAuthMiddleware])
+  .handler(async ({ context }) => {
+  await requireBusinessActor(
+    "view",
+    context.userId ? { userId: context.userId, email: context.userEmail } : undefined,
+  );
   const sql = await getSql();
   const [orders, cards, lines, travellers] = await Promise.all([
     sql`
