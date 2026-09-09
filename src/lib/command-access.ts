@@ -79,6 +79,13 @@ export const getCommandRole = createServerFn({ method: "GET" })
     return getLegacyRole();
   });
 
+export const getCommandIdentity = createServerFn({ method: "GET" })
+  .middleware([optionalAuthMiddleware])
+  .handler(async ({ context }) => ({
+    individual: Boolean(context.userId),
+    email: context.userEmail ?? null,
+  }));
+
 export const getCommandAccess = createServerFn({ method: "GET" })
   .middleware([optionalAuthMiddleware])
   .handler(async ({ context }) => {
