@@ -15,6 +15,12 @@ export type OperatingPlan = {
   milestoneMonths: Record<OperatingPlanMilestoneId, number>;
   productLaunchMonths: Record<OperatingPlanProductId, number>;
   demandScale: number;
+  /**
+   * Optional base-plan unit overrides by relative plan month ("1".."36").
+   * These are planning inputs only. They never create Commercial orders,
+   * Production job cards, inventory, travellers or supplier commitments.
+   */
+  monthlyDemandOverrides?: Record<string, number>;
   fundingTimingOffsetMonths: number;
   cashFloorLakh: number;
   note: string;
@@ -43,6 +49,7 @@ export const DEFAULT_APPROVED_OPERATING_PLAN: OperatingPlan = {
     altitude: 16,
   },
   demandScale: 1,
+  monthlyDemandOverrides: {},
   fundingTimingOffsetMonths: 0,
   cashFloorLakh: 15,
   note: "Initial approved rolling operating plan. Baseline commercial launch is Month 14.",
@@ -61,6 +68,26 @@ const SCENARIO_DEMAND_FACTOR: Record<PlanningScenarioId, number> = {
 };
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 const clampRelativeMonth = (value: number) => Math.max(-120, Math.min(36, Math.round(value)));
+
+function normalizeMonthlyDemandOverrides(overrides?: Record<string, number>) {
+  const normalized: Record<string, number> = {};
+  for (const [monthKey, unitsValue] of Object.entries(overrides ?? {})) {
+    const month = Number(monthKey);
+    const units = Number(unitsValue);
+    if (!Number.isInteger(month) || month < 1 || month > 36 || !Number.isFinite(units)) continue;
+    normalized[String(month)] = Math.max(0, Math.min(1_000_000, Math.round(units)));
+  }
+  return normalized;
+}
+
+function shiftMonthlyDemandOverrides(overrides: Record<string, number> | undefined, deltaMonths: number) {
+  const shifted: Record<string, number> = {};
+  for (const [monthKey, units] of Object.entries(overrides ?? {})) {
+    const shiftedMonth = Number(monthKey) + deltaMonths;
+    if (shiftedMonth >= 1 && shiftedMonth <= 36) shifted[String(shiftedMonth)] = units;
+  }
+  return shifted;
+}
 
 export function normalizeOperatingPlan(plan: OperatingPlan): OperatingPlan {
   return {
@@ -83,6 +110,7 @@ export function normalizeOperatingPlan(plan: OperatingPlan): OperatingPlan {
       altitude: clampRelativeMonth(plan.productLaunchMonths.altitude),
     },
     demandScale: Math.max(0, Math.min(5, Number(plan.demandScale) || 0)),
+    monthlyDemandOverrides: normalizeMonthlyDemandOverrides(plan.monthlyDemandOverrides),
     fundingTimingOffsetMonths: Math.max(-12, Math.min(24, Math.round(plan.fundingTimingOffsetMonths))),
     cashFloorLakh: Math.max(0, Math.min(500, Number(plan.cashFloorLakh) || 0)),
     note: plan.note?.trim().slice(0, 1000) || "Rolling 36-month operating plan.",
@@ -114,8 +142,17 @@ export function unitsForPlanMonth(
   month: number,
   scenario: PlanningScenarioId = "base",
 ) {
-  const launchMonth = effectiveMilestoneMonth(plan, "commercialLaunch", scenario);
-  const index = month - launchMonth;
+  // Monthly overrides belong to the base plan. Scenario timing shifts the base
+  // month forward while scenario demand factors still apply consistently.
+  const sourceMonth = month - scenarioDelayMonths(scenario);
+  if (sourceMonth < 1 || sourceMonth > 36) return 0;
+
+  const override = plan.monthlyDemandOverrides?.[String(sourceMonth)];
+  if (override !== undefined) {
+    return Math.max(0, Math.round(override * SCENARIO_DEMAND_FACTOR[scenario]));
+  }
+
+  const index = sourceMonth - plan.milestoneMonths.commercialLaunch;
   if (index < 0) return 0;
   const base = BASE_DEMAND_RAMP[Math.min(index, BASE_DEMAND_RAMP.length - 1)] ?? 0;
   return Math.max(0, Math.round(base * plan.demandScale * SCENARIO_DEMAND_FACTOR[scenario]));
@@ -148,6 +185,7 @@ export function shiftOperatingPlan(plan: OperatingPlan, deltaMonths: number): Op
       latitude: plan.productLaunchMonths.latitude + delta,
       altitude: plan.productLaunchMonths.altitude + delta,
     },
+    monthlyDemandOverrides: shiftMonthlyDemandOverrides(plan.monthlyDemandOverrides, delta),
   });
 }
 
@@ -174,6 +212,7 @@ export function rollOperatingPlan(plan: OperatingPlan, months = 1): OperatingPla
       latitude: plan.productLaunchMonths.latitude - delta,
       altitude: plan.productLaunchMonths.altitude - delta,
     },
+    monthlyDemandOverrides: shiftMonthlyDemandOverrides(plan.monthlyDemandOverrides, -delta),
   });
 }
 
