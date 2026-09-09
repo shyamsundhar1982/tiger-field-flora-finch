@@ -97,3 +97,37 @@ test("Commercial business writes require an individual identity and prove persis
     "Commercial must persist the order before synchronizing Production",
   );
 });
+
+test("Commercial revisions are buffered and synchronize only on explicit save", async () => {
+  const sales = await text("src/routes/command/sales.tsx");
+  assert.match(sales, /Revise order \/ configuration/);
+  assert.match(sales, /Save & synchronize revision/);
+  assert.match(sales, /editOrderVariant/);
+  assert.match(sales, /editOrderConfiguration/);
+  assert.match(sales, /Controlled Commercial order revision/);
+  assert.doesNotMatch(sales, /onChange=\{\(event\) => void updateOrder/);
+});
+
+test("governed planning supports admin-editable M1-M36 unit overrides without creating transactions", async () => {
+  const plan = await text("src/lib/planning/operating-plan.ts");
+  const studio = await text("src/components/planning-studio.tsx");
+  const store = await text("src/lib/store.ts");
+
+  assert.match(plan, /monthlyDemandOverrides/);
+  assert.match(plan, /unitsForPlanMonth/);
+  assert.match(studio, /Month-by-month base production \/ demand units/);
+  assert.match(studio, /setMonthUnits/);
+  assert.match(studio, /never creates a Commercial order, Production job card, traveller, inventory movement or supplier commitment/);
+  assert.match(store, /key === "unitMultiplier"/);
+  assert.match(store, /demandScale: value/);
+});
+
+test("legacy Command admin can maintain internal Governance action status without weakening business commitments", async () => {
+  const actions = await text("src/lib/operating-action-authority.ts");
+  const actor = await text("src/lib/business-actor.ts");
+  assert.match(actions, /requireOperatingActionActor/);
+  assert.match(actions, /command:admin/);
+  assert.match(actions, /role === "admin"/);
+  assert.match(actor, /const userId = await requireUserId\(\)/);
+  assert.doesNotMatch(actor, /if \(role === "admin"\) return \{ userId: "command:admin"/);
+});

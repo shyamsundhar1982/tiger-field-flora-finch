@@ -18,6 +18,7 @@ import {
 } from "@/lib/finance/equipment-ledger";
 import type { BomCostSource, BomTier } from "@/lib/finance/bom-engine";
 import { ACTIONS } from "@/lib/data/actions";
+import { DEFAULT_APPROVED_OPERATING_PLAN } from "@/lib/planning/operating-plan";
 
 type ActionState = Record<string, "open" | "doing" | "done">;
 type NumericAccountingKey = Exclude<keyof AccountingAssumptions, "fundingTypeByMonth">;
@@ -101,7 +102,14 @@ export const useVeloxis = create<Store>()(
       setAction: (id, status) => set((state) => ({ actions: { ...state.actions, [id]: status } })),
       setFinance: (finance) => set({ finance: withEquipmentDefaults(finance) }),
       updateGlobalFinance: (key, value) =>
-        set((state) => ({ finance: { ...state.finance, [key]: value } })),
+        set((state) => {
+          const finance = { ...state.finance, [key]: value } as FinanceAssumptions;
+          if (key === "unitMultiplier") {
+            const operatingPlan = state.finance.operatingPlan ?? DEFAULT_APPROVED_OPERATING_PLAN;
+            finance.operatingPlan = { ...operatingPlan, demandScale: value };
+          }
+          return { finance };
+        }),
       updateProductLine: (id, key, value) =>
         set((state) => ({
           finance: {

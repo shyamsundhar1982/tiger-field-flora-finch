@@ -7,6 +7,24 @@ import { requireBusinessActor } from "@/lib/business-actor";
 
 export type OperatingActionStatus = "open" | "doing" | "done";
 
+async function requireOperatingActionActor() {
+  const role = await getCommandRole();
+  if (!role || !canPerform(role, "edit")) {
+    throw new Error("Operating action edit permission denied.");
+  }
+  try {
+    return await requireBusinessActor("edit");
+  } catch (error) {
+    // Governance action status is an internal execution-control record rather
+    // than an external commercial/production commitment. Keep the legacy
+    // Command admin usable during the auth migration while preserving an
+    // explicit, auditable actor id. Commercial orders, production approvals and
+    // supplier commitments continue to require an individual Better Auth user.
+    if (role === "admin") return { userId: "command:admin", role: "admin" as const };
+    throw error;
+  }
+}
+
 export const listOperatingActionStatus = createServerFn({ method: "GET" }).handler(async () => {
   const role = await getCommandRole();
   if (!role || !canPerform(role, "view")) throw new Error("Operating action view permission denied.");
@@ -26,7 +44,7 @@ export const saveOperatingActionStatus = createServerFn({ method: "POST" })
     note: z.string().max(1000).optional(),
   }))
   .handler(async ({ data }) => {
-    const actor = await requireBusinessActor("edit");
+    const actor = await requireOperatingActionActor();
     const sql = await getSql();
     await sql.query(`select set_vyndi_operating_action($1,$2,$3,$4::date,$5,$6,$7)`, [
       data.actionId,
