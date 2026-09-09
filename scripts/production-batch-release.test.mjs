@@ -71,3 +71,23 @@ test("Production exposes confirmed-order to current job-card reconciliation inst
   assert.match(production, /If you expected more confirmed orders than the count above/);
   assert.doesNotMatch(production, /const committedUnits = cards\.reduce/);
 });
+
+test("Commercial business writes require an individual identity and prove persistence before Production sync", async () => {
+  const actor = await text("src/lib/business-actor.ts");
+  const authority = await text("src/lib/sales-order-authority.ts");
+  const sales = await text("src/routes/command/sales.tsx");
+
+  assert.match(actor, /getBusinessWriteReadiness/);
+  assert.match(actor, /signedIn: Boolean\(user\)/);
+  assert.match(actor, /canEdit: Boolean\(role && user && canPerform\(role, "edit"\)\)/);
+
+  assert.match(authority, /vyndi_sales_order_revisions/);
+  assert.match(authority, /Sales-order persistence verification failed/);
+  assert.match(authority, /persisted: true as const/);
+
+  assert.match(sales, /getBusinessWriteReadiness/);
+  assert.match(sales, /Order was NOT saved/);
+  assert.match(sales, /IS persisted in Commercial, but Production synchronization failed/);
+  assert.match(sales, /Sign in to create order/);
+  assert.ok(sales.indexOf("saveSalesOrder") < sales.indexOf("syncProductionJobCard"), "Commercial must persist the order before synchronizing Production");
+});
