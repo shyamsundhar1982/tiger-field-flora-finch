@@ -57,6 +57,8 @@ test("Command Centre source and workspace actions force canonical document loads
   assert.match(commandCentre, /href=\{packet\.source\}/);
   assert.match(commandCentre, /Open workspace →/);
   assert.match(commandCentre, /href="\/command\/planning"/);
+  assert.match(commandCentre, /href="\/command\/control-tower"/);
+  assert.match(commandCentre, /ERP Reports →/);
   assert.doesNotMatch(commandCentre, /<Link\b/);
 });
 
