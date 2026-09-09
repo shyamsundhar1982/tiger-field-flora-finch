@@ -4,6 +4,17 @@ import { canPerform, type CommandPermission, type CommandRole } from "@/lib/page
 
 export type BusinessActor = { userId: string; role: CommandRole };
 
+export async function getBusinessWriteReadiness() {
+  const [role, user] = await Promise.all([getCommandRole(), getSessionUser()]);
+  return {
+    role,
+    signedIn: Boolean(user),
+    email: user?.email ?? null,
+    canEdit: Boolean(role && user && canPerform(role, "edit")),
+    canApprove: Boolean(role && user && canPerform(role, "approve")),
+  };
+}
+
 /**
  * Read-only advisory exploration may be performed through an authorised legacy
  * Command session. Mutating permissions still require a stable Better Auth
