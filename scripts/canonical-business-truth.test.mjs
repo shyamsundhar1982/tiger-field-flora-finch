@@ -61,6 +61,10 @@ test("canonical order → reservation → ATP → FIFO/COGS and stale-order cont
   await createReleasedCard(db,{orderId:"SO-TEST-1",cardId:"CARD-TEST-1",lineId:"LINE-TEST-1",quantity:4});
   const reservation=await db.query(`select * from reserve_epr_inventory_for_job_line($1,$2,$3,$4,$5)`,["RES-TEST-1","CARD-TEST-1","LINE-TEST-1","test-user","operations"]);
   assert.equal(Number(reservation.rows[0].required_quantity),4); assert.equal(Number(reservation.rows[0].physical_quantity),5); assert.equal(Number(reservation.rows[0].reserved_quantity),4); assert.equal(Number(reservation.rows[0].shortage_quantity),0);
+  const reportReservation=await db.query(`select reserved_at,health from vyndi_report_reservation_health where reservation_id='RES-TEST-1'`);
+  assert.ok(reportReservation.rows[0].reserved_at); assert.equal(reportReservation.rows[0].health,"OK");
+  const bomCompliance=await db.query(`select model_tier,variant_id,released_mapping_count,compliance from vyndi_report_bom_compliance where job_card_id='CARD-TEST-1'`);
+  assert.equal(bomCompliance.rows[0].model_tier,"core"); assert.equal(bomCompliance.rows[0].variant_id,"core-tiagra"); assert.equal(Number(bomCompliance.rows[0].released_mapping_count),1); assert.equal(bomCompliance.rows[0].compliance,"OK");
   const atp=await db.query(`select physical_quantity,reserved_quantity,available_to_promise from vyndi_inventory_available_to_promise where sku='TEST-SKU' and unit='ea'`);
   assert.equal(Number(atp.rows[0].physical_quantity),5); assert.equal(Number(atp.rows[0].reserved_quantity),4); assert.equal(Number(atp.rows[0].available_to_promise),1);
   await assert.rejects(()=>db.query(`select * from post_vyndi_inventory_issue($1,$2,$3,$4,$5,$6::date,$7,$8,$9,$10)`,["ISS-FREE-FAIL","LED-FREE-FAIL","TEST-SKU",2,"ea","2026-02-01","FREE-ISSUE","must respect reservation","test-user","operations"]),/Insufficient available-to-promise stock/);
@@ -174,23 +178,35 @@ test("recommendation → PO approval → GRN/FIFO → three-way match → paymen
   assert.equal(Number(stock.rows[0].physical_quantity),5); assert.equal(Number(stock.rows[0].available_to_promise),5);
   const openPo=await db.query(`select open_po_quantity from vyndi_open_purchase_orders where sku='P2P-SKU' and unit='ea'`);
   assert.equal(Number(openPo.rows[0].open_po_quantity),5);
+  const procurementReport=await db.query(`select open_po_qty from vyndi_report_procurement_net_requirement where sku='P2P-SKU' and unit='ea'`);
+  assert.equal(Number(procurementReport.rows[0].open_po_qty),5);
+  const receivingReport=await db.query(`select status,exception_class from vyndi_report_receiving_exceptions where purchase_order_id='PO-P2P'`);
+  assert.equal(receivingReport.rows[0].status,'part_received'); assert.equal(receivingReport.rows[0].exception_class,'OPEN_RECEIPT');
 
   const invoice=await db.query(`select * from post_vyndi_supplier_invoice($1,$2,$3,$4::date,$5,$6,$7,$8,$9,$10)`,
     ['AP-P2P','PO-P2P','SUPINV-P2P','2026-02-02',5,500,90,'INVFILE-P2P','ap-user-1','finance']);
   assert.equal(invoice.rows[0].match_status,'matched');
+  const payableReport=await db.query(`select supplier_invoice_id,amount_open_inr,payable_class from vyndi_report_payables_aging where supplier_invoice_id='AP-P2P'`);
+  assert.equal(payableReport.rows[0].supplier_invoice_id,'AP-P2P'); assert.equal(Number(payableReport.rows[0].amount_open_inr),590); assert.equal(payableReport.rows[0].payable_class,'OPEN');
   await assert.rejects(()=>db.query(`select approve_vyndi_supplier_invoice($1,$2,$3)`,['AP-P2P','ap-user-1','finance']),/different authorised user/);
   await db.query(`select approve_vyndi_supplier_invoice($1,$2,$3)`,['AP-P2P','ap-approver-2','finance']);
   await db.query(`select post_vyndi_supplier_payment($1,$2,$3::date,$4,$5,$6,$7)`,['PAY-P2P','AP-P2P','2026-03-04',590,'BANK-P2P','ap-user-1','finance']);
   const payable=await db.query(`select status,amount_open_inr from vyndi_accounts_payable where id='AP-P2P'`);
   assert.equal(payable.rows[0].status,'paid'); assert.equal(Number(payable.rows[0].amount_open_inr),0);
+  const paidReport=await db.query(`select count(*)::int as count from vyndi_report_payables_aging where supplier_invoice_id='AP-P2P'`);
+  assert.equal(Number(paidReport.rows[0].count),0);
 
   await db.query(`select post_vyndi_goods_receipt($1,$2,$3::date,$4,$5,$6,$7,$8,$9,$10,$11)`,
     ['GRN-P2P-MIXED','PO-P2P','2026-02-03',6,5,1,'accepted','DN-P2P-MIXED','replacement plus rejection','receiver-1','operations']);
   const completedPo=await db.query(`select status,quantity_accepted,quantity_received from vyndi_purchase_order_status where id='PO-P2P'`);
   assert.equal(completedPo.rows[0].status,'received'); assert.equal(Number(completedPo.rows[0].quantity_accepted),10); assert.equal(Number(completedPo.rows[0].quantity_received),13);
+  const sop=await db.query(`select open_pos from vyndi_report_sop_snapshot`);
+  assert.equal(Number(sop.rows[0].open_pos),0);
 
   const blocked=await db.query(`select * from post_vyndi_supplier_invoice($1,$2,$3,$4::date,$5,$6,$7,$8,$9,$10)`,
     ['AP-P2P-BLOCK','PO-P2P','SUPINV-P2P-BLOCK','2026-02-02',6,600,108,'INVFILE-P2P-BLOCK','ap-user-1','finance']);
   assert.equal(blocked.rows[0].match_status,'blocked');
+  const blockedReport=await db.query(`select payable_class,amount_open_inr from vyndi_report_payables_aging where supplier_invoice_id='AP-P2P-BLOCK'`);
+  assert.equal(blockedReport.rows[0].payable_class,'BLOCKED'); assert.equal(Number(blockedReport.rows[0].amount_open_inr),708);
   await assert.rejects(()=>db.query(`select approve_vyndi_supplier_invoice($1,$2,$3)`,['AP-P2P-BLOCK','ap-approver-2','finance']),/three-way-matched/);
 });

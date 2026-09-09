@@ -16,7 +16,7 @@
     "preview:stop": "node scripts/preview.mjs stop",
     "typecheck": "npm run build:dev && tsc --noEmit",
     "check:auth": "node scripts/check-auth-invariant.mjs",
-    "test": "node --test scripts/canonical-business-truth.test.mjs scripts/navigation-routing-regression.test.mjs scripts/purchase-history-ledger.test.mjs scripts/ibpe-copilot-intent.test.mjs scripts/production-batch-release.test.mjs && node --experimental-strip-types --test scripts/ibpe-governance.test.mjs scripts/ibpe-workbook-v5-parity.test.mjs scripts/ibpe-committed-material-reconciliation.test.mjs && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/auth/gate-identity.test.ts src/lib/master-ledger.test.ts src/lib/master-inventory-db.test.ts src/lib/route-ownership.test.ts",
+    "test": "node --test scripts/migration-execution.test.mjs scripts/canonical-business-truth.test.mjs scripts/navigation-routing-regression.test.mjs scripts/purchase-history-ledger.test.mjs scripts/ibpe-copilot-intent.test.mjs scripts/production-batch-release.test.mjs && node --experimental-strip-types --test scripts/ibpe-governance.test.mjs scripts/ibpe-workbook-v5-parity.test.mjs scripts/ibpe-committed-material-reconciliation.test.mjs && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/auth/gate-identity.test.ts src/lib/master-ledger.test.ts src/lib/master-inventory-db.test.ts src/lib/route-ownership.test.ts",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
