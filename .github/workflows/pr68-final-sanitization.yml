@@ -31,12 +31,13 @@ jobs:
       - name: Apply deterministic sanitation
         run: node scripts/apply-pr68-final-sanitization.mjs
 
-      - name: Correct generated compatibility assertions
+      - name: Correct generated compatibility assertions and typed ledger route
         run: |
           node --input-type=module <<'NODE'
           import { readFileSync, writeFileSync } from "node:fs";
-          const path = "scripts/check-route-invariants.mjs";
-          let source = readFileSync(path, "utf8");
+
+          const checkPath = "scripts/check-route-invariants.mjs";
+          let source = readFileSync(checkPath, "utf8");
           const replacement = `for (const [route, target] of [["phase-4", "/command/sales"], ["phase-5", "/command/engineering"], ["phase-6", "/command/operations"], ["phase-6a", "/command/epr-execution"], ["management-intelligence", "/command"]]) {
             const aliasSource = read(\`src/routes/command/\${route}.tsx\`);
             assert.ok(aliasSource.includes(\`redirect({ to: "\${target}" })\`), \`\${route} must remain a compatibility redirect\`);
@@ -46,7 +47,25 @@ jobs:
           const pattern = /for \(const \[route, target\] of \[\["phase-4"[\s\S]*?\n\}\n\nconst ops =/;
           if (!pattern.test(source)) throw new Error("generated route alias assertion block not found");
           source = source.replace(pattern, replacement);
-          writeFileSync(path, source, "utf8");
+
+          const lines = source.split("\n");
+          const inventoryAssertion = lines.findIndex((line) => line.includes("assert.match(inventoryNav,"));
+          if (inventoryAssertion < 0) throw new Error("generated inventory ledger route assertion not found");
+          lines.splice(
+            inventoryAssertion,
+            1,
+            'assert.ok(inventoryNav.includes(\'to="/command/inventory-ledgers/$ledger"\'));',
+            'assert.ok(inventoryNav.includes(\'params={{ ledger: "components" }}\'));',
+          );
+          writeFileSync(checkPath, lines.join("\n"), "utf8");
+
+          const navPath = "src/components/inventory-workspace-nav.tsx";
+          let nav = readFileSync(navPath, "utf8");
+          const oldNav = '<Link to="/command/inventory-ledgers/components" className="hover:text-accent">';
+          const newNav = '<Link to="/command/inventory-ledgers/$ledger" params={{ ledger: "components" }} className="hover:text-accent">';
+          if (!nav.includes(oldNav)) throw new Error("generated inventory breadcrumb target not found");
+          nav = nav.replace(oldNav, newNav);
+          writeFileSync(navPath, nav, "utf8");
           NODE
 
       - name: Install dependencies
