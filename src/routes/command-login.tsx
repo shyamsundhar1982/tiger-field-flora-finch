@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { LockKeyhole } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { authClient } from "@/lib/auth/client";
@@ -46,9 +46,9 @@ function CommandLogin() {
     try {
       const identity = username.trim();
 
-      // VINDY-managed individual users are Better Auth accounts. Clear any
-      // previous legacy command session first so an old role cookie cannot
-      // override the newly authenticated user's assigned permissions.
+      // Email credentials are always treated as the canonical individual VYNDI
+      // identity path. Clear a stale legacy role only after deciding this is an
+      // individual login.
       if (identity.includes("@")) {
         await clearLegacyCommandSession();
 
@@ -71,21 +71,24 @@ function CommandLogin() {
         try {
           await authClient.getSession();
         } catch {
-          // Server-function middleware will use the transported bearer when the
+          // Server-function middleware will use the transported bearer when a
           // preview hostname cannot retain the Better Auth cookie reliably.
         }
         await navigate({ to: "/command" });
         return;
       }
 
-      // Legacy command credentials remain a compatibility path. Clear any
-      // Better Auth identity and its bearer first so identities cannot mix.
-      await clearBetterAuthSession();
+      // Legacy shared credentials are a compatibility path only. Validate them
+      // first. A failed or unconfigured legacy login must NOT destroy an already
+      // valid individual Better Auth session.
       const result = await unlockCommand({ data: { username: identity, password } });
       if (!result.ok) {
         setError(result.error ?? "Access denied.");
         return;
       }
+
+      // Only after successful legacy authentication do we switch identities.
+      await clearBetterAuthSession();
       await navigate({ to: "/command" });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to verify access. Please try again.");
@@ -104,18 +107,19 @@ function CommandLogin() {
             </div>
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-accent">VYNDI BIKES</p>
-              <h1 className="text-2xl font-semibold tracking-tight">Command Access</h1>
+              <h1 className="text-2xl font-semibold tracking-tight">Legacy Command Access</h1>
             </div>
           </div>
 
-          <p className="mb-6 text-sm leading-6 text-muted">
-            Admin has full control. Individual VINDY users sign in with their own email and password and receive the role assigned by Admin.
-          </p>
+          <div className="mb-6 rounded-xl border border-accent/30 bg-accent/5 p-4 text-sm leading-6 text-muted">
+            <p><span className="font-semibold text-fg">Individual VYNDI users:</span> use the secure email login. This legacy screen is only for explicitly configured shared Command credentials.</p>
+            <Link to="/login" className="mt-2 inline-block font-semibold text-accent hover:underline">Go to individual sign in →</Link>
+          </div>
 
           <form onSubmit={submit} className="space-y-4">
             <label className="block">
-              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-muted">Email or Username</span>
-              <input autoFocus type="text" value={username} onChange={(event) => setUsername(event.target.value)} className="control w-full" placeholder="name@company.com or admin" autoComplete="username" disabled={busy} />
+              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-muted">Email or legacy username</span>
+              <input autoFocus type="text" value={username} onChange={(event) => setUsername(event.target.value)} className="control w-full" placeholder="name@company.com or configured legacy username" autoComplete="username" disabled={busy} />
             </label>
             <label className="block">
               <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-muted">Password</span>
@@ -125,7 +129,7 @@ function CommandLogin() {
             {error ? <p className="text-sm text-red-400" role="alert">{error}</p> : null}
 
             <button type="submit" disabled={busy || !username || !password} className="w-full rounded-lg border border-accent bg-accent px-4 py-3 text-sm font-semibold text-bg transition-opacity disabled:cursor-not-allowed disabled:opacity-50">
-              {busy ? "Verifying…" : "Enter Command"}
+              {busy ? "Verifying…" : username.includes("@") ? "Sign in as VYNDI user" : "Use legacy Command access"}
             </button>
           </form>
         </section>
