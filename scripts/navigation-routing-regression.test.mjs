@@ -67,7 +67,12 @@ test("Action Inbox opens its owning canonical workspace", () => {
   assert.doesNotMatch(decisionInbox, /<Link\b/);
 });
 
-test("legacy Control Tower remains compatibility-only", () => {
+test("Control Tower is the registered read-only ERP reporting console", () => {
+  assert.match(metadata, /"\/command\/control-tower"/);
   assert.match(controlTower, /createFileRoute\("\/command\/control-tower"\)/);
-  assert.match(controlTower, /redirect\(\{ to: "\/command" \}\)/);
+  assert.match(controlTower, /loader: \(\) => getAllErpSuiteReports\(\)/);
+  assert.match(controlTower, /ERP Control Tower/);
+  assert.match(controlTower, /Download full ERP pack/);
+  assert.match(controlTower, /downloadCsv/);
+  assert.doesNotMatch(controlTower, /redirect\(/);
 });
