@@ -91,5 +91,9 @@ test("Commercial business writes require an individual identity and prove persis
   assert.match(sales, /Order was NOT saved/);
   assert.match(sales, /IS persisted in Commercial, but Production synchronization failed/);
   assert.match(sales, /Sign in to create order/);
-  assert.ok(sales.indexOf("saveSalesOrder") < sales.indexOf("syncProductionJobCard"), "Commercial must persist the order before synchronizing Production");
+  assert.match(
+    sales,
+    /write = await saveSalesOrder\([\s\S]*?const projection = await syncProductionJobCard/,
+    "Commercial must persist the order before synchronizing Production",
+  );
 });
