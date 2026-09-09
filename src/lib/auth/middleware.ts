@@ -1,15 +1,20 @@
 import { createMiddleware } from "@tanstack/react-start";
 
 /**
- * Required auth transport for business mutations. The client forwards the
- * session bearer token when one is available (including rotating Vercel preview
- * hosts); the server verifies that token or the same-origin cookie and exposes
- * one stable verified identity to the handler.
+ * Required auth transport for business mutations. The bearer is sent both in
+ * TanStack function context and as the actual Authorization header. The header
+ * is important because composed/nested server functions read the ambient
+ * request through getRequest(); they must see the same verified identity as the
+ * outer function rather than falling back to a legacy or viewer role.
  */
 export const authMiddleware = createMiddleware({ type: "function" })
   .client(async ({ next }) => {
     const { getBearerToken } = await import("./client");
-    return next({ sendContext: { bearerToken: getBearerToken() ?? undefined } });
+    const token = getBearerToken();
+    return next({
+      sendContext: { bearerToken: token ?? undefined },
+      ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+    });
   })
   .server(async ({ next, context }) => {
     const { assertSameSiteRequest } = await import("./isolation.server");
@@ -29,7 +34,11 @@ export const authMiddleware = createMiddleware({ type: "function" })
 export const optionalAuthMiddleware = createMiddleware({ type: "function" })
   .client(async ({ next }) => {
     const { getBearerToken } = await import("./client");
-    return next({ sendContext: { bearerToken: getBearerToken() ?? undefined } });
+    const token = getBearerToken();
+    return next({
+      sendContext: { bearerToken: token ?? undefined },
+      ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+    });
   })
   .server(async ({ next, context }) => {
     const { assertSameSiteRequest } = await import("./isolation.server");
