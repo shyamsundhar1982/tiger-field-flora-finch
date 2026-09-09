@@ -43,7 +43,6 @@ function CashPlanning() {
   const totalGstSettlement = rows.reduce((sum, row) => sum + row.gstSettlement, 0);
   const totalFunding = rows.reduce((sum, row) => sum + row.funding, 0);
   const totalCapex = rows.reduce((sum, row) => sum + row.capex, 0);
-  const sources = totalCollections + totalFunding;
   const uses = totalSupplierPayments + totals.opex + totalTax + totalGstSettlement + totalCapex;
 
   return (
