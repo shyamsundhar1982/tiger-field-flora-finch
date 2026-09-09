@@ -12,6 +12,20 @@ updates:
         dependency-type: production
       development-dependencies:
         dependency-type: development
+    # Breaking toolchain/runtime upgrades must be handled as explicit
+    # migration work, not bundled into unattended dependency PRs.
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+      # These infrastructure packages can carry database/auth or type-level
+      # compatibility changes even on semver-minor releases.
+      - dependency-name: "better-auth"
+        update-types:
+          - "version-update:semver-minor"
+      - dependency-name: "kysely"
+        update-types:
+          - "version-update:semver-minor"
 
   - package-ecosystem: github-actions
     directory: "/"
@@ -20,3 +34,8 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - dependencies
+    # Major action-runtime upgrades are reviewed and migrated deliberately.
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
