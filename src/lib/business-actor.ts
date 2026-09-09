@@ -1,37 +1,54 @@
 import { getCommandRole } from "@/lib/command-access";
-import { getSessionUser, requireUserId } from "@/lib/auth/verify.server";
+import { getSessionUser, UnauthorizedError } from "@/lib/auth/verify.server";
+import { getAssignedCommandRole } from "@/lib/command-user-role.server";
 import { canPerform, type CommandPermission, type CommandRole } from "@/lib/page-access";
 
 export type BusinessActor = { userId: string; role: CommandRole };
 
+async function getAssignedBusinessIdentity() {
+  const user = await getSessionUser();
+  if (!user) return { user: null, role: null as CommandRole | null };
+  const role = await getAssignedCommandRole(user.id, user.email);
+  return { user, role };
+}
+
 export async function getBusinessWriteReadiness() {
-  const [role, user] = await Promise.all([getCommandRole(), getSessionUser()]);
+  const { user, role } = await getAssignedBusinessIdentity();
   return {
     role,
     signedIn: Boolean(user),
     email: user?.email ?? null,
-    canEdit: Boolean(role && user && canPerform(role, "edit")),
-    canApprove: Boolean(role && user && canPerform(role, "approve")),
+    canEdit: Boolean(role && canPerform(role, "edit")),
+    canApprove: Boolean(role && canPerform(role, "approve")),
   };
 }
 
 /**
- * Read-only advisory exploration may be performed through an authorised legacy
- * Command session. Mutating permissions still require a stable Better Auth
- * identity so a shared-password compatibility session can never create or
- * approve business commitments.
+ * Read-only advisory exploration may still use an authorised legacy Command
+ * session. Mutating business commitments resolve the verified Better Auth user
+ * and that same user's explicit role assignment inside ONE request context.
+ * This prevents a readiness GET from succeeding while a later POST loses the
+ * identity after a nested server-function role lookup.
  */
 export async function requireBusinessActor(permission: CommandPermission): Promise<BusinessActor> {
-  const role = await getCommandRole();
+  if (permission === "view") {
+    const { user, role: assignedRole } = await getAssignedBusinessIdentity();
+    if (user && assignedRole && canPerform(assignedRole, permission)) {
+      return { userId: user.id, role: assignedRole };
+    }
+
+    const legacyRole = await getCommandRole();
+    if (!legacyRole || !canPerform(legacyRole, permission)) {
+      throw new Error(`Business ${permission} permission denied.`);
+    }
+    return { userId: `legacy-command:${legacyRole}`, role: legacyRole };
+  }
+
+  const { user, role } = await getAssignedBusinessIdentity();
+  if (!user) throw new UnauthorizedError();
   if (!role || !canPerform(role, permission)) {
     throw new Error(`Business ${permission} permission denied.`);
   }
 
-  if (permission === "view") {
-    const user = await getSessionUser();
-    return { userId: user?.id ?? `legacy-command:${role}`, role };
-  }
-
-  const userId = await requireUserId();
-  return { userId, role };
+  return { userId: user.id, role };
 }
