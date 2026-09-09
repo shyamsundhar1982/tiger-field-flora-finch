@@ -1,8 +1,20 @@
+import { createServerFn } from "@tanstack/react-start";
 import { getCommandRole } from "@/lib/command-access";
 import { getSessionUser, requireUserId } from "@/lib/auth/verify.server";
 import { canPerform, type CommandPermission, type CommandRole } from "@/lib/page-access";
 
 export type BusinessActor = { userId: string; role: CommandRole };
+
+export const getBusinessWriteReadiness = createServerFn({ method: "GET" }).handler(async () => {
+  const [role, user] = await Promise.all([getCommandRole(), getSessionUser()]);
+  return {
+    role,
+    signedIn: Boolean(user),
+    email: user?.email ?? null,
+    canEdit: Boolean(role && user && canPerform(role, "edit")),
+    canApprove: Boolean(role && user && canPerform(role, "approve")),
+  };
+});
 
 /**
  * Read-only advisory exploration may be performed through an authorised legacy
