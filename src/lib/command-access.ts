@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { CommandRole } from "@/lib/page-access";
 import { getSessionUser } from "@/lib/auth/verify.server";
-import { getSql } from "@/lib/db";
+import { getAssignedCommandRole } from "@/lib/command-user-role.server";
 
 const SESSION_NAME = "__Host-vyndi-command";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
@@ -37,31 +37,6 @@ const roleCredentials: Array<{
 
 function getCommandEnv(): CommandEnv {
   return process.env as CommandEnv;
-}
-
-function getBootstrapAdminEmails(): string[] {
-  return (process.env.VINDY_ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-async function getRoleForUser(userId: string, email?: string | null): Promise<CommandRole | null> {
-  const sql = await getSql();
-  const normalizedEmail = email?.trim().toLowerCase();
-
-  if (normalizedEmail && getBootstrapAdminEmails().includes(normalizedEmail)) {
-    await sql`
-      insert into vindy_user_roles (user_id, role) values (${userId}, 'admin')
-      on conflict (user_id) do update set role = 'admin', updated_at = now()
-    `;
-    return "admin";
-  }
-
-  const rows = await sql<{ role: string }>`
-    select role from vindy_user_roles where user_id = ${userId} limit 1
-  `;
-  return (rows[0]?.role as CommandRole | undefined) ?? null;
 }
 
 async function getLegacySession() {
@@ -99,7 +74,7 @@ async function getLegacyRole(): Promise<CommandRole | null> {
 export const getCommandRole = createServerFn({ method: "GET" }).handler(async () => {
   const user = await getSessionUser();
   if (user) {
-    const assignedRole = await getRoleForUser(user.id, user.email);
+    const assignedRole = await getAssignedCommandRole(user.id, user.email);
     if (assignedRole) return assignedRole;
     return (await getLegacyRole()) ?? "viewer";
   }
