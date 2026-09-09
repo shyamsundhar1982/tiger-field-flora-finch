@@ -9,6 +9,7 @@ const signup = read("src/routes/signup.tsx");
 const commandRoute = read("src/routes/command/route.tsx");
 const commandAccess = read("src/lib/command-access.ts");
 const shell = read("src/components/command-shell-v2.tsx");
+const siteHeader = read("src/components/site-header.tsx");
 const salesEngine = read("src/lib/finance/sales-engine.ts");
 const ibpeBrand = read("src/lib/ibpe-brand.ts");
 const ibpeProjection = read("src/components/ibpe-workspace-projection.tsx");
@@ -43,14 +44,20 @@ test("individual identity never inherits a legacy shared-password role", () => {
   assert.doesNotMatch(roleAuthority, /getLegacyRole\(\).*\?\? "viewer"/s);
 });
 
-test("Command route resolves access and role atomically and cannot redirect its landing page to itself", () => {
-  assert.match(commandAccess, /export const getCommandAuthorization/);
-  assert.match(commandRoute, /const authorization = await getCommandAuthorization\(\)/);
-  assert.doesNotMatch(commandRoute, /await getCommandAccess\(\)/);
-  assert.doesNotMatch(commandRoute, /await getCommandRole\(\)/);
+test("Command route uses production-safe scalar auth contracts and cannot redirect its landing page to itself", () => {
+  assert.match(commandRoute, /const access = await getCommandAccess\(\)/);
+  assert.match(commandRoute, /const role = await getCommandRole\(\)/);
+  assert.doesNotMatch(commandRoute, /getCommandAuthorization\(\)/);
   assert.match(commandRoute, /const routePath = normalizeCommandPath\(location\.pathname\)/);
   assert.match(commandRoute, /if \(routePath === "\/command"\) return/);
   assert.match(commandRoute, /normalizeCommandPath\(preferredTarget\) === routePath \? "\/command" : preferredTarget/);
+});
+
+test("public Command entry always routes through canonical credential sign in", () => {
+  assert.doesNotMatch(siteHeader, /\{ to: "\/command", label: "Command" \}/);
+  assert.match(siteHeader, /const COMMAND_RETURN_TO = "\/command"/);
+  assert.match(siteHeader, /to="\/login"/);
+  assert.match(siteHeader, /search=\{\{ returnTo: COMMAND_RETURN_TO \}\}/);
 });
 
 test("command logout clears legacy compatibility and canonical individual session", () => {

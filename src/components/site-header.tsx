@@ -6,9 +6,9 @@ import { cn } from "@/lib/utils";
 const LINKS = [
   { to: "/", label: "House" },
   { to: "/range", label: "Range" },
-  { to: "/command", label: "Command" },
 ] as const;
 
+const COMMAND_RETURN_TO = "/command";
 const VAYU_LOGO = "/brand/vayu-official.svg";
 
 type SiteHeaderProps = {
@@ -37,6 +37,13 @@ export function SiteHeader({ ghost = false, showNavigation = true, brandHref = "
                   {l.label}
                 </Link>
               ))}
+              <Link
+                to="/login"
+                search={{ returnTo: COMMAND_RETURN_TO }}
+                className="text-sm text-muted transition-colors duration-150 hover:text-accent"
+              >
+                Command
+              </Link>
             </nav>
             <button type="button" className="inline-flex size-11 items-center justify-center rounded-md md:hidden" aria-label={open ? "Close menu" : "Open menu"} onClick={() => setOpen((v) => !v)}>
               {open ? <X className="size-5" /> : <Menu className="size-5" />}
@@ -49,6 +56,14 @@ export function SiteHeader({ ghost = false, showNavigation = true, brandHref = "
           {LINKS.map((l) => (
             <Link key={l.to} to={l.to} className="block py-3 text-base text-fg" onClick={() => setOpen(false)}>{l.label}</Link>
           ))}
+          <Link
+            to="/login"
+            search={{ returnTo: COMMAND_RETURN_TO }}
+            className="block py-3 text-base text-fg"
+            onClick={() => setOpen(false)}
+          >
+            Command
+          </Link>
         </nav>
       ) : null}
     </header>
