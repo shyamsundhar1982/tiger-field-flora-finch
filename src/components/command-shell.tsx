@@ -1,11 +1,17 @@
 import { Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import {
   Activity,
+  AlertTriangle,
+  BookOpen,
+  Boxes,
+  ChevronDown,
   ClipboardCheck,
   DraftingCompass,
   Factory,
   LineChart,
   LogOut,
+  Presentation,
+  Scale,
   Settings2,
   Wallet,
 } from "lucide-react";
@@ -14,7 +20,13 @@ import { SiteHeader } from "@/components/site-header";
 import { cn } from "@/lib/utils";
 import { getCommandRole, lockCommand } from "@/lib/command-access";
 import { canAccessPage, type CommandRole } from "@/lib/page-access";
-import { getRouteMeta } from "@/lib/page-metadata";
+import {
+  getRouteMeta,
+  navigationGroups,
+  type PageDomain,
+  type PageMode,
+  type RouteMeta,
+} from "@/lib/page-metadata";
 
 type WorkspaceItem = {
   to: string;
@@ -138,8 +150,85 @@ const WORKSPACES: WorkspaceItem[] = [
   { to: GOVERNANCE_HOME_ROUTE, label: "Governance", icon: ClipboardCheck, context: GOVERNANCE_CONTEXT_ROUTES },
 ];
 
+const WORKSPACE_ROUTES = new Set(WORKSPACES.map((item) => item.to));
+const LEGACY_ROUTES = new Set<string>([
+  "/command/phase-4",
+  "/command/phase-5",
+  "/command/phase-6",
+  "/command/phase-6a",
+]);
+
+const ICONS: Record<string, typeof Activity> = {
+  command: Activity,
+  finance: Wallet,
+  manufacturing: Factory,
+  inventory: Boxes,
+  procurement: Boxes,
+  engineering: DraftingCompass,
+  epr: ClipboardCheck,
+  knowledge: BookOpen,
+  sales: LineChart,
+  market: LineChart,
+  legal: Scale,
+  risk: AlertTriangle,
+  leadership: Presentation,
+  admin: Settings2,
+};
+
+const DOMAIN_LABELS: Record<PageDomain, string> = {
+  command: "Command",
+  finance: "Finance",
+  manufacturing: "Manufacturing",
+  inventory: "Inventory",
+  procurement: "Procurement",
+  engineering: "Engineering",
+  epr: "EPR",
+  knowledge: "Knowledge",
+  sales: "Sales",
+  market: "Market",
+  legal: "Legal",
+  risk: "Risk",
+  leadership: "Executive",
+  admin: "Administration",
+};
+
+const DOMAIN_ORDER: PageDomain[] = [
+  "knowledge",
+  "epr",
+  "finance",
+  "procurement",
+  "inventory",
+  "manufacturing",
+  "engineering",
+  "sales",
+  "market",
+  "legal",
+  "risk",
+  "leadership",
+  "command",
+  "admin",
+];
+
+const MODE_LABELS: Record<PageMode, string> = {
+  understand: "REFERENCE",
+  observe: "MONITOR",
+  operate: "SPECIALIST",
+  showcase: "SHOWCASE",
+};
+
+const MODE_DESCRIPTIONS: Record<PageMode, string> = {
+  understand: "Knowledge & context",
+  observe: "Status & oversight",
+  operate: "Deep controls",
+  showcase: "External presentation",
+};
+
 function isAccessible(role: CommandRole | null, route: string) {
   return canAccessPage(role, getRouteMeta(route));
+}
+
+function isSecondaryNavigationPage(page: RouteMeta) {
+  return !WORKSPACE_ROUTES.has(page.route) && !LEGACY_ROUTES.has(page.route);
 }
 
 function CanonicalAnchor({
@@ -162,67 +251,175 @@ function CanonicalAnchor({
   );
 }
 
+function SecondaryPageLink({ page, role }: { page: RouteMeta; role: CommandRole | null }) {
+  if (!canAccessPage(role, page)) return null;
+  const Icon = ICONS[page.domain] ?? Activity;
+  return (
+    <a
+      href={page.route}
+      title={page.label}
+      className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted transition-colors hover:bg-bg hover:text-fg"
+    >
+      <Icon className="size-4 shrink-0" />
+      {page.label}
+    </a>
+  );
+}
+
+function SecondaryDomainGroup({
+  domain,
+  mode,
+  role,
+}: {
+  domain: PageDomain;
+  mode: PageMode;
+  role: CommandRole | null;
+}) {
+  const group =
+    mode === "showcase"
+      ? "Showcase"
+      : mode === "observe"
+        ? "Observe"
+        : mode === "operate"
+          ? "Operate"
+          : "Understand";
+  const pages = navigationGroups[group].filter(
+    (page) => page.domain === domain && isSecondaryNavigationPage(page) && canAccessPage(role, page),
+  );
+  if (!pages.length) return null;
+  const Icon = ICONS[domain] ?? Activity;
+  return (
+    <details className="group/domain">
+      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-subtle hover:bg-bg hover:text-fg [&::-webkit-details-marker]:hidden">
+        <Icon className="size-3.5" />
+        <span className="flex-1">{DOMAIN_LABELS[domain]}</span>
+        <span className="text-[9px] font-normal tracking-normal text-muted">{pages.length}</span>
+        <ChevronDown className="size-3" />
+      </summary>
+      <div className="ml-2 mt-1 space-y-0.5 border-l border-border pl-2">
+        {pages.map((page) => (
+          <SecondaryPageLink key={page.route} page={page} role={role} />
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function SecondaryMode({ mode, role }: { mode: PageMode; role: CommandRole | null }) {
+  const location = useLocation();
+  const group =
+    mode === "showcase"
+      ? "Showcase"
+      : mode === "observe"
+        ? "Observe"
+        : mode === "operate"
+          ? "Operate"
+          : "Understand";
+  const pages = navigationGroups[group].filter(
+    (page) => isSecondaryNavigationPage(page) && canAccessPage(role, page),
+  );
+  if (!pages.length) return null;
+  const active = pages.some(
+    (page) => location.pathname === page.route || location.pathname.startsWith(`${page.route}/`),
+  );
+  return (
+    <details open={active} className="group/mode">
+      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-3 py-2 text-[11px] font-bold uppercase tracking-[0.18em] text-fg hover:bg-bg [&::-webkit-details-marker]:hidden">
+        <span className="flex-1">{MODE_LABELS[mode]}</span>
+        <span className="mr-1 text-[9px] font-normal tracking-normal text-muted">{MODE_DESCRIPTIONS[mode]}</span>
+        <ChevronDown className="size-3" />
+      </summary>
+      <div className="ml-2 mt-1 space-y-1 border-l border-border pl-2">
+        {DOMAIN_ORDER.map((domain) => (
+          <SecondaryDomainGroup key={domain} domain={domain} mode={mode} role={role} />
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function MoreFunctions({ role }: { role: CommandRole | null }) {
+  return (
+    <details className="mt-3 rounded-xl border border-border bg-surface/20">
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted hover:text-fg [&::-webkit-details-marker]:hidden">
+        <Settings2 className="size-4 text-accent" />
+        <span className="flex-1">More functions</span>
+        <ChevronDown className="size-4" />
+      </summary>
+      <div className="space-y-1 border-t border-border p-2">
+        <SecondaryMode mode="understand" role={role} />
+        <SecondaryMode mode="observe" role={role} />
+        <SecondaryMode mode="operate" role={role} />
+        <SecondaryMode mode="showcase" role={role} />
+      </div>
+    </details>
+  );
+}
+
 function WorkspaceNavigation({ role, onNavigate }: { role: CommandRole | null; onNavigate?: () => void }) {
   const location = useLocation();
   const items = WORKSPACES.filter((item) => isAccessible(role, item.to));
   const inboxAccessible = isAccessible(role, "/command/decision-inbox");
   return (
-    <section className="rounded-xl border border-border bg-surface/30 p-2">
-      <div className="flex items-center gap-2 px-2 pb-2 pt-1">
-        <Activity className="size-3.5 text-accent" />
-        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-fg">Core workspaces</span>
-        <span className="ml-auto text-[9px] text-muted">7 operating surfaces</span>
-      </div>
-      <div className="space-y-0.5">
-        {items.map((item) => {
-          const Icon = item.icon;
-          const active = item.context.has(location.pathname);
-          return (
-            <div key={item.to}>
-              <CanonicalAnchor
-                to={item.to}
-                label={item.label}
-                active={active}
-                className={cn(
-                  "flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-muted transition-colors hover:bg-bg hover:text-fg",
-                  active && "bg-bg text-fg shadow-sm",
-                )}
-              >
-                <Icon className={cn("size-4 shrink-0", active && "text-accent")} />
-                {item.label}
-              </CanonicalAnchor>
-              {item.to === "/command" && inboxAccessible ? (
-                <a
-                  href="/command/decision-inbox"
-                  onClick={onNavigate}
+    <>
+      <section className="rounded-xl border border-border bg-surface/30 p-2">
+        <div className="flex items-center gap-2 px-2 pb-2 pt-1">
+          <Activity className="size-3.5 text-accent" />
+          <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-fg">Core workspaces</span>
+          <span className="ml-auto text-[9px] text-muted">7 operating surfaces</span>
+        </div>
+        <div className="space-y-0.5">
+          {items.map((item) => {
+            const Icon = item.icon;
+            const active = item.context.has(location.pathname);
+            return (
+              <div key={item.to}>
+                <CanonicalAnchor
+                  to={item.to}
+                  label={item.label}
+                  active={active}
                   className={cn(
-                    "ml-9 block rounded-md px-2 py-1.5 text-xs text-subtle hover:bg-bg hover:text-fg",
-                    location.pathname === "/command/decision-inbox" && "text-accent",
+                    "flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-muted transition-colors hover:bg-bg hover:text-fg",
+                    active && "bg-bg text-fg shadow-sm",
                   )}
                 >
-                  Action Inbox
-                </a>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
-      {role === "admin" ? (
-        <div className="mt-2 border-t border-border pt-2">
-          <a
-            href="/command/users"
-            onClick={onNavigate}
-            className={cn(
-              "flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-muted transition-colors hover:bg-bg hover:text-fg",
-              location.pathname === "/command/users" && "bg-bg text-fg shadow-sm",
-            )}
-          >
-            <Settings2 className="size-4 shrink-0 text-accent" />
-            User Creation & Access
-          </a>
+                  <Icon className={cn("size-4 shrink-0", active && "text-accent")} />
+                  {item.label}
+                </CanonicalAnchor>
+                {item.to === "/command" && inboxAccessible ? (
+                  <a
+                    href="/command/decision-inbox"
+                    onClick={onNavigate}
+                    className={cn(
+                      "ml-9 block rounded-md px-2 py-1.5 text-xs text-subtle hover:bg-bg hover:text-fg",
+                      location.pathname === "/command/decision-inbox" && "text-accent",
+                    )}
+                  >
+                    Action Inbox
+                  </a>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
-      ) : null}
-    </section>
+        {role === "admin" ? (
+          <div className="mt-2 border-t border-border pt-2">
+            <a
+              href="/command/users"
+              onClick={onNavigate}
+              className={cn(
+                "flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-muted transition-colors hover:bg-bg hover:text-fg",
+                location.pathname === "/command/users" && "bg-bg text-fg shadow-sm",
+              )}
+            >
+              <Settings2 className="size-4 shrink-0 text-accent" />
+              User Creation & Access
+            </a>
+          </div>
+        ) : null}
+      </section>
+      <MoreFunctions role={role} />
+    </>
   );
 }
 
@@ -288,7 +485,7 @@ function MobileNavigation({
         {open ? "Close workspace menu" : "Open workspace menu"}
       </button>
       {open ? (
-        <nav className="mt-2 max-h-[58dvh] overflow-y-auto pb-1">
+        <nav className="mt-2 max-h-[65dvh] overflow-y-auto pb-1">
           <WorkspaceNavigation role={role} onNavigate={() => setOpen(false)} />
         </nav>
       ) : null}

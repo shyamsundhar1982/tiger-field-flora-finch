@@ -5,11 +5,12 @@ import test from "node:test";
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const shell = read("src/components/command-shell.tsx");
 const header = read("src/components/site-header.tsx");
+const metadata = read("src/lib/page-metadata.ts");
 const commandCentre = read("src/routes/command/index.tsx");
 const decisionInbox = read("src/routes/command/decision-inbox.tsx");
 const controlTower = read("src/routes/command/control-tower.tsx");
 
-test("command workspace exposes one canonical navigation layer", () => {
+test("command workspace exposes one canonical primary navigation layer", () => {
   assert.match(shell, /<SiteHeader showNavigation=\{false\} brandHref="\/command" \/>/);
   assert.doesNotMatch(shell, /NavigationView/);
   assert.doesNotMatch(shell, /COMMAND_TABS/);
@@ -18,6 +19,32 @@ test("command workspace exposes one canonical navigation layer", () => {
   assert.doesNotMatch(shell, /\/command\/control-tower/);
   assert.match(shell, /<CanonicalAnchor[\s\S]{0,240}to=\{item\.to\}/);
   assert.match(shell, /href="\/command\/decision-inbox"/);
+});
+
+test("secondary reference, monitor, specialist and showcase functions remain discoverable", () => {
+  assert.match(shell, /More functions/);
+  assert.match(shell, /navigationGroups/);
+  assert.match(shell, /<SecondaryMode mode="understand" role=\{role\} \/>/);
+  assert.match(shell, /<SecondaryMode mode="observe" role=\{role\} \/>/);
+  assert.match(shell, /<SecondaryMode mode="operate" role=\{role\} \/>/);
+  assert.match(shell, /<SecondaryMode mode="showcase" role=\{role\} \/>/);
+  assert.match(shell, /href=\{page\.route\}/);
+
+  for (const route of [
+    "/command/epr-live",
+    "/command/receivables",
+    "/command/investor-board",
+    "/command/epr-workflow",
+    "/command/epr-execution",
+    "/command/payables",
+    "/command/legal-control",
+    "/command/investor-pitch",
+    "/command/investor-pitch-external",
+    "/command/platform-walkthrough",
+    "/command/demo-company",
+  ]) {
+    assert.match(metadata, new RegExp(route.replaceAll("/", "\\/")));
+  }
 });
 
 test("public navigation can be suppressed inside Command", () => {
