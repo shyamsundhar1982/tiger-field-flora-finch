@@ -65,18 +65,16 @@ async function getLegacyRole(): Promise<CommandRole | null> {
 }
 
 /**
- * An explicit individual VYNDI role remains authoritative. The optional auth
- * middleware carries the Better Auth bearer/cookie into this server function;
- * only when no individual identity exists do we fall back to the legacy Command
- * session.
+ * Individual Better Auth identity and its assigned VYNDI role are one authority
+ * boundary. A stale shared-password cookie must never elevate or otherwise
+ * change an authenticated individual's role. Legacy role lookup is permitted
+ * only when no individual identity exists.
  */
 export const getCommandRole = createServerFn({ method: "GET" })
   .middleware([optionalAuthMiddleware])
   .handler(async ({ context }) => {
     if (context.userId) {
-      const assignedRole = await getAssignedCommandRole(context.userId, context.userEmail);
-      if (assignedRole) return assignedRole;
-      return (await getLegacyRole()) ?? "viewer";
+      return (await getAssignedCommandRole(context.userId, context.userEmail)) ?? "viewer";
     }
     return getLegacyRole();
   });
