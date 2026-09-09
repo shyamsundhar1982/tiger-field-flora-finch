@@ -16,6 +16,11 @@ import {
   DEFAULT_EQUIPMENT_LEDGER,
   DEFAULT_EQUIPMENT_LEDGER_CATEGORIES,
 } from "@/lib/finance/equipment-ledger";
+import {
+  DEFAULT_PEOPLE_OFFICE_LEDGER,
+  type PeopleOfficeGroup,
+  type PeopleOfficeLedgerItem,
+} from "@/lib/finance/people-office-ledger";
 import type { BomCostSource, BomTier } from "@/lib/finance/bom-engine";
 import { ACTIONS } from "@/lib/data/actions";
 import { DEFAULT_APPROVED_OPERATING_PLAN } from "@/lib/planning/operating-plan";
@@ -23,14 +28,17 @@ import { DEFAULT_APPROVED_OPERATING_PLAN } from "@/lib/planning/operating-plan";
 type ActionState = Record<string, "open" | "doing" | "done">;
 type NumericAccountingKey = Exclude<keyof AccountingAssumptions, "fundingTypeByMonth">;
 type EquipmentEditableKey = Exclude<keyof EquipmentLedgerItem, "id">;
+type PeopleOfficeEditableKey = Exclude<keyof PeopleOfficeLedgerItem, "id" | "group">;
 const initialActions: ActionState = Object.fromEntries(ACTIONS.map((a) => [a.id, "open"]));
 
-function withEquipmentDefaults(finance: FinanceAssumptions): FinanceAssumptions {
+function withFinanceDefaults(finance: FinanceAssumptions): FinanceAssumptions {
   return {
     ...finance,
     equipmentLedger: finance.equipmentLedger ?? DEFAULT_EQUIPMENT_LEDGER,
     equipmentLedgerCategories:
       finance.equipmentLedgerCategories ?? DEFAULT_EQUIPMENT_LEDGER_CATEGORIES,
+    peopleOfficeLedger: finance.peopleOfficeLedger ?? DEFAULT_PEOPLE_OFFICE_LEDGER,
+    peopleOfficeUseItemized: finance.peopleOfficeUseItemized ?? false,
   };
 }
 
@@ -56,6 +64,8 @@ type Store = {
       | "bomTierByProduct"
       | "equipmentLedger"
       | "equipmentLedgerCategories"
+      | "peopleOfficeLedger"
+      | "peopleOfficeUseItemized"
     >,
     value: number,
   ) => void;
@@ -86,6 +96,13 @@ type Store = {
   addEquipmentCategory: (ledger: EquipmentLedgerId, name: string, description?: string) => void;
   updateEquipmentCategory: (id: string, key: "name" | "description", value: string) => void;
   addEquipmentItem: (ledger: EquipmentLedgerId, categoryId: string, name: string) => void;
+  setPeopleOfficeUseItemized: (value: boolean) => void;
+  updatePeopleOfficeItem: (
+    id: string,
+    key: PeopleOfficeEditableKey,
+    value: string | number,
+  ) => void;
+  addPeopleOfficeItem: (group: PeopleOfficeGroup, name: string) => void;
   resetFinance: () => void;
 };
 
@@ -95,12 +112,12 @@ export const useVeloxis = create<Store>()(
       scenario: "base",
       drawStandby: true,
       actions: initialActions,
-      finance: withEquipmentDefaults(DEFAULT_FINANCE_ASSUMPTIONS),
+      finance: withFinanceDefaults(DEFAULT_FINANCE_ASSUMPTIONS),
       accounting: DEFAULT_ACCOUNTING_ASSUMPTIONS,
       setScenario: (scenario) => set({ scenario }),
       setDrawStandby: (drawStandby) => set({ drawStandby }),
       setAction: (id, status) => set((state) => ({ actions: { ...state.actions, [id]: status } })),
-      setFinance: (finance) => set({ finance: withEquipmentDefaults(finance) }),
+      setFinance: (finance) => set({ finance: withFinanceDefaults(finance) }),
       updateGlobalFinance: (key, value) =>
         set((state) => {
           const finance = { ...state.finance, [key]: value } as FinanceAssumptions;
@@ -223,9 +240,44 @@ export const useVeloxis = create<Store>()(
             ],
           },
         })),
+      setPeopleOfficeUseItemized: (value) =>
+        set((state) => ({
+          finance: { ...state.finance, peopleOfficeUseItemized: value },
+        })),
+      updatePeopleOfficeItem: (id, key, value) =>
+        set((state) => ({
+          finance: {
+            ...state.finance,
+            peopleOfficeLedger: (state.finance.peopleOfficeLedger ?? DEFAULT_PEOPLE_OFFICE_LEDGER).map(
+              (item) => (item.id === id ? { ...item, [key]: value } : item),
+            ),
+          },
+        })),
+      addPeopleOfficeItem: (group, name) =>
+        set((state) => ({
+          finance: {
+            ...state.finance,
+            peopleOfficeLedger: [
+              ...(state.finance.peopleOfficeLedger ?? DEFAULT_PEOPLE_OFFICE_LEDGER),
+              {
+                id: newId("people-office"),
+                group,
+                name: name.trim() || "New operating cost",
+                stage: "Foundation",
+                quantity: 1,
+                monthlyUnitCostLakh: 0,
+                startMonth: 1,
+                endMonth: 36,
+                oneTimeCostLakh: 0,
+                oneTimeMonth: 1,
+                notes: "",
+              },
+            ],
+          },
+        })),
       resetFinance: () =>
         set({
-          finance: withEquipmentDefaults(DEFAULT_FINANCE_ASSUMPTIONS),
+          finance: withFinanceDefaults(DEFAULT_FINANCE_ASSUMPTIONS),
           accounting: DEFAULT_ACCOUNTING_ASSUMPTIONS,
         }),
     }),
@@ -245,7 +297,7 @@ export const useVeloxis = create<Store>()(
         return {
           ...current,
           ...saved,
-          finance: withEquipmentDefaults(saved.finance ?? current.finance),
+          finance: withFinanceDefaults(saved.finance ?? current.finance),
         };
       },
     },

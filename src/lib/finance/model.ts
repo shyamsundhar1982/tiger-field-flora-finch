@@ -11,6 +11,11 @@ import {
   type EquipmentLedgerCategory,
   type EquipmentLedgerItem,
 } from "@/lib/finance/equipment-ledger";
+import {
+  DEFAULT_PEOPLE_OFFICE_LEDGER,
+  peopleOfficeExpenseForMonth,
+  type PeopleOfficeLedgerItem,
+} from "@/lib/finance/people-office-ledger";
 import { TIERS, TRANCHES } from "@/lib/data/company";
 import {
   DEFAULT_APPROVED_OPERATING_PLAN,
@@ -82,6 +87,8 @@ export type FinanceAssumptions = {
   bomTierByProduct?: Partial<Record<ProductLineId, BomTier>>;
   equipmentLedger?: EquipmentLedgerItem[];
   equipmentLedgerCategories?: EquipmentLedgerCategory[];
+  peopleOfficeLedger?: PeopleOfficeLedgerItem[];
+  peopleOfficeUseItemized?: boolean;
 };
 
 export const DEFAULT_FINANCE_ASSUMPTIONS: FinanceAssumptions = {
@@ -99,6 +106,8 @@ export const DEFAULT_FINANCE_ASSUMPTIONS: FinanceAssumptions = {
   bomTierByProduct: { aluminium: "core", carbon: "pro", premiumCarbon: "apex" },
   equipmentLedger: DEFAULT_EQUIPMENT_LEDGER,
   equipmentLedgerCategories: DEFAULT_EQUIPMENT_LEDGER_CATEGORIES,
+  peopleOfficeLedger: DEFAULT_PEOPLE_OFFICE_LEDGER,
+  peopleOfficeUseItemized: false,
 };
 
 function effectiveCogs(line: ProductLineAssumption, assumptions: FinanceAssumptions) {
@@ -124,7 +133,7 @@ function allocateUnits(total: number, lines: ProductLineAssumption[], month: num
   return result;
 }
 
-function opexFor(month: number, scenario: ScenarioId, plan: OperatingPlan) {
+function legacyOpexFor(month: number, scenario: ScenarioId, plan: OperatingPlan) {
   const launch = effectiveMilestoneMonth(plan, "commercialLaunch", scenario);
   const relative = month - launch;
   let base = 9.2;
@@ -133,6 +142,11 @@ function opexFor(month: number, scenario: ScenarioId, plan: OperatingPlan) {
   else if (relative <= -3) base = 6;
   else if (relative <= 0) base = 7.8;
   return scenario === "stress" && month < launch ? base * 0.85 : base;
+}
+
+function coreOpexFor(month: number, scenario: ScenarioId, plan: OperatingPlan, assumptions: FinanceAssumptions) {
+  if (!assumptions.peopleOfficeUseItemized) return legacyOpexFor(month, scenario, plan);
+  return peopleOfficeExpenseForMonth(assumptions.peopleOfficeLedger ?? DEFAULT_PEOPLE_OFFICE_LEDGER, month);
 }
 
 function fundingFor(month: number, scenario: ScenarioId, drawStandby: boolean, plan: OperatingPlan) {
@@ -222,7 +236,7 @@ export function buildModelWithInputs(scenario: ScenarioId, drawStandby: boolean,
     const equipmentManufacturingDepreciation = equipmentDirectManufacturingDepreciationForMonth(equipment, month);
     const equipmentSupportDepreciation = equipmentManufacturingSupportDepreciationForMonth(equipment, month);
     const equipmentOfficeDepreciation = equipmentOfficeDepreciationForMonth(equipment, month);
-    const baseOpex = opexFor(month, scenario, plan) * assumptions.opexMultiplier;
+    const baseOpex = coreOpexFor(month, scenario, plan, assumptions) * assumptions.opexMultiplier;
     const longitudeOpex = assumptions.aluminiumVertical.opexLakh > 0
       ? month >= longitudeLaunch ? assumptions.aluminiumVertical.opexLakh : assumptions.aluminiumVertical.opexLakh * 0.35
       : 0;
