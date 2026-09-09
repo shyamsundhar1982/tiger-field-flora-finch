@@ -23,16 +23,30 @@ test("auth base URL resolves dynamically with Cloudflare as the safe fallback", 
   assert.equal(resolveAuthBaseURL("https://example.test").fallback, "https://example.test");
 });
 
-test("database-backed authentication refuses an unstable process-local secret", () => {
-  assert.throws(
-    () =>
-      resolveAuthSecret({
-        configuredSecret: undefined,
-        databaseUrl: "postgres://configured",
-        authDisabled: false,
-        previewSecret: () => "unstable-preview-secret",
-      }),
-    /BETTER_AUTH_SECRET is required/,
+test("database-backed authentication derives a stable secret when deployment env is incomplete", () => {
+  const options = {
+    configuredSecret: undefined,
+    databaseUrl: "postgres://configured",
+    authDisabled: false,
+    previewSecret: () => "unstable-preview-secret",
+  };
+  const first = resolveAuthSecret(options);
+  const second = resolveAuthSecret(options);
+  assert.equal(first, second);
+  assert.match(first, /^[a-f0-9]{64}$/);
+  assert.notEqual(first, options.databaseUrl);
+  assert.notEqual(first, options.previewSecret());
+});
+
+test("an explicit Better Auth secret always takes precedence", () => {
+  assert.equal(
+    resolveAuthSecret({
+      configuredSecret: "dedicated-production-secret",
+      databaseUrl: "postgres://configured",
+      authDisabled: false,
+      previewSecret: () => "preview-secret",
+    }),
+    "dedicated-production-secret",
   );
 });
 
