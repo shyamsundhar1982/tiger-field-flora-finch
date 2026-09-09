@@ -23,7 +23,7 @@ export function summarizeVibpeHorizon(result: IntegratedPlanningResult, requeste
 
   return {
     horizonMonths,
-    expectedUnits: demand.reduce((sum, row) => sum + Number(row.expectedUnits || 0), 0),
+    expectedUnits: demand.reduce((sum, row) => sum + Number(row.expectedTotalQty || 0), 0),
     recommendedProcurementLakh: supply.reduce((sum, row) => sum + Number(row.purchaseCostLakh || 0), 0),
     minimumFreeLiquidityLakh: minimumCash?.freeLiquidityAfterRecommendationsLakh ?? 0,
     fundingNeedLakh,
