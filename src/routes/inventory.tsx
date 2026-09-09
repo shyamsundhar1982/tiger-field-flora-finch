@@ -9,7 +9,7 @@ import { inr } from "@/lib/format";
 export const Route = createFileRoute("/inventory")({
   beforeLoad: async () => {
     const access = await getCommandAccess();
-    if (!access) throw redirect({ to: "/command-login" });
+    if (!access) throw redirect({ to: "/login", search: { returnTo: "/inventory" } });
     const role = await getCommandRole();
     if (!canAccessRoute(role, "/inventory")) throw redirect({ to: "/command" });
   },

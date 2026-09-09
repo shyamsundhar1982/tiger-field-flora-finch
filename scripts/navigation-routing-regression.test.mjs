@@ -62,14 +62,15 @@ test("Command Centre uses client navigation for protected workspace actions", ()
   assert.doesNotMatch(commandCentre, /<a\b/);
 });
 
-test("remaining legacy protected anchors are bridged into TanStack navigation", () => {
+test("protected navigation is client-side while the bridge remains a temporary compatibility guard", () => {
   assert.match(bridge, /document\.addEventListener\("click", handleClick\)/);
   assert.match(bridge, /destination\.pathname\.startsWith\("\/command\/"\)/);
   assert.match(bridge, /event\.preventDefault\(\)/);
   assert.match(bridge, /navigate\(\{ to: to as never \}\)/);
-  // Action Inbox still contains one legacy dynamic anchor; the bridge is the
-  // compatibility guard until that specialist page is migrated individually.
-  assert.match(decisionInbox, /href=\{text\(item, "route"\)\}/);
+  assert.match(decisionInbox, /to=\{text\(item, "route"\) as never\}/);
+  assert.doesNotMatch(decisionInbox, /href=\{text\(item, "route"\)\}/);
+  assert.match(controlTower, /to=\{report\.route as never\}/);
+  assert.doesNotMatch(controlTower, /href=\{report\.route\}/);
 });
 
 test("Control Tower is the registered read-only ERP reporting console", () => {

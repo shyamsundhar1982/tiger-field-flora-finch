@@ -54,7 +54,6 @@ const SUPPLY_TABS = [
   { to: "/command/purchase-execution", label: "Buy" },
   { to: "/command/receiving", label: "Receive" },
   { to: "/command/inventory", label: "Inventory" },
-  { to: "/command/production-jobcards", label: "Release" },
   { to: "/command/production", label: "Production" },
   { to: "/command/quality", label: "Quality" },
 ] as const;
@@ -94,7 +93,6 @@ const SUPPLY_CONTEXT = new Set<string>([
   ...SUPPLY_TABS.map((tab) => tab.to),
   "/command/procurement",
   "/command/manufacturing",
-  "/command/ops",
   "/command/inventory-truth",
   "/command/inventory-ledgers",
   "/command/inventory-master",
@@ -149,6 +147,7 @@ const LEGACY_ROUTES = new Set<string>([
   "/command/phase-6a",
   "/command/management-intelligence",
   "/command/production-jobcards",
+  "/command/ops",
 ]);
 
 const ICONS: Record<PageDomain, typeof Activity> = {

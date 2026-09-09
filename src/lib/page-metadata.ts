@@ -94,6 +94,7 @@ export const routeRegistry: Record<string, RouteMeta> = {
     "founder",
     "keep",
     "Command",
+    { navHidden: true },
   ),
   "/command/governance": meta(
     "/command/governance",
@@ -482,12 +483,13 @@ export const routeRegistry: Record<string, RouteMeta> = {
   ),
   "/command/production-jobcards": meta(
     "/command/production-jobcards",
-    "Production Job Cards",
+    "Production Job Cards (compatibility)",
     "operate",
     "manufacturing",
     "operations",
-    "keep",
+    "review",
     "Operate",
+    { navHidden: true },
   ),
   "/command/manufacturing": meta(
     "/command/manufacturing",
@@ -633,6 +635,7 @@ export const routeRegistry: Record<string, RouteMeta> = {
     "sales",
     "keep",
     "Operate",
+    { navHidden: true },
   ),
   "/command/phase-5": meta(
     "/command/phase-5",
@@ -642,6 +645,7 @@ export const routeRegistry: Record<string, RouteMeta> = {
     "engineering",
     "keep",
     "Operate",
+    { navHidden: true },
   ),
   "/command/phase-6": meta(
     "/command/phase-6",
@@ -651,6 +655,7 @@ export const routeRegistry: Record<string, RouteMeta> = {
     "operations",
     "keep",
     "Operate",
+    { navHidden: true },
   ),
   "/command/phase-6a": meta(
     "/command/phase-6a",
@@ -660,6 +665,7 @@ export const routeRegistry: Record<string, RouteMeta> = {
     "compliance",
     "keep",
     "Operate",
+    { navHidden: true },
   ),
   "/command/deployment-readiness": meta(
     "/command/deployment-readiness",
@@ -681,12 +687,13 @@ export const routeRegistry: Record<string, RouteMeta> = {
   ),
   "/command/ops": meta(
     "/command/ops",
-    "Ops (legacy)",
+    "Ops (compatibility)",
     "operate",
     "procurement",
     "operations",
     "review",
     "Operate",
+    { navHidden: true },
   ),
   "/command/sales": meta(
     "/command/sales",

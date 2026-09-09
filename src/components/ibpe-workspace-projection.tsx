@@ -6,11 +6,11 @@ import { IBPE_CORE_LABEL, VIBPE_COPILOT_LABEL } from "@/lib/ibpe-brand";
 const workspaceDomains: Array<{ routes:string[]; label:string; domains:string[] }> = [
   { routes:["/command/planning","/command/finance-assumptions","/command/scenarios"], label:"Planning", domains:["planning","demand","funding"] },
   { routes:["/command/engineering","/command/product","/command/bom","/command/bom-control"], label:"Engineering", domains:["governance","supply"] },
-  { routes:["/command/operations","/command/procurement","/command/procurement-planning","/command/purchase-execution","/command/receiving","/command/inventory","/command/production","/command/production-jobcards","/command/manufacturing","/command/quality"], label:"Supply & Production", domains:["supply","inventory","procurement","capacity"] },
+  { routes:["/command/operations","/command/procurement","/command/procurement-planning","/command/purchase-execution","/command/receiving","/command/inventory","/command/production","/command/manufacturing","/command/quality"], label:"Supply & Production", domains:["supply","inventory","procurement","capacity"] },
   { routes:["/command/sales","/command/gtm","/command/market-survey"], label:"Commercial", domains:["demand","planning"] },
   { routes:["/command/financial-cockpit","/command/finance","/command/cash","/command/payables","/command/receivables","/command/balance-sheet","/command/funding","/command/actuals"], label:"Finance", domains:["finance","funding","procurement"] },
   { routes:["/command/governance","/command/master-data","/command/bom-inventory-mapping","/command/risk","/command/legal","/command/qa-verification","/command/actions"], label:"Governance", domains:["governance","planning","supply"] },
-  { routes:["/command","/command/control-tower","/command/decision-inbox","/command/founder-command","/command/management-intelligence","/command/decision-engine"], label:"Command", domains:["planning","demand","supply","inventory","procurement","capacity","finance","funding","governance"] },
+  { routes:["/command","/command/control-tower","/command/decision-inbox","/command/founder-command","/command/decision-engine"], label:"Command", domains:["planning","demand","supply","inventory","procurement","capacity","finance","funding","governance"] },
 ];
 
 function workspace(pathname:string) {

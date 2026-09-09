@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Kpi, Panel } from "@/components/kpi";
+import { requireArrayResponse, requireRecordResponse } from "@/lib/commercial-response-contract";
 import { listMonthlyActuals } from "@/lib/actuals-authority";
 import { MODELS } from "@/lib/data/models";
 import { buildModelWithInputs, type ProductLineId, type ScenarioId } from "@/lib/finance/model";
@@ -70,11 +71,23 @@ function Commercial() {
       listMonthlyActuals(),
       getSalesOrderWriteReadiness(),
     ]);
-    setOrders(orderRows);
-    setOrderEdits(Object.fromEntries(orderRows.map((order) => [order.id, { ...order, configuration: { ...(order.configuration ?? {}) } }])));
-    setWriteReadiness(readiness);
+    const safeOrderRows = requireArrayResponse<SalesOrder>(
+      orderRows,
+      "Commercial order register returned an invalid response. No order data was accepted.",
+    );
+    const safeActualRows = requireRecordResponse<Record<number, { units?: number | null; revenue?: number | null }>>(
+      actualRows,
+      "Commercial actuals register returned an invalid response. No actuals data was accepted.",
+    );
+    const safeReadiness = requireRecordResponse<WriteReadiness>(
+      readiness,
+      "Commercial write-readiness response is invalid. Transactions remain disabled.",
+    );
+    setOrders(safeOrderRows);
+    setOrderEdits(Object.fromEntries(safeOrderRows.map((order) => [order.id, { ...order, configuration: { ...(order.configuration ?? {}) } }])));
+    setWriteReadiness(safeReadiness);
     const compact: Record<number, { units?: number | null; revenue?: number | null }> = {};
-    Object.entries(actualRows).forEach(([month, value]) => {
+    Object.entries(safeActualRows).forEach(([month, value]) => {
       compact[Number(month)] = { units: value.units, revenue: value.revenue };
     });
     setActuals(compact);

@@ -12,8 +12,8 @@ export function InventoryWorkspaceNav({ active }: { active?: string }) {
           Inventory hub
         </Link>
         <span aria-hidden="true">/</span>
-        <Link to="/command/inventory-ledgers" className="hover:text-accent">
-          Ledger control
+        <Link to="/command/inventory-ledgers/$ledger" params={{ ledger: "components" }} search={{ sku: undefined }} className="hover:text-accent">
+          Components ledger
         </Link>
       </div>
       {showControlSetup ? <div>
