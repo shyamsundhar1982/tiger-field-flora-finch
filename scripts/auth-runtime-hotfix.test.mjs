@@ -82,7 +82,8 @@ test("production hosts use request-local auth URLs and exact trusted origins", (
   assert.match(authRuntimeConfig, /"tiger-field-flora-finch\.vercel\.app"/);
   assert.match(authRuntimeConfig, /"https:\/\/tiger-field-flora-finch\.vercel\.app"/);
   assert.match(authRuntimeConfig, /"tiger-field-flora-finch\.shyamsundhar1982\.workers\.dev"/);
-  assert.match(authRuntimeConfig, /BETTER_AUTH_SECRET is required when DATABASE_URL is configured/);
+  assert.match(authRuntimeConfig, /vyndi\/better-auth\/session-secret\/v1/);
+  assert.match(authRuntimeConfig, /createHash\("sha256"\)/);
 });
 
 test("command logout clears legacy compatibility and canonical individual session", () => {
