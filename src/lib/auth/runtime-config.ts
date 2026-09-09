@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 export const CLOUDFLARE_PRODUCTION_ORIGIN =
   "https://tiger-field-flora-finch.shyamsundhar1982.workers.dev";
 
@@ -51,9 +53,15 @@ export function resolveAuthSecret(options: {
 }): string {
   if (options.configuredSecret) return options.configuredSecret;
   if (options.databaseUrl && !options.authDisabled) {
-    throw new Error(
-      "BETTER_AUTH_SECRET is required when DATABASE_URL is configured and authentication is enabled.",
-    );
+    // Some connected deployment targets currently expose DATABASE_URL without
+    // BETTER_AUTH_SECRET. Derive an isolate-stable emergency secret from the
+    // already-secret database credential so cookies survive Worker/serverless
+    // instance changes. A dedicated BETTER_AUTH_SECRET remains preferred and
+    // takes precedence above.
+    return createHash("sha256")
+      .update("vyndi/better-auth/session-secret/v1\0")
+      .update(options.databaseUrl)
+      .digest("hex");
   }
   return options.previewSecret();
 }
