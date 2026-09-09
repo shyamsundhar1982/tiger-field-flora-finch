@@ -102,6 +102,21 @@ export type InventoryReceipt = {
   sourceRef?: string;
 };
 
+/**
+ * Exact material demand released by an authorised operating transaction, such
+ * as a configuration-controlled production job card. This is already exploded
+ * to SKU level and therefore must not be re-exploded through the planning BOM.
+ */
+export type CommittedMaterialRequirement = {
+  id: string;
+  sku: string;
+  period: number;
+  quantity: number;
+  unit?: string;
+  orderCount?: number;
+  sourceRef?: string;
+};
+
 export type CapacityPosition = {
   id: string;
   period: number;
@@ -134,6 +149,7 @@ export type IntegratedPlanningInput = {
   demand: DemandSignal[];
   bom: BomRequirement[];
   inventory: InventoryPosition[];
+  committedMaterialRequirements?: CommittedMaterialRequirement[];
   reservations?: InventoryReservation[];
   receipts?: InventoryReceipt[];
   capacity?: CapacityPosition[];
@@ -225,6 +241,9 @@ export type InventoryHealthRow = {
 export type SupplyPlanRow = {
   period: number;
   sku: string;
+  plannedRequirementQty: number;
+  committedRequirementQty: number;
+  demandBasis: "planned" | "committed" | "reconciled";
   grossRequirementQty: number;
   reservedCoverageQty: number;
   unreservedRequirementQty: number;
@@ -620,6 +639,47 @@ function aggregateMrp(mrp: MrpRequirementRow[]) {
   return map;
 }
 
+function aggregateCommittedRequirements(
+  input: IntegratedPlanningInput,
+  horizon: number,
+  findings: PlanningFinding[],
+) {
+  const map = new Map<string, number>();
+  const seen = new Set<string>();
+  for (const row of input.committedMaterialRequirements ?? []) {
+    if (seen.has(row.id)) {
+      addFinding(findings, {
+        id: findingId("supply", `duplicate-committed-requirement-${row.id}`),
+        severity: "high",
+        domain: "supply",
+        title: "Duplicate committed material requirement",
+        problem: `${row.id} occurs more than once in the governed snapshot.`,
+        businessImpact: "Committed job-card demand can be overstated and inflate procurement and funding requirements.",
+        recommendedAction: "Reconcile the released job-card projection to one stable requirement record.",
+        evidence: [{ label: row.id, entityId: row.id, period: row.period, sourceRef: row.sourceRef }],
+      });
+      continue;
+    }
+    seen.add(row.id);
+    if (!validPeriod(row.period, horizon)) {
+      addFinding(findings, {
+        id: findingId("supply", `committed-requirement-outside-horizon-${row.id}`),
+        severity: "high",
+        domain: "supply",
+        title: "Committed material requirement outside planning horizon",
+        problem: `${row.id} uses M${row.period}, outside M1–M${horizon}.`,
+        businessImpact: "A released production requirement is excluded from ATP, procurement and cash planning.",
+        recommendedAction: "Re-date the controlled order/job card or roll the approved planning horizon.",
+        evidence: [{ label: row.id, entityId: row.id, period: row.period, sourceRef: row.sourceRef }],
+      });
+      continue;
+    }
+    const k = skuPeriodKey(row.sku, row.period);
+    map.set(k, (map.get(k) ?? 0) + nonNegative(row.quantity));
+  }
+  return map;
+}
+
 function aggregateReservations(input: IntegratedPlanningInput, horizon: number) {
   const map = new Map<string, number>();
   for (const row of input.reservations ?? []) {
@@ -653,12 +713,16 @@ function buildSupplyPlan(
   options: PlanningEngineOptions,
   findings: PlanningFinding[],
 ): SupplyPlanRow[] {
-  const requirements = aggregateMrp(mrp);
+  const plannedRequirements = aggregateMrp(mrp);
+  const committedRequirements = aggregateCommittedRequirements(input, options.horizonMonths, findings);
   const reservations = aggregateReservations(input, options.horizonMonths);
   const receipts = aggregateReceipts(input, options.horizonMonths);
   const inventoryBySku = new Map(input.inventory.map((item) => [item.sku, item]));
   const healthBySku = new Map(health.map((item) => [item.sku, item]));
-  const requiredSkus = [...new Set(mrp.map((row) => row.sku))].sort();
+  const requiredSkus = [...new Set([
+    ...mrp.map((row) => row.sku),
+    ...(input.committedMaterialRequirements ?? []).map((row) => row.sku),
+  ])].sort();
   const rows: SupplyPlanRow[] = [];
 
   for (const sku of requiredSkus) {
@@ -691,7 +755,18 @@ function buildSupplyPlan(
     const unitCostLakh = Number.isFinite(position?.unitCostLakh) ? nonNegative(position?.unitCostLakh) : null;
 
     for (let period = 1; period <= options.horizonMonths; period += 1) {
-      const grossRequirementQty = requirements.get(skuPeriodKey(sku, period)) ?? 0;
+      const requirementKey = skuPeriodKey(sku, period);
+      const plannedRequirementQty = plannedRequirements.get(requirementKey) ?? 0;
+      const committedRequirementQty = committedRequirements.get(requirementKey) ?? 0;
+      // Planned and exact committed demand remain separately visible. The
+      // larger SKU-month signal governs so a commitment is never ignored and
+      // the same demand is not simply added to its forecast counterpart.
+      const grossRequirementQty = Math.max(plannedRequirementQty, committedRequirementQty);
+      const demandBasis = committedRequirementQty > plannedRequirementQty
+        ? "committed"
+        : plannedRequirementQty > committedRequirementQty
+          ? "planned"
+          : "reconciled";
       const reservationQty = reservations.get(skuPeriodKey(sku, period)) ?? 0;
       const reservedCoverageQty = Math.min(grossRequirementQty, reservationQty);
       const unreservedRequirementQty = Math.max(0, grossRequirementQty - reservedCoverageQty);
@@ -755,6 +830,9 @@ function buildSupplyPlan(
         rows.push({
           period,
           sku,
+          plannedRequirementQty: round(plannedRequirementQty),
+          committedRequirementQty: round(committedRequirementQty),
+          demandBasis,
           grossRequirementQty: round(grossRequirementQty),
           reservedCoverageQty: round(reservedCoverageQty),
           unreservedRequirementQty: round(unreservedRequirementQty),

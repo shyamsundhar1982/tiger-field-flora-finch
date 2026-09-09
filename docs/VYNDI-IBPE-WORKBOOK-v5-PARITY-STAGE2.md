@@ -82,7 +82,7 @@ Runtime parity metadata separately exposes:
 
 This preserves detailed bottleneck evidence while making the executive KPI match its name.
 
-## Scenario and Copilot routing
+## Scenario and VIBpE Co-Pilot routing
 
 The Scenario Studio now executes through the same Stage 2 runtime parity adapter as governed baseline runs.
 
@@ -99,7 +99,7 @@ approved plan
 → payment-timed procurement cash
 → liquidity/funding
 → decision packet
-→ Scenario Studio / IBPE Copilot
+→ Scenario Studio / VIBpE Co-Pilot
 ```
 
 Scenario changes remain hypothetical forecast analysis. They never overwrite actual, committed or approved-plan truth.
@@ -147,4 +147,4 @@ Stage 2 is complete only when:
 - no transaction-side effects are introduced;
 - a deployment/build check succeeds on at least one connected target.
 
-Browser-level authenticated interaction of Scenario Studio and Copilot remains a separate verification gate from build success.
+Browser-level authenticated interaction of Scenario Studio and VIBpE Co-Pilot remains a separate verification gate from build success.

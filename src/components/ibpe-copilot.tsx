@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "@tanstack/react-router";
 import { Bot, BrainCircuit, ChevronRight, Send, ShieldCheck, Sparkles, X } from "lucide-react";
+import { VIBPE_COPILOT_NAME } from "@/lib/ibpe-brand";
 import { askIbpeCopilot } from "@/lib/ibpe-copilot";
 import type { IbpeScenarioRequest } from "@/lib/ibpe-scenario-lab";
 
@@ -67,7 +68,7 @@ export function IbpeCopilot() {
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          text: response.ok ? response.answer ?? "No analysis returned." : response.error ?? "IBPE Copilot is unavailable.",
+          text: response.ok ? response.answer ?? "No analysis returned." : response.error ?? `${VIBPE_COPILOT_NAME} is unavailable.`,
           meta: response.lineage
             ? `Governed R${response.lineage.approvedPlanRevision} · ${response.lineage.inputHash.slice(0, 8)}${response.scenarioId ? ` · scenario ${response.scenarioId}` : ""}`
             : undefined,
@@ -79,7 +80,7 @@ export function IbpeCopilot() {
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          text: error instanceof Error ? error.message : "IBPE Copilot request failed.",
+          text: error instanceof Error ? error.message : `${VIBPE_COPILOT_NAME} request failed.`,
         },
       ]);
     } finally {
@@ -93,16 +94,16 @@ export function IbpeCopilot() {
         type="button"
         onClick={() => setOpen(true)}
         className="fixed bottom-5 right-5 z-40 flex min-h-12 items-center gap-2 rounded-full border border-accent/35 bg-bg/95 px-4 py-3 text-sm font-semibold text-fg shadow-2xl backdrop-blur-xl transition hover:border-accent hover:bg-surface"
-        aria-label="Open VYNDI IBPE Copilot"
+        aria-label={`Open ${VIBPE_COPILOT_NAME}`}
       >
         <span className="flex size-8 items-center justify-center rounded-full bg-accent/12 text-accent"><BrainCircuit className="size-4" /></span>
-        <span className="hidden sm:inline">IBPE Copilot</span>
+        <span className="hidden sm:inline">{VIBPE_COPILOT_NAME}</span>
         {scenario ? <span className="size-2 rounded-full bg-green" title={`Scenario context: ${scenario.label}`} /> : null}
       </button>
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex justify-end bg-bg/55 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="VYNDI IBPE Copilot">
-          <button type="button" aria-label="Close IBPE Copilot" className="absolute inset-0 cursor-default" onClick={() => setOpen(false)} />
+        <div className="fixed inset-0 z-50 flex justify-end bg-bg/55 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={VIBPE_COPILOT_NAME}>
+          <button type="button" aria-label={`Close ${VIBPE_COPILOT_NAME}`} className="absolute inset-0 cursor-default" onClick={() => setOpen(false)} />
           <aside className="relative z-10 flex h-full w-full max-w-xl flex-col border-l border-border bg-bg shadow-2xl">
             <header className="border-b border-border bg-surface/55 px-5 py-4">
               <div className="flex items-start justify-between gap-4">
@@ -110,7 +111,7 @@ export function IbpeCopilot() {
                   <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl border border-accent/25 bg-accent/10 text-accent"><Bot className="size-5" /></span>
                   <div className="min-w-0">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-green">VYNDI Intelligence</p>
-                    <h2 className="font-display text-xl font-semibold text-fg">IBPE Copilot</h2>
+                    <h2 className="font-display text-xl font-semibold text-fg">{VIBPE_COPILOT_NAME}</h2>
                     <p className="mt-1 text-xs leading-5 text-muted">{workspace} · deterministic business truth first, AI explanation second.</p>
                   </div>
                 </div>
@@ -144,7 +145,7 @@ export function IbpeCopilot() {
                 <div className="space-y-4">
                   {messages.map((message) => (
                     <article key={message.id} className={message.role === "user" ? "ml-8 rounded-xl border border-accent/25 bg-accent/8 p-4" : "mr-4 rounded-xl border border-border bg-surface/35 p-4"}>
-                      <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-green">{message.role === "user" ? "You" : "IBPE Copilot"}</p>
+                      <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-green">{message.role === "user" ? "You" : VIBPE_COPILOT_NAME}</p>
                       <div className="whitespace-pre-wrap text-sm leading-6 text-fg">{message.text}</div>
                       {message.meta ? <p className="mt-3 border-t border-border/70 pt-2 text-[10px] text-subtle">{message.meta}</p> : null}
                     </article>
@@ -174,10 +175,10 @@ export function IbpeCopilot() {
                   }}
                   rows={2}
                   maxLength={1800}
-                  placeholder="Ask IBPE about demand, materials, procurement, cash, funding or capacity…"
+                  placeholder={`Ask ${VIBPE_COPILOT_NAME} about demand, materials, procurement, cash, funding or capacity…`}
                   className="min-h-12 flex-1 resize-none rounded-xl border border-border bg-bg px-3 py-2.5 text-sm text-fg outline-none transition placeholder:text-subtle focus:border-accent/60"
                 />
-                <button type="button" disabled={busy || !question.trim()} onClick={() => void ask()} className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-accent text-bg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Ask IBPE Copilot"><Send className="size-4" /></button>
+                <button type="button" disabled={busy || !question.trim()} onClick={() => void ask()} className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-accent text-bg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40" aria-label={`Ask ${VIBPE_COPILOT_NAME}`}><Send className="size-4" /></button>
               </div>
               <p className="mt-2 text-[10px] leading-4 text-subtle">AI explains and explores; authorised transaction workspaces remain the only place to approve or execute business actions.</p>
             </footer>

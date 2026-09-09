@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 const copilot = await readFile(new URL("../src/lib/ibpe-copilot.ts", import.meta.url), "utf8");
 const scenarioLab = await readFile(new URL("../src/lib/ibpe-scenario-lab.ts", import.meta.url), "utf8");
 
-test("IBPE Copilot resolves named scenarios ahead of stale UI scenario context", () => {
+test("VIBpE Co-Pilot resolves named scenarios ahead of stale UI scenario context", () => {
   assert.match(copilot, /function namedScenarioFromQuestion/);
   assert.match(copilot, /growth-25/);
   assert.match(copilot, /cash-protect/);
@@ -13,7 +13,7 @@ test("IBPE Copilot resolves named scenarios ahead of stale UI scenario context",
   assert.match(copilot, /const effectiveScenario = namedScenario \?\? \(explicitlyRequestsBaseline/);
 });
 
-test("IBPE Copilot supports product-family demand overrides", () => {
+test("VIBpE Co-Pilot supports product-family demand overrides", () => {
   assert.match(copilot, /familyGrowth\.family}-growth-25/);
   assert.match(copilot, /family: "longitude", productId: "aluminium", label: "Longitude"/);
   assert.match(copilot, /demandMultiplierByProduct: \{ \[familyGrowth\.productId\]: 1\.25 \}/);
@@ -21,7 +21,7 @@ test("IBPE Copilot supports product-family demand overrides", () => {
   assert.match(scenarioLab, /const rowDemandMultiplier = demandMultiplierByProduct\[row\.productId\] \?\? demandMultiplier/);
 });
 
-test("IBPE Copilot answers multi-question prompts separately", () => {
+test("VIBpE Co-Pilot answers multi-question prompts separately", () => {
   assert.match(copilot, /function splitQuestions/);
   assert.match(copilot, /if \(questions\.length > 1\)/);
   assert.match(copilot, /for \(const \[index, question\] of questions\.entries\(\)\)/);
@@ -62,8 +62,8 @@ test("single multi-metric prompt returns complete governed executive assessment"
   assert.ok(executiveBranch >= 0 && fundingBranch > executiveBranch, "multi-metric executive routing must precede single-domain funding routing");
 });
 
-test("Copilot refuses stale pre-procurement-cost-authority packets", () => {
-  assert.match(copilot, /VYNDI-IBPE-1\.2\.0/);
-  assert.match(copilot, /predates the Procurement Cost Authority/);
-  assert.match(copilot, /catalogue\/reference prices cannot masquerade as procurement cost/);
+test("VIBpE Co-Pilot refuses packets that predate exact committed-material reconciliation", () => {
+  assert.match(copilot, /RUNTIME_IBPE_ENGINE_VERSION/);
+  assert.match(copilot, /predates exact committed-material reconciliation/);
+  assert.match(copilot, /released job-card requirements participate in procurement and funding analysis/);
 });

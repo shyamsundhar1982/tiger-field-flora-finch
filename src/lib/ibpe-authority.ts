@@ -9,15 +9,20 @@ import {
   type BomRequirement,
   type CapacityPosition,
   type CashFlow,
+  type CommittedMaterialRequirement,
   type DemandSignal,
   type IntegratedPlanningResult,
   type InventoryPosition,
   type InventoryReceipt,
   type InventoryReservation,
 } from "@/lib/integrated-business-planning-engine";
-import { runRuntimeIbpe, type RuntimeIbpeInput } from "@/lib/ibpe-runtime-parity";
+import {
+  RUNTIME_IBPE_ENGINE_VERSION,
+  runRuntimeIbpe,
+  type RuntimeIbpeInput,
+} from "@/lib/ibpe-runtime-parity";
 
-export const IBPE_ENGINE_VERSION = "VYNDI-IBPE-1.2.0";
+export const IBPE_ENGINE_VERSION = RUNTIME_IBPE_ENGINE_VERSION;
 export type IbpeValidation = Record<string, JsonValue>;
 
 export type IbpeRun = {
@@ -52,6 +57,7 @@ export type IbpeReadiness = {
     activeInventoryItems: number;
     supplyPlanningRows: number;
     capacityStandardRows: number;
+    unsynchronizedConfirmedOrders: number;
     completeRuns: number;
     longitudeBomRevisions: number;
     latitudeBomRevisions: number;
@@ -109,6 +115,7 @@ async function readIbpeReadiness(sql: Sql): Promise<IbpeReadiness> {
     active_inventory_items: number | string;
     supply_planning_rows: number | string;
     capacity_standard_rows: number | string;
+    unsynchronized_confirmed_orders: number | string;
     complete_runs: number | string;
   }>(`select
       (select count(*) from vyndi_plan_revisions where status='approved') as approved_plans,
@@ -116,6 +123,12 @@ async function readIbpeReadiness(sql: Sql): Promise<IbpeReadiness> {
       (select count(*) from master_inventory_items where active=true) as active_inventory_items,
       (select count(*) from vyndi_supply_planning_parameters where planning_status<>'retired') as supply_planning_rows,
       (select count(*) from vyndi_capacity_standards where planning_status<>'retired') as capacity_standard_rows,
+      (select count(*)
+         from vyndi_sales_orders o
+         left join epr_production_job_cards c on c.sales_order_id=o.id
+        where o.status='confirmed'
+          and (c.id is null or c.sales_order_revision<>o.revision or c.bom_revision is null
+            or c.status not in ('released','in_progress','complete'))) as unsynchronized_confirmed_orders,
       (select count(*) from vyndi_ibpe_runs where status='complete') as complete_runs`);
   const bomRows = await sql.query<{ model_id:string; revisions:number|string }>(
     `select model_id,count(distinct bom_revision) as revisions
@@ -132,6 +145,7 @@ async function readIbpeReadiness(sql: Sql): Promise<IbpeReadiness> {
     activeInventoryItems: Number(summary?.active_inventory_items ?? 0),
     supplyPlanningRows: Number(summary?.supply_planning_rows ?? 0),
     capacityStandardRows: Number(summary?.capacity_standard_rows ?? 0),
+    unsynchronizedConfirmedOrders: Number(summary?.unsynchronized_confirmed_orders ?? 0),
     completeRuns: Number(summary?.complete_runs ?? 0),
     longitudeBomRevisions: bom.get("core") ?? 0,
     latitudeBomRevisions: bom.get("pro") ?? 0,
@@ -193,6 +207,15 @@ async function readIbpeReadiness(sql: Sql): Promise<IbpeReadiness> {
       ready:counts.capacityStandardRows>0,
       detail:`${counts.capacityStandardRows} active capacity standard row(s).`,
       actionTo:"/command/capacity",
+    },
+    {
+      key:"committed-demand-projection",
+      label:"Committed order → production projection",
+      ready:counts.unsynchronizedConfirmedOrders===0,
+      detail:counts.unsynchronizedConfirmedOrders===0
+        ? "Every confirmed order is synchronized to a released, active or completed configuration-controlled job card."
+        : `${counts.unsynchronizedConfirmedOrders} confirmed order(s) have a missing or stale production projection.`,
+      actionTo:"/command/production",
     },
   ];
   return { ready:checks.every((check) => check.ready), checks, counts };
@@ -346,6 +369,35 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
     .map((entry) => entry.row.sku);
   const nonPlanningBomMissingCostSkuCount = costResolution.filter((entry) => !entry.activePlanningBom && entry.governedCostInr === undefined).length;
   const governedCostBySku = new Map(costResolution.map((entry) => [entry.row.sku, entry.governedCostInr]));
+  const committedRequirementRows = await sql.query<{
+    requirement_month:number|string;
+    sku:string;
+    unit:string;
+    committed_requirement:number|string;
+    committed_order_count:number|string;
+  }>(
+    `select requirement_month,sku,unit,committed_requirement,committed_order_count
+       from vyndi_committed_procurement_requirements
+      order by requirement_month,sku,unit`,
+  );
+  const committedMaterialRequirements: CommittedMaterialRequirement[] = committedRequirementRows.map((row) => ({
+    id:`COMMITTED-M${row.requirement_month}-${row.sku}-${row.unit}`,
+    sku:row.sku,
+    period:Number(row.requirement_month),
+    quantity:Number(row.committed_requirement),
+    unit:row.unit,
+    orderCount:Number(row.committed_order_count),
+    sourceRef:"RELEASED-JOB-CARD-REQUIREMENTS",
+  }));
+  const committedRequirementMissingCostSkus = [...new Set(
+    committedMaterialRequirements
+      .filter((row) => governedCostBySku.get(row.sku) === undefined)
+      .map((row) => row.sku),
+  )].sort();
+  const governedRequirementMissingCostSkus = [...new Set([
+    ...activePlanningBomMissingCostSkus,
+    ...committedRequirementMissingCostSkus,
+  ])].sort();
   const targetCogsByProduct = new Map(finance.productLines.map((line) => [line.id, Number(line.cogsLakh)]));
   const labelByProduct = new Map(finance.productLines.map((line) => [line.id, line.label]));
   const bomCogsReconciliation = (Object.keys(PRODUCT_TIER) as ProductLineId[]).map((productId) => {
@@ -426,7 +478,7 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
   for (const r of collectionRows) cashFlows.push({ id:`actual-sales-${r.plan_month}`,businessKey:`sales-M${r.plan_month}`,period:Number(r.plan_month),direction:"inflow",amountLakh:Number(r.amount),truth:"actual",category:"collections",sourceRef:"COLLECTION-LEDGER" });
 
   const input: RuntimeIbpeInput = {
-    demand,bom,inventory,reservations,receipts,capacity,cashFlows,
+    demand,bom,inventory,committedMaterialRequirements,reservations,receipts,capacity,cashFlows,
     funding:{ openingBankCashLakh:finance.openingCashLakh,minimumOperatingReserveLakh:finance.operatingPlan.cashFloorLakh,restrictedCashLakh:0,fundraisingLeadMonths:3 },
     runtimeControls:{
       paymentLagBySku:Object.fromEntries(supplyParameterRows.map((row) => [row.sku, Number(row.payment_lag_months)])),
@@ -445,6 +497,11 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
     paymentLagParameters:supplyParameterRows.filter((r) => Number(r.payment_lag_months) > 0).length,
     paymentLagRuntimeParity:"applied-stage-2",
     paymentLagAuthority:"vyndi_supply_planning_parameters.payment_lag_months",
+    committedMaterialRequirementRows:committedMaterialRequirements.length,
+    committedMaterialRequirementSkus:new Set(committedMaterialRequirements.map((row) => row.sku)).size,
+    committedRequirementMissingCostSkus:committedRequirementMissingCostSkus.join(","),
+    materialDemandReconciliation:"max(planned planning-BOM requirement, exact released job-card requirement) by SKU/month",
+    committedMaterialAuthority:"vyndi_committed_procurement_requirements",
     activePlanningBomSkus,
     activePlanningBomResolvedCostSkus,
     activePlanningBomFifoActualCostSkus,
@@ -454,9 +511,9 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
     activePlanningBomMissingCostSkus:activePlanningBomMissingCostSkus.join(","),
     activePlanningBomLegacyReferenceOnlySkus:activePlanningBomLegacyReferenceOnlySkus.join(","),
     nonPlanningBomMissingCostSkuCount,
-    missingControlledCostSkus:activePlanningBomMissingCostSkus.join(","),
-    missingControlledCostScope:"active-approved-planning-bom-only",
-    procurementCostCoverageComplete:activePlanningBomMissingCostSkus.length === 0,
+    missingControlledCostSkus:governedRequirementMissingCostSkus.join(","),
+    missingControlledCostScope:"active-approved-planning-bom-and-exact-released-job-card-requirements",
+    procurementCostCoverageComplete:governedRequirementMissingCostSkus.length === 0,
     procurementCostAuthority:"vyndi_procurement_cost_authority",
     inventoryCostAuthority:"EPR FIFO actual -> approved purchase order/supplier price -> approved planning procurement price -> explicit missing-cost exception; legacy catalogue/reference price excluded",
     bomCogsReconciliation,
@@ -466,7 +523,7 @@ async function buildGovernedInput(sql: Sql, plan: ApprovedPlanRow) {
     capacityAuthority:"vyndi_capacity_standards",
     capacitySummarySemantics:"unique-shortfall-months-stage-2",
     planningInputs:["vyndi_supply_planning_parameters","vyndi_capacity_standards","vyndi_procurement_prices"],
-    transactionInputs:["vyndi_sales_orders","vyndi_invoices","epr_bom_inventory_mappings","vyndi_inventory_available_to_promise","epr_inventory_reservations","vyndi_purchase_orders","vyndi_open_purchase_orders","vyndi_collections"],
+    transactionInputs:["vyndi_sales_orders","vyndi_invoices","epr_bom_inventory_mappings","vyndi_inventory_available_to_promise","epr_inventory_reservations","vyndi_committed_procurement_requirements","vyndi_purchase_orders","vyndi_open_purchase_orders","vyndi_collections"],
   };
   return { input, validation };
 }

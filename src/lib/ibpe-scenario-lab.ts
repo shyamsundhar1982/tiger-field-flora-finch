@@ -7,7 +7,11 @@ import {
   type IntegratedPlanningResult,
   type PlanningScenario,
 } from "@/lib/integrated-business-planning-engine";
-import { runRuntimeIbpe, type RuntimeIbpeInput } from "@/lib/ibpe-runtime-parity";
+import {
+  RUNTIME_IBPE_ENGINE_VERSION,
+  runRuntimeIbpe,
+  type RuntimeIbpeInput,
+} from "@/lib/ibpe-runtime-parity";
 
 export type IbpeScenarioRequest = PlanningScenario & {
   /** Optional product-line demand overrides. Keys use runtime product IDs: aluminium, carbon, premiumCarbon. */
@@ -45,6 +49,7 @@ export type IbpeScenarioPacket = {
 
 type SnapshotRow = {
   id: string;
+  engine_version: string;
   approved_plan_id: string;
   approved_plan_revision: number | string;
   input_hash: string;
@@ -182,11 +187,14 @@ function compareResults(base: IntegratedPlanningResult, scenario: IntegratedPlan
 
 async function latestSnapshot(sql: Sql): Promise<SnapshotRow> {
   const rows = await sql.query<SnapshotRow>(
-    `select id,approved_plan_id,approved_plan_revision,input_hash,source_sha,snapshot_at::text,input_json,result_json
+    `select id,engine_version,approved_plan_id,approved_plan_revision,input_hash,source_sha,snapshot_at::text,input_json,result_json
        from vyndi_ibpe_runs where status='complete' order by created_at desc limit 1`,
   );
   const snapshot = rows[0];
   if (!snapshot) throw new Error("No governed IBPE run exists. Run governed IBPE first.");
+  if (snapshot.engine_version !== RUNTIME_IBPE_ENGINE_VERSION) {
+    throw new Error("Latest governed IBPE run predates exact committed-material reconciliation. Run governed IBPE 1.3 before exploring scenarios.");
+  }
   if (!snapshot.input_json?.runtimeControls?.paymentLagBySku) {
     throw new Error("Latest governed IBPE run predates Stage 2 payment-lag parity. Run governed IBPE once to create a Stage 2 snapshot before exploring scenarios.");
   }

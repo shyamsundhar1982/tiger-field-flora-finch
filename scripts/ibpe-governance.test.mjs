@@ -75,14 +75,16 @@ test("IBPE persistence rejects a non-approved plan revision", async (t) => {
   ),/exact approved operating-plan revision/);
 });
 
-test("governed IBPE procurement cost excludes catalogue references and scopes cost exceptions to the active planning BOM", async () => {
+test("governed IBPE procurement cost excludes catalogue references and scopes cost exceptions to planned and exact committed requirements", async () => {
   const authority = await readFile(join(here, "..", "src", "lib", "ibpe-authority.ts"), "utf8");
   const migration = await readFile(join(migrationsDir, "0036_procurement_cost_authority.sql"), "utf8");
 
-  assert.match(authority, /VYNDI-IBPE-1\.2\.0/);
+  assert.match(authority, /RUNTIME_IBPE_ENGINE_VERSION/);
+  assert.match(authority, /vyndi_committed_procurement_requirements/);
+  assert.match(authority, /committedRequirementMissingCostSkus/);
   assert.match(authority, /vyndi_procurement_cost_authority/);
   assert.match(authority, /activePlanningBomMissingCostSkus/);
-  assert.match(authority, /missingControlledCostScope:"active-approved-planning-bom-only"/);
+  assert.match(authority, /missingControlledCostScope:"active-approved-planning-bom-and-exact-released-job-card-requirements"/);
   assert.match(authority, /bomCogsReconciliation/);
   assert.match(authority, /commercialBreakEvenPeriod/);
   assert.match(authority, /legacy catalogue\/reference price excluded/);

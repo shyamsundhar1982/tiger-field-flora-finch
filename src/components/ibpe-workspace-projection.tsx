@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "@tanstack/react-router";
-import { getIbpeReadiness, getLatestIbpeRun, runGovernedIbpe, type IbpeReadiness, type IbpeRun } from "@/lib/ibpe-authority";
+import { IBPE_ENGINE_VERSION, getIbpeReadiness, getLatestIbpeRun, runGovernedIbpe, type IbpeReadiness, type IbpeRun } from "@/lib/ibpe-authority";
 
 const workspaceDomains: Array<{ routes:string[]; label:string; domains:string[] }> = [
   { routes:["/command/planning","/command/finance-assumptions","/command/scenarios"], label:"Planning", domains:["planning","demand","funding"] },
@@ -20,7 +20,8 @@ function isUsableRun(value: unknown): value is IbpeRun {
   if (!value || typeof value !== "object") return false;
   const run = value as Partial<IbpeRun>;
   const result = run.result as IbpeRun["result"] | undefined;
-  return typeof run.approvedPlanRevision === "number"
+  return run.engineVersion === IBPE_ENGINE_VERSION
+    && typeof run.approvedPlanRevision === "number"
     && typeof run.inputHash === "string"
     && typeof run.sourceSha === "string"
     && !!result
@@ -135,7 +136,7 @@ export function IbpeWorkspaceProjection() {
 
   return <div className="border-b border-border bg-surface/50 px-4 py-2 text-xs">
     <div className="mx-auto flex max-w-[1800px] flex-wrap items-center gap-x-3 gap-y-1">
-      <span className="font-semibold text-fg">IBPE · {current?.label ?? "Command"}</span>
+      <span className="font-semibold text-fg">IBPE 1.3 · {current?.label ?? "Command"}</span>
       {run ? <>
         <span className="text-muted">R{run.approvedPlanRevision} · {run.inputHash.slice(0,8)} · {run.sourceSha.slice(0,7)}</span>
         <span className="text-muted">Health {run.result.summary.businessHealthScore}/100</span>

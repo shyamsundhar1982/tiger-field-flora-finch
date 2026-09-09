@@ -9,6 +9,8 @@ import {
   type PlanningSeverity,
 } from "./integrated-business-planning-engine.ts";
 
+export const RUNTIME_IBPE_ENGINE_VERSION = "VYNDI-IBPE-1.3.0";
+
 /**
  * Workbook/runtime controls that must participate in the governed input hash.
  * Keeping them inside input_json makes every persisted result reproducible from
