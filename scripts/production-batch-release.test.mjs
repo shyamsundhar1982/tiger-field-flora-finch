@@ -84,6 +84,8 @@ test("Commercial business writes require an individual identity and prove persis
   assert.doesNotMatch(actor, /requireUserId/);
 
   assert.match(authority, /getSalesOrderWriteReadiness/);
+  assert.match(authority, /middleware\(\[optionalAuthMiddleware\]\)/);
+  assert.match(authority, /middleware\(\[authMiddleware\]\)/);
   assert.match(authority, /vyndi_sales_order_revisions/);
   assert.match(authority, /Sales-order persistence verification failed/);
   assert.match(authority, /persisted: true as const/);
@@ -100,12 +102,45 @@ test("Commercial business writes require an individual identity and prove persis
   );
 });
 
+test("email login captures bearer and server functions transport the same verified identity", async () => {
+  const login = await text("src/routes/login.tsx");
+  const commandLogin = await text("src/routes/command-login.tsx");
+  const middleware = await text("src/lib/auth/middleware.ts");
+  const actor = await text("src/lib/business-actor.ts");
+  const commandAccess = await text("src/lib/command-access.ts");
+  const productionJobCard = await text("src/lib/production-job-card.ts");
+  const productionRelease = await text("src/lib/production-release-authority.ts");
+
+  assert.match(login, /set-auth-token/);
+  assert.match(login, /grok-auth\.bearer-token/);
+  assert.match(commandLogin, /set-auth-token/);
+  assert.match(commandLogin, /removeItem\(BEARER_KEY\)/);
+
+  assert.match(middleware, /export const authMiddleware/);
+  assert.match(middleware, /export const optionalAuthMiddleware/);
+  assert.match(middleware, /getBearerToken/);
+  assert.match(middleware, /getSessionUser\(context\?\.bearerToken\)/);
+
+  assert.match(actor, /verified\?: VerifiedBusinessIdentity/);
+  assert.match(actor, /getAssignedBusinessIdentity\(verified\)/);
+  assert.match(actor, /if \(!user\) throw new UnauthorizedError\(\)/);
+  assert.match(actor, /return \{ userId: user\.id, role \}/);
+  assert.doesNotMatch(actor, /const role = await getCommandRole\(\);[\s\S]*?requireUserId/);
+
+  assert.match(commandAccess, /middleware\(\[optionalAuthMiddleware\]\)/);
+  assert.match(commandAccess, /getAssignedCommandRole\(context\.userId, context\.userEmail\)/);
+  assert.match(productionJobCard, /middleware\(\[authMiddleware\]\)/);
+  assert.match(productionJobCard, /requireBusinessActor\("edit", \{ userId: context\.userId, email: context\.userEmail \}\)/);
+  assert.match(productionRelease, /middleware\(\[authMiddleware\]\)/);
+  assert.match(productionRelease, /requireBusinessActor\("approve", \{ userId: context\.userId, email: context\.userEmail \}\)/);
+});
+
 test("business mutation actor resolves verified identity and assigned role in one request context", async () => {
   const actor = await text("src/lib/business-actor.ts");
   const assignedRole = await text("src/lib/command-user-role.server.ts");
   const commandAccess = await text("src/lib/command-access.ts");
 
-  assert.match(actor, /const \{ user, role \} = await getAssignedBusinessIdentity\(\)/);
+  assert.match(actor, /const \{ user, role \} = await getAssignedBusinessIdentity\(verified\)/);
   assert.match(actor, /if \(!user\) throw new UnauthorizedError\(\)/);
   assert.match(actor, /return \{ userId: user\.id, role \}/);
   assert.doesNotMatch(actor, /const role = await getCommandRole\(\);[\s\S]*?requireUserId/);
@@ -113,7 +148,7 @@ test("business mutation actor resolves verified identity and assigned role in on
   assert.match(assignedRole, /getAssignedCommandRole/);
   assert.match(assignedRole, /select role from vindy_user_roles/);
   assert.match(assignedRole, /VINDY_ADMIN_EMAILS/);
-  assert.match(commandAccess, /getAssignedCommandRole\(user\.id, user\.email\)/);
+  assert.match(commandAccess, /getAssignedCommandRole\(context\.userId, context\.userEmail\)/);
 });
 
 test("Commercial revisions are buffered and synchronize only on explicit save", async () => {
