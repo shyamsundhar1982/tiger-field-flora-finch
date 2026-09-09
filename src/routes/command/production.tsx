@@ -51,12 +51,15 @@ function ProductionWorkspace() {
   const trough = accountingRows.reduce((minimum, row) => row.closingCash < minimum.closingCash ? row : minimum, accountingRows[0]);
 
   const approvedCards = cards.filter((card: any) => Boolean(card.approved_at)).length;
-  const committedUnits = cards.reduce((sum: number, card: any) => sum + Number(card.units), 0);
+  const confirmedOrderUnits = orders.reduce((sum: number, order: any) => sum + Number(order.units ?? 0), 0);
   const shortages = lines.filter((line: any) => Number(line.shortage_quantity ?? 0) > 0 && Boolean(line.sku)).length;
   const draftPos = cards.reduce((sum: number, card: any) => sum + Number(card.po_draft_count ?? 0), 0);
   const pendingControls = MANUFACTURING_CONTROLS.filter((item) => item.status === "pending").length;
   const verifyControls = MANUFACTURING_CONTROLS.filter((item) => item.status === "verify").length;
 
+  const synchronizedOrders = orders.filter((order: any) =>
+    Boolean(order.job_card_id) && Number(order.job_card_revision ?? 0) === Number(order.revision),
+  );
   const ordersNeedingJobCard = orders.filter((order: any) =>
     !order.job_card_id || Number(order.job_card_revision ?? 0) !== Number(order.revision),
   );
@@ -70,6 +73,23 @@ function ProductionWorkspace() {
       await router.invalidate();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Production synchronization failed.");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function reconcileAll() {
+    if (!ordersNeedingJobCard.length) return;
+    setBusyAction("sync:all");
+    setMessage("");
+    try {
+      for (const order of ordersNeedingJobCard) {
+        await syncProductionJobCard({ data: { salesOrderId: String(order.id) } });
+      }
+      setMessage(`${ordersNeedingJobCard.length} confirmed Commercial order(s) reconciled to current Production job-card revisions.`);
+      await router.invalidate();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Confirmed-order reconciliation failed.");
     } finally {
       setBusyAction(null);
     }
@@ -121,9 +141,10 @@ function ProductionWorkspace() {
         </Link>
       </header>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
+        <Kpi label="Confirmed orders" value={String(orders.length)} hint={`${confirmedOrderUnits} committed unit(s) from Commercial`} tone={orders.length ? "ok" : "warn"} />
         <Kpi label="Job cards" value={String(cards.length)} hint={`${approvedCards} approved builds`} />
-        <Kpi label="Committed units" value={String(committedUnits)} hint="Confirmed Commercial demand" />
+        <Kpi label="Missing / stale" value={String(ordersNeedingJobCard.length)} hint={`${synchronizedOrders.length}/${orders.length} confirmed orders on current job-card revision`} tone={ordersNeedingJobCard.length ? "danger" : "ok"} />
         <Kpi label="Travellers" value={String(travellers.length)} hint="Auto-registered genealogy" />
         <Kpi label="Shortage lines" value={String(shortages)} hint="Stock required" tone={shortages ? "danger" : "ok"} />
         <Kpi label="Draft POs" value={String(draftPos)} hint="Not supplier commitments" tone={draftPos ? "warn" : "ok"} />
@@ -132,21 +153,40 @@ function ProductionWorkspace() {
 
       {message ? <div role="status" className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-muted">{message}</div> : null}
 
-      {ordersNeedingJobCard.length ? (
-        <Panel title="Commercial orders awaiting Production synchronization" kicker="Normally automatic on order save">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {ordersNeedingJobCard.map((order: any) => (
-              <article key={order.id} className="rounded-xl border border-border bg-bg-elevated/25 p-4">
-                <p className="text-xs font-semibold text-fg">{order.variant_name ?? order.variant_id ?? order.id}</p>
-                <p className="mt-1 text-xs text-muted">{order.id} R{order.revision} · {order.units} unit(s) · M{order.plan_month}</p>
-                <Button className="mt-3 w-full" disabled={busyAction !== null} onClick={() => void synchronize(order.id)}>
-                  {busyAction === `sync:${order.id}` ? "Synchronizing…" : "Synchronize controlled build"}
-                </Button>
-              </article>
-            ))}
+      <Panel title="Order → Job Card reconciliation" kicker="Confirmed Commercial truth must reconcile 1:1 to current Production revisions">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Metric label="Confirmed orders" value={String(orders.length)} />
+          <Metric label="Confirmed units" value={String(confirmedOrderUnits)} />
+          <Metric label="Current-revision job cards" value={String(synchronizedOrders.length)} />
+          <Metric label="Missing / stale cards" value={String(ordersNeedingJobCard.length)} />
+        </div>
+        {orders.length === 0 ? (
+          <div className="mt-4 rounded-lg border border-warn/40 bg-warn/5 p-4">
+            <p className="text-sm font-semibold text-warn">Production cannot see any confirmed Commercial order.</p>
+            <p className="mt-1 text-xs leading-5 text-muted">If Commercial shows confirmed orders, this proves a persistence/environment mismatch rather than a hidden Production card.</p>
+            <Link to="/command/sales" className="mt-3 inline-block text-xs font-semibold text-accent hover:underline">Open Commercial order register →</Link>
           </div>
-        </Panel>
-      ) : null}
+        ) : ordersNeedingJobCard.length ? (
+          <div className="mt-4 space-y-3">
+            <div className="flex flex-col gap-3 rounded-lg border border-warn/40 bg-warn/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div><p className="text-sm font-semibold text-warn">{ordersNeedingJobCard.length} confirmed order(s) are not on the current Production revision.</p><p className="mt-1 text-xs text-muted">Reconciliation validates the controlled BOM before creating or refreshing the job card. It does not approve the bike/batch.</p></div>
+              <Button disabled={busyAction !== null} onClick={() => void reconcileAll()}>{busyAction === "sync:all" ? "Reconciling…" : "Reconcile all"}</Button>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {ordersNeedingJobCard.map((order: any) => (
+                <article key={order.id} className="rounded-xl border border-border bg-bg-elevated/25 p-4">
+                  <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold text-fg">{order.variant_name ?? order.variant_id ?? order.id}</p><p className="mt-1 font-mono text-[10px] text-subtle">{order.id}</p></div><span className="text-[10px] font-bold uppercase text-warn">{order.job_card_id ? "STALE" : "MISSING"}</span></div>
+                  <p className="mt-3 text-xs text-muted">Order R{order.revision} · {order.units} unit(s) · M{order.plan_month}</p>
+                  <p className="mt-1 text-[10px] text-subtle">Job card: {order.job_card_id ? `${order.job_card_id} R${order.job_card_revision ?? "—"}` : "not created"}</p>
+                  <Button className="mt-3 w-full" disabled={busyAction !== null} onClick={() => void synchronize(String(order.id))}>{busyAction === `sync:${order.id}` ? "Synchronizing…" : "Synchronize controlled build"}</Button>
+                </article>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4 rounded-lg border border-green/30 bg-green/5 p-4"><p className="text-sm font-semibold text-green">All confirmed Commercial orders are synchronized to the current Production revision.</p><p className="mt-1 text-xs text-muted">If you expected more confirmed orders than the count above, the missing records are upstream in the Commercial persistence/environment, not hidden in Production.</p></div>
+        )}
+      </Panel>
 
       <Panel title="Bike / batch release" kicker="One approval creates the dependent production records">
         {cards.length === 0 ? (

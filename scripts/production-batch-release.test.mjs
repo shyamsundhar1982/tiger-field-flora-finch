@@ -59,3 +59,15 @@ test("Commercial defaults components and Production exposes one batch approval",
   assert.match(production, /approveProductionBatch/);
   assert.match(production, /Draft PO is generated when this build is approved/);
 });
+
+test("Production exposes confirmed-order to current job-card reconciliation instead of silently hiding gaps", async () => {
+  const production = await text("src/routes/command/production.tsx");
+  assert.match(production, /Confirmed orders/);
+  assert.match(production, /Order → Job Card reconciliation/);
+  assert.match(production, /Missing \/ stale/);
+  assert.match(production, /Reconcile all/);
+  assert.match(production, /synchronizedOrders/);
+  assert.match(production, /ordersNeedingJobCard/);
+  assert.match(production, /If you expected more confirmed orders than the count above/);
+  assert.doesNotMatch(production, /const committedUnits = cards\.reduce/);
+});
