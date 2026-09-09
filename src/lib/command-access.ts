@@ -9,6 +9,11 @@ const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
 
 type CommandSession = { role?: CommandRole };
 
+type CommandAuthContext = {
+  userId?: string;
+  userEmail?: string | null;
+};
+
 type CommandEnv = {
   COMMAND_PASSWORD?: string;
   COMMAND_MANAGEMENT_PASSWORD?: string;
@@ -64,20 +69,30 @@ async function getLegacyRole(): Promise<CommandRole | null> {
   }
 }
 
+async function resolveCommandAuthorization(
+  context: CommandAuthContext,
+): Promise<{ access: boolean; role: CommandRole | null }> {
+  if (context.userId) {
+    const role = (await getAssignedCommandRole(context.userId, context.userEmail)) ?? "viewer";
+    return { access: true, role };
+  }
+  const role = await getLegacyRole();
+  return { access: Boolean(role), role };
+}
+
 /**
  * Individual Better Auth identity and its assigned VYNDI role are one authority
  * boundary. A stale shared-password cookie must never elevate or otherwise
  * change an authenticated individual's role. Legacy role lookup is permitted
  * only when no individual identity exists.
  */
+export const getCommandAuthorization = createServerFn({ method: "GET" })
+  .middleware([optionalAuthMiddleware])
+  .handler(async ({ context }) => resolveCommandAuthorization(context));
+
 export const getCommandRole = createServerFn({ method: "GET" })
   .middleware([optionalAuthMiddleware])
-  .handler(async ({ context }) => {
-    if (context.userId) {
-      return (await getAssignedCommandRole(context.userId, context.userEmail)) ?? "viewer";
-    }
-    return getLegacyRole();
-  });
+  .handler(async ({ context }) => (await resolveCommandAuthorization(context)).role);
 
 export const getCommandIdentity = createServerFn({ method: "GET" })
   .middleware([optionalAuthMiddleware])
@@ -88,10 +103,7 @@ export const getCommandIdentity = createServerFn({ method: "GET" })
 
 export const getCommandAccess = createServerFn({ method: "GET" })
   .middleware([optionalAuthMiddleware])
-  .handler(async ({ context }) => {
-    if (context.userId) return true;
-    return Boolean(await getLegacyRole());
-  });
+  .handler(async ({ context }) => (await resolveCommandAuthorization(context)).access);
 
 export const unlockCommand = createServerFn({ method: "POST" })
   .validator(z.object({ username: z.string().min(1).max(100), password: z.string().min(1).max(200) }))
