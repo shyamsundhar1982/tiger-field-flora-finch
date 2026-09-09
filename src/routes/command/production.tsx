@@ -198,6 +198,9 @@ function ProductionWorkspace() {
               const linkedTravellers = travellers.filter((traveller: any) => traveller.job_card_id === card.id && traveller.status !== "rejected");
               const shortageCount = cardLines.filter((line: any) => line.sku && Number(line.shortage_quantity ?? 0) > 0).length;
               const approved = Boolean(card.approved_at);
+              const requisitionId = `MR-${String(card.batch_code ?? card.id).replace(/^BATCH-/, "")}`;
+              const materialLines = cardLines.filter((line: any) => Boolean(line.sku));
+              const issuedLines = materialLines.filter((line: any) => line.issue_status === "issued").length;
               return (
                 <article key={card.id} className="rounded-xl border border-border bg-bg-elevated/25 p-4">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -228,13 +231,26 @@ function ProductionWorkspace() {
                   </div>
 
                   <details className="mt-4 rounded-lg border border-border/70 bg-bg/40 p-3" open={false}>
-                    <summary className="cursor-pointer text-xs font-semibold text-fg">Material requirements · automatically selected from released BOM</summary>
+                    <summary className="cursor-pointer text-xs font-semibold text-fg">Material Requisition &amp; Issue · {requisitionId}</summary>
+                    <div className="mt-3 flex flex-col gap-3 border-b border-border/70 pb-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        <Metric label="Job card / order" value={`${card.id} · ${card.sales_order_id}`} />
+                        <Metric label="Requested by" value={card.created_by ?? "—"} />
+                        <Metric label="Approved by" value={card.approved_by ?? "Approval pending"} />
+                        <Metric label="Issue progress" value={`${issuedLines}/${materialLines.length} material line(s)`} />
+                      </div>
+                      <button type="button" onClick={() => window.print()} className="rounded-md border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent">
+                        Print requisition / issue record
+                      </button>
+                    </div>
+                    <p className="mt-3 text-[11px] leading-5 text-muted">Generated from the released BOM; no duplicate material entry is required. Stores confirms the actual FIFO issue against a compatible traveller serial below.</p>
                     <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                       {cardLines.map((line: any) => {
                         const required = Number(line.quantity ?? 0);
-                        const physical = Number(line.available_quantity ?? 0);
                         const reserved = Number(line.reserved_quantity ?? 0);
                         const shortage = Number(line.shortage_quantity ?? 0);
+                        const reservationQuantity = Number(line.reservation_quantity ?? 0);
+                        const issuedQuantity = line.issue_status === "issued" || line.reservation_status === "consumed" ? reservationQuantity || required : 0;
                         const compatibleTravellers = linkedTravellers.filter((traveller: any) =>
                           ["released", "in_build"].includes(traveller.status) && traveller.model_name === familyForCard(card) && traveller.bom_revision === card.bom_revision,
                         );
@@ -248,7 +264,11 @@ function ProductionWorkspace() {
                               <span className={`text-[10px] font-bold uppercase ${shortage > 0 ? "text-warn" : "text-green"}`}>{shortage > 0 ? "Short" : line.sku ? "Covered" : "Operation"}</span>
                             </div>
                             <div className="mt-3 grid grid-cols-4 gap-2 text-center text-[10px]">
-                              <SmallMetric label="Req" value={`${required}`} /><SmallMetric label="Stock" value={`${physical}`} /><SmallMetric label="Reserved" value={`${reserved}`} /><SmallMetric label="Short" value={`${shortage}`} />
+                              <SmallMetric label="Requested" value={`${required}`} /><SmallMetric label="Reserved" value={`${line.reservation_status === "active" ? reservationQuantity : 0}`} /><SmallMetric label="Issued" value={`${issuedQuantity}`} /><SmallMetric label="Short" value={`${shortage}`} />
+                            </div>
+                            <div className="mt-2 space-y-1 text-[10px] text-subtle">
+                              <p>Reservation: {line.reservation_id ?? "Not available"}</p>
+                              <p>{line.reservation_status === "consumed" ? `Issued by ${line.consumed_by ?? "recorded operator"}${line.consumed_at ? ` · ${String(line.consumed_at).replace("T", " ").slice(0, 16)} UTC` : ""}` : line.reserved_by ? `Reserved by ${line.reserved_by}${line.reserved_at ? ` · ${String(line.reserved_at).replace("T", " ").slice(0, 16)} UTC` : ""}` : "Awaiting stock reservation"}</p>
                             </div>
                             {line.sku && line.issue_status !== "issued" && fullyReserved && compatibleTravellers.length > 0 ? (
                               <div className="mt-3">
