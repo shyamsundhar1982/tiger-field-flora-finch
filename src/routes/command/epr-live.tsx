@@ -167,7 +167,7 @@ function LiveEpr() {
       <InventoryWorkspaceNav />
 
       <div className="rounded-xl border border-accent/30 bg-accent/5 p-4 text-xs leading-5 text-muted">
-        <strong className="text-fg">Inventory authority:</strong> physical stock, valuation, MSL and FIFO are canonical in <Link to="/command/inventory" className="font-semibold text-accent">Master Inventory</Link>. Job-card reservations are commitments, not movements, and reserved material must be consumed from <Link to="/command/production-jobcards" className="font-semibold text-accent">Production Job Cards</Link> against the released traveller/serial. This EPR form is only for permitted direct unreserved issue/consume or return transactions.
+        <strong className="text-fg">Inventory authority:</strong> physical stock, valuation, MSL and FIFO are canonical in <Link to="/command/inventory" className="font-semibold text-accent">Master Inventory</Link>. Job-card reservations are commitments, not movements, and reserved material must be consumed from <Link to="/command/production" className="font-semibold text-accent">Production</Link> against the released traveller/serial. This EPR form is only for permitted direct unreserved issue/consume or return transactions.
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">

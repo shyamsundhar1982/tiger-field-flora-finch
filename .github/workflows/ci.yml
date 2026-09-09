@@ -9,9 +9,13 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,6 +28,12 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Authentication invariant gate
+        run: npm run check:auth -- --ci
+
+      - name: Route invariant gate
+        run: npm run check:routes
 
       - name: Generate route tree and typecheck
         run: npm run typecheck

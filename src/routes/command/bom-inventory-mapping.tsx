@@ -1,15 +1,13 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Panel } from "@/components/kpi";
 import { InventoryWorkspaceNav } from "@/components/inventory-workspace-nav";
 import { approveControlledBomMapping, createControlledBomMapping, listControlledBomMappings, retireControlledBomMapping } from "@/lib/bom-mapping-authority";
-import { getCommandAccess, getCommandRole } from "@/lib/command-access";
 import { SEED_INVENTORY, type InventoryCategory } from "@/lib/data/inventory";
 import { MODELS } from "@/lib/data/models";
-import { canAccessRoute } from "@/lib/page-access";
 import { isEligible } from "@/lib/product-configuration";
 
-export const Route=createFileRoute("/command/bom-inventory-mapping")({beforeLoad:async()=>{if(!await getCommandAccess())throw redirect({to:"/command-login"});const role=await getCommandRole();if(!canAccessRoute(role,"/command/bom-inventory-mapping"))throw redirect({to:"/command"});},component:BomInventoryMappingPage});
+export const Route = createFileRoute("/command/bom-inventory-mapping")({ component: BomInventoryMappingPage });
 type Mapping={id:string;venture:"carbon"|"aluminium";model_id:string;bom_revision:string;bom_line_key:string;sku:string;quantity:number|string;unit:string;status:string;configuration_category:InventoryCategory|null;configuration_option_id:string|null;approved_by?:string|null;approved_at?:string|null;notes?:string};
 const planningScopes=[{id:"core",label:"Planning standard · Longitude",venture:"aluminium" as const},{id:"pro",label:"Planning standard · Latitude",venture:"carbon" as const},{id:"apex",label:"Planning standard · Altitude",venture:"carbon" as const}];
 const configurableCategories=["groupset","wheelset","tyre","handlebar","stem","saddle","thruaxle","bottom-bracket","bottle-cage","tool-pouch","bracket","colour"] as const;

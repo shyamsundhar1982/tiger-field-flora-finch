@@ -1,6 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { FormEvent, useState } from "react";
-import { authClient } from "@/lib/auth/client";
 
 export const Route = createFileRoute("/signup")({ component: SignupPage });
 
@@ -16,13 +15,36 @@ function SignupPage() {
     event.preventDefault();
     setBusy(true);
     setError("");
-    const result = await authClient.signUp.email({ name, email, password });
-    if (result.error) {
-      setError(result.error.message ?? "Account creation failed.");
+
+    try {
+      // Better Auth intentionally has autoSignIn=false so an administrator can
+      // create users without losing the administrator's own session. Public
+      // signup therefore completes account creation first and then asks the new
+      // user to authenticate explicitly.
+      const { authClient } = await import("@/lib/auth/client");
+      const normalizedEmail = email.trim().toLowerCase();
+      const result = await authClient.signUp.email({
+        name: name.trim(),
+        email: normalizedEmail,
+        password,
+      });
+      if (result.error) {
+        setError(result.error.message ?? "Account creation failed.");
+        return;
+      }
+      await navigate({
+        to: "/login",
+        search: {
+          email: normalizedEmail,
+          created: true,
+          returnTo: "/command",
+        },
+      });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Account creation failed.");
+    } finally {
       setBusy(false);
-      return;
     }
-    await navigate({ to: "/command" });
   }
 
   return (

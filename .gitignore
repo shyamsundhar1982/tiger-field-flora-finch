@@ -3,6 +3,8 @@ node_modules/
 .github_repo
 .env
 .env.*
-.vercel/output/
+.vercel/
 .output/
 src/routeTree.gen.ts
+.grok/preview.log
+.grok/status

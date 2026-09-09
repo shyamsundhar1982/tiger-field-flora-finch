@@ -3,7 +3,9 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
-const shell = read("src/components/command-shell.tsx");
+const shellEntry = read("src/components/command-shell.tsx");
+const shell = read("src/components/command-shell-v2.tsx");
+const bridge = read("src/components/protected-navigation-bridge.tsx");
 const header = read("src/components/site-header.tsx");
 const metadata = read("src/lib/page-metadata.ts");
 const commandCentre = read("src/routes/command/index.tsx");
@@ -11,24 +13,21 @@ const decisionInbox = read("src/routes/command/decision-inbox.tsx");
 const controlTower = read("src/routes/command/control-tower.tsx");
 
 test("command workspace exposes one canonical primary navigation layer", () => {
+  assert.match(shellEntry, /export \{ CommandShell \} from "\.\/command-shell-v2"/);
   assert.match(shell, /<SiteHeader showNavigation=\{false\} brandHref="\/command" \/>/);
+  assert.match(shell, /Core workspaces/);
+  assert.match(shell, /ClientLink/);
+  assert.match(shell, /\/command\/decision-inbox/);
   assert.doesNotMatch(shell, /NavigationView/);
   assert.doesNotMatch(shell, /COMMAND_TABS/);
-  assert.doesNotMatch(shell, />Workspaces</);
-  assert.doesNotMatch(shell, />More</);
-  assert.doesNotMatch(shell, /\/command\/control-tower/);
-  assert.match(shell, /<CanonicalAnchor[\s\S]{0,240}to=\{item\.to\}/);
-  assert.match(shell, /href="\/command\/decision-inbox"/);
 });
 
 test("secondary reference, monitor, specialist and showcase functions remain discoverable", () => {
   assert.match(shell, /More functions/);
   assert.match(shell, /navigationGroups/);
-  assert.match(shell, /<SecondaryMode mode="understand" role=\{role\} \/>/);
-  assert.match(shell, /<SecondaryMode mode="observe" role=\{role\} \/>/);
-  assert.match(shell, /<SecondaryMode mode="operate" role=\{role\} \/>/);
-  assert.match(shell, /<SecondaryMode mode="showcase" role=\{role\} \/>/);
-  assert.match(shell, /href=\{page\.route\}/);
+  for (const mode of ["understand", "observe", "operate", "showcase"]) {
+    assert.match(shell, new RegExp(`"${mode}"`));
+  }
 
   for (const route of [
     "/command/epr-live",
@@ -47,26 +46,31 @@ test("secondary reference, monitor, specialist and showcase functions remain dis
   }
 });
 
-test("public navigation can be suppressed inside Command", () => {
+test("public navigation can be suppressed inside Command and protected brand navigation stays client-side", () => {
   assert.match(header, /showNavigation\?: boolean/);
   assert.match(header, /showNavigation = true/);
   assert.match(header, /\{showNavigation \? \(/);
+  assert.match(header, /<Link to=\{brandHref as never\}/);
+  assert.doesNotMatch(header, /<a href=\{brandHref\}/);
 });
 
-test("Command Centre source and workspace actions force canonical document loads", () => {
-  assert.match(commandCentre, /href=\{packet\.source\}/);
-  assert.match(commandCentre, /Open workspace →/);
-  assert.match(commandCentre, /href="\/command\/planning"/);
-  assert.match(commandCentre, /href="\/command\/control-tower"/);
+test("Command Centre uses client navigation for protected workspace actions", () => {
+  assert.match(commandCentre, /import \{ createFileRoute, Link \}/);
+  assert.match(commandCentre, /const WorkLink/);
+  assert.match(commandCentre, /to="\/command\/planning"/);
   assert.match(commandCentre, /ERP Reports →/);
-  assert.doesNotMatch(commandCentre, /<Link\b/);
+  assert.doesNotMatch(commandCentre, /<a\b/);
 });
 
-test("Action Inbox opens its owning canonical workspace", () => {
-  assert.match(decisionInbox, /href=\{text\(item, "route"\)\}/);
-  assert.match(decisionInbox, /Open workspace/);
-  assert.doesNotMatch(decisionInbox, /Open owner/);
-  assert.doesNotMatch(decisionInbox, /<Link\b/);
+test("protected navigation is client-side while the bridge remains a temporary compatibility guard", () => {
+  assert.match(bridge, /document\.addEventListener\("click", handleClick\)/);
+  assert.match(bridge, /destination\.pathname\.startsWith\("\/command\/"\)/);
+  assert.match(bridge, /event\.preventDefault\(\)/);
+  assert.match(bridge, /navigate\(\{ to: to as never \}\)/);
+  assert.match(decisionInbox, /to=\{text\(item, "route"\) as never\}/);
+  assert.doesNotMatch(decisionInbox, /href=\{text\(item, "route"\)\}/);
+  assert.match(controlTower, /to=\{report\.route as never\}/);
+  assert.doesNotMatch(controlTower, /href=\{report\.route\}/);
 });
 
 test("Control Tower is the registered read-only ERP reporting console", () => {

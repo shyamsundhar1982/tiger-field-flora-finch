@@ -55,7 +55,6 @@ export const ERP_FLOW: ErpFlowStep[] = [
       "/command/operations",
       "/command/procurement-planning",
       "/command/purchase-execution",
-      "/command/production-jobcards",
       "/command/production",
       "/command/manufacturing",
       "/command/quality",
@@ -102,7 +101,6 @@ export const ERP_FLOW: ErpFlowStep[] = [
     outputs: "Decisions, actions and board/investor view",
     routes: [
       "/command/control-tower",
-      "/command/management-intelligence",
       "/command/investor-board",
       "/command/actions",
       "/command/decision-inbox",

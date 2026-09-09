@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { Kpi, Panel } from "@/components/kpi";
 import { DECISION_PACKETS, DECISION_STATE_LABELS, decisionPriorityRank } from "@/lib/data/decision-engine";
@@ -39,6 +39,10 @@ function CommandCentre() {
   const blockedDecisions = visibleDecisions.filter((packet) => packet.state === "blocked").length;
   const cashTone = trough.cash < 0 ? "danger" : trough.cash < 15 ? "warn" : "ok";
 
+  const WorkLink = ({ to, className, children }: { to: string; className?: string; children: React.ReactNode }) => (
+    <Link to={to as never} className={className}>{children}</Link>
+  );
+
   return (
     <div className="space-y-6">
       <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -48,11 +52,11 @@ function CommandCentre() {
           <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">One screen for what needs attention now: financial health, blockers, decisions, accountable actions and the next operating gate. Detailed work stays in its specialist workspace.</p>
         </div>
         <div className="flex flex-wrap gap-3 text-sm font-semibold">
-          {accessible("/command/planning") && <a href="/command/planning" className="text-accent hover:text-fg">Master Plan →</a>}
-          {accessible("/command/control-tower") && <a href="/command/control-tower" className="text-accent hover:text-fg">ERP Reports →</a>}
-          {accessible("/command/decision-inbox") && <a href="/command/decision-inbox" className="text-accent hover:text-fg">Action Inbox →</a>}
-          {accessible("/command/governance") && <a href="/command/governance" className="text-accent hover:text-fg">Governance →</a>}
-          {accessible("/command/founder-command") && <a href="/command/founder-command" className="text-muted hover:text-fg">Action & evidence ledger →</a>}
+          {accessible("/command/planning") && <WorkLink to="/command/planning" className="text-accent hover:text-fg">Master Plan →</WorkLink>}
+          {accessible("/command/control-tower") && <WorkLink to="/command/control-tower" className="text-accent hover:text-fg">ERP Reports →</WorkLink>}
+          {accessible("/command/decision-inbox") && <WorkLink to="/command/decision-inbox" className="text-accent hover:text-fg">Action Inbox →</WorkLink>}
+          {accessible("/command/governance") && <WorkLink to="/command/governance" className="text-accent hover:text-fg">Governance →</WorkLink>}
+          {accessible("/command/founder-command") && <WorkLink to="/command/founder-command" className="text-muted hover:text-fg">Action & evidence ledger →</WorkLink>}
         </div>
       </header>
 
@@ -79,7 +83,7 @@ function CommandCentre() {
                 <p className="text-[10px] uppercase tracking-wider text-subtle">State</p>
                 <p className="mt-1 text-xs text-muted">{DECISION_STATE_LABELS[packet.state]}</p>
               </div>
-              <a href={packet.source} className="text-xs font-semibold text-accent hover:text-fg">Open workspace →</a>
+              <WorkLink to={packet.source} className="text-xs font-semibold text-accent hover:text-fg">Open workspace →</WorkLink>
             </div>
           ))}
         </div>
@@ -113,8 +117,8 @@ function CommandCentre() {
           </table>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          {accessible("/command/founder-command") && <a href="/command/founder-command" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:border-accent hover:text-fg">Open full action & evidence ledger</a>}
-          {accessible("/command/actions") && <a href="/command/actions" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:border-accent hover:text-fg">Action log</a>}
+          {accessible("/command/founder-command") && <WorkLink to="/command/founder-command" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:border-accent hover:text-fg">Open full action & evidence ledger</WorkLink>}
+          {accessible("/command/actions") && <WorkLink to="/command/actions" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:border-accent hover:text-fg">Action log</WorkLink>}
         </div>
       </Panel>
 
@@ -150,10 +154,10 @@ function CommandCentre() {
           ]
             .filter(([, , to]) => accessible(to))
             .map(([title, note, to]) => (
-              <a key={to} href={to} className="rounded-lg border border-border p-4 transition-colors hover:border-accent/50 hover:bg-surface">
+              <WorkLink key={to} to={to} className="rounded-lg border border-border p-4 transition-colors hover:border-accent/50 hover:bg-surface">
                 <p className="text-sm font-semibold text-fg">{title}</p>
                 <p className="mt-1 text-xs leading-5 text-muted">{note}</p>
-              </a>
+              </WorkLink>
             ))}
         </div>
       </Panel>
@@ -168,7 +172,7 @@ function CommandCentre() {
           ]
             .filter(([, to]) => accessible(to))
             .map(([label, to]) => (
-              <a key={to} href={to} className="rounded-md border border-border p-3 hover:border-accent hover:text-fg">{label}</a>
+              <WorkLink key={to} to={to} className="rounded-md border border-border p-3 hover:border-accent hover:text-fg">{label}</WorkLink>
             ))}
         </div>
         <p className="mt-3 text-xs leading-5 text-subtle">Command Centre surfaces only information that changes a decision, triggers an action, records evidence or explains a material exception. Detailed calculations remain in their canonical functional workspaces.</p>

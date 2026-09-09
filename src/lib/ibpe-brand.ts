@@ -1,1 +1,4 @@
 export const VIBPE_COPILOT_NAME = "VIBPE Co-Pilot";
+export const VIBPE_COPILOT_VERSION = "2.0";
+export const VIBPE_COPILOT_LABEL = `${VIBPE_COPILOT_NAME} ${VIBPE_COPILOT_VERSION}`;
+export const IBPE_CORE_LABEL = "IBPE Core 1.3";

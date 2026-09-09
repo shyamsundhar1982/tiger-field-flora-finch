@@ -29,7 +29,7 @@ function InventoryTruth() {
     <InventoryWorkspaceNav active="truth" />
     <div className="flex flex-wrap gap-2 text-xs">
       <Link to="/command/procurement" className="rounded-lg border border-border px-3 py-2 font-semibold text-muted hover:border-accent hover:text-accent">Replenishment queue →</Link>
-      <Link to="/command/production-jobcards" className="rounded-lg border border-border px-3 py-2 font-semibold text-muted hover:border-accent hover:text-accent">Production job cards →</Link>
+      <Link to="/command/production" className="rounded-lg border border-border px-3 py-2 font-semibold text-muted hover:border-accent hover:text-accent">Production →</Link>
       <Link to="/command/epr-live" className="rounded-lg border border-border px-3 py-2 font-semibold text-muted hover:border-accent hover:text-accent">EPR execution →</Link>
     </div>
     <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">

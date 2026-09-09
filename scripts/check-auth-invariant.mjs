@@ -1,27 +1,14 @@
 #!/usr/bin/env node
 /**
- * Fail loudly when the running dev server and the next build disagree about
- * `VITE_AUTH_ENABLED`.
+ * Authentication invariant checker.
  *
- * `npm run dev`, `npm run build` and `npm run preview` all get the flag from
- * `scripts/with-app-env.mjs`, so they agree by construction — but a dev server
- * started outside npm (`npx vite dev`) does not, and the result is sign-in
- * visible in the live preview and absent from the built output, or the reverse.
- *
- * The two sides compared:
- *  - **dev**: what the running server resolved, read from the `/__app-env`
- *    endpoint the template's dev-only `appEnvPlugin` serves.
- *  - **build**: what the wrapper hands `vite build` / `vite preview`.
- *
- * The built bundle is not read: Vite inlines the flag and the minifier folds
- * `"false" !== "false"` away, so the built client JS carries no marker to
- * compare against unless the app is made to emit one.
- *
- * `scripts/browser-smoke.mjs` runs the comparison on every smoke; run it
- * standalone against a live dev server with `npm run check:auth` (exit 0 agree,
- * 1 diverged, 2 could not observe). Callers comparing the flag should use
- * `compareAuthInvariant()` rather than re-deriving it.
+ * Local mode compares a running dev server's resolved `VITE_AUTH_ENABLED` with
+ * the next build. CI mode cannot probe a dev server, so it validates the
+ * build-side VYNDI auth contract instead: sign-in must resolve enabled and the
+ * canonical Better Auth route, login route and copied auth schema must exist.
  */
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { APP_ENV_ROUTE } from "./app-env-plugin.mjs";
 import { isMainModule, mergeAppEnv, projectRoot, readAppEnv } from "./with-app-env.mjs";
 
@@ -89,7 +76,43 @@ export function buildAuthEnabled(root = projectRoot(), processEnv = process.env)
   return authEnabledFromEnvValue(env.VITE_AUTH_ENABLED);
 }
 
+/**
+ * Headless CI cannot query a running dev server. Instead enforce the production
+ * VYNDI build contract so auth cannot silently be disabled or partially wired.
+ */
+export function checkCiAuthInvariant(root = projectRoot(), processEnv = process.env) {
+  const requiredPaths = [
+    "src/routes/login.tsx",
+    "src/routes/api/auth/$.ts",
+    "migrations/0001_auth.sql",
+  ];
+  const missing = requiredPaths.filter((relativePath) => !existsSync(join(root, relativePath)));
+  if (!buildAuthEnabled(root, processEnv)) {
+    return {
+      status: "diverged",
+      message: "[auth-invariant] CI build resolves VITE_AUTH_ENABLED=false; VYNDI production auth must remain enabled.",
+    };
+  }
+  if (missing.length) {
+    return {
+      status: "diverged",
+      message: `[auth-invariant] canonical auth wiring is incomplete: missing ${missing.join(", ")}`,
+    };
+  }
+  return {
+    status: "ok",
+    message: "[auth-invariant] CI auth contract OK: sign-in enabled, canonical route/API/schema present",
+  };
+}
+
 async function main(argv) {
+  if (argv.includes("--ci")) {
+    const result = checkCiAuthInvariant();
+    const output = result.status === "ok" ? console.log : console.error;
+    output(result.message);
+    process.exit(result.status === "ok" ? 0 : 1);
+  }
+
   const devUrlFlag = argv.indexOf("--dev-url");
   const devUrl = devUrlFlag === -1 ? DEFAULT_DEV_URL : argv[devUrlFlag + 1];
   const result = compareAuthInvariant({

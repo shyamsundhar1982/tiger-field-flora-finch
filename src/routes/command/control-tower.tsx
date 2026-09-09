@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Download, ExternalLink } from "lucide-react";
 import { Kpi, Panel } from "@/components/kpi";
 import { getAllErpSuiteReports } from "@/lib/erp-suite-reports";
@@ -61,9 +61,9 @@ function ReportCard({ report }: { report: Report }) {
           <p className="font-medium text-fg">{report.label}</p>
           <p className="mt-1 text-xs text-muted">{severityLabel(report)}</p>
         </div>
-        <a href={report.route} className="text-xs font-semibold text-accent hover:underline" onClick={(event) => event.stopPropagation()}>
+        <Link to={report.route as never} className="text-xs font-semibold text-accent hover:underline" onClick={(event) => event.stopPropagation()}>
           Open authority <ExternalLink className="ml-1 inline size-3" />
-        </a>
+        </Link>
       </summary>
       <div className="border-t border-border p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
@@ -147,7 +147,7 @@ function ErpControlTower() {
       key: "production-release-gate",
       label: "Production · Release gates",
       rows: data.engineeringProduction.productionReleaseGate as Row[],
-      route: "/command/production-jobcards",
+      route: "/command/production",
       exception: (row) => ["AWAITING_RELEASE", "HOLD"].includes(text(row, "gate_status")),
     },
     {
@@ -230,10 +230,10 @@ function ErpControlTower() {
           <div className="mt-4 grid gap-2 md:grid-cols-2">
             {criticalReports.map((report) => {
               const count = report.rows.filter(report.exception!).length;
-              return <a key={report.key} href={report.route} className="flex items-center justify-between rounded-lg border border-border bg-bg/40 px-4 py-3 text-sm hover:border-accent/35">
+              return <Link key={report.key} to={report.route as never} className="flex items-center justify-between rounded-lg border border-border bg-bg/40 px-4 py-3 text-sm hover:border-accent/35">
                 <span><span className="font-medium text-fg">{report.label}</span><span className="ml-2 text-muted">{count} exception{count === 1 ? "" : "s"}</span></span>
                 <span className="text-xs font-semibold text-accent">Resolve →</span>
-              </a>;
+              </Link>;
             })}
           </div>
         ) : <p className="mt-4 text-sm text-ok">No report-level exceptions are currently active.</p>}

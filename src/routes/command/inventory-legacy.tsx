@@ -53,11 +53,6 @@ function InventoryLegacy() {
         ))}
       </section>
 
-      <div className="flex justify-end">
-        <a href="/inventory" className="text-xs text-subtle hover:text-accent">
-          Open legacy public component reference →
-        </a>
-      </div>
     </main>
   );
 }
