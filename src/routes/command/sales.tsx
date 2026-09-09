@@ -2,7 +2,6 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Kpi, Panel } from "@/components/kpi";
 import { listMonthlyActuals } from "@/lib/actuals-authority";
-import { getBusinessWriteReadiness } from "@/lib/business-actor";
 import { MODELS } from "@/lib/data/models";
 import { buildModelWithInputs, type ProductLineId, type ScenarioId } from "@/lib/finance/model";
 import {
@@ -23,7 +22,7 @@ import {
   type ProductTier,
 } from "@/lib/product-configuration";
 import { syncProductionJobCard } from "@/lib/production-job-card";
-import { listSalesOrders, saveSalesOrder } from "@/lib/sales-order-authority";
+import { getSalesOrderWriteReadiness, listSalesOrders, saveSalesOrder } from "@/lib/sales-order-authority";
 import { useVeloxis } from "@/lib/store";
 
 export const Route = createFileRoute("/command/sales")({ component: Commercial });
@@ -68,7 +67,7 @@ function Commercial() {
     const [orderRows, actualRows, readiness] = await Promise.all([
       listSalesOrders(),
       listMonthlyActuals(),
-      getBusinessWriteReadiness(),
+      getSalesOrderWriteReadiness(),
     ]);
     setOrders(orderRows);
     setWriteReadiness(readiness);
