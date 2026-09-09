@@ -1,9 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { authMiddleware, optionalAuthMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
 import { getBusinessWriteReadiness, requireBusinessActor } from "@/lib/business-actor";
-import { getCommandRole } from "@/lib/command-access";
-import { canPerform } from "@/lib/page-access";
 import type { SalesOrder } from "@/lib/finance/sales-engine";
 import { MODELS } from "@/lib/data/models";
 import { validateConfiguration } from "@/lib/product-configuration";
@@ -50,27 +49,39 @@ function toSalesOrder(row: Record<string, unknown>): SalesOrder {
   };
 }
 
-export const getSalesOrderWriteReadiness = createServerFn({ method: "GET" }).handler(async () =>
-  getBusinessWriteReadiness(),
-);
+export const getSalesOrderWriteReadiness = createServerFn({ method: "GET" })
+  .middleware([optionalAuthMiddleware])
+  .handler(async ({ context }) =>
+    getBusinessWriteReadiness(
+      context.userId ? { userId: context.userId, email: context.userEmail } : undefined,
+    ),
+  );
 
-export const listSalesOrders = createServerFn({ method: "GET" }).handler(async () => {
-  const role = await getCommandRole();
-  if (!role || !canPerform(role, "view")) throw new Error("Sales order view permission denied.");
-  const sql = await getSql();
-  const rows = await sql<Record<string, unknown>>`
-    select id,revision,plan_month,product_id,units,asp_lakh,channel,status,model_tier,
-           variant_id,variant_name,configuration,updated_at::text as updated_at
-    from vyndi_sales_orders
-    order by plan_month,id
-  `;
-  return rows.map(toSalesOrder);
-});
+export const listSalesOrders = createServerFn({ method: "GET" })
+  .middleware([optionalAuthMiddleware])
+  .handler(async ({ context }) => {
+    await requireBusinessActor(
+      "view",
+      context.userId ? { userId: context.userId, email: context.userEmail } : undefined,
+    );
+    const sql = await getSql();
+    const rows = await sql<Record<string, unknown>>`
+      select id,revision,plan_month,product_id,units,asp_lakh,channel,status,model_tier,
+             variant_id,variant_name,configuration,updated_at::text as updated_at
+      from vyndi_sales_orders
+      order by plan_month,id
+    `;
+    return rows.map(toSalesOrder);
+  });
 
 export const saveSalesOrder = createServerFn({ method: "POST" })
   .validator(orderSchema)
-  .handler(async ({ data }) => {
-    const actor = await requireBusinessActor("edit");
+  .middleware([authMiddleware])
+  .handler(async ({ data, context }) => {
+    const actor = await requireBusinessActor("edit", {
+      userId: context.userId,
+      email: context.userEmail,
+    });
     const sql = await getSql();
 
     if (data.variantId) {
