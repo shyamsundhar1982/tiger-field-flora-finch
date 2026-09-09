@@ -30,7 +30,7 @@ jobs:
         run: npm ci
 
       - name: Authentication invariant gate
-        run: npm run check:auth
+        run: npm run check:auth -- --ci
 
       - name: Generate route tree and typecheck
         run: npm run typecheck
