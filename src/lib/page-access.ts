@@ -27,6 +27,15 @@ type RolePolicy = {
   permissions: CommandPermission[];
 };
 
+const PEOPLE_OFFICE_ROUTE = "/command/people-office";
+const PEOPLE_OFFICE_PAGE: PageMeta = {
+  mode: "operate",
+  domain: "finance",
+  owner: "finance",
+  maturity: "keep",
+  group: "Operate",
+};
+
 /**
  * Phase E source of truth for VINDY role access.
  *
@@ -145,6 +154,7 @@ export function canAccessPage(role: CommandRole | null, page: PageMeta | undefin
 export function canAccessRoute(role: CommandRole | null, route: string): boolean {
   const direct = getRouteMeta(route);
   if (direct) return canAccessPage(role, direct);
+  if (route === PEOPLE_OFFICE_ROUTE) return canAccessPage(role, PEOPLE_OFFICE_PAGE);
 
   // Nested pages such as /command/inventory-ledgers/stock are real router
   // routes, but their navigation metadata belongs to the registered parent.
