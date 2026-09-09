@@ -49,6 +49,7 @@ function CommandCentre() {
         </div>
         <div className="flex flex-wrap gap-3 text-sm font-semibold">
           {accessible("/command/planning") && <a href="/command/planning" className="text-accent hover:text-fg">Master Plan →</a>}
+          {accessible("/command/control-tower") && <a href="/command/control-tower" className="text-accent hover:text-fg">ERP Reports →</a>}
           {accessible("/command/decision-inbox") && <a href="/command/decision-inbox" className="text-accent hover:text-fg">Action Inbox →</a>}
           {accessible("/command/governance") && <a href="/command/governance" className="text-accent hover:text-fg">Governance →</a>}
           {accessible("/command/founder-command") && <a href="/command/founder-command" className="text-muted hover:text-fg">Action & evidence ledger →</a>}
