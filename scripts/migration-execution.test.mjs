@@ -9,17 +9,15 @@ import { pendingMigrations } from "./migration-plan.mjs";
 const here = dirname(fileURLToPath(import.meta.url));
 const migrationsDir = join(here, "..", "migrations");
 
-async function collectSqlFiles(dir, prefix = "") {
+/**
+ * Mirror the production migration applier exactly: `scripts/migrate.mjs` reads
+ * only the root migrations directory and does not descend into template/helper
+ * folders such as `migrations/auth/`. The auth template becomes deployable only
+ * after it is copied to `migrations/0001_auth.sql`.
+ */
+async function collectDeploySqlFiles(dir) {
   const entries = await readdir(dir, { withFileTypes: true });
-  const files = [];
-  for (const entry of entries) {
-    if (entry.isDirectory()) {
-      files.push(...(await collectSqlFiles(join(dir, entry.name), `${prefix}${entry.name}/`)));
-    } else {
-      files.push(`${prefix}${entry.name}`);
-    }
-  }
-  return files;
+  return entries.filter((entry) => entry.isFile()).map((entry) => entry.name);
 }
 
 test("every deploy-time migration executes from an empty database in production order", async (t) => {
@@ -30,10 +28,11 @@ test("every deploy-time migration executes from an empty database in production 
     "create table _migrations (name text primary key, applied_at timestamptz not null default now())",
   );
 
-  const files = await collectSqlFiles(migrationsDir);
+  const files = await collectDeploySqlFiles(migrationsDir);
   const migrations = pendingMigrations(files, []);
   assert.ok(migrations.some(({ path }) => path === "0039_erp_suite_report_views.sql"));
-  assert.ok(migrations.some(({ path }) => path === "auth/0001_auth.sql"));
+  assert.ok(migrations.some(({ path }) => path === "0001_auth.sql"));
+  assert.ok(!migrations.some(({ path }) => path.startsWith("auth/")));
 
   for (const { name, path } of migrations) {
     const sql = await readFile(join(migrationsDir, path), "utf8");
