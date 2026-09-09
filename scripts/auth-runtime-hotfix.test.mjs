@@ -15,6 +15,7 @@ const salesEngine = read("src/lib/finance/sales-engine.ts");
 const ibpeBrand = read("src/lib/ibpe-brand.ts");
 const ibpeProjection = read("src/components/ibpe-workspace-projection.tsx");
 const authServer = read("src/lib/auth/server.ts");
+const authRuntimeConfig = read("src/lib/auth/runtime-config.ts");
 
 test("canonical login preserves the requested protected workspace", () => {
   assert.match(login, /returnTo\?: string/);
@@ -51,7 +52,10 @@ test("Command route uses production-safe scalar auth contracts and cannot redire
   assert.doesNotMatch(commandRoute, /getCommandAuthorization\(\)/);
   assert.match(commandRoute, /const routePath = normalizeCommandPath\(location\.pathname\)/);
   assert.match(commandRoute, /if \(routePath === "\/command"\) return/);
-  assert.match(commandRoute, /normalizeCommandPath\(preferredTarget\) === routePath \? "\/command" : preferredTarget/);
+  assert.match(
+    commandRoute,
+    /normalizeCommandPath\(preferredTarget\) === routePath \? "\/command" : preferredTarget/,
+  );
 });
 
 test("public Command entry always routes through canonical credential sign in", () => {
@@ -62,12 +66,23 @@ test("public Command entry always routes through canonical credential sign in", 
 });
 
 test("Better Auth API re-wraps handler responses with mutable headers before TanStack cookie finalization", () => {
-  assert.match(authApiRoute, /async function handleAuthRequest\(request: Request\): Promise<Response>/);
+  assert.match(
+    authApiRoute,
+    /async function handleAuthRequest\(request: Request\): Promise<Response>/,
+  );
   assert.match(authApiRoute, /const response = await auth\.handler\(request\)/);
   assert.match(authApiRoute, /return new Response\(response\.body,/);
   assert.match(authApiRoute, /headers: new Headers\(response\.headers\)/);
   assert.match(authApiRoute, /GET: \(\{ request \}\) => handleAuthRequest\(request\)/);
   assert.match(authApiRoute, /POST: \(\{ request \}\) => handleAuthRequest\(request\)/);
+});
+
+test("production hosts use request-local auth URLs and exact trusted origins", () => {
+  assert.match(authServer, /resolveAuthBaseURL\(explicitBaseURL\)/);
+  assert.match(authRuntimeConfig, /"tiger-field-flora-finch\.vercel\.app"/);
+  assert.match(authRuntimeConfig, /"https:\/\/tiger-field-flora-finch\.vercel\.app"/);
+  assert.match(authRuntimeConfig, /"tiger-field-flora-finch\.shyamsundhar1982\.workers\.dev"/);
+  assert.match(authRuntimeConfig, /BETTER_AUTH_SECRET is required when DATABASE_URL is configured/);
 });
 
 test("command logout clears legacy compatibility and canonical individual session", () => {
