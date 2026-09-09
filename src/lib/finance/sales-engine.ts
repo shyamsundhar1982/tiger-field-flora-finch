@@ -32,10 +32,13 @@ export type SalesMonth = {
 };
 
 export function productAsp(finance: FinanceAssumptions, id: ProductLineId) {
-  return finance.productLines.find((p) => p.id === id)?.aspLakh ?? 0;
+  const lines = Array.isArray(finance?.productLines) ? finance.productLines : [];
+  return lines.find((p) => p.id === id)?.aspLakh ?? 0;
 }
 export function salesPlan(rows: MonthRow[], finance: FinanceAssumptions): SalesMonth[] {
-  return rows.map((r) => ({
+  void finance;
+  const safeRows = Array.isArray(rows) ? rows : [];
+  return safeRows.map((r) => ({
     m: r.m,
     plannedUnits: r.units,
     plannedRevenue: r.revenue,
@@ -56,19 +59,25 @@ export function buildSalesMonths(
   actuals: Record<number, { units?: number | null; revenue?: number | null }> = {},
   accounting?: AccountingAssumptions,
 ): SalesMonth[] {
+  void finance;
+  // Deployment/server-function serialization must never be able to crash the
+  // entire Commercial workspace. Treat a malformed legacy order payload as an
+  // empty register and let the page surface its load error separately.
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const safeOrders = Array.isArray(orders) ? orders : [];
+  const safeActuals = actuals && typeof actuals === "object" && !Array.isArray(actuals) ? actuals : {};
   const collectionDays = accounting?.collectionDays ?? (accounting?.collectionMonths ?? 1) * 30;
   const byMonth = new Map<number, SalesOrder[]>();
-  for (const o of orders) {
-    if (o.status !== "cancelled") {
-      const list = byMonth.get(o.month) ?? [];
-      list.push(o);
-      byMonth.set(o.month, list);
-    }
+  for (const order of safeOrders) {
+    if (!order || typeof order !== "object" || order.status === "cancelled") continue;
+    const list = byMonth.get(order.month) ?? [];
+    list.push(order);
+    byMonth.set(order.month, list);
   }
   let receivables = accounting?.openingReceivablesLakh ?? 0;
-  return rows.map((r, i) => {
+  return safeRows.map((r) => {
     const m = r.m,
-      entered = actuals[m] ?? {},
+      entered = safeActuals[m] ?? {},
       actualUnits = entered.units ?? 0,
       actualRevenue = entered.revenue ?? 0,
       os = byMonth.get(m) ?? [],
@@ -92,14 +101,15 @@ export function buildSalesMonths(
       ordersRevenue,
       collections,
       openReceivables: receivables,
-      varianceUnits: actuals[m]?.units != null ? actualUnits - r.units : ordersUnits - r.units,
+      varianceUnits: safeActuals[m]?.units != null ? actualUnits - r.units : ordersUnits - r.units,
       varianceRevenue:
-        actuals[m]?.revenue != null ? actualRevenue - r.revenue : ordersRevenue - r.revenue,
+        safeActuals[m]?.revenue != null ? actualRevenue - r.revenue : ordersRevenue - r.revenue,
     };
   });
 }
 export function salesTotals(rows: SalesMonth[]) {
-  return rows.reduce(
+  const safeRows = Array.isArray(rows) ? rows : [];
+  return safeRows.reduce(
     (a, r) => ({
       plannedUnits: a.plannedUnits + r.plannedUnits,
       plannedRevenue: a.plannedRevenue + r.plannedRevenue,
