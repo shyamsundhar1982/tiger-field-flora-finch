@@ -54,3 +54,10 @@ test("VIBPE 2.0 is active ahead of the legacy production fallback", () => {
   assert.match(productionCopilot, /if \(handledByVibpe2 && vibpe2\?\.answer\)/);
   assert.match(productionCopilot, /copilotVersion: handledByVibpe2 \? "2\.0" : "legacy-fallback"/);
 });
+
+
+test("VIBPE 2.0 runtime errors fail safely to the governed production fallback", () => {
+  assert.match(productionCopilot, /try \{[\s\S]*await runVibpeCopilot2\(/);
+  assert.match(productionCopilot, /catch \{[\s\S]*vibpe2FallbackReason = "runtime-error"/);
+  assert.match(productionCopilot, /vibpe2FallbackReason: vibpe2FallbackReason \?\? null/);
+});
