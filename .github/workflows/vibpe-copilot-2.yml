@@ -1,0 +1,55 @@
+name: VIBPE Co-Pilot 2 Deployment Gate
+
+on:
+  pull_request:
+    paths:
+      - 'src/lib/ibpe-copilot.ts'
+      - 'src/lib/ibpe-scenario-lab.ts'
+      - 'src/lib/vibpe-*.ts'
+      - 'scripts/vibpe-*.test.mjs'
+      - 'docs/VIBPE-*.md'
+      - '.github/workflows/vibpe-copilot-2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck application
+        run: npm run typecheck
+
+      - name: Existing governed regression suite
+        run: npm test
+
+      - name: VIBPE Co-Pilot 2 regression suite
+        run: >-
+          node --test
+          scripts/vibpe-copilot-2-intent.test.mjs
+          scripts/vibpe-copilot-2-orchestration.test.mjs
+          scripts/vibpe-copilot-2-package.test.mjs
+          scripts/vibpe-evaluation-corpus.test.mjs
+          scripts/vibpe-governed-context.test.mjs
+          scripts/vibpe-optimiser.test.mjs
+          scripts/vibpe-planning.test.mjs
+          scripts/vibpe-session-and-knowledge.test.mjs
+          scripts/vibpe-finance-compliance-engineering.test.mjs
+          scripts/vibpe-ca-financial-planner.test.mjs
+          scripts/vibpe-cycling-performance.test.mjs
+          scripts/vibpe-indian-bike-fit.test.mjs
+          scripts/vibpe-carbon-bike-designer.test.mjs
