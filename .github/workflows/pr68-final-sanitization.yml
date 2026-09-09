@@ -1,0 +1,60 @@
+name: PR68 Final Sanitation
+
+on:
+  push:
+    branches:
+      - hotfix-auth-runtime-vibpe-2026-09-09
+    paths:
+      - scripts/apply-pr68-final-sanitization.mjs
+      - .github/workflows/pr68-final-sanitization.yml
+
+permissions:
+  contents: write
+
+jobs:
+  sanitize-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout PR68 branch
+        uses: actions/checkout@v4
+        with:
+          ref: hotfix-auth-runtime-vibpe-2026-09-09
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Apply deterministic sanitation
+        run: node scripts/apply-pr68-final-sanitization.mjs
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Authentication invariant gate
+        run: npm run check:auth -- --ci
+
+      - name: Route invariant gate
+        run: npm run check:routes
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests
+        run: npm test
+
+      - name: Commit verified sanitation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm scripts/apply-pr68-final-sanitization.mjs .github/workflows/pr68-final-sanitization.yml
+          git add -A
+          git diff --cached --check
+          git commit -m "Sanitize legacy workflow routes and runtime contracts"
+          git push origin HEAD:hotfix-auth-runtime-vibpe-2026-09-09
