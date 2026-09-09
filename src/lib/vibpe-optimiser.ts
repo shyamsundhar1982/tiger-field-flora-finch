@@ -1,5 +1,5 @@
 import { evaluateScenario, type IbpeScenarioComparison, type IbpeScenarioRequest } from "@/lib/ibpe-scenario-lab";
-import type { IntegratedPlanningResult } from "@/lib/integrated-business-planning-engine";
+import type { Sql } from "@/lib/db";
 
 export type VibpeCandidate = {
   scenario: IbpeScenarioRequest;
@@ -14,11 +14,20 @@ export type VibpeOptimisationGoal = {
   maxCapacityShortfallMonths?: number;
 };
 
-function scoreComparison(comparison: IbpeScenarioComparison, goal: VibpeOptimisationGoal) {
-  const result = comparison.scenario;
+function scoreScenario(
+  comparison: IbpeScenarioComparison,
+  result: {
+    funding: { incrementalFundingNeedLakh: number };
+    summary: {
+      minimumFreeLiquidityAfterRecommendationsLakh: number;
+      capacityShortfallMonths: number;
+      findingCounts: { critical: number; high: number };
+    };
+  },
+  goal: VibpeOptimisationGoal,
+) {
   let score = 100;
   const rationale: string[] = [];
-
   const fundingNeed = result.funding.incrementalFundingNeedLakh;
   const minimumLiquidity = result.summary.minimumFreeLiquidityAfterRecommendationsLakh;
   const capacityShortfalls = result.summary.capacityShortfallMonths;
@@ -37,25 +46,29 @@ function scoreComparison(comparison: IbpeScenarioComparison, goal: VibpeOptimisa
     score -= Math.min(40, (capacityShortfalls - goal.maxCapacityShortfallMonths) * 8);
     rationale.push(`${capacityShortfalls} capacity-shortfall months exceed target.`);
   }
+
   score -= result.summary.findingCounts.critical * 10;
   score -= result.summary.findingCounts.high * 2;
+  if (comparison.fundingNeedDeltaLakh > 0) rationale.push(`Funding need worsens by ₹${comparison.fundingNeedDeltaLakh.toFixed(1)}L versus governed baseline.`);
+  if (comparison.minimumFreeLiquidityAfterRecommendationsDeltaLakh < 0) rationale.push(`Liquidity deteriorates by ₹${Math.abs(comparison.minimumFreeLiquidityAfterRecommendationsDeltaLakh).toFixed(1)}L versus governed baseline.`);
   if (!rationale.length) rationale.push("Candidate satisfies the supplied optimisation guardrails before governance review.");
 
   return { score: Math.max(0, score), rationale };
 }
 
-export function rankVibpeCandidates(
-  governedBaseline: IntegratedPlanningResult,
+export async function rankVibpeCandidates(
+  sql: Sql,
   candidates: IbpeScenarioRequest[],
   goal: VibpeOptimisationGoal,
-): VibpeCandidate[] {
-  return candidates
-    .map((scenario) => {
-      const comparison = evaluateScenario(governedBaseline, scenario);
-      const judged = scoreComparison(comparison, goal);
-      return { scenario, comparison, ...judged };
-    })
-    .sort((a, b) => b.score - a.score);
+): Promise<VibpeCandidate[]> {
+  const ranked = await Promise.all(
+    candidates.map(async (scenario) => {
+      const packet = await evaluateScenario(sql, scenario);
+      const judged = scoreScenario(packet.comparison, packet.result, goal);
+      return { scenario: packet.scenario, comparison: packet.comparison, ...judged };
+    }),
+  );
+  return ranked.sort((a, b) => b.score - a.score);
 }
 
 export function buildFundingPaceCandidates(maxFundingLakh: number, horizon = 6): IbpeScenarioRequest[] {
