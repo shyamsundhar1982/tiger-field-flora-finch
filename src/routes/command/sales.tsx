@@ -50,6 +50,7 @@ function Commercial() {
     [scenario, drawStandby, finance],
   );
   const [orders, setOrders] = useState<SalesOrder[]>([]);
+  const [orderEdits, setOrderEdits] = useState<Record<string, SalesOrder>>({});
   const [actuals, setActuals] = useState<Record<number, { units?: number | null; revenue?: number | null }>>({});
   const [writeReadiness, setWriteReadiness] = useState<WriteReadiness | null>(null);
   const [busy, setBusy] = useState(false);
@@ -70,6 +71,7 @@ function Commercial() {
       getSalesOrderWriteReadiness(),
     ]);
     setOrders(orderRows);
+    setOrderEdits(Object.fromEntries(orderRows.map((order) => [order.id, { ...order, configuration: { ...(order.configuration ?? {}) } }])));
     setWriteReadiness(readiness);
     const compact: Record<number, { units?: number | null; revenue?: number | null }> = {};
     Object.entries(actualRows).forEach(([month, value]) => {
@@ -167,11 +169,43 @@ function Commercial() {
     await persist(order, "Created in Commercial workspace");
   }
 
-  async function updateOrder(id: string, key: "month" | "units" | "status", value: number | string) {
-    const current = orders.find((order) => order.id === id);
-    if (!current || !canWrite) return;
-    const updated = { ...current, [key]: key === "status" ? value : Number(value) } as SalesOrder;
-    await persist(updated, `Commercial revision: ${key} changed`);
+  function editOrder(id: string, patch: Partial<SalesOrder>) {
+    setOrderEdits((current) => {
+      const basis = current[id] ?? orders.find((order) => order.id === id);
+      if (!basis) return current;
+      return { ...current, [id]: { ...basis, ...patch } };
+    });
+  }
+
+  function editOrderVariant(id: string, variantId: string) {
+    const variant = MODELS.find((entry) => entry.id === variantId);
+    if (!variant) return;
+    const product = financeProductFor(variant.tier);
+    editOrder(id, {
+      product,
+      aspLakh: variant.asp / 100_000 || productAsp(finance, product),
+      modelTier: variant.tier,
+      variantId: variant.id,
+      variantName: variant.name,
+      configuration: defaultConfiguration(variant.id),
+    });
+  }
+
+  function editOrderConfiguration(id: string, key: keyof ProductConfiguration, value: string) {
+    const current = orderEdits[id] ?? orders.find((order) => order.id === id);
+    if (!current) return;
+    editOrder(id, { configuration: { ...(current.configuration ?? {}), [key]: value } as ProductConfiguration });
+  }
+
+  async function saveOrderRevision(id: string) {
+    const original = orders.find((order) => order.id === id);
+    const updated = orderEdits[id];
+    if (!original || !updated || !canWrite) return;
+    if (updated.month < 1 || updated.month > 36 || updated.units <= 0) {
+      setMessage("Order revision was not saved: month must be M1–M36 and units must be greater than zero.");
+      return;
+    }
+    await persist(updated, "Controlled Commercial order revision");
   }
 
   const currentVariant = MODELS.find((entry) => entry.id === draft.variantId)!;
@@ -240,30 +274,57 @@ function Commercial() {
         </details>
       </Panel>
 
-      <Panel title="Order register" kicker="Centrally persisted Commercial commitments">
+      <Panel title="Order register" kicker="Centrally persisted Commercial commitments · revise here, never inside the Job Card">
         {orders.length === 0 ? (
           <p className="text-sm text-muted">No centrally persisted orders yet. A successful creation will appear here immediately before Production synchronization is attempted.</p>
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {orders.map((order) => (
-              <article key={order.id} className="rounded-xl border border-border bg-bg-elevated/25 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div><p className="font-semibold text-fg">{order.variantName ?? order.variantId ?? order.product}</p><p className="mt-1 font-mono text-[10px] text-subtle">{order.id}</p></div>
-                  <span className="text-[10px] font-bold uppercase text-accent">{order.status}</span>
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
-                  <Mini label="Family" value={order.modelTier ? modelFamily(order.modelTier) : "—"} />
-                  <Mini label="Configuration" value={`${Object.keys(order.configuration ?? {}).length} auto-selected`} />
-                  <Mini label="Value" value={lakh(order.units * order.aspLakh)} />
-                  <Mini label="Channel" value={order.channel} />
-                </div>
-                <div className="mt-4 grid grid-cols-3 gap-2">
-                  <Field label="Month"><input disabled={busy || !canWrite} type="number" min="1" max="36" value={order.month} onChange={(event) => void updateOrder(order.id, "month", Number(event.target.value))} className="control mt-1" /></Field>
-                  <Field label="Units"><input disabled={busy || !canWrite} type="number" min="1" value={order.units} onChange={(event) => void updateOrder(order.id, "units", Number(event.target.value))} className="control mt-1" /></Field>
-                  <Field label="Status"><select disabled={busy || !canWrite} value={order.status} onChange={(event) => void updateOrder(order.id, "status", event.target.value)} className="control mt-1">{statusOptions.map((status) => <option key={status}>{status}</option>)}</select></Field>
-                </div>
-              </article>
-            ))}
+            {orders.map((order) => {
+              const edit = orderEdits[order.id] ?? order;
+              const editVariant = MODELS.find((entry) => entry.id === edit.variantId) ?? initialVariant;
+              const changed = JSON.stringify(edit) !== JSON.stringify(order);
+              return (
+                <article key={order.id} className="rounded-xl border border-border bg-bg-elevated/25 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div><p className="font-semibold text-fg">{order.variantName ?? order.variantId ?? order.product}</p><p className="mt-1 font-mono text-[10px] text-subtle">{order.id}</p></div>
+                    <span className="text-[10px] font-bold uppercase text-accent">{order.status}</span>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+                    <Mini label="Family" value={order.modelTier ? modelFamily(order.modelTier) : "—"} />
+                    <Mini label="Configuration" value={`${Object.keys(order.configuration ?? {}).length} controlled selections`} />
+                    <Mini label="Value" value={lakh(order.units * order.aspLakh)} />
+                    <Mini label="Channel" value={order.channel} />
+                  </div>
+
+                  <details className="mt-4 rounded-lg border border-border bg-bg/40 p-3">
+                    <summary className="cursor-pointer text-xs font-semibold text-fg">Revise order / configuration</summary>
+                    <fieldset disabled={busy || !canWrite} className="mt-3 space-y-3 disabled:opacity-60">
+                      <Field label="Model & variant"><select value={edit.variantId ?? editVariant.id} onChange={(event) => editOrderVariant(order.id, event.target.value)} className="control mt-1">{MODELS.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}</select></Field>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Field label="Month"><input type="number" min="1" max="36" value={edit.month} onChange={(event) => editOrder(order.id, { month: Number(event.target.value) })} className="control mt-1" /></Field>
+                        <Field label="Units"><input type="number" min="1" value={edit.units} onChange={(event) => editOrder(order.id, { units: Number(event.target.value) })} className="control mt-1" /></Field>
+                        <Field label="Channel"><select value={edit.channel} onChange={(event) => editOrder(order.id, { channel: event.target.value as SalesChannel })} className="control mt-1">{channelOptions.map((channel) => <option key={channel}>{channel}</option>)}</select></Field>
+                        <Field label="Status"><select value={edit.status} onChange={(event) => editOrder(order.id, { status: event.target.value as SalesOrderStatus })} className="control mt-1">{statusOptions.map((status) => <option key={status}>{status}</option>)}</select></Field>
+                      </div>
+                      <details className="rounded-lg border border-border/70 p-3">
+                        <summary className="cursor-pointer text-[11px] font-semibold text-muted">Component configuration</summary>
+                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                          {CONFIGURATION_CATEGORIES.map(({ key, label }) => {
+                            const choices = optionsFor(editVariant.tier, key);
+                            return <Field key={key} label={label}><select value={edit.configuration?.[key] ?? ""} disabled={key === "groupset"} onChange={(event) => editOrderConfiguration(order.id, key, event.target.value)} className="control mt-1 disabled:opacity-70">{choices.map((choice) => <option key={choice.id} value={choice.id}>{choice.brand} {choice.model}</option>)}</select></Field>;
+                          })}
+                        </div>
+                      </details>
+                    </fieldset>
+                    <div className="mt-3 flex items-center gap-2">
+                      <button type="button" disabled={busy || !canWrite || !changed} onClick={() => void saveOrderRevision(order.id)} className="rounded-md bg-accent px-3 py-2 text-xs font-semibold text-bg disabled:opacity-40">Save & synchronize revision</button>
+                      {changed ? <span className="text-[10px] font-semibold text-warn">Unsaved revision</span> : <span className="text-[10px] text-subtle">Matches persisted order</span>}
+                    </div>
+                    <p className="mt-2 text-[10px] leading-4 text-subtle">Saving creates a Commercial revision first, then revalidates the released BOM and reconciles the Job Card. An already-approved build cannot be silently replaced; it requires a controlled production change.</p>
+                  </details>
+                </article>
+              );
+            })}
           </div>
         )}
       </Panel>
