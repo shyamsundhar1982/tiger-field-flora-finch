@@ -1,47 +1,45 @@
 import { createMiddleware } from "@tanstack/react-start";
 
 /**
- * Auth middleware for server functions — the standard way to get the caller's
- * verified user id. When deployed the session cookie is same-origin and rides
- * along automatically. In the live preview the client also forwards the bearer
- * token (partitioned cookies) via the `.client` hook below — call sites do not
- * thread it themselves.
- *
- *   import { createServerFn } from "@tanstack/react-start";
- *   import { getSql } from "@/lib/db";
- *   import { authMiddleware } from "@/lib/auth/middleware";
- *
- *   export const listTodos = createServerFn({ method: "GET" })
- *     .middleware([authMiddleware])
- *     .handler(async ({ context }) => {
- *       const sql = await getSql();
- *       return sql`select * from todos where user_id = ${context.userId}`;
- *     });
- *
- * Signed out with auth on (live preview included) -> throws `UnauthorizedError`
- * (see `verify.server.ts`). With auth disabled (`VITE_AUTH_ENABLED=false`, the
- * shipped default) it resolves the shared dev user — but throws instead when a
- * `DATABASE_URL` is also set, so an app without sign-in must not use this at
- * all. On the auth-on path, use it on every server function that touches
- * per-user data and scope every query by `context.userId`.
+ * Required auth transport for business mutations. The client forwards the
+ * session bearer token when one is available (including rotating Vercel preview
+ * hosts); the server verifies that token or the same-origin cookie and exposes
+ * one stable verified identity to the handler.
  */
 export const authMiddleware = createMiddleware({ type: "function" })
   .client(async ({ next }) => {
-    // Live preview (partitioned iframe): the session rides a bearer token, not a
-    // cookie, so forward it to the server. Null when deployed (cookie auth), so
-    // this is a no-op there.
     const { getBearerToken } = await import("./client");
     return next({ sendContext: { bearerToken: getBearerToken() ?? undefined } });
   })
   .server(async ({ next, context }) => {
-    // ONLY import `*.server` modules here. This file is dual client/server
-    // (bearer hook on the client). A plain `./isolation` path was renamed to
-    // `isolation.server.ts` — keep this import in sync so image `tsc` resolves
-    // it, and so Vite does not ship `@tanstack/react-start/server` to the browser.
     const { assertSameSiteRequest } = await import("./isolation.server");
-    const { requireUserId } = await import("./verify.server");
-    // Reject scripted cross-site/sibling requests before touching per-user data.
+    const { getSessionUser, UnauthorizedError } = await import("./verify.server");
     assertSameSiteRequest();
-    const userId = await requireUserId(context.bearerToken);
-    return next({ context: { userId } });
+    const user = await getSessionUser(context?.bearerToken);
+    if (!user) throw new UnauthorizedError();
+    return next({ context: { userId: user.id, userEmail: user.email } });
+  });
+
+/**
+ * Optional auth transport for read-only workspaces. It preserves legacy
+ * Command-password viewing when no individual identity exists, while allowing a
+ * signed-in Better Auth identity to be recognized through the same bearer/cookie
+ * transport used by mutations.
+ */
+export const optionalAuthMiddleware = createMiddleware({ type: "function" })
+  .client(async ({ next }) => {
+    const { getBearerToken } = await import("./client");
+    return next({ sendContext: { bearerToken: getBearerToken() ?? undefined } });
+  })
+  .server(async ({ next, context }) => {
+    const { assertSameSiteRequest } = await import("./isolation.server");
+    const { getSessionUser } = await import("./verify.server");
+    assertSameSiteRequest();
+    const user = await getSessionUser(context?.bearerToken);
+    return next({
+      context: {
+        userId: user?.id,
+        userEmail: user?.email ?? null,
+      },
+    });
   });

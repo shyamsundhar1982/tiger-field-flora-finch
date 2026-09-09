@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { CommandRole } from "@/lib/page-access";
-import { getSessionUser } from "@/lib/auth/verify.server";
+import { optionalAuthMiddleware } from "@/lib/auth/middleware";
 import { getAssignedCommandRole } from "@/lib/command-user-role.server";
 
 const SESSION_NAME = "__Host-vyndi-command";
@@ -65,29 +65,28 @@ async function getLegacyRole(): Promise<CommandRole | null> {
 }
 
 /**
- * An explicit Better Auth role assignment remains authoritative. During the
- * migration period, an authenticated but not-yet-mapped Better Auth user may
- * retain an already-authorised legacy Command role instead of being silently
- * downgraded to viewer. With neither mapping nor legacy role, viewer remains the
- * fail-closed default.
+ * An explicit individual VYNDI role remains authoritative. The optional auth
+ * middleware carries the Better Auth bearer/cookie into this server function;
+ * only when no individual identity exists do we fall back to the legacy Command
+ * session.
  */
-export const getCommandRole = createServerFn({ method: "GET" }).handler(async () => {
-  const user = await getSessionUser();
-  if (user) {
-    const assignedRole = await getAssignedCommandRole(user.id, user.email);
-    if (assignedRole) return assignedRole;
-    return (await getLegacyRole()) ?? "viewer";
-  }
+export const getCommandRole = createServerFn({ method: "GET" })
+  .middleware([optionalAuthMiddleware])
+  .handler(async ({ context }) => {
+    if (context.userId) {
+      const assignedRole = await getAssignedCommandRole(context.userId, context.userEmail);
+      if (assignedRole) return assignedRole;
+      return (await getLegacyRole()) ?? "viewer";
+    }
+    return getLegacyRole();
+  });
 
-  return getLegacyRole();
-});
-
-export const getCommandAccess = createServerFn({ method: "GET" }).handler(async () => {
-  const user = await getSessionUser();
-  if (user) return true;
-
-  return Boolean(await getLegacyRole());
-});
+export const getCommandAccess = createServerFn({ method: "GET" })
+  .middleware([optionalAuthMiddleware])
+  .handler(async ({ context }) => {
+    if (context.userId) return true;
+    return Boolean(await getLegacyRole());
+  });
 
 export const unlockCommand = createServerFn({ method: "POST" })
   .validator(z.object({ username: z.string().min(1).max(100), password: z.string().min(1).max(200) }))
