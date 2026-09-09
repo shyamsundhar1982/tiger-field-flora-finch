@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
 import { getCommandRole } from "@/lib/command-access";
 import { canPerform } from "@/lib/page-access";
@@ -130,8 +131,9 @@ async function activeReleasedMappings(
 /** Synchronize Production from the current central Sales-order revision. */
 export const syncProductionJobCard = createServerFn({ method: "POST" })
   .validator(syncSchema)
-  .handler(async ({ data }) => {
-    const actor = await requireBusinessActor("edit");
+  .middleware([authMiddleware])
+  .handler(async ({ data, context }) => {
+    const actor = await requireBusinessActor("edit", { userId: context.userId, email: context.userEmail });
     const sql = await getSql();
     const [order] = await sql.query<OrderRow>(
       `select id,revision,plan_month,product_id,units,status,model_tier,variant_id,variant_name,configuration
@@ -241,8 +243,9 @@ export const syncProductionJobCard = createServerFn({ method: "POST" })
 
 export const refreshProductionReservations = createServerFn({ method: "POST" })
   .validator(z.object({ jobCardId: z.string().min(1).max(120) }))
-  .handler(async ({ data }) => {
-    const actor = await requireBusinessActor("edit");
+  .middleware([authMiddleware])
+  .handler(async ({ data, context }) => {
+    const actor = await requireBusinessActor("edit", { userId: context.userId, email: context.userEmail });
     const sql = await getSql();
     const lines = await sql.query<{ id: string }>(`select id from epr_production_job_card_lines where job_card_id=$1 and sku is not null order by id`, [data.jobCardId]);
     for (const line of lines) {
@@ -253,8 +256,9 @@ export const refreshProductionReservations = createServerFn({ method: "POST" })
 
 export const issueProductionReservation = createServerFn({ method: "POST" })
   .validator(z.object({ reservationId: z.string().min(1).max(160), travellerId: z.string().min(1).max(160) }))
-  .handler(async ({ data }) => {
-    const actor = await requireBusinessActor("edit");
+  .middleware([authMiddleware])
+  .handler(async ({ data, context }) => {
+    const actor = await requireBusinessActor("edit", { userId: context.userId, email: context.userEmail });
     const sql = await getSql();
     const movementId = `MOV-${crypto.randomUUID()}`;
     const ledgerId = `LED-${crypto.randomUUID()}`;
