@@ -10,6 +10,7 @@ const commandRoute = read("src/routes/command/route.tsx");
 const commandAccess = read("src/lib/command-access.ts");
 const shell = read("src/components/command-shell-v2.tsx");
 const siteHeader = read("src/components/site-header.tsx");
+const authApiRoute = read("src/routes/api/auth/$.ts");
 const salesEngine = read("src/lib/finance/sales-engine.ts");
 const ibpeBrand = read("src/lib/ibpe-brand.ts");
 const ibpeProjection = read("src/components/ibpe-workspace-projection.tsx");
@@ -58,6 +59,15 @@ test("public Command entry always routes through canonical credential sign in", 
   assert.match(siteHeader, /const COMMAND_RETURN_TO = "\/command"/);
   assert.match(siteHeader, /to="\/login"/);
   assert.match(siteHeader, /search=\{\{ returnTo: COMMAND_RETURN_TO \}\}/);
+});
+
+test("Better Auth API re-wraps handler responses with mutable headers before TanStack cookie finalization", () => {
+  assert.match(authApiRoute, /async function handleAuthRequest\(request: Request\): Promise<Response>/);
+  assert.match(authApiRoute, /const response = await auth\.handler\(request\)/);
+  assert.match(authApiRoute, /return new Response\(response\.body,/);
+  assert.match(authApiRoute, /headers: new Headers\(response\.headers\)/);
+  assert.match(authApiRoute, /GET: \(\{ request \}\) => handleAuthRequest\(request\)/);
+  assert.match(authApiRoute, /POST: \(\{ request \}\) => handleAuthRequest\(request\)/);
 });
 
 test("command logout clears legacy compatibility and canonical individual session", () => {
