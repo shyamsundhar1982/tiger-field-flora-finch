@@ -10,10 +10,15 @@ import { useOperatingPlanSync } from "@/lib/operating-plan-sync";
 export const Route = createFileRoute("/command")({
   beforeLoad: async ({ location }) => {
     const access = await getCommandAccess();
-    // Individual Better Auth identity is the canonical VYNDI login. The legacy
-    // Command-password gate remains available only as an explicit compatibility
-    // path at /command-login and must not be the default redirect.
-    if (!access) throw redirect({ to: "/login" });
+    // Individual Better Auth identity is the canonical VYNDI login. Preserve
+    // the requested workspace so a successful sign-in returns the user to the
+    // page they actually selected rather than collapsing every flow to Command.
+    if (!access) {
+      throw redirect({
+        to: "/login",
+        search: { returnTo: location.pathname },
+      });
+    }
     const role = await getCommandRole();
     if (!canAccessRoute(role, location.pathname)) {
       const page = getRouteMeta(location.pathname);
