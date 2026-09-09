@@ -38,14 +38,21 @@ export const getProductionJobCardView = createServerFn({ method: "GET" })
     sql`
       select l.id,l.job_card_id,l.stage_no,l.stage_code,l.stage_name,l.line_type,l.source_bom_line,
              l.sku,l.category,l.item,l.quantity,l.unit,l.bom_mapping_id,l.issue_status,
-             r.id as reservation_id,
+             r.id as reservation_id,r.status as reservation_status,r.quantity_reserved as reservation_quantity,
+             r.reserved_by,r.reserved_at::text as reserved_at,r.consumed_by,r.consumed_at::text as consumed_at,
              coalesce(v.physical_quantity,0) as available_quantity,
              coalesce(v.reserved_quantity,0) as reserved_quantity,
              coalesce(v.available_to_promise,0) as available_to_promise,
              coalesce(v.shortage_quantity,l.quantity) as shortage_quantity
         from epr_production_job_card_lines l
         left join vyndi_live_job_card_requirements v on v.job_card_line_id=l.id
-        left join epr_inventory_reservations r on r.job_card_line_id=l.id and r.status='active'
+        left join lateral (
+          select reservation.*
+            from epr_inventory_reservations reservation
+           where reservation.job_card_line_id=l.id
+           order by reservation.reserved_at desc,reservation.id desc
+           limit 1
+        ) r on true
        order by l.job_card_id,l.stage_no,l.id
     `,
     sql`
