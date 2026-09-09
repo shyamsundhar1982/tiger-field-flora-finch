@@ -65,16 +65,11 @@ test("public Command entry always routes through canonical credential sign in", 
   assert.match(siteHeader, /search=\{\{ returnTo: COMMAND_RETURN_TO \}\}/);
 });
 
-test("Better Auth API re-wraps handler responses with mutable headers before TanStack cookie finalization", () => {
-  assert.match(
-    authApiRoute,
-    /async function handleAuthRequest\(request: Request\): Promise<Response>/,
-  );
-  assert.match(authApiRoute, /const response = await auth\.handler\(request\)/);
-  assert.match(authApiRoute, /return new Response\(response\.body,/);
-  assert.match(authApiRoute, /headers: new Headers\(response\.headers\)/);
-  assert.match(authApiRoute, /GET: \(\{ request \}\) => handleAuthRequest\(request\)/);
-  assert.match(authApiRoute, /POST: \(\{ request \}\) => handleAuthRequest\(request\)/);
+test("Better Auth owns the HTTP cookie response without a duplicate TanStack handoff", () => {
+  assert.match(authApiRoute, /GET: \(\{ request \}\) => auth\.handler\(request\)/);
+  assert.match(authApiRoute, /POST: \(\{ request \}\) => auth\.handler\(request\)/);
+  assert.doesNotMatch(authApiRoute, /new Response\(response\.body/);
+  assert.doesNotMatch(authServer, /tanstackStartCookies/);
 });
 
 test("production hosts use request-local auth URLs and exact trusted origins", () => {
