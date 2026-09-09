@@ -119,6 +119,7 @@ test("Commercial business writes require an individual identity and prove persis
 });
 
 test("email login captures bearer and server functions transport the same verified identity", async () => {
+  const appEnv = JSON.parse(await text(".grok/app-env.json"));
   const login = await text("src/routes/login.tsx");
   const commandLogin = await text("src/routes/command-login.tsx");
   const middleware = await text("src/lib/auth/middleware.ts");
@@ -126,6 +127,8 @@ test("email login captures bearer and server functions transport the same verifi
   const commandAccess = await text("src/lib/command-access.ts");
   const productionJobCard = await text("src/lib/production-job-card.ts");
   const productionRelease = await text("src/lib/production-release-authority.ts");
+
+  assert.notEqual(appEnv.VITE_AUTH_ENABLED, "false", "individual VYNDI login must be enabled in local, preview and provider builds");
 
   assert.match(login, /set-auth-token/);
   assert.match(login, /grok-auth\.bearer-token/);
@@ -165,6 +168,45 @@ test("business mutation actor resolves verified identity and assigned role in on
   assert.match(assignedRole, /select role from vindy_user_roles/);
   assert.match(assignedRole, /VINDY_ADMIN_EMAILS/);
   assert.match(commandAccess, /getAssignedCommandRole\(context\.userId, context\.userEmail\)/);
+});
+
+test("user administration transports the same verified identity used for role enforcement", async () => {
+  const users = await text("src/lib/vindy-users.ts");
+
+  assert.match(users, /getVindyUserContext[\s\S]*?middleware\(\[optionalAuthMiddleware\]\)/);
+  assert.match(users, /listVindyUsers[\s\S]*?middleware\(\[authMiddleware\]\)/);
+  assert.match(users, /createVindyUser[\s\S]*?middleware\(\[authMiddleware\]\)/);
+  assert.match(users, /resetVindyUserPassword[\s\S]*?middleware\(\[authMiddleware\]\)/);
+  assert.match(users, /setVindyUserRole[\s\S]*?middleware\(\[authMiddleware\]\)/);
+  assert.match(users, /deleteVindyUser[\s\S]*?middleware\(\[authMiddleware\]\)/);
+  assert.match(users, /getAssignedCommandRole\(context\.userId, context\.userEmail\)/);
+  assert.doesNotMatch(users, /getSessionUser\(/);
+});
+
+test("Cash consumes canonical accounting timing rather than treating accrual sales as immediate cash", async () => {
+  const cash = await text("src/routes/command/cash.tsx");
+  const statements = await text("src/routes/command/balance-sheet.tsx");
+
+  assert.match(cash, /buildAccountingModel\(planning, accounting\)/);
+  assert.match(cash, /salesCollections/);
+  assert.match(cash, /supplierPayments/);
+  assert.match(cash, /gstSettlement/);
+  assert.match(cash, /Revenue recognition and cash collection are deliberately separate/);
+  assert.doesNotMatch(cash, /Cash inflow modeled at sale/);
+  assert.match(statements, /buildAccountingModel\(planning,accounting\)/);
+});
+
+test("CA Audit is a live launch gate over the canonical accounting model", async () => {
+  const audit = await text("src/routes/command/ca-audit.tsx");
+
+  assert.match(audit, /buildAccountingModel\(planning, accounting\)/);
+  assert.match(audit, /checkFinanceIntegrity\(rows\)/);
+  assert.match(audit, /fundingTypeByMonth/);
+  assert.match(audit, /STATUTORY_GAPS/);
+  assert.match(audit, /Statutory \/ certified external use: NO-GO/);
+  assert.match(audit, /browser-side planning state/);
+  assert.match(audit, /taxRatePct > 0/);
+  assert.match(audit, /gstRatePct > 0/);
 });
 
 test("Commercial revisions are buffered and synchronize only on explicit save", async () => {
