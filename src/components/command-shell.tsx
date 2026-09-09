@@ -19,7 +19,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { cn } from "@/lib/utils";
 import { getCommandRole, lockCommand } from "@/lib/command-access";
-import { canAccessPage, type CommandRole } from "@/lib/page-access";
+import { canAccessPage, canAccessRoute, type CommandRole } from "@/lib/page-access";
 import {
   getRouteMeta,
   navigationGroups,
@@ -54,6 +54,7 @@ const EXECUTIVE_CONTEXT_ROUTES = new Set<string>([
 const FINANCE_TABS = [
   { to: FINANCE_HOME_ROUTE, label: "Overview" },
   { to: "/command/finance-assumptions", label: "Plan" },
+  { to: "/command/people-office", label: "People & Office" },
   { to: "/command/cash", label: "Cash" },
   { to: "/command/payables", label: "Payables" },
   { to: "/command/receivables", label: "Receivables" },
@@ -224,7 +225,7 @@ const MODE_DESCRIPTIONS: Record<PageMode, string> = {
 };
 
 function isAccessible(role: CommandRole | null, route: string) {
-  return canAccessPage(role, getRouteMeta(route));
+  return canAccessRoute(role, route);
 }
 
 function isSecondaryNavigationPage(page: RouteMeta) {
