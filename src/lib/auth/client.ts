@@ -2,6 +2,7 @@ import { genericOAuthClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 import { runPreSignInSignOut, runSignOut } from "../../../scripts/sign-out-plan.mjs";
 import { GROK_PROVIDERS } from "./providers";
+import { isBearerTransportHost } from "./bearer-transport";
 
 /**
  * Better Auth client for this React SPA (browser-side).
@@ -50,6 +51,10 @@ const BEARER_KEY = "grok-auth.bearer-token";
 /** The stored preview bearer token, or null. */
 export function getBearerToken(): string | null {
   if (typeof window === "undefined") return null;
+  if (!isBearerTransportHost(window.location.hostname)) {
+    clearStoredBearerToken();
+    return null;
+  }
   try {
     return window.sessionStorage.getItem(BEARER_KEY);
   } catch {
@@ -67,6 +72,14 @@ function setBearerToken(token: string | null): void {
   }
 }
 
+function clearStoredBearerToken(): void {
+  try {
+    window.sessionStorage.removeItem(BEARER_KEY);
+  } catch {
+    /* storage unavailable — ignore */
+  }
+}
+
 /**
  * The sandbox live preview runs this app inside an iframe on a `*.grok-sandbox.com`
  * host, where a full-page redirect to the broker can't work — so sign-in uses a
@@ -75,7 +88,7 @@ function setBearerToken(token: string | null): void {
 function inLivePreview(): boolean {
   return (
     typeof window !== "undefined" &&
-    window.location.hostname.endsWith(".grok-sandbox.com")
+    isBearerTransportHost(window.location.hostname)
   );
 }
 

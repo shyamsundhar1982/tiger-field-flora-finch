@@ -54,9 +54,10 @@ function CommandLogin() {
 
         const normalizedEmail = identity.toLowerCase();
         const result = await authClient.signIn.email(
-          { email: normalizedEmail, password },
+            { email: normalizedEmail, password },
           {
             onSuccess(ctx) {
+              if (!window.location.hostname.endsWith(".grok-sandbox.com")) return;
               const token = ctx.response.headers.get("set-auth-token");
               if (token) window.sessionStorage.setItem(BEARER_KEY, token);
             },
@@ -71,8 +72,8 @@ function CommandLogin() {
         try {
           await authClient.getSession();
         } catch {
-          // Server-function middleware will use the transported bearer when a
-          // preview hostname cannot retain the Better Auth cookie reliably.
+          // Production uses the first-party HttpOnly cookie. The middleware
+          // only forwards a bearer inside the embedded sandbox preview.
         }
         await navigate({ to: "/command" });
         return;

@@ -55,6 +55,7 @@ function LoginPage() {
         { email: normalizedEmail, password },
         {
           onSuccess(ctx) {
+            if (!window.location.hostname.endsWith(".grok-sandbox.com")) return;
             const token = ctx.response.headers.get("set-auth-token");
             if (token) window.sessionStorage.setItem(BEARER_KEY, token);
           },
@@ -67,8 +68,8 @@ function LoginPage() {
       try {
         await authClient.getSession();
       } catch {
-        // The transported bearer remains authoritative when a preview/deployment
-        // hostname cannot retain the Better Auth cookie reliably.
+        // The preview bearer is used only inside the embedded sandbox. Deployed
+        // hosts authenticate through their first-party HttpOnly cookie.
       }
 
       const destination = safeReturnTo(search.returnTo);
