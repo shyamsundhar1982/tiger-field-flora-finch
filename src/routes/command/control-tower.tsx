@@ -206,7 +206,7 @@ function ErpControlTower() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Link
-            to="/command/control-tower/ibpe-operating-workspace"
+            to="/command/ibpe-operating-workspace"
             className="inline-flex items-center justify-center gap-2 rounded-lg border border-green/40 bg-green/10 px-4 py-2.5 text-sm font-semibold text-green hover:bg-green/15"
           >
             Open IBPE Operating Workspace <ExternalLink className="size-4" />
