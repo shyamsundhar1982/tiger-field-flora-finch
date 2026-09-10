@@ -251,9 +251,9 @@ export const confirmIbpeBusinessUpdate = createServerFn({ method: "POST" })
        returning id,domain,interpretation_json,impact_json`,
       [data.proposalId, data.note ?? null, actor.userId, actor.role],
     );
-    if (!result.rows.length) throw new Error("Business Update proposal is not available for confirmation.");
-    await writeAudit("ibpe_business_update", data.proposalId, "confirmed", actor, result.rows[0]);
-    return { ok: true, proposal: result.rows[0] };
+    if (!result.length) throw new Error("Business Update proposal is not available for confirmation.");
+    await writeAudit("ibpe_business_update", data.proposalId, "confirmed", actor, result[0]);
+    return { ok: true, proposal: result[0] };
   });
 
 export const applyConfirmedIbpeBusinessUpdate = createServerFn({ method: "POST" })
@@ -267,8 +267,8 @@ export const applyConfirmedIbpeBusinessUpdate = createServerFn({ method: "POST" 
        from vyndi_ibpe_business_update_proposals where id=$1`,
       [data.proposalId],
     );
-    if (!current.rows.length) throw new Error("Business Update proposal not found.");
-    const proposal = current.rows[0] as {
+    if (!current.length) throw new Error("Business Update proposal not found.");
+    const proposal = current[0] as {
       id: string;
       domain: IbpeUpdateDomain;
       raw_input: string;
@@ -340,9 +340,9 @@ export const listIbpeGovernanceRecords = createServerFn({ method: "GET" }).handl
     sql.query(`select id,schema_version,evidence_cutoff,source,created_by_role,created_at from vyndi_ibpe_report_snapshots order by created_at desc limit 30`),
   ]);
   return {
-    actions: actions.rows,
-    decisions: decisions.rows,
-    proposals: proposals.rows,
-    snapshots: snapshots.rows,
+    actions,
+    decisions,
+    proposals,
+    snapshots,
   };
 });
