@@ -12,7 +12,7 @@ const commandCentre = read("src/routes/command/index.tsx");
 const decisionInbox = read("src/routes/command/decision-inbox.tsx");
 const controlTower = read("src/routes/command/control-tower.tsx");
 const managementIntelligence = read("src/routes/command/management-intelligence.tsx");
-const ibpeWorkspaceRoute = read("src/routes/command/control-tower/ibpe-operating-workspace.tsx");
+const ibpeWorkspaceRoute = read("src/routes/command/ibpe-operating-workspace.tsx");
 const ibpeOperatingWorkspace = read("src/lib/ibpe-operating-workspace.ts");
 
 test("command workspace exposes one canonical primary navigation layer", () => {
