@@ -11,6 +11,9 @@ const metadata = read("src/lib/page-metadata.ts");
 const commandCentre = read("src/routes/command/index.tsx");
 const decisionInbox = read("src/routes/command/decision-inbox.tsx");
 const controlTower = read("src/routes/command/control-tower.tsx");
+const managementIntelligence = read("src/routes/command/management-intelligence.tsx");
+const ibpeWorkspaceRoute = read("src/routes/command/control-tower/ibpe-operating-workspace.tsx");
+const ibpeOperatingWorkspace = read("src/lib/ibpe-operating-workspace.ts");
 
 test("command workspace exposes one canonical primary navigation layer", () => {
   assert.match(shellEntry, /export \{ CommandShell \} from "\.\/command-shell-v2"/);
@@ -81,4 +84,26 @@ test("Control Tower is the registered read-only ERP reporting console", () => {
   assert.match(controlTower, /Download full ERP pack/);
   assert.match(controlTower, /downloadCsv/);
   assert.doesNotMatch(controlTower, /redirect\(/);
+});
+
+test("management intelligence remains a compatibility redirect", () => {
+  assert.match(managementIntelligence, /createFileRoute\("\/command\/management-intelligence"\)/);
+  assert.match(managementIntelligence, /redirect\(\{ to: "\/command" \}\)/);
+});
+
+test("IBPE Phase 1 workspace is a nested read-only Control Tower consumer", () => {
+  assert.match(ibpeWorkspaceRoute, /createFileRoute\("\/command\/control-tower\/ibpe-operating-workspace"\)/);
+  assert.match(ibpeWorkspaceRoute, /getAllErpSuiteReports/);
+  assert.match(ibpeWorkspaceRoute, /buildIbpeOperatingWorkspace/);
+  assert.match(ibpeWorkspaceRoute, /IBPE Operating Workspace/);
+
+  assert.match(ibpeOperatingWorkspace, /mode: "read-only" as const/);
+  assert.match(ibpeOperatingWorkspace, /source: "canonical-erp-report-pack" as const/);
+  assert.match(ibpeOperatingWorkspace, /canonicalWriteEnabled: false/);
+  assert.match(ibpeOperatingWorkspace, /autonomousLearningEnabled: false/);
+  assert.match(ibpeOperatingWorkspace, /autonomousProcurementEnabled: false/);
+  assert.match(ibpeOperatingWorkspace, /autonomousPlanningWritesEnabled: false/);
+  assert.doesNotMatch(ibpeOperatingWorkspace, /insert into/i);
+  assert.doesNotMatch(ibpeOperatingWorkspace, /update\s+(?:vyndi_|epr_)[a-z0-9_]+/i);
+  assert.doesNotMatch(ibpeOperatingWorkspace, /delete from/i);
 });
