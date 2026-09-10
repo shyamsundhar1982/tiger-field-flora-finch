@@ -204,13 +204,21 @@ function ErpControlTower() {
           </p>
           <p className="mt-2 text-xs text-subtle">Generated {new Date(data.generatedAt).toLocaleString("en-IN")}</p>
         </div>
-        <button
-          type="button"
-          onClick={() => download("vyndi-erp-report-pack.json", JSON.stringify(data, null, 2), "application/json;charset=utf-8")}
-          className="inline-flex items-center justify-center gap-2 rounded-lg border border-accent/40 bg-accent/10 px-4 py-2.5 text-sm font-semibold text-accent hover:bg-accent/15"
-        >
-          <Download className="size-4" /> Download full ERP pack
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            to="/command/control-tower/ibpe-operating-workspace"
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-green/40 bg-green/10 px-4 py-2.5 text-sm font-semibold text-green hover:bg-green/15"
+          >
+            Open IBPE Operating Workspace <ExternalLink className="size-4" />
+          </Link>
+          <button
+            type="button"
+            onClick={() => download("vyndi-erp-report-pack.json", JSON.stringify(data, null, 2), "application/json;charset=utf-8")}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-accent/40 bg-accent/10 px-4 py-2.5 text-sm font-semibold text-accent hover:bg-accent/15"
+          >
+            <Download className="size-4" /> Download full ERP pack
+          </button>
+        </div>
       </header>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
