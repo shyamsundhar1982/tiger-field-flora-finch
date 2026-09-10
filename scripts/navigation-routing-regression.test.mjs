@@ -91,8 +91,8 @@ test("management intelligence remains a compatibility redirect", () => {
   assert.match(managementIntelligence, /redirect\(\{ to: "\/command" \}\)/);
 });
 
-test("IBPE Phase 1 workspace is a nested read-only Control Tower consumer", () => {
-  assert.match(ibpeWorkspaceRoute, /createFileRoute\("\/command\/control-tower\/ibpe-operating-workspace"\)/);
+test("IBPE Phase 1 workspace is a routable Command workspace fed by the Control Tower report pack", () => {
+  assert.match(ibpeWorkspaceRoute, /createFileRoute\("\/command\/ibpe-operating-workspace"\)/);
   assert.match(ibpeWorkspaceRoute, /getAllErpSuiteReports/);
   assert.match(ibpeWorkspaceRoute, /buildIbpeOperatingWorkspace/);
   assert.match(ibpeWorkspaceRoute, /IBPE Operating Workspace/);
