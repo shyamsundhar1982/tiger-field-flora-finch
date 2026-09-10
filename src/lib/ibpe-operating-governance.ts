@@ -56,7 +56,18 @@ export type IbpeUpdateDomain =
 
 function classifyDomain(input: string): IbpeUpdateDomain {
   const q = input.toLowerCase();
-  const rules: Array<[IbpeUpdateDomain, RegExp]> = [
+
+  // Explicit governed command intent wins over the subject matter mentioned in
+  // the command body. Example: "Create management action: review procurement
+  // exceptions" must route to the IBPE action adapter, not procurement.
+  const intentRules: Array<[IbpeUpdateDomain, RegExp]> = [
+    ["action", /\b(?:create|add|record|open|assign|log)\s+(?:a\s+)?(?:management\s+)?(?:action|task|follow[- ]?up)\b|\bmanagement\s+action\s*:/],
+    ["decision", /\b(?:create|add|record|log)\s+(?:a\s+)?(?:management\s+)?decision\b|\brecord\s+decision\b|\bdecision\s*:/],
+  ];
+  const explicitIntent = intentRules.find(([, pattern]) => pattern.test(q));
+  if (explicitIntent) return explicitIntent[0];
+
+  const subjectRules: Array<[IbpeUpdateDomain, RegExp]> = [
     ["orders", /order|demand|sales|customer commitment|confirmed units?/],
     ["cash", /cash|collection|receivable|payment|expense|expenditure|funding|finance/],
     ["procurement", /supplier|purchase order|\bpo\b|procure|lead time|quotation|rfq/],
@@ -69,7 +80,7 @@ function classifyDomain(input: string): IbpeUpdateDomain {
     ["decision", /decision|approve|approval|reject|authorize|authorise/],
     ["action", /action|follow up|owner|due date|task/],
   ];
-  return rules.find(([, pattern]) => pattern.test(q))?.[0] ?? "unknown";
+  return subjectRules.find(([, pattern]) => pattern.test(q))?.[0] ?? "unknown";
 }
 
 function extractEvidence(input: string) {
