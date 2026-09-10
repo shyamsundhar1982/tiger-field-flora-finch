@@ -1,4 +1,5 @@
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
+import { requestSafePostgresPoolConfig } from "./postgres-pool";
 
 /** Which database backend is active. */
 export type DbSource = "neon" | "pglite";
@@ -76,14 +77,17 @@ function toSql(run: Run): Sql {
 }
 
 function createNeonSql(): Promise<Sql> {
+  if (!databaseUrl) throw new Error("DATABASE_URL is required for the Neon database backend");
+  const connectionString = databaseUrl;
   globalRef.__pgSqlPromise__ ??= (async () => {
     // Regular Postgres driver: node-postgres (`pg`) — works directly with Neon's
-    // pooled endpoint. One pool per process; warm serverless instances reuse it.
+    // pooled endpoint. The pool object may stay warm, but each client is retired
+    // after one checkout so request-bound Worker sockets are never reused.
     const { Pool, types } = await import("pg");
     types.setTypeParser(OID_INT8, Number);
     types.setTypeParser(OID_DATE, identity);
     types.setTypeParser(OID_INTERVAL, identity);
-    const pool = new Pool({ connectionString: databaseUrl });
+    const pool = new Pool(requestSafePostgresPoolConfig(connectionString));
     return toSql(async <T>(text: string, params: unknown[]) => {
       const res = await pool.query(text, params);
       return res.rows as T[];
