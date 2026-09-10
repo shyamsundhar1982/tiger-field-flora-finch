@@ -12,6 +12,7 @@ const commandCentre = read("src/routes/command/index.tsx");
 const decisionInbox = read("src/routes/command/decision-inbox.tsx");
 const controlTower = read("src/routes/command/control-tower.tsx");
 const managementIntelligence = read("src/routes/command/management-intelligence.tsx");
+const ibpeWorkspaceRoute = read("src/routes/command/control-tower/ibpe-operating-workspace.tsx");
 const ibpeOperatingWorkspace = read("src/lib/ibpe-operating-workspace.ts");
 
 test("command workspace exposes one canonical primary navigation layer", () => {
@@ -85,13 +86,16 @@ test("Control Tower is the registered read-only ERP reporting console", () => {
   assert.doesNotMatch(controlTower, /redirect\(/);
 });
 
-test("IBPE Phase 1 management intelligence consumes canonical read-only ERP evidence", () => {
-  assert.match(metadata, /"\/command\/management-intelligence"/);
+test("management intelligence remains a compatibility redirect", () => {
   assert.match(managementIntelligence, /createFileRoute\("\/command\/management-intelligence"\)/);
-  assert.match(managementIntelligence, /getAllErpSuiteReports/);
-  assert.match(managementIntelligence, /buildIbpeOperatingWorkspace/);
-  assert.match(managementIntelligence, /IBPE Operating Workspace/);
-  assert.doesNotMatch(managementIntelligence, /redirect\(/);
+  assert.match(managementIntelligence, /redirect\(\{ to: "\/command" \}\)/);
+});
+
+test("IBPE Phase 1 workspace is a nested read-only Control Tower consumer", () => {
+  assert.match(ibpeWorkspaceRoute, /createFileRoute\("\/command\/control-tower\/ibpe-operating-workspace"\)/);
+  assert.match(ibpeWorkspaceRoute, /getAllErpSuiteReports/);
+  assert.match(ibpeWorkspaceRoute, /buildIbpeOperatingWorkspace/);
+  assert.match(ibpeWorkspaceRoute, /IBPE Operating Workspace/);
 
   assert.match(ibpeOperatingWorkspace, /mode: "read-only" as const/);
   assert.match(ibpeOperatingWorkspace, /source: "canonical-erp-report-pack" as const/);
