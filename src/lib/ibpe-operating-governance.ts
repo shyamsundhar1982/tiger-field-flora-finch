@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { getSql } from "@/lib/db";
+import { getSql, type JsonValue } from "@/lib/db";
 import { assertSameSiteRequest } from "@/lib/auth/isolation.server";
 import { requireBusinessActor } from "@/lib/business-actor";
 
@@ -248,8 +248,8 @@ export const confirmIbpeBusinessUpdate = createServerFn({ method: "POST" })
     const existing = await sql.query<{
       id: string;
       domain: IbpeUpdateDomain;
-      interpretation_json: Record<string, unknown>;
-      impact_json: Record<string, unknown>;
+      interpretation_json: JsonValue;
+      impact_json: JsonValue;
       status: string;
     }>(
       `select id,domain,interpretation_json,impact_json,status
