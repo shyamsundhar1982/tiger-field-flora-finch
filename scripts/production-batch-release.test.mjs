@@ -88,6 +88,21 @@ test("Production job card owns the material requisition and traveller-linked FIF
   assert.doesNotMatch(production, /to="\/command\/stores-requisition"/);
 });
 
+test("production release SQL qualifies job-card lineage inside table-returning functions", async () => {
+  const batch = await text("migrations/0042_fix_production_batch_job_card_id_ambiguity.sql");
+  const traveller = await text("migrations/0043_fix_traveller_job_card_return_ambiguity.sql");
+
+  assert.match(batch, /tr\.job_card_id=c\.id/);
+  assert.match(batch, /req\.job_card_id=c\.id/);
+  assert.match(batch, /po\.id=v_po_id/);
+  assert.doesNotMatch(batch, /where job_card_id=c\.id/);
+
+  assert.match(traveller, /jc\.sales_order_id as sales_order_id_value/);
+  assert.match(traveller, /tr\.job_card_id=c\.job_card_id_value/);
+  assert.match(traveller, /c\.sales_order_id_value/);
+  assert.doesNotMatch(traveller, /where job_card_id=/);
+});
+
 test("Commercial business writes require an individual identity and prove persistence before Production sync", async () => {
   const actor = await text("src/lib/business-actor.ts");
   const authority = await text("src/lib/sales-order-authority.ts");
