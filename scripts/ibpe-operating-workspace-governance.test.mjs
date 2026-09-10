@@ -58,3 +58,18 @@ test("IBPE proposal confirmation is idempotent and race-safe", () => {
   assert.match(source, /if \(raced\.length && raced\[0\]\.status === "confirmed"\)/);
   assert.match(source, /confirmation did not persist/);
 });
+
+
+test("explicit IBPE action intent outranks protected-domain subject keywords", () => {
+  const source = read("src/lib/ibpe-operating-governance.ts");
+  assert.match(source, /management\\s\+action/);
+  assert.match(source, /if \(explicitIntent\) return explicitIntent\[0\]/);
+  assert.match(source, /\["action", \/\\b\(\?:create\|add\|record\|open\|assign\|log\)/);
+  assert.match(source, /\["procurement", \/supplier\|purchase order/);
+});
+
+test("explicit IBPE decision intent outranks subject keywords", () => {
+  const source = read("src/lib/ibpe-operating-governance.ts");
+  assert.match(source, /\["decision", \/\\b\(\?:create\|add\|record\|log\)/);
+  assert.match(source, /explicit governed command intent wins over the subject matter/i);
+});
