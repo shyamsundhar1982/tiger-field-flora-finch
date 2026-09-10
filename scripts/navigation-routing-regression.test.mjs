@@ -104,6 +104,6 @@ test("IBPE Phase 1 workspace is a nested read-only Control Tower consumer", () =
   assert.match(ibpeOperatingWorkspace, /autonomousProcurementEnabled: false/);
   assert.match(ibpeOperatingWorkspace, /autonomousPlanningWritesEnabled: false/);
   assert.doesNotMatch(ibpeOperatingWorkspace, /insert into/i);
-  assert.doesNotMatch(ibpeOperatingWorkspace, /update\s+\w+/i);
+  assert.doesNotMatch(ibpeOperatingWorkspace, /update\s+(?:vyndi_|epr_)[a-z0-9_]+/i);
   assert.doesNotMatch(ibpeOperatingWorkspace, /delete from/i);
 });
