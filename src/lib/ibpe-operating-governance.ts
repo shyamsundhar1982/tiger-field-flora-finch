@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { getSql } from "@/lib/db";
+import { getSql, type JsonValue } from "@/lib/db";
 import { assertSameSiteRequest } from "@/lib/auth/isolation.server";
 import { requireBusinessActor } from "@/lib/business-actor";
 
@@ -244,16 +244,55 @@ export const confirmIbpeBusinessUpdate = createServerFn({ method: "POST" })
     assertSameSiteRequest();
     const actor = await requireBusinessActor("approve");
     const sql = await getSql();
+
+    const existing = await sql.query<{
+      id: string;
+      domain: IbpeUpdateDomain;
+      interpretation_json: JsonValue;
+      impact_json: JsonValue;
+      status: string;
+    }>(
+      `select id,domain,interpretation_json,impact_json,status
+       from vyndi_ibpe_business_update_proposals
+       where id=$1`,
+      [data.proposalId],
+    );
+
+    if (!existing.length) {
+      throw new Error("Business Update proposal was not found in persistent storage. Preview it again before confirmation.");
+    }
+
+    if (existing[0].status === "confirmed") {
+      return { ok: true, proposal: existing[0], alreadyConfirmed: true };
+    }
+
+    if (existing[0].status !== "previewed") {
+      throw new Error(`Business Update cannot be confirmed from status '${existing[0].status}'.`);
+    }
+
     const result = await sql.query(
       `update vyndi_ibpe_business_update_proposals
        set status='confirmed', confirmation_note=$2, confirmed_by=$3, confirmed_by_role=$4, confirmed_at=now()
        where id=$1 and status='previewed'
-       returning id,domain,interpretation_json,impact_json`,
+       returning id,domain,interpretation_json,impact_json,status`,
       [data.proposalId, data.note ?? null, actor.userId, actor.role],
     );
-    if (!result.length) throw new Error("Business Update proposal is not available for confirmation.");
+
+    if (!result.length) {
+      const raced = await sql.query(
+        `select id,domain,interpretation_json,impact_json,status
+         from vyndi_ibpe_business_update_proposals
+         where id=$1`,
+        [data.proposalId],
+      );
+      if (raced.length && raced[0].status === "confirmed") {
+        return { ok: true, proposal: raced[0], alreadyConfirmed: true };
+      }
+      throw new Error("Business Update confirmation did not persist. Preview it again before retrying.");
+    }
+
     await writeAudit("ibpe_business_update", data.proposalId, "confirmed", actor, result[0]);
-    return { ok: true, proposal: result[0] };
+    return { ok: true, proposal: result[0], alreadyConfirmed: false };
   });
 
 export const applyConfirmedIbpeBusinessUpdate = createServerFn({ method: "POST" })

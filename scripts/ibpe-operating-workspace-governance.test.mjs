@@ -48,3 +48,13 @@ test("IBPE report snapshots retain governed source lineage", () => {
   assert.match(source, /canonical-erp-report-pack/);
   assert.match(source, /ibpe_report_snapshot/);
 });
+
+
+test("IBPE proposal confirmation is idempotent and race-safe", () => {
+  const source = read("src/lib/ibpe-operating-governance.ts");
+  assert.match(source, /if \(existing\[0\]\.status === "confirmed"\)/);
+  assert.match(source, /alreadyConfirmed: true/);
+  assert.match(source, /where id=\$1 and status='previewed'/);
+  assert.match(source, /if \(raced\.length && raced\[0\]\.status === "confirmed"\)/);
+  assert.match(source, /confirmation did not persist/);
+});
