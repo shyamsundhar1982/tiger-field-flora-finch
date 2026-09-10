@@ -10,7 +10,7 @@ import {
   saveIbpeReportSnapshot,
 } from "@/lib/ibpe-operating-governance";
 
-export const Route = createFileRoute("/command/control-tower/ibpe-operating-workspace")({
+export const Route = createFileRoute("/command/ibpe-operating-workspace")({
   loader: async () => {
     const reports = await getAllErpSuiteReports();
     return buildIbpeOperatingWorkspace(reports as IbpeErpReportPack);

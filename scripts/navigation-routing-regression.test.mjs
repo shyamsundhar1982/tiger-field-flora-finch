@@ -12,7 +12,7 @@ const commandCentre = read("src/routes/command/index.tsx");
 const decisionInbox = read("src/routes/command/decision-inbox.tsx");
 const controlTower = read("src/routes/command/control-tower.tsx");
 const managementIntelligence = read("src/routes/command/management-intelligence.tsx");
-const ibpeWorkspaceRoute = read("src/routes/command/control-tower/ibpe-operating-workspace.tsx");
+const ibpeWorkspaceRoute = read("src/routes/command/ibpe-operating-workspace.tsx");
 const ibpeOperatingWorkspace = read("src/lib/ibpe-operating-workspace.ts");
 
 test("command workspace exposes one canonical primary navigation layer", () => {
@@ -91,8 +91,8 @@ test("management intelligence remains a compatibility redirect", () => {
   assert.match(managementIntelligence, /redirect\(\{ to: "\/command" \}\)/);
 });
 
-test("IBPE Phase 1 workspace is a nested read-only Control Tower consumer", () => {
-  assert.match(ibpeWorkspaceRoute, /createFileRoute\("\/command\/control-tower\/ibpe-operating-workspace"\)/);
+test("IBPE Phase 1 workspace is a routable Command workspace fed by the Control Tower report pack", () => {
+  assert.match(ibpeWorkspaceRoute, /createFileRoute\("\/command\/ibpe-operating-workspace"\)/);
   assert.match(ibpeWorkspaceRoute, /getAllErpSuiteReports/);
   assert.match(ibpeWorkspaceRoute, /buildIbpeOperatingWorkspace/);
   assert.match(ibpeWorkspaceRoute, /IBPE Operating Workspace/);
