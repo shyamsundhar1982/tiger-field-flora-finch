@@ -11,6 +11,8 @@ const metadata = read("src/lib/page-metadata.ts");
 const commandCentre = read("src/routes/command/index.tsx");
 const decisionInbox = read("src/routes/command/decision-inbox.tsx");
 const controlTower = read("src/routes/command/control-tower.tsx");
+const managementIntelligence = read("src/routes/command/management-intelligence.tsx");
+const ibpeOperatingWorkspace = read("src/lib/ibpe-operating-workspace.ts");
 
 test("command workspace exposes one canonical primary navigation layer", () => {
   assert.match(shellEntry, /export \{ CommandShell \} from "\.\/command-shell-v2"/);
@@ -81,4 +83,23 @@ test("Control Tower is the registered read-only ERP reporting console", () => {
   assert.match(controlTower, /Download full ERP pack/);
   assert.match(controlTower, /downloadCsv/);
   assert.doesNotMatch(controlTower, /redirect\(/);
+});
+
+test("IBPE Phase 1 management intelligence consumes canonical read-only ERP evidence", () => {
+  assert.match(metadata, /"\/command\/management-intelligence"/);
+  assert.match(managementIntelligence, /createFileRoute\("\/command\/management-intelligence"\)/);
+  assert.match(managementIntelligence, /getAllErpSuiteReports/);
+  assert.match(managementIntelligence, /buildIbpeOperatingWorkspace/);
+  assert.match(managementIntelligence, /IBPE Operating Workspace/);
+  assert.doesNotMatch(managementIntelligence, /redirect\(/);
+
+  assert.match(ibpeOperatingWorkspace, /mode: "read-only" as const/);
+  assert.match(ibpeOperatingWorkspace, /source: "canonical-erp-report-pack" as const/);
+  assert.match(ibpeOperatingWorkspace, /canonicalWriteEnabled: false/);
+  assert.match(ibpeOperatingWorkspace, /autonomousLearningEnabled: false/);
+  assert.match(ibpeOperatingWorkspace, /autonomousProcurementEnabled: false/);
+  assert.match(ibpeOperatingWorkspace, /autonomousPlanningWritesEnabled: false/);
+  assert.doesNotMatch(ibpeOperatingWorkspace, /insert into/i);
+  assert.doesNotMatch(ibpeOperatingWorkspace, /update\s+\w+/i);
+  assert.doesNotMatch(ibpeOperatingWorkspace, /delete from/i);
 });
