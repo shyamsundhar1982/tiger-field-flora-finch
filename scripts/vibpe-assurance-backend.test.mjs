@@ -62,3 +62,13 @@ test("backend service exposes read coverage, live exceptions, and controlled sna
   assert.match(service, /requireBusinessActor\(\s*"approve"/);
   assert.doesNotMatch(service, /createFileRoute|command-shell|navigation|workspaceForRoute/);
 });
+
+
+test("surface inventory records backend visibility without changing UI structure", () => {
+  const surfaces = readFileSync(new URL("../migrations/0048_vibpe_surface_inventory.sql", import.meta.url), "utf8");
+  assert.match(surfaces, /vyndi_vibpe_surface_registry/);
+  assert.match(surfaces, /route:quality/);
+  assert.match(surfaces, /'gap'/);
+  assert.match(surfaces, /order\/job-card-linked inspection evidence is not yet persisted/i);
+  assert.doesNotMatch(surfaces, /command-shell|navigation|createFileRoute/);
+});
