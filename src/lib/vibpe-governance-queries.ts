@@ -52,7 +52,7 @@ type HealthRunRow = {
   missing_cost_skus: string;
 };
 
-const n = (value: string | number | null | undefined) => Number(value ?? 0);
+const n = (value: unknown) => Number(value ?? 0);
 const clean = (value: unknown) => String(value ?? "").trim();
 
 export function isTraceabilityExceptionQuestion(question: string) {
@@ -319,7 +319,35 @@ async function overallRagHealthAnswer(sql: Sql) {
         (select count(*) from vyndi_quality_releases where superseded_at is null) as quality_releases,
         (select count(*) from vyndi_shipments where status='posted') as shipments,
         (select count(*) from vyndi_invoices where status='issued') as invoices,
-        (select count(*) from vyndi_collections where status='posted') as collections
+        (select count(*) from vyndi_collections where status='posted') as collections,
+        (select count(*) from (
+          with jc as (
+            select sku,
+                   sum(case when coalesce(issue_status,'') <> 'issued' then required_quantity else 0 end)::numeric as open_required,
+                   sum(case when coalesce(issue_status,'') <> 'issued' then reserved_quantity else 0 end)::numeric as open_reserved,
+                   sum(case when coalesce(issue_status,'') <> 'issued' then shortage_quantity else 0 end)::numeric as open_shortage
+              from vyndi_live_job_card_requirements
+             where sku is not null
+             group by sku
+          ), pr as (
+            select sku,
+                   sum(committed_requirement)::numeric as committed_requirement,
+                   sum(reserved_quantity)::numeric as procurement_reserved,
+                   sum(net_committed_shortage)::numeric as net_committed_shortage
+              from vyndi_committed_procurement_requirements
+             group by sku
+          ), rn as (
+            select sku,committed_reserved_qty from vyndi_report_procurement_net_requirement
+          )
+          select coalesce(jc.sku,pr.sku,rn.sku) as sku
+            from jc
+            full join pr on pr.sku=jc.sku
+            full join rn on rn.sku=coalesce(jc.sku,pr.sku)
+           where abs(coalesce(jc.open_required,0)-coalesce(pr.committed_requirement,0))>0.0001
+              or abs(coalesce(jc.open_reserved,0)-coalesce(pr.procurement_reserved,0))>0.0001
+              or abs(coalesce(jc.open_reserved,0)-coalesce(rn.committed_reserved_qty,0))>0.0001
+              or abs(coalesce(jc.open_shortage,0)-coalesce(pr.net_committed_shortage,0))>0.0001
+        ) reconciliation_mismatches) as reconciliation_mismatch_skus
     `),
     sql.query<Record<string, unknown>>(`select count(*) as total_items,count(*) filter (where lifecycle_status='draft') as draft_items from vyndi_people_office_cost_items`),
   ]);
@@ -333,13 +361,32 @@ async function overallRagHealthAnswer(sql: Sql) {
   const execution = executionRows[0] ?? {};
   const people = peopleRows[0] ?? {};
   const missingCosts = clean(run.missing_cost_skus).split(",").filter(Boolean).length;
+  const reconciliationMismatchSkus = n(execution.reconciliation_mismatch_skus);
 
-  const overall = n(run.critical_count) > 0 || n(run.minimum_liquidity) < 0 || n(execution.current_shortage_units) > 0 ? "RED" : n(run.high_count) > 0 ? "AMBER" : "GREEN";
+  const overall = n(run.critical_count) > 0 || n(run.minimum_liquidity) < 0 || n(execution.current_shortage_units) > 0 || reconciliationMismatchSkus > 0
+    ? "RED"
+    : n(run.high_count) > 0 ? "AMBER" : "GREEN";
+
+  const green = [
+    `${n(trace.total_job_cards) - n(trace.broken_origin_links)}/${n(trace.total_job_cards)} job cards resolve to their exact originating order revision`,
+    `VIBPE assurance has ${n(assurance.exception_count)} active exceptions and ${n(assurance.blocked_gate_count)} exception-blocked registered gates`,
+    `production-release rows are ${n(production.released_rows)}/${n(production.gate_rows)} RELEASED`,
+  ];
+  if (reconciliationMismatchSkus === 0) green.push("inventory reservation / committed procurement / open production-material demand reconciliation has 0 SKU mismatches");
+
+  const red = [
+    `minimum free liquidity after recommendations is ₹${n(run.minimum_liquidity).toFixed(3)}L`,
+    `incremental funding need is ₹${n(run.funding_need).toFixed(3)}L with first breach ${run.first_breach ? `M${n(run.first_breach)}` : "not present"}`,
+    `current open job-card material shortage is ${n(execution.current_shortage_units).toFixed(1)} units and the 36-month IBPE horizon carries ${n(run.shortage_sku_months)} shortage SKU-months`,
+    `procurement cost authority covers ${n(run.resolved_cost_skus)}/${n(run.active_bom_skus)} active planning-BOM SKUs, with ${missingCosts} planned/exact committed cost exceptions in scope`,
+  ];
+  if (reconciliationMismatchSkus > 0) red.push(`operational demand/reservation/procurement reconciliation has ${reconciliationMismatchSkus} SKU mismatch${reconciliationMismatchSkus === 1 ? "" : "es"}`);
+
   return [
     `Current overall VYNDI health: ${overall}. Governed IBPE R${n(run.approved_plan_revision)} is ${n(run.business_health_score).toFixed(0)}/100 across ${n(run.expected_units).toFixed(0)} expected units.`,
-    `GREEN — lineage/control integrity: ${n(trace.total_job_cards) - n(trace.broken_origin_links)}/${n(trace.total_job_cards)} job cards resolve to their exact originating order revision; VIBPE assurance has ${n(assurance.exception_count)} active exceptions and ${n(assurance.blocked_gate_count)} exception-blocked registered gates; production-release rows are ${n(production.released_rows)}/${n(production.gate_rows)} RELEASED. Operational reservation/procurement demand reconciliation is governed separately and currently ties out.`,
+    `GREEN — verified controls: ${green.join("; ")}.`,
     `AMBER — execution/governance hygiene: ${n(actions.active_actions)} operating actions remain in progress; ${n(actions.missing_due)} lack due dates and ${n(actions.missing_owner)} lack owners. ${n(execution.draft_po_count)} POs remain draft with ${n(execution.committed_po_count)} approved/issued/part-received. ${n(people.draft_items)}/${n(people.total_items)} People & Office cost items remain draft. Downstream Quality/Dispatch/Invoice/Collection counts are ${n(execution.quality_releases)}/${n(execution.shipments)}/${n(execution.invoices)}/${n(execution.collections)}.`,
-    `RED — liquidity and supply authority: minimum free liquidity after recommendations is ₹${n(run.minimum_liquidity).toFixed(3)}L; incremental funding need is ₹${n(run.funding_need).toFixed(3)}L with first breach ${run.first_breach ? `M${n(run.first_breach)}` : "not present"}. Current open job-card material shortage is ${n(execution.current_shortage_units).toFixed(1)} units and the 36-month IBPE horizon carries ${n(run.shortage_sku_months)} shortage SKU-months. Procurement cost authority covers ${n(run.resolved_cost_skus)}/${n(run.active_bom_skus)} active planning-BOM SKUs, with ${missingCosts} planned/exact committed cost exceptions in scope.`,
+    `RED — current blockers: ${red.join("; ")}.`,
     `Finding load: ${n(run.critical_count)} critical, ${n(run.high_count)} high and ${n(run.medium_count)} medium. Current high-level root causes are funding/liquidity, committed-supply coverage, procurement timing/cost authority and demand-vs-plan variance.`,
     `Evidence: governed IBPE input ${run.input_hash.slice(0, 8)} plus live action, assurance, traceability, production-release, material, procurement and downstream transaction ledgers.`
   ].join("\n\n");
