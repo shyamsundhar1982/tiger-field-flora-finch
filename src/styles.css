@@ -41,24 +41,40 @@
     font-synthesis: none;
     text-rendering: optimizeLegibility;
   }
-  h1, h2, h3 {
+  h1,
+  h2,
+  h3 {
     text-wrap: balance;
     font-family: var(--font-display);
     font-synthesis: none;
     letter-spacing: -0.018em;
   }
-  p { text-wrap: pretty; }
-  :where(main, section) { min-width: 0; }
-  ::selection { background: rgb(255 116 23 / 0.28); color: var(--color-fg); }
-  button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
+  p {
+    text-wrap: pretty;
+  }
+  :where(main, section) {
+    min-width: 0;
+  }
+  ::selection {
+    background: rgb(255 116 23 / 0.28);
+    color: var(--color-fg);
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
   :where(a, button, input, select, textarea, summary):focus-visible {
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
   }
-  img.media { outline: 1px solid rgb(255 255 255 / 0.1); outline-offset: -1px; }
+  img.media {
+    outline: 1px solid rgb(255 255 255 / 0.1);
+    outline-offset: -1px;
+  }
 
   /* Keep native form controls readable against the VINDY dark UI. */
-  select, option {
+  select,
+  option {
     color: var(--color-fg);
     background-color: var(--color-surface);
     color-scheme: dark;
@@ -72,13 +88,201 @@
     padding: 0.7rem 0.8rem;
     outline: none;
   }
-  .control::placeholder { color: var(--color-subtle); }
-  .control:focus { border-color: var(--color-accent); box-shadow: 0 0 0 1px rgb(255 116 23 / 0.2); }
+  .control::placeholder {
+    color: var(--color-subtle);
+  }
+  .control:focus {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 1px rgb(255 116 23 / 0.2);
+  }
 
   nav[aria-label$="workspace"] a[aria-current="page"],
   nav[aria-label$="workspace"] a[data-status="active"] {
     background: var(--color-accent);
     color: var(--color-accent-fg);
+  }
+}
+
+.command-entry {
+  position: relative;
+  min-height: 100dvh;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  padding: 2rem 1.25rem;
+  color: #e8f5f5;
+  background: radial-gradient(circle at 58% 48%, #10272b 0, #071113 34%, #030708 75%);
+  isolation: isolate;
+}
+.command-entry::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.2;
+  background:
+    repeating-linear-gradient(115deg, transparent 0 3px, #8ba2a5 4px, transparent 5px 12px),
+    repeating-linear-gradient(25deg, #0000 0 7px, #0e191b 8px 9px);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+.command-entry__canvas,
+.command-entry__grid {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.command-entry__canvas {
+  z-index: -1;
+}
+.command-entry__grid {
+  z-index: -1;
+  opacity: 0.22;
+  background-image:
+    linear-gradient(#5cd5e8 1px, transparent 1px),
+    linear-gradient(90deg, #5cd5e8 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(ellipse at center, #000 0, transparent 70%);
+}
+.command-entry__hud {
+  position: absolute;
+  z-index: 1;
+  color: #65dbea;
+  font: 10px/1.4 var(--font-mono);
+  letter-spacing: 0.2em;
+  opacity: 0.62;
+}
+.command-entry__hud--top {
+  top: 2rem;
+  left: 2rem;
+}
+.command-entry__hud--bottom {
+  right: 2rem;
+  bottom: 2rem;
+}
+.command-entry__panel {
+  width: min(100%, 440px);
+  position: relative;
+  z-index: 2;
+  padding: clamp(1.5rem, 5vw, 2.75rem);
+  border: 1px solid #6dd9e844;
+  background: linear-gradient(145deg, #0c1b1dcc, #050b0dcc);
+  box-shadow:
+    0 30px 100px #000b,
+    inset 0 0 35px #5cd5e80b;
+  backdrop-filter: blur(14px);
+}
+.command-entry__eyebrow {
+  margin: 0;
+  color: #efffff;
+  font: 700 1.25rem var(--font-mono);
+  letter-spacing: 0.14em;
+}
+.command-entry__eyebrow span {
+  color: #ff934d;
+}
+.command-entry__legal,
+.command-entry__note,
+.command-entry__back {
+  color: #78a4a8;
+  font: 10px var(--font-mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.command-entry__panel h1 {
+  margin: 2.4rem 0 0.6rem;
+  font-size: clamp(2rem, 6vw, 3rem);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.command-entry__intro {
+  color: #abc4c5;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+.command-entry__form {
+  display: grid;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+.command-entry__form label {
+  color: #a9c5c6;
+  font: 11px var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.command-entry__form input {
+  display: block;
+  width: 100%;
+  margin-top: 0.45rem;
+  padding: 0.85rem 0.9rem;
+  border: 1px solid #47777c;
+  border-radius: 2px;
+  color: white;
+  background: #02090acc;
+  outline: none;
+}
+.command-entry__form input:focus {
+  border-color: #ff934d;
+  box-shadow: 0 0 0 2px #ff934d33;
+}
+.command-entry__form button {
+  margin-top: 0.5rem;
+  padding: 0.95rem;
+  border: 1px solid #ff934d;
+  color: #071113;
+  background: #ff934d;
+  font: 700 11px var(--font-mono);
+  letter-spacing: 0.18em;
+}
+.command-entry__form button:disabled {
+  opacity: 0.65;
+}
+.command-entry__error {
+  padding: 0.75rem;
+  border: 1px solid #ff7c6c66;
+  color: #ffb5a9;
+  background: #6b211c33;
+  font-size: 0.8rem;
+}
+.command-entry__welcome {
+  color: #8fe9ef;
+  font: 11px var(--font-mono);
+  letter-spacing: 0.16em;
+  line-height: 1.7;
+}
+.command-entry__back {
+  display: inline-block;
+  margin-top: 1.7rem;
+  text-decoration: none;
+}
+.command-entry--granted .command-entry__panel {
+  animation: entry-forward 0.9s ease-in both;
+}
+@keyframes entry-forward {
+  to {
+    transform: scale(1.08) translateY(-1rem);
+    opacity: 0.05;
+  }
+}
+@media (max-width: 640px) {
+  .command-entry__hud {
+    display: none;
+  }
+  .command-entry {
+    padding: 1rem;
+  }
+  .command-entry__panel h1 {
+    margin-top: 1.8rem;
+  }
+  .command-entry__grid {
+    background-size: 44px 44px;
+    opacity: 0.14;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .command-entry--granted .command-entry__panel {
+    animation: none;
   }
 }
 
@@ -140,5 +344,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
