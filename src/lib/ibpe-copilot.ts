@@ -11,6 +11,7 @@ import type { IntegratedPlanningResult } from "@/lib/integrated-business-plannin
 import { VIBPE_COPILOT_NAME } from "@/lib/ibpe-brand";
 import { RUNTIME_IBPE_ENGINE_VERSION } from "@/lib/ibpe-runtime-parity";
 import { runVibpeCopilot2 } from "@/lib/vibpe-copilot-2";
+import { retrieveVibpeKnowledgeEvidence, type VibpeKnowledgeEvidence } from "@/lib/vibpe-knowledge-retrieval";
 
 export type IbpeCopilotRequest = {
   question: string;
@@ -429,6 +430,9 @@ function systemPrompt() {
     `You are ${VIBPE_COPILOT_NAME} for Vayu Shastr Private Limited.`,
     "You are an advisory exploration agent sitting on top of a deterministic Integrated Business Planning Engine.",
     "The deterministic IBPE packet is the authority for quantities, cash, MRP, ATP/MSL, capacity, funding and scenario deltas. Never invent or recompute numbers outside the supplied packet.",
+    "Weekly-review knowledge evidence is advisory or unresolved context only. It may explain progress, blockers, decisions, design, prototype, incubation and launch readiness, but it must never override governed internal/master data or deterministic IBPE transaction truth.",
+    "When weekly-review evidence conflicts with governed internal knowledge, use the governed value and identify the review item as historical or unresolved evidence.",
+    "If you use weekly-review evidence, preserve its provenance by naming the source review date/title when practical and state unresolved status explicitly.",
     "Always distinguish plan, forecast, committed and actual truth. A scenario is hypothetical forecast analysis and must never be described as an approved plan or actual transaction.",
     "If the user asks multiple distinct questions, answer every question separately and in the same order.",
     "If the user asks for several executive metrics in one question, return one complete IBPE Executive Assessment covering every requested domain.",
@@ -477,6 +481,14 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
       sourceSha: row.source_sha,
     };
     const questions = splitQuestions(data.question);
+    let knowledgeEvidence: VibpeKnowledgeEvidence[] = [];
+    try {
+      knowledgeEvidence = await retrieveVibpeKnowledgeEvidence(sql, data.question, 10);
+    } catch {
+      // Knowledge evidence is supplementary. A migration/configuration lag must
+      // not make the governed deterministic Co-Pilot unavailable.
+      knowledgeEvidence = [];
+    }
     const scenarioCache = new Map<string, Awaited<ReturnType<typeof evaluateScenario>>>();
 
     async function resolveQuestion(question: string) {
@@ -565,6 +577,16 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
           scenario: resolved.scenarioContext,
           ibpe: compactResult(resolved.result),
           validation: compactValidation(row.validation_json ?? {}),
+          knowledgeEvidence: knowledgeEvidence.map((item) => ({
+            claim: item.claimText,
+            class: item.claimClass,
+            authority: item.authority,
+            domain: item.domain,
+            sourceTitle: item.title,
+            reviewDate: item.reviewDate,
+            sourceRevision: item.sourceRevision,
+            sourceUrl: item.externalUrl,
+          })),
         };
         try {
           const response = await fetch("https://api.x.ai/v1/chat/completions", {
@@ -620,6 +642,8 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
           mode,
           executiveAssessment,
           answerChars: answer.length,
+          knowledgeEvidenceCount: knowledgeEvidence.length,
+          knowledgeEvidenceDocumentIds: [...new Set(knowledgeEvidence.map((item) => item.documentId))],
           copilotVersion: handledByVibpe2 ? "2.0" : "legacy-fallback",
           vibpe2FallbackReason: vibpe2FallbackReason ?? null,
         }),
