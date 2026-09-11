@@ -60,3 +60,25 @@ test("IBPE action lifecycle is audited and completed actions leave active inbox"
   assert.match(ui,/Start/);
   assert.match(ui,/Complete/);
 });
+
+
+test("Action Inbox material shortages are scoped to current active production truth",()=>{
+  const source=read("src/lib/procure-to-pay-authority.ts");
+  assert.match(source,/join vyndi_sales_orders o/);
+  assert.match(source,/o\.status='confirmed'/);
+  assert.match(source,/o\.revision=r\.sales_order_revision/);
+  assert.match(source,/r\.job_card_status in \('released','in_progress'\)/);
+  assert.match(source,/r\.shortage_quantity>0/);
+});
+
+test("Action Inbox and Purchase Execution use compact grouped spreadsheet registers",()=>{
+  const inbox=read("src/routes/command/decision-inbox.tsx");
+  const purchase=read("src/routes/command/purchase-execution.tsx");
+  assert.match(inbox,/<details/);
+  assert.match(inbox,/<table/);
+  assert.match(inbox,/grouped queues/);
+  assert.match(purchase,/autoDraftGroups/);
+  assert.match(purchase,/poSupplierGroups/);
+  assert.match(purchase,/Grouped by supplier/);
+  assert.match(purchase,/<table/);
+});
