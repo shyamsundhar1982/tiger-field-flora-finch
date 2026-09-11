@@ -3,7 +3,7 @@ import fs from "node:fs";
 import test from "node:test";
 
 const searchSource = fs.readFileSync(new URL("../src/lib/traceability-search.ts", import.meta.url), "utf8");
-const centreSource = fs.readFileSync(new URL("../src/components/traceability-document-centre.tsx", import.meta.url), "utf8");
+const centreSource = fs.readFileSync(new URL("../src/components/traceability-document-centre-v2.tsx", import.meta.url), "utf8");
 const copilotSource = fs.readFileSync(new URL("../src/components/ibpe-copilot.tsx", import.meta.url), "utf8");
 const routeSource = fs.readFileSync(new URL("../src/routes/command/route.tsx", import.meta.url), "utf8");
 
@@ -41,6 +41,18 @@ test("traceability search remains permission-aware and server-side", () => {
   assert.match(searchSource, /limit \$2/i);
 });
 
+test("direct Traceability Centre accepts ordinary free text without weakening Co-Pilot intent gating", () => {
+  assert.match(centreSource, /DIRECT_SEARCH_SENTINEL/);
+  assert.match(centreSource, /interpretTraceabilityQuery\(trimmed\)/);
+  assert.match(centreSource, /interpretation\.recognized \? trimmed/);
+  assert.match(centreSource, /searchTraceability\(\{ data: \{ query: serverQuery, limit: 60 \} \}\)/);
+  for (const example of ["C3 cycles", "Longitude", "HB-AL-420", "061E6697", "782055", "C3 cycles oda pending PO"]) {
+    assert.ok(centreSource.includes(example), `missing direct-search regression example: ${example}`);
+  }
+  assert.match(searchSource, /if \(!interpretation\.recognized\) return/);
+  assert.match(copilotSource, /askTraceabilityCopilot/);
+});
+
 test("landscape centre exposes direct controlled printing without horizontal table scrolling", () => {
   assert.match(centreSource, /Traceability & Print Centre/);
   assert.match(centreSource, /max-w-\[1680px\]/);
@@ -51,10 +63,10 @@ test("landscape centre exposes direct controlled printing without horizontal tab
   assert.match(centreSource, /End-to-End Digital Thread/);
 });
 
-test("VIBPE Co-Pilot routes traceability language through the same search engine", () => {
+test("VIBPE Co-Pilot routes traceability language through the same governed search engine", () => {
   assert.match(copilotSource, /askTraceabilityCopilot/);
   assert.match(copilotSource, /vyndi:traceability-search/);
   assert.match(copilotSource, /Vernacular traceability/);
   assert.match(copilotSource, /Open Traceability & Print/);
-  assert.match(routeSource, /TraceabilityDocumentCentre/);
+  assert.match(routeSource, /TraceabilityDocumentCentreV2/);
 });
