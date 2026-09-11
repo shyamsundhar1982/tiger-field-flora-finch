@@ -73,3 +73,11 @@ test("production authority wording is not treated as production capacity by the 
   assert.match(copilot2, /production capacity/);
   assert.match(copilot2, /return !explicitIbpeMetric/);
 });
+
+test("knowledge answers keep supporting evidence topically selective", () => {
+  assert.match(copilot2, /function selectKnowledgeAnswerEvidence/);
+  assert.match(copilot2, /KNOWLEDGE_EVIDENCE_STOP_WORDS/);
+  assert.match(copilot2, /directMatches > 0/);
+  assert.match(copilot2, /slice\(0, 2\)/);
+  assert.match(copilot2, /const selected = selectKnowledgeAnswerEvidence\(question, evidence\)/);
+});
