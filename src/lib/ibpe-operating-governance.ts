@@ -40,6 +40,12 @@ const proposalIdSchema = z.object({
   note: z.string().max(1000).optional(),
 });
 
+const actionLifecycleSchema = z.object({
+  actionId: z.string().min(8).max(100),
+  status: z.enum(["open", "in_progress", "blocked", "done", "cancelled"]),
+  owner: z.string().max(160).optional(),
+});
+
 export type IbpeUpdateDomain =
   | "orders"
   | "cash"
@@ -326,23 +332,51 @@ export const applyConfirmedIbpeBusinessUpdate = createServerFn({ method: "POST" 
       impact_json: { adapter?: string | null; protectedDomain?: boolean };
       status: string;
     };
+    if (proposal.status === "applied") {
+      const prior = await sql.query<{ entity_id: string | null }>(
+        `select payload_json->>'entityId' as entity_id
+           from vyndi_audit_events
+          where entity_type='ibpe_business_update' and entity_id=$1 and action='applied'
+          order by created_at desc limit 1`,
+        [proposal.id],
+      );
+      return { ok: true, applied: true, alreadyApplied: true, entityId: prior[0]?.entity_id ?? undefined };
+    }
     if (proposal.status !== "confirmed") throw new Error("Business Update must be confirmed before application.");
 
     if (proposal.domain === "action") {
-      const actionId = `IBPE-ACTION-${crypto.randomUUID()}`;
-      await sql.query(
-        `insert into vyndi_ibpe_management_actions
-         (id,title,classification,issue,impact,evidence,owner,recommended_action,escalation,created_by,created_by_role,updated_by,updated_by_role)
-         values ($1,$2,'KNOWN_FACT',$3,'','','',$3,'',$4,$5,$4,$5)`,
-        [actionId, proposal.raw_input.slice(0, 180), proposal.raw_input, actor.userId, actor.role],
-      );
-      await sql.query(
-        `update vyndi_ibpe_business_update_proposals set status='applied',applied_at=now() where id=$1`,
+      const claimed = await sql.query(
+        `update vyndi_ibpe_business_update_proposals
+            set status='applied',applied_at=now()
+          where id=$1 and status='confirmed'
+          returning id`,
         [proposal.id],
       );
+      if (!claimed.length) {
+        const existingAction = await sql.query<{ id: string }>(
+          `select id from vyndi_ibpe_management_actions where source_proposal_id=$1 limit 1`,
+          [proposal.id],
+        );
+        return { ok: true, applied: true, alreadyApplied: true, adapter: "ibpe-management-action", entityId: existingAction[0]?.id };
+      }
+      const actionId = `IBPE-ACTION-${crypto.randomUUID()}`;
+      try {
+        await sql.query(
+          `insert into vyndi_ibpe_management_actions
+           (id,title,classification,issue,impact,evidence,owner,recommended_action,escalation,created_by,created_by_role,updated_by,updated_by_role,source_proposal_id)
+           values ($1,$2,'KNOWN_FACT',$3,'','','',$3,'',$4,$5,$4,$5,$6)`,
+          [actionId, proposal.raw_input.slice(0, 180), proposal.raw_input, actor.userId, actor.role, proposal.id],
+        );
+      } catch (error) {
+        await sql.query(
+          `update vyndi_ibpe_business_update_proposals set status='confirmed',applied_at=null where id=$1 and status='applied'`,
+          [proposal.id],
+        );
+        throw error;
+      }
       await writeAudit("ibpe_management_action", actionId, "created_from_confirmed_update", actor, { proposalId: proposal.id });
       await writeAudit("ibpe_business_update", proposal.id, "applied", actor, { adapter: "ibpe-management-action", entityId: actionId });
-      return { ok: true, applied: true, adapter: "ibpe-management-action", entityId: actionId };
+      return { ok: true, applied: true, alreadyApplied: false, adapter: "ibpe-management-action", entityId: actionId };
     }
 
     if (proposal.domain === "decision") {
@@ -396,3 +430,27 @@ export const listIbpeGovernanceRecords = createServerFn({ method: "GET" }).handl
     snapshots,
   };
 });
+
+
+export const updateIbpeManagementActionLifecycle = createServerFn({ method: "POST" })
+  .validator(actionLifecycleSchema)
+  .handler(async ({ data }) => {
+    assertSameSiteRequest();
+    const actor = await requireBusinessActor("edit");
+    const sql = await getSql();
+    const updated = await sql.query(
+      `update vyndi_ibpe_management_actions
+          set status=$2,
+              owner=coalesce($3,owner),
+              revision=revision+1,
+              updated_by=$4,
+              updated_by_role=$5,
+              updated_at=now()
+        where id=$1
+        returning id,title,status,owner,revision,updated_at`,
+      [data.actionId, data.status, data.owner ?? null, actor.userId, actor.role],
+    );
+    if (!updated.length) throw new Error("IBPE management action not found.");
+    await writeAudit("ibpe_management_action", data.actionId, `status_${data.status}`, actor, updated[0]);
+    return { ok: true, action: updated[0] };
+  });
