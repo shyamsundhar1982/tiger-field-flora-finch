@@ -58,7 +58,9 @@ test("Cloudflare-first Playwright runner checks authority and workflow surfaces 
 });
 
 test("final VIBPE Assurance page consumes canonical backend evidence and does not become a business writer", () => {
-  assert.match(page, /createFileRoute\("\/command\/ibpe-operating-workspace\/assurance"\)/);
+  // TanStack rewrites the source route literal to the generated route ID during route-tree generation.
+  // The trailing underscore marks a non-nested file route but does not change the public URL.
+  assert.match(page, /createFileRoute\("\/command\/ibpe-operating-workspace_?\/assurance"\)/);
   assert.match(page, /getVibpeAssuranceCoverage/);
   assert.match(page, /listVibpeAssuranceExceptions/);
   assert.match(page, /getVibpeUiAssurance/);
