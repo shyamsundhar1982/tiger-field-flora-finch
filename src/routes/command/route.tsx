@@ -3,6 +3,7 @@ import { CommandShell } from "@/components/command-shell";
 import { IbpeCopilot } from "@/components/ibpe-copilot";
 import { IbpeWorkspaceProjection } from "@/components/ibpe-workspace-projection";
 import { ProtectedNavigationBridge } from "@/components/protected-navigation-bridge";
+import { VibpeRuntimeObserver } from "@/components/vibpe-runtime-observer";
 import { getCommandAccess, getCommandRole } from "@/lib/command-access";
 import { canAccessRoute } from "@/lib/page-access";
 import { getRouteMeta } from "@/lib/page-metadata";
@@ -15,9 +16,6 @@ function normalizeCommandPath(pathname: string) {
 
 export const Route = createFileRoute("/command")({
   beforeLoad: async ({ location }) => {
-    // Keep the production route guard on the scalar server-function contracts
-    // that are already used throughout the application. A failed/undefined
-    // composite payload must never be dereferenced at the routing boundary.
     const access = await getCommandAccess();
     if (!access) {
       throw redirect({
@@ -27,8 +25,6 @@ export const Route = createFileRoute("/command")({
     }
 
     const routePath = normalizeCommandPath(location.pathname);
-    // Command Centre is the authenticated fail-safe landing page. Never redirect
-    // /command to itself, even if role metadata is unavailable or inconsistent.
     if (routePath === "/command") return;
 
     const role = await getCommandRole();
@@ -46,5 +42,5 @@ export const Route = createFileRoute("/command")({
 
 function CommandRoot() {
   useOperatingPlanSync();
-  return <><ProtectedNavigationBridge /><IbpeWorkspaceProjection /><CommandShell /><IbpeCopilot /></>;
+  return <><ProtectedNavigationBridge /><VibpeRuntimeObserver /><IbpeWorkspaceProjection /><CommandShell /><IbpeCopilot /></>;
 }

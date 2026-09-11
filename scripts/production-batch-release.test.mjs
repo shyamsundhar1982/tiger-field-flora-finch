@@ -198,17 +198,24 @@ test("user administration transports the same verified identity used for role en
   assert.doesNotMatch(users, /getSessionUser\(/);
 });
 
-test("Cash consumes canonical accounting timing rather than treating accrual sales as immediate cash", async () => {
+test("Cash and Balance Sheet consume canonical posted authorities rather than planning projections", async () => {
   const cash = await text("src/routes/command/cash.tsx");
   const statements = await text("src/routes/command/balance-sheet.tsx");
+  const authority = await text("src/lib/finance-governance-authority.ts");
 
-  assert.match(cash, /buildAccountingModel\(planning, accounting\)/);
-  assert.match(cash, /salesCollections/);
-  assert.match(cash, /supplierPayments/);
-  assert.match(cash, /gstSettlement/);
-  assert.match(cash, /Revenue recognition and cash collection are deliberately separate/);
+  assert.match(cash, /listCanonicalCashAuthority/);
+  assert.match(cash, /vyndi_cash_authority/);
+  assert.match(cash, /transaction-derived and verified monthly actuals/);
+  assert.doesNotMatch(cash, /buildAccountingModel/);
   assert.doesNotMatch(cash, /Cash inflow modeled at sale/);
-  assert.match(statements, /buildAccountingModel\(planning,accounting\)/);
+
+  assert.match(statements, /listCanonicalBalanceSheetAuthority/);
+  assert.match(statements, /vyndi_financial_statement_snapshots/);
+  assert.match(statements, /controlled empty register/i);
+  assert.doesNotMatch(statements, /buildAccountingModel/);
+
+  assert.match(authority, /postFinancialStatementSnapshot/);
+  assert.match(authority, /Math\.abs\(balanceError\) > 0\.01/);
 });
 
 test("CA Audit is a live launch gate over the canonical accounting model", async () => {

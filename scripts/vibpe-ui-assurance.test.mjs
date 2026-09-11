@@ -3,11 +3,17 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const migration = readFileSync(new URL("../migrations/0056_vibpe_ui_assurance.sql", import.meta.url), "utf8");
+const remediation = readFileSync(new URL("../migrations/0057_vibpe_assurance_remediation.sql", import.meta.url), "utf8");
+const shortageTrigger = readFileSync(new URL("../migrations/0058_vibpe_shortage_response_trigger.sql", import.meta.url), "utf8");
 const service = readFileSync(new URL("../src/lib/vibpe-ui-assurance.ts", import.meta.url), "utf8");
 const api = readFileSync(new URL("../src/routes/api/vibpe/ui-assurance.ts", import.meta.url), "utf8");
 const runner = readFileSync(new URL("./vibpe-ui-assurance-runner.mjs", import.meta.url), "utf8");
+const observer = readFileSync(new URL("../src/components/vibpe-runtime-observer.tsx", import.meta.url), "utf8");
+const commandRoute = readFileSync(new URL("../src/routes/command/route.tsx", import.meta.url), "utf8");
 const page = readFileSync(new URL("../src/routes/command/ibpe-operating-workspace_.assurance.tsx", import.meta.url), "utf8");
 const workflow = readFileSync(new URL("../src/lib/operating-workflow.ts", import.meta.url), "utf8");
+const financeAuthority = readFileSync(new URL("../src/lib/finance-governance-authority.ts", import.meta.url), "utf8");
+const route = (name) => readFileSync(new URL(`../src/routes/command/${name}.tsx`, import.meta.url), "utf8");
 
 test("UI assurance has a declarative registry, observations, explicit unobserved state and unified exception projection", () => {
   assert.match(migration, /vyndi_vibpe_ui_capability_registry/);
@@ -38,7 +44,7 @@ test("UI assurance API is protected and validates registered capability routes",
 test("Cloudflare-first Playwright runner checks authority and workflow surfaces and records evidence", () => {
   assert.match(runner, /from "playwright"/);
   assert.match(runner, /cloudflare-production/);
-  for (const route of [
+  for (const protectedRoute of [
     "/command/sales",
     "/command/product",
     "/command/engineering",
@@ -51,15 +57,13 @@ test("Cloudflare-first Playwright runner checks authority and workflow surfaces 
     "/command/operations",
     "/command/actions",
     "/command/ibpe-operating-workspace/assurance",
-  ]) assert.ok(runner.includes(route), `missing protected route check: ${route}`);
+  ]) assert.ok(runner.includes(protectedRoute), `missing protected route check: ${protectedRoute}`);
   assert.match(runner, /\/api\/vibpe\/ui-assurance/);
   assert.match(runner, /something went wrong\|application error\|internal server error/i);
   assert.match(runner, /Start\|Complete/i);
 });
 
 test("final VIBPE Assurance page consumes canonical backend evidence and does not become a business writer", () => {
-  // TanStack rewrites the source route literal to the generated route ID during route-tree generation.
-  // The trailing underscore marks a non-nested file route but does not change the public URL.
   assert.match(page, /createFileRoute\("\/command\/ibpe-operating-workspace_?\/assurance"\)/);
   assert.match(page, /getVibpeAssuranceCoverage/);
   assert.match(page, /listVibpeAssuranceExceptions/);
@@ -74,4 +78,67 @@ test("Command navigation exposes VIBPE Assurance without changing workspace owne
   assert.match(workflow, /\/command\/ibpe-operating-workspace\/assurance/);
   assert.match(workflow, /label: "VIBPE Assurance"/);
   assert.match(workflow, /COMMAND_CONTEXT/);
+});
+
+test("VIBPE remediation binds all ten reported gap routes to canonical authorities", () => {
+  for (const id of [
+    "route:product","route:engineering","route:quality","route:people-office","route:dispatch-visibility",
+    "route:payables","route:cash","route:balance-sheet","route:risk","route:legal",
+  ]) assert.ok(remediation.includes(`'${id}'`), `missing remediation surface ${id}`);
+  assert.match(remediation, /coverage_status='full'/);
+  assert.match(route("product"), /listCanonicalProductCatalog/);
+  assert.doesNotMatch(route("product"), /useVeloxis|TIERS|buildModelWithInputs/);
+  assert.match(route("engineering"), /listEngineeringAuthority/);
+  assert.doesNotMatch(route("engineering"), /ENGINEERING_REVISIONS|useVeloxis/);
+  assert.match(route("quality"), /listQualityAuthority/);
+  assert.doesNotMatch(route("quality"), /quality-engine|QUALITY_CHECKS|WARRANTY_CASES/);
+  assert.match(route("people-office"), /listPeopleOfficeAuthority/);
+  assert.doesNotMatch(route("people-office"), /useVeloxis|buildPeopleLedger|buildOfficeLedger/);
+  assert.match(route("operations"), /listDispatchRegister/);
+  assert.doesNotMatch(route("operations"), /qualitySummary/);
+  assert.match(route("cash"), /listCanonicalCashAuthority/);
+  assert.doesNotMatch(route("cash"), /buildAccountingModel|useVeloxis/);
+  assert.match(route("balance-sheet"), /listCanonicalBalanceSheetAuthority/);
+  assert.doesNotMatch(route("balance-sheet"), /buildAccountingModel|useVeloxis/);
+  assert.match(route("legal"), /listCanonicalLegalAuthority/);
+  assert.doesNotMatch(route("legal"), /@\/lib\/data\/legal/);
+  assert.match(route("risk"), /listCanonicalRiskAuthority/);
+  assert.doesNotMatch(route("risk"), /const RISKS|@\/lib\/data\/legal|SCENARIOS/);
+  assert.match(route("payables"), /@\/lib\/procure-to-pay-authority/);
+});
+
+test("critical shortage receives an automatic governed draft procurement response", () => {
+  assert.match(remediation, /ensure_vyndi_shortage_procurement_response/);
+  assert.match(remediation, /insert into epr_procurement_sku_actions/);
+  assert.match(remediation, /insert into vyndi_purchase_orders/);
+  assert.match(remediation, /'draft','VIBPE-SHORTAGE:/);
+  assert.match(remediation, /supplierCommitment',false/);
+  assert.match(remediation, /system:vibpe-remediation/);
+  assert.match(shortageTrigger, /after update of shortage_quantity/);
+  assert.match(shortageTrigger, /ensure_vyndi_shortage_procurement_response/);
+});
+
+test("finance, legal and risk have persisted canonical source authority", () => {
+  assert.match(remediation, /vyndi_cash_authority/);
+  assert.match(remediation, /vyndi_financial_statement_snapshots/);
+  assert.match(remediation, /vyndi_balance_sheet_authority/);
+  assert.match(remediation, /vyndi_risk_register/);
+  assert.match(remediation, /vyndi_legal_register/);
+  assert.match(financeAuthority, /listCanonicalCashAuthority/);
+  assert.match(financeAuthority, /listCanonicalBalanceSheetAuthority/);
+  assert.match(financeAuthority, /postFinancialStatementSnapshot/);
+  assert.match(financeAuthority, /Math\.abs\(balanceError\) > 0\.01/);
+});
+
+test("authenticated runtime observer can evidence every registered UI capability", () => {
+  for (const id of [
+    "UI-AUTH-SESSION","UI-SALES-LOAD","UI-SALES-CONFIRM","UI-PRODUCT-LOAD","UI-ENGINEERING-LOAD","UI-BOM-LOAD",
+    "UI-INVENTORY-LOAD","UI-PROCUREMENT-LOAD","UI-PRODUCTION-LOAD","UI-QUALITY-LOAD","UI-PEOPLE-OFFICE-LOAD",
+    "UI-DISPATCH-VISIBILITY","UI-ACTION-INBOX","UI-ACTION-LIFECYCLE","UI-CONTROL-TOWER","UI-VIBPE-ASSURANCE",
+  ]) assert.ok(observer.includes(id), `missing runtime observer capability ${id}`);
+  assert.match(observer, /credentials: "include"/);
+  assert.match(observer, /authenticated-route-sweep/);
+  assert.match(observer, /DOMParser/);
+  assert.match(observer, /\/api\/vibpe\/ui-assurance/);
+  assert.match(commandRoute, /VibpeRuntimeObserver/);
 });
