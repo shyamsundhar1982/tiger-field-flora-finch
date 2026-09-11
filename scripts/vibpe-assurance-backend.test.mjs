@@ -64,7 +64,7 @@ test("backend service exposes read coverage, live exceptions, and controlled sna
 });
 
 
-test("surface inventory records backend visibility without changing UI structure", () => {
+// UI-scope guard checks code constructs, not prose comments.\ntest("surface inventory records backend visibility without changing UI structure", () => {
   const surfaces = readFileSync(new URL("../migrations/0048_vibpe_surface_inventory.sql", import.meta.url), "utf8");
   assert.match(surfaces, /vyndi_vibpe_surface_registry/);
   assert.match(surfaces, /route:quality/);
