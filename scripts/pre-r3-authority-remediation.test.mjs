@@ -8,6 +8,8 @@ const engineeringMigration = readFileSync(new URL("../migrations/0050_engineerin
 const engineeringAuthority = readFileSync(new URL("../src/lib/engineering-authority.ts", import.meta.url), "utf8");
 const qualityMigration = readFileSync(new URL("../migrations/0051_quality_lineage_authority.sql", import.meta.url), "utf8");
 const qualityAuthority = readFileSync(new URL("../src/lib/quality-authority.ts", import.meta.url), "utf8");
+const peopleOfficeMigration = readFileSync(new URL("../migrations/0052_people_office_authority.sql", import.meta.url), "utf8");
+const peopleOfficeAuthority = readFileSync(new URL("../src/lib/people-office-authority.ts", import.meta.url), "utf8");
 const models = readFileSync(new URL("../src/lib/data/models.ts", import.meta.url), "utf8");
 
 const currentVariantIds = [...models.matchAll(/\{id:"([^"]+)"/g)].map((match) => match[1]);
@@ -109,4 +111,40 @@ test("G3 quality decisions preserve actor and audit evidence", () => {
   ]) assert.match(qualityAuthority, new RegExp(action));
   assert.match(qualityAuthority, /actor_user_id,actor_role/);
   assert.match(qualityAuthority, /requirePermission\("approve"\)/);
+});
+
+// G4 — People & Office authority.
+test("G4 persists People, payroll/office/services and office-asset source records", () => {
+  assert.match(peopleOfficeMigration, /create table if not exists vyndi_people_records/);
+  assert.match(peopleOfficeMigration, /create table if not exists vyndi_people_office_cost_items/);
+  assert.match(peopleOfficeMigration, /cost_group text not null check \(cost_group in \('payroll','office','statutory','outsourcing'\)\)/);
+  assert.match(peopleOfficeMigration, /create table if not exists vyndi_people_office_assets/);
+});
+
+test("G4 migrates old planning templates only as zero-value drafts", () => {
+  assert.match(peopleOfficeMigration, /zero-value planning templates are seeded as drafts/i);
+  assert.match(peopleOfficeMigration, /'people-founder-management','payroll'.+1,0,1,36,0,1,'draft'/s);
+  assert.match(peopleOfficeMigration, /'computers','Computers','IT','office_admin',0,0,1,60,100,'draft'/);
+  assert.doesNotMatch(peopleOfficeMigration, /CUTOVER:DEFAULT_PEOPLE_OFFICE_LEDGER'\s*,\s*'system:migration'\)\s*;\s*update.+approved/is);
+});
+
+test("G4 exposes only approved source records to the Finance downstream feed", () => {
+  assert.match(peopleOfficeMigration, /create or replace view vyndi_people_office_finance_feed/);
+  assert.match(peopleOfficeMigration, /c\.lifecycle_status='approved'/);
+  assert.match(peopleOfficeMigration, /a\.lifecycle_status='approved'/);
+  assert.match(peopleOfficeMigration, /Finance downstream feed\. Only approved People & Office source records contribute/i);
+  assert.match(peopleOfficeAuthority, /getPeopleOfficeFinanceFeed/);
+});
+
+test("G4 makes server authority auditable and approval-gated", () => {
+  assert.match(peopleOfficeAuthority, /savePeopleRecordDraft/);
+  assert.match(peopleOfficeAuthority, /savePeopleOfficeCostDraft/);
+  assert.match(peopleOfficeAuthority, /savePeopleOfficeAssetDraft/);
+  assert.match(peopleOfficeAuthority, /transitionPeopleOfficeCost/);
+  assert.match(peopleOfficeAuthority, /transitionPeopleOfficeAsset/);
+  assert.match(peopleOfficeAuthority, /transitionPeopleRecord/);
+  assert.match(peopleOfficeAuthority, /PEOPLE_OFFICE_COST_STATUS_CHANGED/);
+  assert.match(peopleOfficeAuthority, /PEOPLE_RECORD_STATUS_CHANGED/);
+  assert.match(peopleOfficeAuthority, /PEOPLE_OFFICE_ASSET_STATUS_CHANGED/);
+  assert.match(peopleOfficeAuthority, /canPerform\(role, permission\)/);
 });
