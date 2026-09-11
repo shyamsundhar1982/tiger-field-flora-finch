@@ -1,7 +1,8 @@
 import { createFileRoute, Link, redirect, useRouter } from "@tanstack/react-router";
 import { Download, FileSpreadsheet } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Kpi } from "@/components/kpi";
+import { printControlledElement } from "@/lib/controlled-print";
 import { inr } from "@/lib/format";
 import {
   isMasterInventoryLedger,
@@ -37,6 +38,7 @@ function InventoryLedger() {
   const search = Route.useSearch();
   const data = Route.useLoaderData();
   const router = useRouter();
+  const ledgerPrintRef = useRef<HTMLDivElement>(null);
   const ledger = MASTER_INVENTORY_LEDGER_PAGES.find((item) => item.id === ledgerId)!;
   const items = useMemo(
     () => data.items.filter((item) => item.ledger_id === ledgerId),
@@ -162,6 +164,20 @@ function InventoryLedger() {
     URL.revokeObjectURL(url);
   }
 
+  function printLedgerPdf() {
+    if (!ledgerPrintRef.current) return;
+    try {
+      printControlledElement(ledgerPrintRef.current, {
+        title: `${ledger.label} · inventory ledger`,
+        recordType: "Controlled Inventory Ledger Extract",
+        subtitle: `${items.length} active SKU(s) · ${lots.length} FIFO receipt lot(s)`,
+        sourceReference: `inventory-ledgers/${ledgerId}`,
+      });
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "The controlled inventory ledger could not be opened.");
+    }
+  }
+
   const fifoSequence = new Map<string, number>();
 
   return (
@@ -177,7 +193,14 @@ function InventoryLedger() {
             allocation can be audited in one spreadsheet.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={printLedgerPdf}
+            className="inline-flex items-center gap-2 rounded-lg border border-accent px-3 py-2.5 text-sm font-semibold text-accent hover:bg-accent/10"
+          >
+            Print / Export PDF
+          </button>
           <button
             type="button"
             onClick={downloadCsv}
@@ -315,200 +338,202 @@ function InventoryLedger() {
         ) : null}
       </section>
 
-      <section
-        className="rounded-xl border border-border bg-bg-elevated"
-        aria-labelledby="item-register-heading"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-5">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-subtle">
-              Controlled catalogue
-            </p>
-            <h2 id="item-register-heading" className="mt-1 font-display text-2xl">
-              Item balance register
-            </h2>
-          </div>
-          <p className="text-xs text-muted">All active items are shown, including zero balance.</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] text-sm">
-            <thead className="text-[10px] uppercase tracking-[0.14em] text-subtle">
-              <tr>
-                <th className="px-4 py-3 text-left">SKU / item</th>
-                <th className="px-3 py-3 text-left">Category</th>
-                <th className="px-3 py-3 text-right">Balance</th>
-                <th className="px-3 py-3 text-right">Reserved</th>
-                <th className="px-3 py-3 text-right">ATP</th>
-                <th className="px-3 py-3 text-right">MSL</th>
-                <th className="px-3 py-3 text-left">Status</th>
-                <th className="px-4 py-3 text-left">Last receipt</th>
-                <th className="px-4 py-3 text-left">Controls</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => {
-                const balance = number(item.available_quantity);
-                const msl = number(item.minimum_stock_level);
-                const status = stockHealth(balance, msl);
-                return (
-                  <tr key={item.id} className="border-t border-border/70 hover:bg-surface/50">
-                    <td className="px-4 py-3">
-                      <p className="font-semibold text-fg">{item.name}</p>
-                      <p className="font-mono text-[10px] text-subtle">{item.sku}</p>
-                    </td>
-                    <td className="px-3 py-3 text-xs text-muted">
-                      {item.category || "Uncategorised"}
-                    </td>
-                    <td className="px-3 py-3 text-right font-semibold tabular-nums">
-                      {balance.toLocaleString("en-IN")}{" "}
-                      <span className="text-[10px] font-normal text-subtle">{item.unit}</span>
-                    </td>
-                    <td className="px-3 py-3 text-right tabular-nums">
-                      {number(item.reserved_quantity).toLocaleString("en-IN")}
-                    </td>
-                    <td className="px-3 py-3 text-right tabular-nums">
-                      {number(item.available_to_promise).toLocaleString("en-IN")}
-                    </td>
-                    <td className="px-3 py-3 text-right tabular-nums">
-                      {msl.toLocaleString("en-IN")}
-                    </td>
-                    <td
-                      className={cn(
-                        "px-3 py-3 text-xs font-semibold",
-                        status === "Sufficient" ? "text-ok" : "text-warn",
-                      )}
-                    >
-                      {status}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted">{item.last_received_on || "—"}</td>
-                    <td className="px-4 py-3 text-xs">
-                      <button type="button" className="font-semibold text-accent" onClick={() => beginEdit(item)}>Edit</button>
-                      <button type="button" className="ml-3 font-semibold text-warn" onClick={() => void archiveItem(item)} disabled={busy}>Archive</button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {!items.length ? (
-            <div className="p-8 text-center text-sm text-muted">
-              No items are registered in this ledger yet. Use “Add item / category” to create a
-              controlled catalogue row; its balance will display as 0 until a receipt is posted.
-            </div>
-          ) : null}
-        </div>
-        {editing ? (
-          <div className="border-t border-border p-5" aria-label="Edit inventory item">
-            <p className="text-xs font-semibold uppercase tracking-wider text-accent">Governed metadata edit</p>
-            <p className="mt-1 text-xs text-muted">Changes are audited; balances and receipt/issue history cannot be edited here.</p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-              {([["Name","name"],["Category","category"],["Unit","unit"],["Minimum stock","minimumStockLevel"],["Planned / month","plannedMonthlyUse"]] as const).map(([label, key]) => (
-                <label key={key} className="text-xs text-muted">{label}<input className="control mt-1" type={key.includes("Stock") || key.includes("Monthly") ? "number" : "text"} value={editForm[key]} onChange={(event) => setEditForm({ ...editForm, [key]: event.target.value })} /></label>
-              ))}
-            </div>
-            <label className="mt-3 block text-xs text-muted">Reason for change<input className="control mt-1" value={editForm.reason} onChange={(event) => setEditForm({ ...editForm, reason: event.target.value })} placeholder="Required for audit trail" /></label>
-            <div className="mt-3 flex gap-2"><button type="button" disabled={busy || !editForm.reason.trim()} onClick={() => void saveEdit()} className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-40">{busy ? "Saving…" : "Save audited change"}</button><button type="button" onClick={() => setEditing(null)} className="rounded-lg border border-border px-4 py-2 text-sm">Cancel</button></div>
-          </div>
-        ) : null}
-      </section>
-
-      <section
-        className="rounded-xl border border-border bg-bg-elevated"
-        aria-labelledby="spreadsheet-heading"
-      >
-        <div className="flex items-center gap-3 border-b border-border p-5">
-          <FileSpreadsheet className="size-5 text-accent" />
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-subtle">
-              Receipt and issue audit
-            </p>
-            <h2 id="spreadsheet-heading" className="mt-1 font-display text-2xl">
-              Ledger spreadsheet
-            </h2>
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1320px] text-sm">
-            <thead className="text-[10px] uppercase tracking-[0.14em] text-subtle">
-              <tr>
-                <th className="px-4 py-3 text-left">FIFO</th>
-                <th className="px-3 py-3 text-left">Item</th>
-                <th className="px-3 py-3 text-left">Category</th>
-                <th className="px-3 py-3 text-left">Received</th>
-                <th className="px-3 py-3 text-left">Reference</th>
-                <th className="px-3 py-3 text-right">Received</th>
-                <th className="px-3 py-3 text-right">Issued</th>
-                <th className="px-3 py-3 text-right">Available</th>
-                <th className="px-3 py-3 text-right">Unit cost</th>
-                <th className="px-3 py-3 text-right">MSL</th>
-                <th className="px-3 py-3 text-right">Plan / mo</th>
-                <th className="px-3 py-3 text-left">Expiry / inspection</th>
-                <th className="px-4 py-3 text-left">Last issue</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lots.map((lot) => {
-                const sequence = (fifoSequence.get(lot.item_id) ?? 0) + 1;
-                fifoSequence.set(lot.item_id, sequence);
-                return (
-                  <tr key={lot.id} className="border-t border-border/70 hover:bg-surface/50">
-                    <td className="px-4 py-3 font-mono text-xs text-subtle">#{sequence}</td>
-                    <td className="px-3 py-3">
-                      <p className="font-semibold text-fg">{lot.name}</p>
-                      <p className="mt-0.5 font-mono text-[10px] text-subtle">{lot.sku}</p>
-                    </td>
-                    <td className="px-3 py-3 text-xs text-muted">{lot.category}</td>
-                    <td className="px-3 py-3 text-xs">{lot.received_on}</td>
-                    <td
-                      className="max-w-48 truncate px-3 py-3 text-xs text-muted"
-                      title={lot.reference}
-                    >
-                      {lot.reference || "—"}
-                    </td>
-                    <td className="px-3 py-3 text-right tabular-nums">
-                      {number(lot.quantity_received).toLocaleString("en-IN")}
-                    </td>
-                    <td className="px-3 py-3 text-right tabular-nums text-muted">
-                      {number(lot.allocated_quantity).toLocaleString("en-IN")}
-                    </td>
-                    <td className="px-3 py-3 text-right font-semibold tabular-nums">
-                      {number(lot.quantity_remaining).toLocaleString("en-IN")}{" "}
-                      <span className="text-[10px] font-normal text-subtle">{lot.unit}</span>
-                    </td>
-                    <td className="px-3 py-3 text-right tabular-nums">
-                      {inr(number(lot.unit_cost_inr))}
-                    </td>
-                    <td className="px-3 py-3 text-right tabular-nums">
-                      {number(lot.minimum_stock_level).toLocaleString("en-IN")}
-                    </td>
-                    <td className="px-3 py-3 text-right tabular-nums">
-                      {number(lot.planned_monthly_use) || "—"}
-                    </td>
-                    <td className="px-3 py-3 text-xs text-muted">
-                      {lot.expiry_on || "—"} / {lot.next_inspection_on || "—"}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted">{lot.last_issue_on || "—"}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {lots.length === 0 ? (
-            <div className="p-10 text-center">
-              <FileSpreadsheet className="mx-auto size-6 text-subtle" />
-              <p className="mt-2 text-sm text-muted">
-                No receipt lots yet. Add the first item or receipt from Master Inventory.
+      <div ref={ledgerPrintRef} className="space-y-6">
+        <section
+          className="rounded-xl border border-border bg-bg-elevated"
+          aria-labelledby="item-register-heading"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-5">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-subtle">
+                Controlled catalogue
               </p>
-              <Link
-                to="/command/inventory"
-                className="mt-3 inline-flex text-xs font-semibold text-accent"
-              >
-                Open single point entry →
-              </Link>
+              <h2 id="item-register-heading" className="mt-1 font-display text-2xl">
+                Item balance register
+              </h2>
+            </div>
+            <p className="text-xs text-muted">All active items are shown, including zero balance.</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[980px] text-sm">
+              <thead className="text-[10px] uppercase tracking-[0.14em] text-subtle">
+                <tr>
+                  <th className="px-4 py-3 text-left">SKU / item</th>
+                  <th className="px-3 py-3 text-left">Category</th>
+                  <th className="px-3 py-3 text-right">Balance</th>
+                  <th className="px-3 py-3 text-right">Reserved</th>
+                  <th className="px-3 py-3 text-right">ATP</th>
+                  <th className="px-3 py-3 text-right">MSL</th>
+                  <th className="px-3 py-3 text-left">Status</th>
+                  <th className="px-4 py-3 text-left">Last receipt</th>
+                  <th className="px-4 py-3 text-left">Controls</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => {
+                  const balance = number(item.available_quantity);
+                  const msl = number(item.minimum_stock_level);
+                  const status = stockHealth(balance, msl);
+                  return (
+                    <tr key={item.id} className="border-t border-border/70 hover:bg-surface/50">
+                      <td className="px-4 py-3">
+                        <p className="font-semibold text-fg">{item.name}</p>
+                        <p className="font-mono text-[10px] text-subtle">{item.sku}</p>
+                      </td>
+                      <td className="px-3 py-3 text-xs text-muted">
+                        {item.category || "Uncategorised"}
+                      </td>
+                      <td className="px-3 py-3 text-right font-semibold tabular-nums">
+                        {balance.toLocaleString("en-IN")}{" "}
+                        <span className="text-[10px] font-normal text-subtle">{item.unit}</span>
+                      </td>
+                      <td className="px-3 py-3 text-right tabular-nums">
+                        {number(item.reserved_quantity).toLocaleString("en-IN")}
+                      </td>
+                      <td className="px-3 py-3 text-right tabular-nums">
+                        {number(item.available_to_promise).toLocaleString("en-IN")}
+                      </td>
+                      <td className="px-3 py-3 text-right tabular-nums">
+                        {msl.toLocaleString("en-IN")}
+                      </td>
+                      <td
+                        className={cn(
+                          "px-3 py-3 text-xs font-semibold",
+                          status === "Sufficient" ? "text-ok" : "text-warn",
+                        )}
+                      >
+                        {status}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted">{item.last_received_on || "—"}</td>
+                      <td className="px-4 py-3 text-xs">
+                        <button type="button" className="font-semibold text-accent" onClick={() => beginEdit(item)}>Edit</button>
+                        <button type="button" className="ml-3 font-semibold text-warn" onClick={() => void archiveItem(item)} disabled={busy}>Archive</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {!items.length ? (
+              <div className="p-8 text-center text-sm text-muted">
+                No items are registered in this ledger yet. Use “Add item / category” to create a
+                controlled catalogue row; its balance will display as 0 until a receipt is posted.
+              </div>
+            ) : null}
+          </div>
+          {editing ? (
+            <div className="border-t border-border p-5" aria-label="Edit inventory item">
+              <p className="text-xs font-semibold uppercase tracking-wider text-accent">Governed metadata edit</p>
+              <p className="mt-1 text-xs text-muted">Changes are audited; balances and receipt/issue history cannot be edited here.</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                {([["Name","name"],["Category","category"],["Unit","unit"],["Minimum stock","minimumStockLevel"],["Planned / month","plannedMonthlyUse"]] as const).map(([label, key]) => (
+                  <label key={key} className="text-xs text-muted">{label}<input className="control mt-1" type={key.includes("Stock") || key.includes("Monthly") ? "number" : "text"} value={editForm[key]} onChange={(event) => setEditForm({ ...editForm, [key]: event.target.value })} /></label>
+                ))}
+              </div>
+              <label className="mt-3 block text-xs text-muted">Reason for change<input className="control mt-1" value={editForm.reason} onChange={(event) => setEditForm({ ...editForm, reason: event.target.value })} placeholder="Required for audit trail" /></label>
+              <div className="mt-3 flex gap-2"><button type="button" disabled={busy || !editForm.reason.trim()} onClick={() => void saveEdit()} className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-40">{busy ? "Saving…" : "Save audited change"}</button><button type="button" onClick={() => setEditing(null)} className="rounded-lg border border-border px-4 py-2 text-sm">Cancel</button></div>
             </div>
           ) : null}
-        </div>
-      </section>
+        </section>
+
+        <section
+          className="rounded-xl border border-border bg-bg-elevated"
+          aria-labelledby="spreadsheet-heading"
+        >
+          <div className="flex items-center gap-3 border-b border-border p-5">
+            <FileSpreadsheet className="size-5 text-accent" />
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-subtle">
+                Receipt and issue audit
+              </p>
+              <h2 id="spreadsheet-heading" className="mt-1 font-display text-2xl">
+                Ledger spreadsheet
+              </h2>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1320px] text-sm">
+              <thead className="text-[10px] uppercase tracking-[0.14em] text-subtle">
+                <tr>
+                  <th className="px-4 py-3 text-left">FIFO</th>
+                  <th className="px-3 py-3 text-left">Item</th>
+                  <th className="px-3 py-3 text-left">Category</th>
+                  <th className="px-3 py-3 text-left">Received</th>
+                  <th className="px-3 py-3 text-left">Reference</th>
+                  <th className="px-3 py-3 text-right">Received</th>
+                  <th className="px-3 py-3 text-right">Issued</th>
+                  <th className="px-3 py-3 text-right">Available</th>
+                  <th className="px-3 py-3 text-right">Unit cost</th>
+                  <th className="px-3 py-3 text-right">MSL</th>
+                  <th className="px-3 py-3 text-right">Plan / mo</th>
+                  <th className="px-3 py-3 text-left">Expiry / inspection</th>
+                  <th className="px-4 py-3 text-left">Last issue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lots.map((lot) => {
+                  const sequence = (fifoSequence.get(lot.item_id) ?? 0) + 1;
+                  fifoSequence.set(lot.item_id, sequence);
+                  return (
+                    <tr key={lot.id} className="border-t border-border/70 hover:bg-surface/50">
+                      <td className="px-4 py-3 font-mono text-xs text-subtle">#{sequence}</td>
+                      <td className="px-3 py-3">
+                        <p className="font-semibold text-fg">{lot.name}</p>
+                        <p className="mt-0.5 font-mono text-[10px] text-subtle">{lot.sku}</p>
+                      </td>
+                      <td className="px-3 py-3 text-xs text-muted">{lot.category}</td>
+                      <td className="px-3 py-3 text-xs">{lot.received_on}</td>
+                      <td
+                        className="max-w-48 truncate px-3 py-3 text-xs text-muted"
+                        title={lot.reference}
+                      >
+                        {lot.reference || "—"}
+                      </td>
+                      <td className="px-3 py-3 text-right tabular-nums">
+                        {number(lot.quantity_received).toLocaleString("en-IN")}
+                      </td>
+                      <td className="px-3 py-3 text-right tabular-nums text-muted">
+                        {number(lot.allocated_quantity).toLocaleString("en-IN")}
+                      </td>
+                      <td className="px-3 py-3 text-right font-semibold tabular-nums">
+                        {number(lot.quantity_remaining).toLocaleString("en-IN")}{" "}
+                        <span className="text-[10px] font-normal text-subtle">{lot.unit}</span>
+                      </td>
+                      <td className="px-3 py-3 text-right tabular-nums">
+                        {inr(number(lot.unit_cost_inr))}
+                      </td>
+                      <td className="px-3 py-3 text-right tabular-nums">
+                        {number(lot.minimum_stock_level).toLocaleString("en-IN")}
+                      </td>
+                      <td className="px-3 py-3 text-right tabular-nums">
+                        {number(lot.planned_monthly_use) || "—"}
+                      </td>
+                      <td className="px-3 py-3 text-xs text-muted">
+                        {lot.expiry_on || "—"} / {lot.next_inspection_on || "—"}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted">{lot.last_issue_on || "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {lots.length === 0 ? (
+              <div className="p-10 text-center">
+                <FileSpreadsheet className="mx-auto size-6 text-subtle" />
+                <p className="mt-2 text-sm text-muted">
+                  No receipt lots yet. Add the first item or receipt from Master Inventory.
+                </p>
+                <Link
+                  to="/command/inventory"
+                  className="mt-3 inline-flex text-xs font-semibold text-accent"
+                >
+                  Open single point entry →
+                </Link>
+              </div>
+            ) : null}
+          </div>
+        </section>
+      </div>
     </main>
   );
 }
