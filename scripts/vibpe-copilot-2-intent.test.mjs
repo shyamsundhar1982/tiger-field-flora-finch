@@ -7,6 +7,7 @@ const doctrine = await readFile(new URL("../src/lib/vibpe-business-operator.ts",
 const architecture = await readFile(new URL("../docs/VIBPE-COPILOT-2-ARCHITECTURE.md", import.meta.url), "utf8");
 const productionCopilot = await readFile(new URL("../src/lib/ibpe-copilot.ts", import.meta.url), "utf8");
 const copilot2 = await readFile(new URL("../src/lib/vibpe-copilot-2.ts", import.meta.url), "utf8");
+const operational = await readFile(new URL("../src/lib/vibpe-operational-queries.ts", import.meta.url), "utf8");
 
 test("VIBPE recognizes conversational closing instead of returning baseline assessment", () => {
   assert.match(intent, /bye\|goodbye\|see you\|thanks\|thank you/);
@@ -80,4 +81,22 @@ test("knowledge answers keep supporting evidence topically selective", () => {
   assert.match(copilot2, /directMatches > 0/);
   assert.match(copilot2, /slice\(0, 2\)/);
   assert.match(copilot2, /const selected = selectKnowledgeAnswerEvidence\(question, evidence\)/);
+});
+
+test("operational reconciliation routes before generic IBPE assessment", () => {
+  assert.match(copilot2, /tryOperationalDataAnswer/);
+  assert.match(operational, /isOperationalReconciliationQuestion/);
+  assert.match(operational, /vyndi_live_job_card_requirements/);
+  assert.match(operational, /vyndi_committed_procurement_requirements/);
+  assert.match(operational, /Operational reconciliation: PASS/);
+  assert.match(operational, /sku is not null/);
+  assert.match(operational, /issue_status = 'issued'/);
+});
+
+test("supplier lookup resolves governed supplier, PO and price records", () => {
+  assert.match(operational, /vyndi_suppliers/);
+  assert.match(operational, /vyndi_purchase_orders/);
+  assert.match(operational, /vyndi_procurement_prices/);
+  assert.match(operational, /oda\\b/);
+  assert.match(operational, /Supplier price authority rows/);
 });

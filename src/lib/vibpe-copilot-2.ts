@@ -4,6 +4,7 @@ import type { IbpeScenarioComparison, IbpeScenarioRequest } from "@/lib/ibpe-sce
 import { evaluateScenario } from "@/lib/ibpe-scenario-lab";
 import { parseVibpeIntent, type VibpeScenarioParse } from "@/lib/vibpe-intent";
 import { retrieveVibpeKnowledgeEvidence, type VibpeKnowledgeEvidence } from "@/lib/vibpe-knowledge-retrieval";
+import { tryOperationalDataAnswer } from "@/lib/vibpe-operational-queries";
 import { explainVibpeHorizon } from "@/lib/vibpe-planning";
 import { vibpeBusinessOperatorContext } from "@/lib/vibpe-business-operator";
 import { getVibpeSession, updateVibpeSession } from "@/lib/vibpe-session";
@@ -155,6 +156,22 @@ export async function runVibpeCopilot2(
   const sessionKey = options.sessionKey ?? "default";
   const session = getVibpeSession(sessionKey);
   const priorScenario = session.activeScenario ?? options.uiScenario;
+
+  try {
+    const operationalAnswer = await tryOperationalDataAnswer(sql, question);
+    if (operationalAnswer) {
+      updateVibpeSession(sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
+      return {
+        intent: parsed.intent,
+        answer: operationalAnswer,
+        doctrine: vibpeBusinessOperatorContext(),
+        advisoryOnly: true,
+      };
+    }
+  } catch {
+    // Operational lookup is supplementary to the governed IBPE packet. If a
+    // view is temporarily unavailable, continue through normal VIBPE routing.
+  }
 
   if (isKnowledgeQuestion(question)) {
     try {
