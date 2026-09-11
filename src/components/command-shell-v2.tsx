@@ -80,6 +80,11 @@ const GOVERNANCE_TABS = [
   { to: "/command/actions", label: "Audit & Actions" },
 ] as const;
 
+const ADMIN_TABS = [
+  { to: "/command/users", label: "Users & Roles" },
+  { to: "/command/master-data", label: "Master Data" },
+] as const;
+
 const FINANCE_CONTEXT = new Set<string>([
   ...FINANCE_TABS.map((tab) => tab.to),
   "/command/finance",
@@ -106,7 +111,7 @@ const PLAN_SALES_CONTEXT = new Set<string>([...PLAN_SALES_TABS.map((tab) => tab.
 const ENGINEERING_CONTEXT = new Set<string>([...ENGINEERING_TABS.map((tab) => tab.to)]);
 const GOVERNANCE_CONTEXT = new Set<string>([...GOVERNANCE_TABS.map((tab) => tab.to)]);
 const PEOPLE_CONTEXT = new Set<string>(["/command/people-office"]);
-const ADMIN_CONTEXT = new Set<string>(["/command/users", "/command/master-data"]);
+const ADMIN_CONTEXT = new Set<string>([...ADMIN_TABS.map((tab) => tab.to)]);
 const COMMAND_CONTEXT = new Set<string>([
   "/command",
   "/command/control-tower",
@@ -140,6 +145,7 @@ const TAB_ROUTES = new Set<string>([
   ...PLAN_SALES_TABS.map((item) => item.to),
   ...ENGINEERING_TABS.map((item) => item.to),
   ...GOVERNANCE_TABS.map((item) => item.to),
+  ...ADMIN_TABS.map((item) => item.to),
 ]);
 const LEGACY_ROUTES = new Set<string>([
   "/command/phase-4",
@@ -245,16 +251,21 @@ function WorkspaceNavigation({ role, onNavigate }: { role: CommandRole | null; o
               </ClientLink>
             );
           })}
-          {isAccessible(role, "/command/decision-inbox") ? (
+          {[
+            ["/command/decision-inbox", "Action Inbox"],
+            ["/command/control-tower", "ERP Reports"],
+            ["/command/ibpe-operating-workspace", "VIBPE Workspace"],
+          ].filter(([to]) => isAccessible(role, to)).map(([to, label]) => (
             <ClientLink
-              to="/command/decision-inbox"
+              key={to}
+              to={to}
               onNavigate={onNavigate}
-              active={pathname === "/command/decision-inbox"}
+              active={pathname === to}
               className="ml-9 block rounded-md px-2 py-1.5 text-xs text-subtle hover:bg-bg hover:text-fg aria-[current=page]:text-accent"
             >
-              Action Inbox
+              {label}
             </ClientLink>
-          ) : null}
+          ))}
         </div>
       </section>
 
@@ -490,6 +501,7 @@ export function CommandShell() {
             <WorkspaceTabs role={role} routes={PLAN_SALES_TABS} context={PLAN_SALES_CONTEXT} label="Plan and Sales workspace" />
             <WorkspaceTabs role={role} routes={ENGINEERING_TABS} context={ENGINEERING_CONTEXT} label="Product and Engineering workspace" />
             <WorkspaceTabs role={role} routes={GOVERNANCE_TABS} context={GOVERNANCE_CONTEXT} label="Governance workspace" />
+            <WorkspaceTabs role={role} routes={ADMIN_TABS} context={ADMIN_CONTEXT} label="Administration workspace" />
             <fieldset disabled={viewer} className="m-0 min-w-0 border-0 p-0">
               <Outlet />
             </fieldset>
