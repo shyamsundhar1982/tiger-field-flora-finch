@@ -86,6 +86,16 @@ export const routeRegistry: Record<string, RouteMeta> = {
     "keep",
     "Command",
   ),
+  "/command/ibpe-operating-workspace": meta(
+    "/command/ibpe-operating-workspace",
+    "IBPE Operating Workspace",
+    "operate",
+    "command",
+    "founder",
+    "keep",
+    "Command",
+    { navHidden: true },
+  ),
   "/command/management-intelligence": meta(
     "/command/management-intelligence",
     "Management Intelligence",

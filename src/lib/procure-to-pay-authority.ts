@@ -331,6 +331,7 @@ export const getDecisionInboxData = createServerFn({ method: "GET" }).handler(as
     payableApprovals,
     planApprovals,
     materialExceptions,
+    ibpeManagementActions,
   ] = await Promise.all([
     sql.query<SqlRow>(
       `select id,'Purchase approval' as kind,'high' as priority,
@@ -365,6 +366,20 @@ export const getDecisionInboxData = createServerFn({ method: "GET" }).handler(as
               '/command/procurement-planning' as route,null::text as created_at
          from vyndi_live_job_card_requirements where shortage_quantity>0 order by due_month,sku`,
     ),
+    sql.query<SqlRow>(
+      `select id,'IBPE management action' as kind,
+              case when status='blocked' then 'high' else 'medium' end as priority,
+              title,
+              'ID '||id||
+              case when owner<>'' then ' · owner '||owner else '' end||
+              case when due_date is not null then ' · due '||due_date::text else '' end||
+              ' · status '||status as detail,
+              '/command/ibpe-operating-workspace' as route,created_at::text as created_at
+         from vyndi_ibpe_management_actions
+        where status in ('open','in_progress','blocked')
+        order by case when status='blocked' then 0 else 1 end,
+                 due_date nulls last,updated_at desc`,
+    ),
   ]);
   const items = [
     ...purchaseApprovals,
@@ -372,6 +387,7 @@ export const getDecisionInboxData = createServerFn({ method: "GET" }).handler(as
     ...payableApprovals,
     ...planApprovals,
     ...materialExceptions,
+    ...ibpeManagementActions,
   ].filter((item) => canPerform(role, "view", getRouteMeta(String(item.route))));
   return { items };
 });
