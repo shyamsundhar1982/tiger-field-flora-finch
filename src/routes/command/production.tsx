@@ -30,6 +30,145 @@ function statusTone(status: string) {
   return "text-muted";
 }
 
+function escapePrintHtml(value: unknown) {
+  return String(value ?? "—")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function printRequisitionRecord({
+  card,
+  requisitionId,
+  cardLines,
+  linkedTravellers,
+  issuedLines,
+}: {
+  card: any;
+  requisitionId: string;
+  cardLines: any[];
+  linkedTravellers: any[];
+  issuedLines: number;
+}) {
+  const printWindow = window.open("", "_blank", "width=1100,height=820");
+  if (!printWindow) throw new Error("The print record window was blocked. Allow pop-ups for VYNDI and try again.");
+  printWindow.opener = null;
+
+  const materialLines = cardLines.filter((line: any) => Boolean(line.sku));
+  const generatedAt = `${new Date().toISOString().replace("T", " ").slice(0, 19)} UTC`;
+  const travellerText = linkedTravellers.length
+    ? linkedTravellers.map((traveller: any) => `${traveller.serial_number ?? traveller.id} · ${traveller.id}`).join("<br />")
+    : "—";
+  const rows = cardLines.map((line: any, index: number) => {
+    const required = Number(line.quantity ?? 0);
+    const reservationQuantity = Number(line.reservation_quantity ?? 0);
+    const reserved = line.reservation_status === "active" ? reservationQuantity : 0;
+    const issued = line.issue_status === "issued" || line.reservation_status === "consumed" ? reservationQuantity || required : 0;
+    const shortage = Number(line.shortage_quantity ?? 0);
+    const state = issued > 0 ? "ISSUED" : shortage > 0 ? "SHORT" : line.sku ? "COVERED" : "OPERATION";
+    const evidence = line.reservation_status === "consumed"
+      ? `Issued by ${line.consumed_by ?? "recorded operator"}${line.consumed_at ? ` · ${String(line.consumed_at).replace("T", " ").slice(0, 16)} UTC` : ""}`
+      : line.reserved_by
+        ? `Reserved by ${line.reserved_by}${line.reserved_at ? ` · ${String(line.reserved_at).replace("T", " ").slice(0, 16)} UTC` : ""}`
+        : "Awaiting stock reservation";
+    return `<tr>
+      <td>${index + 1}</td>
+      <td><strong>${escapePrintHtml(line.sku ?? line.item)}</strong><div class="sub">${escapePrintHtml(`${line.stage_code ?? ""} · ${line.stage_name ?? ""}`)}</div></td>
+      <td class="num">${required}</td>
+      <td class="num">${reserved}</td>
+      <td class="num">${issued}</td>
+      <td class="num">${shortage}</td>
+      <td><strong>${state}</strong></td>
+      <td><div>${escapePrintHtml(line.reservation_id ?? "Not available")}</div><div class="sub">${escapePrintHtml(evidence)}</div></td>
+    </tr>`;
+  }).join("");
+
+  printWindow.document.write(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapePrintHtml(requisitionId)} · VYNDI Material Requisition</title>
+  <style>
+    @page { size: A4 landscape; margin: 12mm; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #171717; background: #fff; font-family: Arial, Helvetica, sans-serif; font-size: 10px; }
+    .sheet { width: 100%; }
+    .brand { display: flex; align-items: flex-end; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 12px; }
+    .brand h1 { margin: 0; font-size: 22px; letter-spacing: .06em; }
+    .brand .company { margin-top: 3px; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    .document { text-align: right; }
+    .document h2 { margin: 0; font-size: 16px; }
+    .document p { margin: 4px 0 0; }
+    .meta { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid #bbb; margin-bottom: 12px; }
+    .meta div { min-height: 48px; padding: 7px 8px; border-right: 1px solid #ddd; border-bottom: 1px solid #ddd; }
+    .meta div:nth-child(4n) { border-right: 0; }
+    .meta .label { display: block; color: #555; font-size: 8px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 4px; }
+    .meta .value { font-size: 10px; font-weight: 700; word-break: break-word; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    th, td { border: 1px solid #bbb; padding: 5px 6px; vertical-align: top; text-align: left; overflow-wrap: anywhere; }
+    th { background: #f2f2f2; font-size: 8px; letter-spacing: .05em; text-transform: uppercase; }
+    th:nth-child(1), td:nth-child(1) { width: 3%; }
+    th:nth-child(2), td:nth-child(2) { width: 18%; }
+    th:nth-child(3), td:nth-child(3), th:nth-child(4), td:nth-child(4), th:nth-child(5), td:nth-child(5), th:nth-child(6), td:nth-child(6) { width: 6%; }
+    th:nth-child(7), td:nth-child(7) { width: 8%; }
+    th:nth-child(8), td:nth-child(8) { width: 41%; }
+    .num { text-align: center; font-variant-numeric: tabular-nums; }
+    .sub { margin-top: 3px; color: #555; font-size: 8px; line-height: 1.25; }
+    .note { margin: 9px 0 12px; color: #444; line-height: 1.4; }
+    .signoff { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+    .signoff div { min-height: 54px; border: 1px solid #bbb; padding: 7px; }
+    .signoff strong { display: block; margin-bottom: 28px; text-transform: uppercase; font-size: 8px; letter-spacing: .07em; }
+    .footer { display: flex; justify-content: space-between; border-top: 1px solid #bbb; margin-top: 12px; padding-top: 6px; color: #666; font-size: 8px; }
+    @media print { .no-print { display: none !important; } }
+  </style>
+</head>
+<body>
+  <main class="sheet">
+    <section class="brand">
+      <div><h1>VYNDI</h1><div class="company">Vāyú Shastr Pvt Ltd · Controlled Production Record</div></div>
+      <div class="document"><h2>Material Requisition &amp; Issue Record</h2><p><strong>${escapePrintHtml(requisitionId)}</strong></p></div>
+    </section>
+
+    <section class="meta">
+      <div><span class="label">Job card</span><span class="value">${escapePrintHtml(card.id)}</span></div>
+      <div><span class="label">Commercial order</span><span class="value">${escapePrintHtml(`${card.sales_order_id} R${card.sales_order_revision ?? "—"}`)}</span></div>
+      <div><span class="label">Batch</span><span class="value">${escapePrintHtml(card.batch_code ?? "—")}</span></div>
+      <div><span class="label">BOM revision</span><span class="value">${escapePrintHtml(card.bom_revision ?? "—")}</span></div>
+      <div><span class="label">Bicycle / variant</span><span class="value">${escapePrintHtml(card.product_label ?? card.variant_id ?? "—")}</span></div>
+      <div><span class="label">Requested by</span><span class="value">${escapePrintHtml(card.created_by ?? "—")}</span></div>
+      <div><span class="label">Approved by</span><span class="value">${escapePrintHtml(card.approved_by ?? "Approval pending")}</span></div>
+      <div><span class="label">Issue progress</span><span class="value">${issuedLines}/${materialLines.length} material line(s)</span></div>
+      <div><span class="label">Traveller / serial</span><span class="value">${travellerText}</span></div>
+      <div><span class="label">Quantity</span><span class="value">${escapePrintHtml(`${Number(card.units)} bike(s)`)}</span></div>
+      <div><span class="label">Production status</span><span class="value">${escapePrintHtml(card.status ?? "—")}</span></div>
+      <div><span class="label">Record generated</span><span class="value">${escapePrintHtml(generatedAt)}</span></div>
+    </section>
+
+    <p class="note">Generated from the released BOM. Stores records actual FIFO reservation and issue evidence against the compatible traveller genealogy. This document is a controlled transaction record; it is not a screenshot of the operating workspace.</p>
+
+    <table>
+      <thead><tr><th>#</th><th>SKU / operation</th><th>Req.</th><th>Res.</th><th>Issued</th><th>Short</th><th>Status</th><th>Reservation / issue evidence</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+
+    <section class="signoff">
+      <div><strong>Stores issue / verification</strong>Name / sign / date</div>
+      <div><strong>Production receipt</strong>Name / sign / date</div>
+      <div><strong>Quality / traceability reference</strong>Reference / sign / date</div>
+    </section>
+
+    <footer class="footer"><span>${escapePrintHtml(requisitionId)} · ${escapePrintHtml(card.id)}</span><span>VYNDI · Vāyú Shastr Pvt Ltd</span></footer>
+  </main>
+  <script>window.addEventListener("load",()=>{setTimeout(()=>window.print(),80)});window.addEventListener("afterprint",()=>window.close(),{once:true});<\/script>
+</body>
+</html>`);
+  printWindow.document.close();
+  printWindow.focus();
+}
+
 function ProductionWorkspace() {
   const { orders, cards, lines, travellers } = Route.useLoaderData();
   const router = useRouter();
@@ -239,7 +378,17 @@ function ProductionWorkspace() {
                         <Metric label="Approved by" value={card.approved_by ?? "Approval pending"} />
                         <Metric label="Issue progress" value={`${issuedLines}/${materialLines.length} material line(s)`} />
                       </div>
-                      <button type="button" onClick={() => window.print()} className="rounded-md border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          try {
+                            printRequisitionRecord({ card, requisitionId, cardLines, linkedTravellers, issuedLines });
+                          } catch (error) {
+                            setMessage(error instanceof Error ? error.message : "Print record could not be opened.");
+                          }
+                        }}
+                        className="rounded-md border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent"
+                      >
                         Print requisition / issue record
                       </button>
                     </div>

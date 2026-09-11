@@ -70,3 +70,13 @@ test("Legal editor writes through canonical audited authority", () => {
   assert.match(authority, /LEGAL_STATUS_CHANGED/);
   assert.match(authority, /insert into vyndi_audit_events/);
 });
+
+test("Production prints a dedicated material requisition record instead of the whole workspace", () => {
+  const source = read("src/routes/command/production.tsx");
+  assert.match(source, /function printRequisitionRecord/);
+  assert.match(source, /Material Requisition &amp; Issue Record/);
+  assert.match(source, /Controlled Production Record/);
+  assert.match(source, /Stores issue \/ verification/);
+  assert.match(source, /Production receipt/);
+  assert.doesNotMatch(source, /onClick=\{\(\) => window\.print\(\)\}/);
+});

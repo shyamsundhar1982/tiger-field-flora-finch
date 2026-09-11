@@ -42,6 +42,14 @@ export default tseslint.config(
       "@typescript-eslint/no-explicit-any": "off",
     },
   },
+  // The dedicated Production print document writes its own HTML shell. The closing-script
+  // escape prevents an embedded HTML parser from prematurely terminating that generated script.
+  {
+    files: ["src/routes/command/production.tsx"],
+    rules: {
+      "no-useless-escape": "off",
+    },
+  },
   // Disable rules that conflict with Prettier formatting.
   prettier,
 );
