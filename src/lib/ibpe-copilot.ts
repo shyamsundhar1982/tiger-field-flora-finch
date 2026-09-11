@@ -425,6 +425,24 @@ function deterministicAnswer(
   return lines.join("\n\n");
 }
 
+function shouldSurfaceKnowledgeEvidence(question: string) {
+  return /weekly|status|progress|milestone|design|engineering|geometry|clearance|prototype|manufactur|oem|tooling|incubat|tansam|tancam|launch|readiness|blocker|decision|priority|material change/i.test(question);
+}
+
+function formatKnowledgeEvidence(evidence: VibpeKnowledgeEvidence[]) {
+  if (!evidence.length) return "";
+  const items = evidence.slice(0, 4).map((item) => {
+    const date = item.reviewDate ? ` · ${item.reviewDate}` : "";
+    const state = item.authority === "unresolved" ? "unresolved" : "advisory evidence";
+    return `• [${state}] ${item.claimText} — ${item.title}${date}`;
+  });
+  return [
+    "VIBPE knowledge evidence (weekly reviews; not master authority):",
+    ...items,
+    "Governance: governed internal/master data and deterministic IBPE truth override any conflicting review statement.",
+  ].join("\n");
+}
+
 function systemPrompt() {
   return [
     `You are ${VIBPE_COPILOT_NAME} for Vayu Shastr Private Limited.`,
@@ -619,6 +637,13 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
         } catch {
           // Deterministic IBPE explanation remains available if the external AI service fails.
         }
+      }
+    }
+
+    if (shouldSurfaceKnowledgeEvidence(data.question) && knowledgeEvidence.length) {
+      const evidenceText = formatKnowledgeEvidence(knowledgeEvidence);
+      if (evidenceText && !answer.includes("VIBPE knowledge evidence (weekly reviews; not master authority):")) {
+        answer = `${answer}\n\n${evidenceText}`;
       }
     }
 
