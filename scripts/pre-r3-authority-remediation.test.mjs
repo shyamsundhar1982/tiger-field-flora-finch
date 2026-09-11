@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 
 const productMigration = readFileSync(new URL("../migrations/0049_canonical_product_authority.sql", import.meta.url), "utf8");
 const productAuthority = readFileSync(new URL("../src/lib/product-authority.ts", import.meta.url), "utf8");
+const engineeringMigration = readFileSync(new URL("../migrations/0050_engineering_revision_authority.sql", import.meta.url), "utf8");
+const engineeringAuthority = readFileSync(new URL("../src/lib/engineering-authority.ts", import.meta.url), "utf8");
 const models = readFileSync(new URL("../src/lib/data/models.ts", import.meta.url), "utf8");
 
 const currentVariantIds = [...models.matchAll(/\{id:"([^"]+)"/g)].map((match) => match[1]);
@@ -35,4 +37,34 @@ test("G1 exposes canonical business identity while legacy tier lookup stays serv
   assert.match(productAuthority, /resolveCanonicalFamilyByCompatibilityTier/);
   assert.match(productAuthority, /implementation alias rather than the\s+\* user-facing business identity/s);
   assert.doesNotMatch(productAuthority, /familyName:\s*"core"|familyName:\s*"pro"|familyName:\s*"apex"/);
+});
+
+// G2 — Engineering revision / ECR authority.
+test("G2 persists Engineering baselines with governed release lifecycle", () => {
+  assert.match(engineeringMigration, /create table if not exists vyndi_engineering_baselines/);
+  assert.match(engineeringMigration, /status text not null default 'draft' check \(status in \('draft','pending_approval','released','superseded'\)\)/);
+  assert.match(engineeringMigration, /record_revision integer not null default 1/);
+  assert.match(engineeringMigration, /ENG-LATITUDE-C3/);
+  assert.match(engineeringMigration, /ENG-LONGITUDE-A2/);
+  assert.match(engineeringMigration, /ENG-ALTITUDE-C2/);
+  assert.match(engineeringMigration, /ENGINEERING_BASELINE_CUTOVER/);
+});
+
+test("G2 persists ECRs with product, BOM and downstream-impact references", () => {
+  assert.match(engineeringMigration, /create table if not exists vyndi_engineering_change_requests/);
+  assert.match(engineeringMigration, /from_baseline_id text references vyndi_engineering_baselines/);
+  assert.match(engineeringMigration, /target_bom_revision text/);
+  assert.match(engineeringMigration, /affected_skus jsonb/);
+  assert.match(engineeringMigration, /implemented_baseline_id text references vyndi_engineering_baselines/);
+  assert.match(engineeringAuthority, /createEngineeringChange/);
+  assert.match(engineeringAuthority, /transitionEngineeringChange/);
+});
+
+test("G2 enforces actor-attributed approval and released-baseline implementation", () => {
+  assert.match(engineeringAuthority, /requirePermission\(approvalDecision \? "approve" : "edit"\)/);
+  assert.match(engineeringAuthority, /Implemented ECR requires the released Engineering baseline/);
+  assert.match(engineeringAuthority, /status='released'/);
+  assert.match(engineeringAuthority, /ECR_STATUS_CHANGED/);
+  assert.match(engineeringAuthority, /ENGINEERING_BASELINE_STATUS_CHANGED/);
+  assert.match(engineeringAuthority, /actor_user_id,actor_role/);
 });
