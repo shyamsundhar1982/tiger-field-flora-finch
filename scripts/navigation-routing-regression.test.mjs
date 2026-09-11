@@ -172,7 +172,7 @@ test("G3: Operations is the actual execution hub, not only a renamed sidebar ent
   assert.doesNotMatch(operations, /min-w-\[(?:9|1[0-9])\d{2}px\]/);
 });
 
-test("G4: lineage joins persisted order, production, procurement, receiving, genealogy and order-to-cash evidence", () => {
+test("G4: lineage joins persisted order, production, procurement, receiving, genealogy, Quality and order-to-cash evidence", () => {
   assert.match(lineage, /createServerFn\(\{ method: "GET" \}\)/);
   assert.match(lineage, /jc\.sales_order_revision=o\.revision/);
   assert.match(lineage, /vyndi_live_job_card_requirements/);
@@ -182,7 +182,8 @@ test("G4: lineage joins persisted order, production, procurement, receiving, gen
   assert.match(lineage, /vyndi_shipments/);
   assert.match(lineage, /vyndi_invoices/);
   assert.match(lineage, /vyndi_collections/);
-  assert.match(operations, /Quality: specialist control, not order-linked yet/);
+  assert.match(operations, /listQualityAuthority/);
+  assert.match(operations, /Quality evidence is loaded from/);
   assert.doesNotMatch(lineage, /insert into/i);
   assert.doesNotMatch(lineage, /delete from/i);
   assert.doesNotMatch(lineage, /update\s+(?:vyndi_|epr_)/i);
