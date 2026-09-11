@@ -18,7 +18,7 @@ export const Route = createFileRoute("/api/vibpe/assurance")({
         const [exceptions, coverage] = await Promise.all([
           sql.query(`select exception_key,exception_type,severity,domain,entity_type,entity_id,
                             related_entity_type,related_entity_id,gate_id,correlation_id,evidence_json
-                       from vyndi_vibpe_assurance_exceptions
+                       from vyndi_vibpe_assurance_exceptions_all
                       order by case severity when 'critical' then 1 when 'warning' then 2 else 3 end,
                                domain,exception_type,entity_id`),
           sql.query(`select * from vyndi_vibpe_coverage_summary order by domain`),
