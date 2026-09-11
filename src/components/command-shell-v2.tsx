@@ -13,6 +13,7 @@ import {
   Presentation,
   Scale,
   Settings2,
+  ShieldCheck,
   UsersRound,
   Wallet,
 } from "lucide-react";
@@ -32,9 +33,12 @@ import {
   ENGINEERING_CONTEXT,
   ENGINEERING_HOME,
   ENGINEERING_TABS,
-  FINANCE_GOVERNANCE_CONTEXT,
-  FINANCE_GOVERNANCE_TABS,
+  FINANCE_CONTEXT,
   FINANCE_HOME,
+  FINANCE_TABS,
+  GOVERNANCE_CONTEXT,
+  GOVERNANCE_HOME,
+  GOVERNANCE_TABS,
   LEGACY_ROUTES,
   OPERATIONS_CONTEXT,
   OPERATIONS_HOME,
@@ -58,11 +62,12 @@ import { cn } from "@/lib/utils";
 
 const WORKSPACES = [
   { to: COMMAND_HOME, label: "Command", icon: Activity, context: COMMAND_CONTEXT },
-  { to: PLAN_HOME, label: "Plan & Sales", icon: LineChart, context: PLAN_SALES_CONTEXT },
+  { to: PLAN_HOME, label: "Plan & Commercial", icon: LineChart, context: PLAN_SALES_CONTEXT },
   { to: ENGINEERING_HOME, label: "Product & Engineering", icon: DraftingCompass, context: ENGINEERING_CONTEXT },
-  { to: OPERATIONS_HOME, label: "Operations", icon: Factory, context: OPERATIONS_CONTEXT },
+  { to: OPERATIONS_HOME, label: "Supply & Operations", icon: Factory, context: OPERATIONS_CONTEXT },
   { to: PEOPLE_HOME, label: "People & Office", icon: UsersRound, context: PEOPLE_CONTEXT },
-  { to: FINANCE_HOME, label: "Finance & Governance", icon: Wallet, context: FINANCE_GOVERNANCE_CONTEXT },
+  { to: FINANCE_HOME, label: "Finance", icon: Wallet, context: FINANCE_CONTEXT },
+  { to: GOVERNANCE_HOME, label: "Governance & Assurance", icon: ShieldCheck, context: GOVERNANCE_CONTEXT },
   { to: ADMIN_HOME, label: "Admin", icon: Settings2, context: ADMIN_CONTEXT, adminOnly: true },
 ] as const;
 
@@ -71,7 +76,8 @@ const TAB_ROUTES = new Set<string>([
   ...PLAN_SALES_TABS.map((item) => item.to),
   ...ENGINEERING_TABS.map((item) => item.to),
   ...OPERATIONS_TABS.map((item) => item.to),
-  ...FINANCE_GOVERNANCE_TABS.map((item) => item.to),
+  ...FINANCE_TABS.map((item) => item.to),
+  ...GOVERNANCE_TABS.map((item) => item.to),
   ...ADMIN_TABS.map((item) => item.to),
 ]);
 
@@ -147,7 +153,7 @@ function WorkspaceNavigation({ role, onNavigate }: { role: CommandRole | null; o
         <div className="flex items-center gap-2 px-2 pb-2 pt-1">
           <Activity className="size-3.5 text-accent" />
           <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-fg">Operating workspaces</span>
-          <span className="ml-auto text-[9px] text-muted">7 owners</span>
+          <span className="ml-auto text-[9px] text-muted">8 owners</span>
         </div>
         <div className="space-y-0.5">
           {WORKSPACES.filter((item) => (!(item as { adminOnly?: boolean }).adminOnly || role === "admin") && isAccessible(role, item.to)).map((item) => {
@@ -398,10 +404,11 @@ export function CommandShell() {
           <MobileNavigation role={role} logout={logout} loggingOut={loggingOut} logoutError={logoutError} />
           <div className="px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
             <WorkflowRail role={role} />
-            <WorkspaceTabs role={role} routes={PLAN_SALES_TABS} context={PLAN_SALES_CONTEXT} label="Plan and Sales workspace" />
+            <WorkspaceTabs role={role} routes={PLAN_SALES_TABS} context={PLAN_SALES_CONTEXT} label="Plan and Commercial workspace" />
             <WorkspaceTabs role={role} routes={ENGINEERING_TABS} context={ENGINEERING_CONTEXT} label="Product and Engineering workspace" />
-            <WorkspaceTabs role={role} routes={OPERATIONS_TABS} context={OPERATIONS_CONTEXT} label="Operations workspace" />
-            <WorkspaceTabs role={role} routes={FINANCE_GOVERNANCE_TABS} context={FINANCE_GOVERNANCE_CONTEXT} label="Finance and Governance workspace" />
+            <WorkspaceTabs role={role} routes={OPERATIONS_TABS} context={OPERATIONS_CONTEXT} label="Supply and Operations workspace" />
+            <WorkspaceTabs role={role} routes={FINANCE_TABS} context={FINANCE_CONTEXT} label="Finance workspace" />
+            <WorkspaceTabs role={role} routes={GOVERNANCE_TABS} context={GOVERNANCE_CONTEXT} label="Governance and Assurance workspace" />
             <WorkspaceTabs role={role} routes={ADMIN_TABS} context={ADMIN_CONTEXT} label="Administration workspace" />
             <fieldset disabled={viewer} className="m-0 min-w-0 border-0 p-0">
               <Outlet />
