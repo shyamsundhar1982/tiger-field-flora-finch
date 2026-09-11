@@ -123,6 +123,11 @@ function DecisionInbox() {
                         </span>
                       </div>
                       <p className="mt-1 text-xs leading-5 text-muted">{text(item, "detail")}</p>
+                      {group === "IBPE management action" ? (
+                        <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-green">
+                          Lifecycle · {text(item, "status") || "open"}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="flex shrink-0 flex-wrap gap-2">
                       {group === "IBPE management action" && text(item, "status") === "open" ? (
