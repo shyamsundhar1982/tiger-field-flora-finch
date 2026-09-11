@@ -333,15 +333,14 @@ export const applyConfirmedIbpeBusinessUpdate = createServerFn({ method: "POST" 
       status: string;
     };
     if (proposal.status === "applied") {
-      const prior = await sql.query<{ entity_id: string }>(
-        `select entity_id
+      const prior = await sql.query<{ entity_id: string | null }>(
+        `select payload_json->>'entityId' as entity_id
            from vyndi_audit_events
           where entity_type='ibpe_business_update' and entity_id=$1 and action='applied'
           order by created_at desc limit 1`,
         [proposal.id],
       );
-      const payload = prior[0] as unknown as { payload_json?: { entityId?: string } } | undefined;
-      return { ok: true, applied: true, alreadyApplied: true, entityId: payload?.payload_json?.entityId };
+      return { ok: true, applied: true, alreadyApplied: true, entityId: prior[0]?.entity_id ?? undefined };
     }
     if (proposal.status !== "confirmed") throw new Error("Business Update must be confirmed before application.");
 
@@ -354,15 +353,19 @@ export const applyConfirmedIbpeBusinessUpdate = createServerFn({ method: "POST" 
         [proposal.id],
       );
       if (!claimed.length) {
-        return { ok: true, applied: true, alreadyApplied: true };
+        const existingAction = await sql.query<{ id: string }>(
+          `select id from vyndi_ibpe_management_actions where source_proposal_id=$1 limit 1`,
+          [proposal.id],
+        );
+        return { ok: true, applied: true, alreadyApplied: true, adapter: "ibpe-management-action", entityId: existingAction[0]?.id };
       }
       const actionId = `IBPE-ACTION-${crypto.randomUUID()}`;
       try {
         await sql.query(
           `insert into vyndi_ibpe_management_actions
-           (id,title,classification,issue,impact,evidence,owner,recommended_action,escalation,created_by,created_by_role,updated_by,updated_by_role)
-           values ($1,$2,'KNOWN_FACT',$3,'','','',$3,'',$4,$5,$4,$5)`,
-          [actionId, proposal.raw_input.slice(0, 180), proposal.raw_input, actor.userId, actor.role],
+           (id,title,classification,issue,impact,evidence,owner,recommended_action,escalation,created_by,created_by_role,updated_by,updated_by_role,source_proposal_id)
+           values ($1,$2,'KNOWN_FACT',$3,'','','',$3,'',$4,$5,$4,$5,$6)`,
+          [actionId, proposal.raw_input.slice(0, 180), proposal.raw_input, actor.userId, actor.role, proposal.id],
         );
       } catch (error) {
         await sql.query(
