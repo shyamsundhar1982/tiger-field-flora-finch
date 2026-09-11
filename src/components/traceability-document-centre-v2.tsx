@@ -131,7 +131,11 @@ export function TraceabilityDocumentCentreV2() {
           setResponse({ ...result, query: trimmed, interpretation: interpretTraceabilityQuery(trimmed) });
         }
       } catch (cause) {
-        if (id === requestRef.current) setError(cause instanceof Error ? cause.message : "Traceability search failed.");
+        if (id === requestRef.current) {
+          console.error("Traceability search failed", cause);
+          setResponse(null);
+          setError("Traceability query failed. The governed record search could not be completed.");
+        }
       } finally {
         if (id === requestRef.current) setBusy(false);
       }
@@ -198,7 +202,8 @@ export function TraceabilityDocumentCentreV2() {
 
             <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
               {!query.trim() ? <div className="mx-auto mt-20 max-w-2xl rounded-xl border border-border bg-surface/30 p-6 text-center"><FileSearch className="mx-auto size-8 text-accent" /><p className="mt-3 font-medium text-fg">Search by any traceable fragment.</p><p className="mt-2 text-sm leading-6 text-muted">Partial IDs, supplier names, model names, SKUs and vernacular business phrases resolve to the governed digital thread.</p></div> : null}
-              {query.trim() && !busy && response && !hits.length ? <div className="mx-auto mt-16 max-w-xl rounded-xl border border-border p-5 text-center text-sm text-muted">No governed lineage matched this search and filter combination.</div> : null}
+              {error && !busy ? <div className="mx-auto mt-16 max-w-xl rounded-xl border border-danger/40 bg-danger/5 p-5 text-center"><p className="text-sm font-semibold text-danger">Traceability query failed</p><p className="mt-2 text-xs leading-5 text-muted">No search result has been presented as audit evidence. Retry the search after the governed data source is available.</p></div> : null}
+              {query.trim() && !busy && !error && response && !hits.length ? <div className="mx-auto mt-16 max-w-xl rounded-xl border border-border p-5 text-center text-sm text-muted">No controlled records found for this search and filter combination.</div> : null}
 
               {hits.length ? (
                 <div className="space-y-2">

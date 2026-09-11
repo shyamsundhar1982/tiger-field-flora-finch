@@ -386,8 +386,10 @@ async function searchRows(sql: Awaited<ReturnType<typeof getSql>>, interpretatio
     left join lateral (
       select string_agg(p.id,'|' order by p.created_at,p.id) filter (where p.status<>'cancelled') as ids,
              string_agg(p.status,'|' order by p.created_at,p.id) filter (where p.status<>'cancelled') as statuses,
-             string_agg(coalesce(p.supplier_name,p.supplier_id),'|' order by p.created_at,p.id) filter (where p.status<>'cancelled') as suppliers
-      from vyndi_purchase_orders p where p.job_card_id=c.id
+             string_agg(coalesce(s.name,p.supplier_id,'Supplier not assigned'),'|' order by p.created_at,p.id) filter (where p.status<>'cancelled') as suppliers
+      from vyndi_purchase_orders p
+      left join vyndi_suppliers s on s.id=p.supplier_id
+      where p.job_card_id=c.id
     ) po on true
     left join lateral (
       select string_agg(g.id,'|' order by g.created_at,g.id) as ids,
@@ -572,7 +574,7 @@ export const getTraceabilityPrintRecord = createServerFn({ method: "POST" })
     }
 
     if (data.type === "purchase_order") {
-      const row = await firstRow(sql, `select * from vyndi_purchase_orders where id=$1 limit 1`, [data.id]);
+      const row = await firstRow(sql, `select p.*,coalesce(s.name,p.supplier_id,'Supplier not assigned') as supplier_name,(p.quantity*p.unit_price_inr) as order_value_inr from vyndi_purchase_orders p left join vyndi_suppliers s on s.id=p.supplier_id where p.id=$1 limit 1`, [data.id]);
       if (!row) throw new Error("Purchase Order not found.");
       return {
         title: clean(row.id), recordType: "Purchase Order", status: clean(row.status), authority: "Procurement · purchase-order authority", sourceReference: clean(row.source_reference) || `PO ${clean(row.id)}`,
@@ -584,7 +586,7 @@ export const getTraceabilityPrintRecord = createServerFn({ method: "POST" })
     }
 
     if (data.type === "grn") {
-      const row = await firstRow(sql, `select g.*,p.job_card_id,p.supplier_name from vyndi_goods_receipts g left join vyndi_purchase_orders p on p.id=g.purchase_order_id where g.id=$1 limit 1`, [data.id]);
+      const row = await firstRow(sql, `select g.*,p.job_card_id,p.sku,coalesce(s.name,p.supplier_id,'Supplier not assigned') as supplier_name from vyndi_goods_receipts g left join vyndi_purchase_orders p on p.id=g.purchase_order_id left join vyndi_suppliers s on s.id=p.supplier_id where g.id=$1 limit 1`, [data.id]);
       if (!row) throw new Error("GRN not found.");
       return {
         title: clean(row.id), recordType: "Goods Receipt Note / Incoming Inspection", status: clean(row.inspection_status), authority: "Receiving · controlled GRN and inventory boundary", sourceReference: clean(row.source_reference) || `GRN ${clean(row.id)}`,

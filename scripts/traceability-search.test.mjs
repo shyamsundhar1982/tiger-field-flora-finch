@@ -53,6 +53,17 @@ test("direct Traceability Centre accepts ordinary free text without weakening Co
   assert.match(copilotSource, /askTraceabilityCopilot/);
 });
 
+test("traceability supplier lookups use canonical supplier joins and controlled error states", () => {
+  assert.match(searchSource, /left join vyndi_suppliers s on s\.id=p\.supplier_id/);
+  assert.match(searchSource, /coalesce\(s\.name,p\.supplier_id,'Supplier not assigned'\)/);
+  assert.doesNotMatch(searchSource, /coalesce\(p\.supplier_name,p\.supplier_id\)/);
+  assert.match(searchSource, /\(p\.quantity\*p\.unit_price_inr\) as order_value_inr/);
+  assert.match(searchSource, /select g\.\*,p\.job_card_id,p\.sku,coalesce\(s\.name,p\.supplier_id,'Supplier not assigned'\) as supplier_name/);
+  assert.match(centreSource, /Traceability query failed\. The governed record search could not be completed\./);
+  assert.match(centreSource, /No controlled records found for this search and filter combination\./);
+  assert.match(centreSource, /No search result has been presented as audit evidence\./);
+});
+
 test("landscape centre exposes direct controlled printing without horizontal table scrolling", () => {
   assert.match(centreSource, /Traceability & Print Centre/);
   assert.match(centreSource, /max-w-\[1680px\]/);
