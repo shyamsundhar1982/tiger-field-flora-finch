@@ -31,3 +31,42 @@ test("Receiving exposes quarantine disposition through governed lifecycle", () =
   assert.match(source, /Accept to stock/);
   assert.match(source, /Reject material/);
 });
+
+test("historical Demand route redirects to canonical Commercial truth", () => {
+  const source = read("src/routes/command/demand.tsx");
+  assert.match(source, /createFileRoute\("\/command\/demand"\)/);
+  assert.match(source, /redirect\(\{ to: "\/command\/sales", replace: true \}\)/);
+  assert.doesNotMatch(source, /component:/);
+});
+
+test("Governance persists OPEN and CLOSED enforcement separately from evidence status", () => {
+  const page = read("src/routes/command/governance.tsx");
+  const authority = read("src/lib/governance-control-authority.ts");
+  assert.match(page, /listGovernanceControls/);
+  assert.match(page, /saveOperatingActionStatus/);
+  assert.match(page, /governance-gate:/);
+  assert.match(page, /Gate \{gate\.gateOpen \? "OPEN" : "CLOSED"\}/);
+  assert.match(page, /closing a gate does not fabricate or alter evidence status/i);
+  assert.match(authority, /vyndi_operating_actions/);
+  assert.match(authority, /status !== "done"/);
+});
+
+test("Risk editor writes through canonical audited authority", () => {
+  const page = read("src/routes/command/risk.tsx");
+  const authority = read("src/lib/finance-governance-authority.ts");
+  assert.match(page, /transitionRiskRegisterItem/);
+  assert.match(page, /Save audited change/);
+  assert.match(page, /sourceReference/);
+  assert.match(authority, /RISK_STATUS_CHANGED/);
+  assert.match(authority, /insert into vyndi_audit_events/);
+});
+
+test("Legal editor writes through canonical audited authority", () => {
+  const page = read("src/routes/command/legal.tsx");
+  const authority = read("src/lib/finance-governance-authority.ts");
+  assert.match(page, /transitionLegalRegisterItem/);
+  assert.match(page, /Save audited change/);
+  assert.match(page, /sourceReference/);
+  assert.match(authority, /LEGAL_STATUS_CHANGED/);
+  assert.match(authority, /insert into vyndi_audit_events/);
+});
