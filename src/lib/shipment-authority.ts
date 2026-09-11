@@ -4,6 +4,7 @@ import { getSql } from "@/lib/db";
 import { requireBusinessActor } from "@/lib/business-actor";
 import { getCommandRole } from "@/lib/command-access";
 import { canPerform } from "@/lib/page-access";
+import { postDispatch, reverseDispatch } from "@/lib/dispatch-authority";
 
 const id = z.string().trim().min(1).max(120);
 const sourceReference = z.string().trim().min(1).max(500);
@@ -61,26 +62,10 @@ export const listShipmentRevenueLedger = createServerFn({ method: "GET" }).handl
   };
 });
 
-export const postShipment = createServerFn({ method: "POST" })
-  .validator(z.object({ id, salesOrderId:id, planMonth:month, units:z.number().positive(), sourceReference }))
-  .handler(async ({ data }) => {
-    const actor = await requireBusinessActor("edit");
-    const sql = await getSql();
-    const rows = await sql.query<{ post_vyndi_shipment: string }>(
-      `select post_vyndi_shipment($1,$2,$3,$4,$5,$6,$7)`,
-      [data.id,data.salesOrderId,data.planMonth,data.units,data.sourceReference,actor.userId,actor.role],
-    );
-    return { id: rows[0]?.post_vyndi_shipment ?? data.id };
-  });
-
-export const reverseShipment = createServerFn({ method: "POST" })
-  .validator(z.object({ id, reason:z.string().trim().min(1).max(500) }))
-  .handler(async ({ data }) => {
-    const actor = await requireBusinessActor("edit");
-    const sql = await getSql();
-    const rows = await sql.query<{ revision: number | string }>(`select reverse_vyndi_shipment($1,$2,$3,$4) as revision`,[data.id,data.reason,actor.userId,actor.role]);
-    return { id:data.id, revision:Number(rows[0]?.revision ?? 0) };
-  });
+/** @deprecated Shipment execution is Operations-owned; compatibility alias retained for current callers. */
+export const postShipment = postDispatch;
+/** @deprecated Shipment execution is Operations-owned; compatibility alias retained for current callers. */
+export const reverseShipment = reverseDispatch;
 
 export const issueInvoice = createServerFn({ method: "POST" })
   .validator(z.object({ id, shipmentId:id, sourceReference }))
