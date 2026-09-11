@@ -7,6 +7,7 @@ const productAuthority = readFileSync(new URL("../src/lib/product-authority.ts",
 const models = readFileSync(new URL("../src/lib/data/models.ts", import.meta.url), "utf8");
 
 const currentVariantIds = [...models.matchAll(/\{id:"([^"]+)"/g)].map((match) => match[1]);
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // G1 — Product master authority.
 test("G1 persists only the three canonical VYNDI product family identities", () => {
@@ -22,7 +23,7 @@ test("G1 persists only the three canonical VYNDI product family identities", () 
 test("G1 preserves every current order-facing variant identifier in canonical persistence", () => {
   assert.equal(currentVariantIds.length, 10, "Unexpected model catalogue size; update the canonical cutover intentionally.");
   for (const id of currentVariantIds) {
-    assert.match(productMigration, new RegExp(`'${id.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}'`), `Missing canonical variant ${id}`);
+    assert.match(productMigration, new RegExp(`'${escapeRegExp(id)}'`), `Missing canonical variant ${id}`);
   }
   assert.match(productMigration, /compatibility_variant_id text not null unique/);
   assert.match(productAuthority, /resolveCanonicalProductVariant/);
