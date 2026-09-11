@@ -28,9 +28,18 @@ function actor(role: string) {
   return `command:${role}`;
 }
 
-async function assertVariantBelongsToFamily(sql: Awaited<ReturnType<typeof getSql>>, familyCode: string, variantId?: string | null) {
+async function assertVariantBelongsToFamily(
+  sql: Awaited<ReturnType<typeof getSql>>,
+  familyCode: string,
+  variantId?: string | null,
+) {
   if (!variantId) return;
-  const rows = await sql<{ id: string }>`select variant_id as id from vyndi_product_variants where variant_id=${variantId} and family_code=${familyCode} and active=true limit 1`;
+  const rows = await sql<{ id: string }>`
+    select variant_id as id
+    from vyndi_product_variants
+    where variant_id=${variantId} and family_code=${familyCode} and active=true
+    limit 1
+  `;
   if (!rows[0]) throw new Error("Selected variant does not belong to the selected canonical product family.");
 }
 
@@ -100,7 +109,13 @@ export const createEngineeringBaselineDraft = createServerFn({ method: "POST" })
       ) values (
         ${crypto.randomUUID()},'engineering_baseline',${id},1,'ENGINEERING_BASELINE_DRAFT_CREATED',
         ${actor(role)},${role},${data.sourceReference},
-        ${JSON.stringify({ familyCode: data.familyCode, variantId: data.variantId ?? null, revisionCode: data.revisionCode, drawingRef: data.drawingRef, bomRevision: data.bomRevision ?? null })}::jsonb,
+        ${JSON.stringify({
+          familyCode: data.familyCode,
+          variantId: data.variantId ?? null,
+          revisionCode: data.revisionCode,
+          drawingRef: data.drawingRef,
+          bomRevision: data.bomRevision ?? null,
+        })}::jsonb,
         ${`ENGINEERING|${data.familyCode}|${data.revisionCode}`},null,'draft','Engineering baseline draft created.'
       )
     `;
@@ -118,27 +133,42 @@ export const transitionEngineeringBaseline = createServerFn({ method: "POST" })
   .validator(baselineTransitionSchema)
   .handler(async ({ data }) => {
     await assertSameSiteRequest();
-    const permission: CommandPermission = data.toStatus === "released" || data.toStatus === "superseded" ? "approve" : "edit";
+    const permission: CommandPermission =
+      data.toStatus === "released" || data.toStatus === "superseded" ? "approve" : "edit";
     const role = await requirePermission(permission);
     const sql = await getSql();
-    const rows = await sql<{ status: string; recordRevision: number; familyCode: string; revisionCode: string }>`
-      select status, record_revision as "recordRevision", family_code as "familyCode", revision_code as "revisionCode"
-      from vyndi_engineering_baselines where id=${data.id} limit 1
+    const rows = await sql<{
+      status: string;
+      recordRevision: number;
+      familyCode: string;
+      revisionCode: string;
+    }>`
+      select
+        status,
+        record_revision as "recordRevision",
+        family_code as "familyCode",
+        revision_code as "revisionCode"
+      from vyndi_engineering_baselines
+      where id=${data.id}
+      limit 1
     `;
     const current = rows[0];
     if (!current) throw new Error("Engineering baseline not found.");
     const allowed =
       (current.status === "draft" && data.toStatus === "pending_approval") ||
-      (current.status === "pending_approval" && (data.toStatus === "draft" || data.toStatus === "released")) ||
+      (current.status === "pending_approval" &&
+        (data.toStatus === "draft" || data.toStatus === "released")) ||
       (current.status === "released" && data.toStatus === "superseded");
-    if (!allowed) throw new Error(`Invalid Engineering baseline transition: ${current.status} → ${data.toStatus}`);
+    if (!allowed) {
+      throw new Error(`Invalid Engineering baseline transition: ${current.status} → ${data.toStatus}`);
+    }
     const nextRevision = current.recordRevision + 1;
     await sql`
       update vyndi_engineering_baselines set
         status=${data.toStatus},
         record_revision=${nextRevision},
-        approved_by=${data.toStatus === "released" ? actor(role) : null},
-        released_at=${data.toStatus === "released" ? new Date() : null},
+        approved_by=case when ${data.toStatus}='released' then ${actor(role)} else approved_by end,
+        released_at=case when ${data.toStatus}='released' then now() else released_at end,
         updated_at=now()
       where id=${data.id}
     `;
@@ -147,12 +177,18 @@ export const transitionEngineeringBaseline = createServerFn({ method: "POST" })
         id,entity_type,entity_id,entity_revision,action,actor_user_id,actor_role,
         source_reference,payload_json,correlation_id,previous_state,new_state,reason
       ) values (
-        ${crypto.randomUUID()},'engineering_baseline',${data.id},${nextRevision},'ENGINEERING_BASELINE_STATUS_CHANGED',
-        ${actor(role)},${role},${data.sourceReference},'{}'::jsonb,
-        ${`ENGINEERING|${current.familyCode}|${current.revisionCode}`},${current.status},${data.toStatus},${data.note ?? null}
+        ${crypto.randomUUID()},'engineering_baseline',${data.id},${nextRevision},
+        'ENGINEERING_BASELINE_STATUS_CHANGED',${actor(role)},${role},${data.sourceReference},
+        '{}'::jsonb,${`ENGINEERING|${current.familyCode}|${current.revisionCode}`},
+        ${current.status},${data.toStatus},${data.note ?? null}
       )
     `;
-    return { ok: true, fromStatus: current.status, toStatus: data.toStatus, recordRevision: nextRevision };
+    return {
+      ok: true,
+      fromStatus: current.status,
+      toStatus: data.toStatus,
+      recordRevision: nextRevision,
+    };
   });
 
 const ecrDraftSchema = z.object({
@@ -180,7 +216,12 @@ export const createEngineeringChange = createServerFn({ method: "POST" })
     const sql = await getSql();
     await assertVariantBelongsToFamily(sql, data.familyCode, data.variantId);
     if (data.fromBaselineId) {
-      const basis = await sql<{ id: string }>`select id from vyndi_engineering_baselines where id=${data.fromBaselineId} and family_code=${data.familyCode} limit 1`;
+      const basis = await sql<{ id: string }>`
+        select id
+        from vyndi_engineering_baselines
+        where id=${data.fromBaselineId} and family_code=${data.familyCode}
+        limit 1
+      `;
       if (!basis[0]) throw new Error("ECR baseline does not belong to the selected product family.");
     }
     await sql`
@@ -189,8 +230,9 @@ export const createEngineeringChange = createServerFn({ method: "POST" })
         title,reason,bom_cost_delta_inr,weight_delta_g,production_impact_pct,inventory_impact_lakh,
         affected_skus,status,source_ref,created_by
       ) values (
-        ${data.id},${data.familyCode},${data.variantId ?? null},${data.fromBaselineId ?? null},${data.targetRevisionCode},${data.targetBomRevision ?? null},
-        ${data.title},${data.reason},${data.bomCostDeltaInr},${data.weightDeltaG},${data.productionImpactPct},${data.inventoryImpactLakh},
+        ${data.id},${data.familyCode},${data.variantId ?? null},${data.fromBaselineId ?? null},
+        ${data.targetRevisionCode},${data.targetBomRevision ?? null},${data.title},${data.reason},
+        ${data.bomCostDeltaInr},${data.weightDeltaG},${data.productionImpactPct},${data.inventoryImpactLakh},
         ${JSON.stringify(data.affectedSkus)}::jsonb,'open',${data.sourceReference},${actor(role)}
       )
     `;
@@ -201,7 +243,14 @@ export const createEngineeringChange = createServerFn({ method: "POST" })
       ) values (
         ${crypto.randomUUID()},'engineering_change_request',${data.id},1,'ECR_CREATED',
         ${actor(role)},${role},${data.sourceReference},
-        ${JSON.stringify({ familyCode: data.familyCode, variantId: data.variantId ?? null, fromBaselineId: data.fromBaselineId ?? null, targetRevisionCode: data.targetRevisionCode, targetBomRevision: data.targetBomRevision ?? null, affectedSkus: data.affectedSkus })}::jsonb,
+        ${JSON.stringify({
+          familyCode: data.familyCode,
+          variantId: data.variantId ?? null,
+          fromBaselineId: data.fromBaselineId ?? null,
+          targetRevisionCode: data.targetRevisionCode,
+          targetBomRevision: data.targetBomRevision ?? null,
+          affectedSkus: data.affectedSkus,
+        })}::jsonb,
         ${`ECR|${data.id}`},null,'open',${data.reason}
       )
     `;
@@ -220,34 +269,64 @@ export const transitionEngineeringChange = createServerFn({ method: "POST" })
   .validator(ecrTransitionSchema)
   .handler(async ({ data }) => {
     await assertSameSiteRequest();
-    const approvalDecision = data.toStatus === "approved" || data.toStatus === "rejected" || data.toStatus === "implemented";
+    const approvalDecision =
+      data.toStatus === "approved" || data.toStatus === "rejected" || data.toStatus === "implemented";
     const role = await requirePermission(approvalDecision ? "approve" : "edit");
     const sql = await getSql();
     const rows = await sql<{ status: string; recordRevision: number; familyCode: string }>`
-      select status, record_revision as "recordRevision", family_code as "familyCode"
-      from vyndi_engineering_change_requests where id=${data.id} limit 1
+      select
+        status,
+        record_revision as "recordRevision",
+        family_code as "familyCode"
+      from vyndi_engineering_change_requests
+      where id=${data.id}
+      limit 1
     `;
     const current = rows[0];
     if (!current) throw new Error("Engineering change request not found.");
     const allowed =
       (current.status === "open" && data.toStatus === "pending_approval") ||
-      (current.status === "pending_approval" && (data.toStatus === "open" || data.toStatus === "approved" || data.toStatus === "rejected")) ||
+      (current.status === "pending_approval" &&
+        (data.toStatus === "open" || data.toStatus === "approved" || data.toStatus === "rejected")) ||
       (current.status === "approved" && data.toStatus === "implemented");
     if (!allowed) throw new Error(`Invalid ECR transition: ${current.status} → ${data.toStatus}`);
     if (data.toStatus === "implemented") {
-      if (!data.implementedBaselineId) throw new Error("Implemented ECR requires the released Engineering baseline created by the change.");
-      const baseline = await sql<{ id: string }>`select id from vyndi_engineering_baselines where id=${data.implementedBaselineId} and family_code=${current.familyCode} and status='released' limit 1`;
-      if (!baseline[0]) throw new Error("Implemented ECR baseline must be a released baseline for the same product family.");
+      if (!data.implementedBaselineId) {
+        throw new Error("Implemented ECR requires the released Engineering baseline created by the change.");
+      }
+      const baseline = await sql<{ id: string }>`
+        select id
+        from vyndi_engineering_baselines
+        where id=${data.implementedBaselineId}
+          and family_code=${current.familyCode}
+          and status='released'
+        limit 1
+      `;
+      if (!baseline[0]) {
+        throw new Error("Implemented ECR baseline must be a released baseline for the same product family.");
+      }
     }
     const nextRevision = current.recordRevision + 1;
     await sql`
       update vyndi_engineering_change_requests set
         status=${data.toStatus},
         record_revision=${nextRevision},
-        submitted_by=${data.toStatus === "pending_approval" ? actor(role) : submitted_by},
-        decided_by=${data.toStatus === "approved" || data.toStatus === "rejected" ? actor(role) : decided_by},
-        implemented_by=${data.toStatus === "implemented" ? actor(role) : implemented_by},
-        implemented_baseline_id=${data.toStatus === "implemented" ? data.implementedBaselineId ?? null : implemented_baseline_id},
+        submitted_by=case
+          when ${data.toStatus}='pending_approval' then ${actor(role)}
+          else submitted_by
+        end,
+        decided_by=case
+          when ${data.toStatus} in ('approved','rejected') then ${actor(role)}
+          else decided_by
+        end,
+        implemented_by=case
+          when ${data.toStatus}='implemented' then ${actor(role)}
+          else implemented_by
+        end,
+        implemented_baseline_id=case
+          when ${data.toStatus}='implemented' then ${data.implementedBaselineId ?? null}
+          else implemented_baseline_id
+        end,
         updated_at=now()
       where id=${data.id}
     `;
@@ -256,11 +335,16 @@ export const transitionEngineeringChange = createServerFn({ method: "POST" })
         id,entity_type,entity_id,entity_revision,action,actor_user_id,actor_role,
         source_reference,payload_json,correlation_id,previous_state,new_state,reason
       ) values (
-        ${crypto.randomUUID()},'engineering_change_request',${data.id},${nextRevision},'ECR_STATUS_CHANGED',
-        ${actor(role)},${role},${data.sourceReference},
+        ${crypto.randomUUID()},'engineering_change_request',${data.id},${nextRevision},
+        'ECR_STATUS_CHANGED',${actor(role)},${role},${data.sourceReference},
         ${JSON.stringify({ implementedBaselineId: data.implementedBaselineId ?? null })}::jsonb,
         ${`ECR|${data.id}`},${current.status},${data.toStatus},${data.note ?? null}
       )
     `;
-    return { ok: true, fromStatus: current.status, toStatus: data.toStatus, recordRevision: nextRevision };
+    return {
+      ok: true,
+      fromStatus: current.status,
+      toStatus: data.toStatus,
+      recordRevision: nextRevision,
+    };
   });
