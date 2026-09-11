@@ -31,6 +31,7 @@ export const COMMAND_SHORTCUTS: readonly WorkspaceLink[] = [
   { to: "/command/decision-inbox", label: "Action Inbox" },
   { to: "/command/control-tower", label: "ERP Reports" },
   { to: "/command/ibpe-operating-workspace", label: "VIBPE Workspace" },
+  { to: "/command/ibpe-operating-workspace/assurance", label: "VIBPE Assurance" },
 ];
 
 export const PLAN_SALES_TABS: readonly WorkspaceLink[] = [
@@ -101,6 +102,7 @@ export const COMMAND_CONTEXT = new Set<string>([
   "/command/founder-control",
   "/command/decision-engine",
   "/command/ibpe-operating-workspace",
+  "/command/ibpe-operating-workspace/assurance",
 ]);
 
 export const PLAN_SALES_CONTEXT = new Set<string>([
