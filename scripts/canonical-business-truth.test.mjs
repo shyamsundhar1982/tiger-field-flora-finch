@@ -103,22 +103,56 @@ test("zero physical inventory preserves released production demand and exposes t
   const fakeStock=await db.query(`select count(*)::int as count from epr_inventory_ledger where sku='TEST-SKU'`); assert.equal(Number(fakeStock.rows[0].count),0);
 });
 
-test("Stage 2 order → shipment → invoice → receivable → collection gate is controlled, idempotent and reversible", async (t) => {
+test("Stage 2 order → production → quality → dispatch → invoice → receivable → collection gate is controlled, idempotent and reversible", async (t) => {
   const db=await createCanonicalDb(); t.after(()=>db.close());
   await saveSalesOrder(db,{id:"SO-STAGE2",units:2,month:6,status:"confirmed"});
   await createReleasedCard(db,{orderId:"SO-STAGE2",cardId:"CARD-STAGE2",lineId:"LINE-STAGE2",quantity:4});
 
   await assert.rejects(
     ()=>db.query(`select post_vyndi_shipment($1,$2,$3,$4,$5,$6,$7)`,["SHIP-STAGE2","SO-STAGE2",6,2,"DISPATCH-001","test-user","operations"]),
-    /requires the linked production job card to be complete/,
+    /Production Job Card to be complete/,
   );
+
+  for (const [travellerId,serialNumber] of [["TRV-STAGE2-1","SERIAL-STAGE2-1"],["TRV-STAGE2-2","SERIAL-STAGE2-2"]]) {
+    await db.query(
+      `select * from raise_epr_traveller_for_job_card($1,$2,$3,$4,$5,$6,$7)`,
+      [travellerId,"CARD-STAGE2",serialNumber,"VEDM-STAGE2","Test OEM","test-user","operations"],
+    );
+    await db.query(`update epr_travellers set status='released' where id=$1`,[travellerId]);
+  }
   await db.query(`update epr_production_job_cards set status='complete' where id='CARD-STAGE2'`);
+
+  await assert.rejects(
+    ()=>db.query(`select post_vyndi_shipment($1,$2,$3,$4,$5,$6,$7)`,["SHIP-STAGE2","SO-STAGE2",6,2,"DISPATCH-001","test-user","operations"]),
+    /Quality release evidence/,
+  );
+
+  for (const [suffix,travellerId,serialNumber] of [["1","TRV-STAGE2-1","SERIAL-STAGE2-1"],["2","TRV-STAGE2-2","SERIAL-STAGE2-2"]]) {
+    await db.query(
+      `insert into vyndi_quality_inspections
+        (id,inspection_stage,inspection_type,sales_order_id,job_card_id,traveller_id,sku,serial_number,
+         sample_size,defect_quantity,result,disposition,criteria_ref,evidence_ref,notes,recorded_by,recorded_role)
+       values ($1,'final','Final release inspection','SO-STAGE2','CARD-STAGE2',$2,'core-tiagra',$3,1,0,'pass','accepted','ISO4210-STAGE2',$4,'integration release evidence','qa-user','quality')`,
+      [`QI-STAGE2-${suffix}`,travellerId,serialNumber,`QI-EVIDENCE-STAGE2-${suffix}`],
+    );
+    await db.query(
+      `insert into vyndi_quality_releases
+        (id,traveller_id,job_card_id,sales_order_id,serial_number,decision,decision_reason,evidence_ref,decided_by,decided_role)
+       values ($1,$2,'CARD-STAGE2','SO-STAGE2',$3,'released','Passing final inspection',$4,'qa-approver','quality')`,
+      [`QR-STAGE2-${suffix}`,travellerId,serialNumber,`QR-EVIDENCE-STAGE2-${suffix}`],
+    );
+  }
 
   const shipment=await db.query(`select post_vyndi_shipment($1,$2,$3,$4,$5,$6,$7) as id`,["SHIP-STAGE2","SO-STAGE2",6,2,"DISPATCH-001","test-user","operations"]);
   assert.equal(shipment.rows[0].id,"SHIP-STAGE2");
   const shipmentAgain=await db.query(`select post_vyndi_shipment($1,$2,$3,$4,$5,$6,$7) as id`,["SHIP-STAGE2","SO-STAGE2",6,2,"DISPATCH-001","test-user","operations"]);
   assert.equal(shipmentAgain.rows[0].id,"SHIP-STAGE2","same shipment command must be idempotent");
   await assert.rejects(()=>db.query(`select post_vyndi_shipment($1,$2,$3,$4,$5,$6,$7)`,["SHIP-OVER","SO-STAGE2",6,1,"DISPATCH-OVER","test-user","operations"]),/exceeds remaining confirmed order quantity/);
+
+  const dispatch=await db.query(`select owner_workspace,job_card_id,current_quality_release_count from vyndi_dispatch_register where shipment_id='SHIP-STAGE2'`);
+  assert.equal(dispatch.rows[0].owner_workspace,"operations");
+  assert.equal(dispatch.rows[0].job_card_id,"CARD-STAGE2");
+  assert.equal(Number(dispatch.rows[0].current_quality_release_count),2);
 
   const invoice=await db.query(`select * from issue_vyndi_invoice($1,$2,$3,$4,$5)`,["INV-STAGE2","SHIP-STAGE2","INVREF-001","test-user","finance"]);
   assert.equal(Number(invoice.rows[0].amount_lakh),2.5,"invoice amount must derive from shipped units × controlled order ASP");
