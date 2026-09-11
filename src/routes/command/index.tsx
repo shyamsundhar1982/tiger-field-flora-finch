@@ -49,7 +49,7 @@ function CommandCentre() {
         <div>
           <p className="text-[11px] uppercase tracking-[0.2em] text-green">VINDY · Executive operating view</p>
           <h1 className="mt-1 font-display text-4xl text-accent">Command Centre</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">One screen for what needs attention now: financial health, blockers, decisions, accountable actions and the next operating gate. Detailed work stays in its specialist workspace.</p>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">One screen for what needs attention now: health, blockers, decisions, accountable actions and the next operating gate. Work then follows the same Plan → Sell → Engineer → Buy → Build → Finance/Governance operating structure used throughout VYNDI.</p>
         </div>
         <div className="flex flex-wrap gap-3 text-sm font-semibold">
           {accessible("/command/planning") && <WorkLink to="/command/planning" className="text-accent hover:text-fg">Master Plan →</WorkLink>}
@@ -145,12 +145,12 @@ function CommandCentre() {
       <Panel title="Go to the work" kicker="One canonical destination per function">
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {[
-            ["Master Plan", "Roadmap, demand, procurement, production, finance and scenarios", "/command/planning"],
-            ["Finance", "Cash, assumptions, funding, balance sheet and CA verification", "/command/financial-cockpit"],
-            ["Supply & Production", "Plan, buy, receive, inventory, release, production and quality", "/command/operations"],
-            ["Engineering", "Product, BOM, revisions, tooling and validation", "/command/engineering"],
-            ["Commercial", "Demand, orders, sales forecast and GTM", "/command/sales"],
-            ["Governance", "Risks, approvals, evidence and audit trail", "/command/governance"],
+            ["Plan & Sales", "Operating plan, demand, orders, GTM, market and scenarios", "/command/planning"],
+            ["Product & Engineering", "Product definition, controlled BOM, revisions and validation", "/command/engineering"],
+            ["Operations", "Material check, procurement, receiving, inventory, production and quality", "/command/operations"],
+            ["People & Office", "Manpower, payroll inputs, office costs, assets and operating overheads", "/command/people-office"],
+            ["Finance & Governance", "Cash, AR/AP, accounting, approvals, risk, legal and audit evidence", "/command/financial-cockpit"],
+            ["Admin", "Users, roles and controlled master data", "/command/users"],
           ]
             .filter(([, , to]) => accessible(to))
             .map(([title, note, to]) => (
