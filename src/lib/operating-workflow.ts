@@ -29,6 +29,7 @@ export const PEOPLE_HOME = "/command/people-office";
 export const FINANCE_HOME = "/command/financial-cockpit";
 export const GOVERNANCE_HOME = "/command/governance";
 export const ADMIN_HOME = "/command/users";
+export const STORY_HOME = "/story";
 
 /** Cross-cutting Command tools — not transaction workspaces. */
 export const COMMAND_SHORTCUTS: readonly WorkspaceLink[] = [
@@ -141,14 +142,11 @@ export const WORKFLOW_STAGES: readonly WorkflowStage[] = [
   { id: "collection", label: "Collection", shortLabel: "Collect", to: "/command/receivables", routes: ["/command/receivables"], owner: "finance" },
 ];
 
+/** Operator Command only — no founder/investor narrative pages. */
 export const COMMAND_CONTEXT = new Set<string>([
   COMMAND_HOME,
   "/command/control-tower",
   "/command/decision-inbox",
-  "/command/management-intelligence",
-  "/command/founder-command",
-  "/command/founder-control",
-  "/command/decision-engine",
   "/command/ibpe-operating-workspace",
   "/command/ibpe-operating-workspace/assurance",
 ]);
@@ -157,7 +155,6 @@ export const PLAN_SALES_CONTEXT = new Set<string>([
   ...PLAN_SALES_TABS.map((tab) => tab.to),
   "/command/market-survey",
   "/command/finance-assumptions",
-  "/command/funding",
 ]);
 
 export const ENGINEERING_CONTEXT = new Set<string>([
@@ -207,6 +204,31 @@ export const FINANCE_GOVERNANCE_CONTEXT = new Set<string>([
 
 export const ADMIN_CONTEXT = new Set<string>([...ADMIN_TABS.map((tab) => tab.to)]);
 
+/**
+ * Narrative / investor / reference — audience is not the day-to-day operator.
+ * Prefer StoryShell (/story) over Command sidebar for these.
+ * Paths remain under /command/* until explicit redirects are added.
+ */
+export const STORY_ROUTES = new Set<string>([
+  "/command/founder-command",
+  "/command/founder-control",
+  "/command/decision-engine",
+  "/command/management-intelligence",
+  "/command/investor-pitch",
+  "/command/investor-pitch-external",
+  "/command/investor-board",
+  "/command/stakeholder-portal",
+  "/command/demo-company",
+  "/command/platform-walkthrough",
+  "/command/knowledge",
+  "/command/technical",
+  "/command/design-philosophy",
+  "/command/ai-knowledge",
+  "/command/deployment-readiness",
+  "/command/funding",
+  STORY_HOME,
+]);
+
 export const LEGACY_ROUTES = new Set<string>([
   "/command/phase-4",
   "/command/phase-5",
@@ -215,6 +237,7 @@ export const LEGACY_ROUTES = new Set<string>([
   "/command/management-intelligence",
   "/command/production-jobcards",
   "/command/ops",
+  ...STORY_ROUTES,
 ]);
 
 export const WORKFLOW_VISIBLE_ROUTES = new Set<string>([
@@ -251,4 +274,8 @@ export function workspaceForRoute(pathname: string): WorkspaceId | null {
   if (GOVERNANCE_CONTEXT.has(pathname)) return "governance";
   if (ADMIN_CONTEXT.has(pathname)) return "admin";
   return null;
+}
+
+export function isStoryRoute(pathname: string): boolean {
+  return STORY_ROUTES.has(pathname) || pathname.startsWith(`${STORY_HOME}/`);
 }
