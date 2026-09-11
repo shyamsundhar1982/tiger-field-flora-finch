@@ -17,7 +17,7 @@ test("UI assurance has a declarative registry, observations and exception projec
 });
 
 test("UI observation service is protected and writes only assurance evidence", () => {
-  assert.match(service, /requireBusinessActor\(\s*"command"/);
+  assert.match(service, /requireBusinessActor\(\s*"edit"/);
   assert.match(service, /insert into vyndi_vibpe_ui_observations/);
   assert.doesNotMatch(service, /(?:insert into|update|delete from)\s+(?:vyndi_sales_orders|epr_production_job_cards|epr_inventory_reservations|vyndi_purchase_orders|vyndi_shipments|vyndi_invoices|vyndi_collections)/i);
 });
@@ -25,7 +25,7 @@ test("UI observation service is protected and writes only assurance evidence", (
 test("UI assurance API is protected and validates registered capability routes", () => {
   assert.match(api, /createFileRoute\("\/api\/vibpe\/ui-assurance"\)/);
   assert.match(api, /requireBusinessActor\("view"\)/);
-  assert.match(api, /requireBusinessActor\("command"\)/);
+  assert.match(api, /requireBusinessActor\("edit"\)/);
   assert.match(api, /unknown_capability/);
   assert.match(api, /route_mismatch/);
 });
