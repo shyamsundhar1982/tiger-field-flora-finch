@@ -14,6 +14,7 @@ import {
   Scale,
   Settings2,
   Wallet,
+  UsersRound,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { SiteHeader } from "@/components/site-header";
@@ -39,13 +40,11 @@ const GOVERNANCE_HOME_ROUTE = "/command/governance";
 const FINANCE_TABS = [
   { to: FINANCE_HOME_ROUTE, label: "Overview" },
   { to: "/command/finance-assumptions", label: "Plan" },
-  { to: "/command/people-office", label: "People & Office" },
   { to: "/command/cash", label: "Cash" },
   { to: "/command/payables", label: "Payables" },
   { to: "/command/receivables", label: "Receivables" },
   { to: "/command/balance-sheet", label: "Balance Sheet" },
   { to: "/command/ca-audit", label: "CA Audit" },
-  { to: "/command/scenarios", label: "Scenarios" },
 ] as const;
 
 const SUPPLY_TABS = [
@@ -58,10 +57,12 @@ const SUPPLY_TABS = [
   { to: "/command/quality", label: "Quality" },
 ] as const;
 
-const COMMERCIAL_TABS = [
+const PLAN_SALES_TABS = [
+  { to: MASTER_PLAN_ROUTE, label: "Plan" },
   { to: COMMERCIAL_HOME_ROUTE, label: "Demand & Orders" },
   { to: "/command/gtm", label: "GTM" },
   { to: "/command/market-survey", label: "Market" },
+  { to: "/command/scenarios", label: "Scenarios" },
 ] as const;
 
 const ENGINEERING_TABS = [
@@ -77,7 +78,6 @@ const GOVERNANCE_TABS = [
   { to: "/command/legal", label: "Legal & IP" },
   { to: "/command/qa-verification", label: "QA Verification" },
   { to: "/command/actions", label: "Audit & Actions" },
-  { to: "/command/master-data", label: "Master Data" },
 ] as const;
 
 const FINANCE_CONTEXT = new Set<string>([
@@ -102,16 +102,11 @@ const SUPPLY_CONTEXT = new Set<string>([
   "/command/inventory-legacy",
   "/command/bom-inventory-mapping",
 ]);
-const COMMERCIAL_CONTEXT = new Set<string>([...COMMERCIAL_TABS.map((tab) => tab.to)]);
+const PLAN_SALES_CONTEXT = new Set<string>([...PLAN_SALES_TABS.map((tab) => tab.to)]);
 const ENGINEERING_CONTEXT = new Set<string>([...ENGINEERING_TABS.map((tab) => tab.to)]);
-const GOVERNANCE_CONTEXT = new Set<string>([...GOVERNANCE_TABS.map((tab) => tab.to), "/command/users"]);
-const PLAN_CONTEXT = new Set<string>([
-  MASTER_PLAN_ROUTE,
-  "/command/finance-assumptions",
-  "/command/scenarios",
-  "/command/procurement-planning",
-  "/command/funding",
-]);
+const GOVERNANCE_CONTEXT = new Set<string>([...GOVERNANCE_TABS.map((tab) => tab.to)]);
+const PEOPLE_CONTEXT = new Set<string>(["/command/people-office"]);
+const ADMIN_CONTEXT = new Set<string>(["/command/users", "/command/master-data"]);
 const COMMAND_CONTEXT = new Set<string>([
   "/command",
   "/command/control-tower",
@@ -120,23 +115,29 @@ const COMMAND_CONTEXT = new Set<string>([
   "/command/founder-command",
   "/command/founder-control",
   "/command/decision-engine",
+  "/command/ibpe-operating-workspace",
+]);
+
+const FINANCE_GOVERNANCE_CONTEXT = new Set<string>([
+  ...FINANCE_CONTEXT,
+  ...GOVERNANCE_CONTEXT,
 ]);
 
 const WORKSPACES = [
-  { to: "/command", label: "Command Centre", icon: Activity, context: COMMAND_CONTEXT },
-  { to: MASTER_PLAN_ROUTE, label: "Master Plan", icon: LineChart, context: PLAN_CONTEXT },
-  { to: ENGINEERING_HOME_ROUTE, label: "Engineering", icon: DraftingCompass, context: ENGINEERING_CONTEXT },
-  { to: SUPPLY_HOME_ROUTE, label: "Supply & Production", icon: Factory, context: SUPPLY_CONTEXT },
-  { to: COMMERCIAL_HOME_ROUTE, label: "Commercial", icon: LineChart, context: COMMERCIAL_CONTEXT },
-  { to: FINANCE_HOME_ROUTE, label: "Finance", icon: Wallet, context: FINANCE_CONTEXT },
-  { to: GOVERNANCE_HOME_ROUTE, label: "Governance", icon: ClipboardCheck, context: GOVERNANCE_CONTEXT },
+  { to: "/command", label: "Command", icon: Activity, context: COMMAND_CONTEXT },
+  { to: MASTER_PLAN_ROUTE, label: "Plan & Sales", icon: LineChart, context: PLAN_SALES_CONTEXT },
+  { to: ENGINEERING_HOME_ROUTE, label: "Product & Engineering", icon: DraftingCompass, context: ENGINEERING_CONTEXT },
+  { to: SUPPLY_HOME_ROUTE, label: "Operations", icon: Factory, context: SUPPLY_CONTEXT },
+  { to: "/command/people-office", label: "People & Office", icon: UsersRound, context: PEOPLE_CONTEXT },
+  { to: FINANCE_HOME_ROUTE, label: "Finance & Governance", icon: Wallet, context: FINANCE_GOVERNANCE_CONTEXT },
+  { to: "/command/users", label: "Admin", icon: Settings2, context: ADMIN_CONTEXT, adminOnly: true },
 ] as const;
 
 const WORKSPACE_ROUTES = new Set<string>(WORKSPACES.map((item) => item.to));
 const TAB_ROUTES = new Set<string>([
   ...FINANCE_TABS.map((item) => item.to),
   ...SUPPLY_TABS.map((item) => item.to),
-  ...COMMERCIAL_TABS.map((item) => item.to),
+  ...PLAN_SALES_TABS.map((item) => item.to),
   ...ENGINEERING_TABS.map((item) => item.to),
   ...GOVERNANCE_TABS.map((item) => item.to),
 ]);
@@ -222,10 +223,10 @@ function WorkspaceNavigation({ role, onNavigate }: { role: CommandRole | null; o
         <div className="flex items-center gap-2 px-2 pb-2 pt-1">
           <Activity className="size-3.5 text-accent" />
           <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-fg">Core workspaces</span>
-          <span className="ml-auto text-[9px] text-muted">7 operating surfaces</span>
+          <span className="ml-auto text-[9px] text-muted">7 workflow areas</span>
         </div>
         <div className="space-y-0.5">
-          {WORKSPACES.filter((item) => isAccessible(role, item.to)).map((item) => {
+          {WORKSPACES.filter((item) => (!(item as { adminOnly?: boolean }).adminOnly || role === "admin") && isAccessible(role, item.to)).map((item) => {
             const Icon = item.icon;
             const active = item.context.has(pathname);
             return (
@@ -255,19 +256,6 @@ function WorkspaceNavigation({ role, onNavigate }: { role: CommandRole | null; o
             </ClientLink>
           ) : null}
         </div>
-        {role === "admin" ? (
-          <div className="mt-2 border-t border-border pt-2">
-            <ClientLink
-              to="/command/users"
-              onNavigate={onNavigate}
-              active={pathname === "/command/users"}
-              className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-muted hover:bg-bg hover:text-fg aria-[current=page]:bg-bg aria-[current=page]:text-fg"
-            >
-              <Settings2 className="size-4 shrink-0 text-accent" />
-              User Creation & Access
-            </ClientLink>
-          </div>
-        ) : null}
       </section>
 
       {secondary.length ? (
@@ -339,6 +327,51 @@ function WorkspaceTabs({
             {tab.label}
           </ClientLink>
         ))}
+      </div>
+    </nav>
+  );
+}
+
+const WORKFLOW_STEPS = [
+  { label: "Demand", to: "/command/sales", routes: ["/command/sales"] },
+  { label: "Engineering / BOM", to: "/command/bom-control", routes: ["/command/engineering", "/command/product", "/command/bom", "/command/bom-control"] },
+  { label: "Material Check", to: "/command/inventory", routes: ["/command/inventory"] },
+  { label: "Procurement", to: "/command/purchase-execution", routes: ["/command/procurement-planning", "/command/purchase-execution"] },
+  { label: "Receiving", to: "/command/receiving", routes: ["/command/receiving"] },
+  { label: "Job Card", to: "/command/production", routes: [] },
+  { label: "Traveller", to: "/command/production", routes: [] },
+  { label: "Production", to: "/command/production", routes: ["/command/production"] },
+  { label: "Quality", to: "/command/quality", routes: ["/command/quality"] },
+  { label: "Invoice / Collection", to: "/command/receivables", routes: ["/command/receivables"] },
+] as const;
+
+const WORKFLOW_CONTEXT = new Set<string>(WORKFLOW_STEPS.flatMap((step) => [...step.routes, step.to]));
+
+function WorkflowRail({ role }: { role: CommandRole | null }) {
+  const { pathname } = useLocation();
+  if (!WORKFLOW_CONTEXT.has(pathname)) return null;
+  const steps = WORKFLOW_STEPS.filter((step) => isAccessible(role, step.to));
+  return (
+    <nav aria-label="End-to-end operating workflow" className="mb-4 overflow-x-auto rounded-xl border border-border bg-surface/30 px-2 py-2 [scrollbar-width:thin]">
+      <div className="flex min-w-max items-center gap-1">
+        {steps.map((step, index) => {
+          const active = step.routes.includes(pathname as never);
+          return (
+            <div key={step.label} className="flex items-center gap-1">
+              {index ? <span className="px-1 text-subtle">→</span> : null}
+              <ClientLink
+                to={step.to}
+                active={active}
+                className={cn(
+                  "rounded-md px-2.5 py-1.5 text-[11px] font-semibold text-muted hover:bg-bg hover:text-fg",
+                  active && "bg-accent/10 text-accent",
+                )}
+              >
+                {step.label}
+              </ClientLink>
+            </div>
+          );
+        })}
       </div>
     </nav>
   );
@@ -451,10 +484,11 @@ export function CommandShell() {
         <div className="min-w-0 flex-1">
           <MobileNavigation role={role} logout={logout} loggingOut={loggingOut} logoutError={logoutError} />
           <div className="px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
+            <WorkflowRail role={role} />
             <WorkspaceTabs role={role} routes={FINANCE_TABS} context={FINANCE_CONTEXT} label="Finance workspace" />
-            <WorkspaceTabs role={role} routes={SUPPLY_TABS} context={SUPPLY_CONTEXT} label="Supply and Production workspace" />
-            <WorkspaceTabs role={role} routes={COMMERCIAL_TABS} context={COMMERCIAL_CONTEXT} label="Commercial workspace" />
-            <WorkspaceTabs role={role} routes={ENGINEERING_TABS} context={ENGINEERING_CONTEXT} label="Engineering workspace" />
+            <WorkspaceTabs role={role} routes={SUPPLY_TABS} context={SUPPLY_CONTEXT} label="Operations workspace" />
+            <WorkspaceTabs role={role} routes={PLAN_SALES_TABS} context={PLAN_SALES_CONTEXT} label="Plan and Sales workspace" />
+            <WorkspaceTabs role={role} routes={ENGINEERING_TABS} context={ENGINEERING_CONTEXT} label="Product and Engineering workspace" />
             <WorkspaceTabs role={role} routes={GOVERNANCE_TABS} context={GOVERNANCE_CONTEXT} label="Governance workspace" />
             <fieldset disabled={viewer} className="m-0 min-w-0 border-0 p-0">
               <Outlet />
