@@ -140,5 +140,12 @@ test("authenticated runtime observer can evidence every registered UI capability
   assert.match(observer, /authenticated-route-sweep/);
   assert.match(observer, /DOMParser/);
   assert.match(observer, /\/api\/vibpe\/ui-assurance/);
+  assert.match(observer, /probeAuthenticatedSession/);
+  assert.match(observer, /payload\?\.ok === true/);
+  assert.match(observer, /actorPresent/);
+  assert.match(observer, /passedCount === capabilities\.length/);
+  assert.match(observer, /sessionStorage\.removeItem/);
+  assert.match(observer, /cloudflare-production/);
+  assert.match(observer, /vercel-production/);
   assert.match(commandRoute, /VibpeRuntimeObserver/);
 });

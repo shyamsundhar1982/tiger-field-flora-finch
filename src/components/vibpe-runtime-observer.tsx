@@ -22,7 +22,15 @@ const capabilities: Capability[] = [
   { id: "UI-VIBPE-ASSURANCE", route: "/command/ibpe-operating-workspace/assurance", label: "VIBPE Assurance renders" },
 ];
 
-const target = () => `cloudflare-production:auto:${window.location.hostname}`;
+function target() {
+  const hostname = window.location.hostname;
+  const provider = hostname.endsWith(".workers.dev")
+    ? "cloudflare-production"
+    : hostname.endsWith(".vercel.app")
+      ? "vercel-production"
+      : "production";
+  return `${provider}:auto:${hostname}`;
+}
 
 async function record(capability: Capability, passed: boolean, observedResult: string, evidence: Record<string, unknown>) {
   const response = await fetch("/api/vibpe/ui-assurance", {
@@ -72,10 +80,53 @@ function inspectDocument(capability: Capability, doc: Document) {
   return { passed: !errorLike, result: `${capability.label}: rendered`, evidence: { errorLike } };
 }
 
+async function probeAuthenticatedSession(mode: "live-session-probe" | "authenticated-route-sweep") {
+  const capability = capabilities.find((item) => item.id === "UI-AUTH-SESSION");
+  if (!capability) return { posted: false, passed: false };
+  try {
+    const response = await fetch("/api/vibpe/ui-assurance", {
+      method: "GET",
+      credentials: "include",
+      redirect: "follow",
+      cache: "no-store",
+    });
+    const payload = (await response.json().catch(() => null)) as { ok?: boolean; actor?: { userId?: string; role?: string } } | null;
+    const passed = response.ok && payload?.ok === true && Boolean(payload.actor?.userId);
+    const posted = await record(
+      capability,
+      passed,
+      passed
+        ? `Authenticated business session verified by protected assurance API (HTTP ${response.status}).`
+        : `Authenticated business session probe failed (HTTP ${response.status}).`,
+      {
+        mode,
+        probe: "/api/vibpe/ui-assurance",
+        httpStatus: response.status,
+        apiOk: payload?.ok === true,
+        actorPresent: Boolean(payload?.actor?.userId),
+        actorRole: payload?.actor?.role ?? null,
+      },
+    );
+    return { posted, passed };
+  } catch (error) {
+    const posted = await record(
+      capability,
+      false,
+      `Authenticated business session probe failed: ${error instanceof Error ? error.message : String(error)}`,
+      { mode, probe: "/api/vibpe/ui-assurance", error: String(error) },
+    ).catch(() => false);
+    return { posted, passed: false };
+  }
+}
+
 async function observeCurrentRoute(pathname: string) {
   const matches = capabilities.filter((capability) => capability.route === pathname);
   if (!matches.length) return;
   for (const capability of matches) {
+    if (capability.id === "UI-AUTH-SESSION") {
+      await probeAuthenticatedSession("live-session-probe");
+      continue;
+    }
     const inspected = inspectDocument(capability, document);
     await record(capability, inspected.passed, `${inspected.result} at ${pathname}`, {
       ...inspected.evidence,
@@ -85,10 +136,17 @@ async function observeCurrentRoute(pathname: string) {
 }
 
 async function sweepAuthenticatedRoutes() {
-  const key = "vibpe-ui-assurance-sweep-r3";
+  const key = `vibpe-ui-assurance-sweep-r4:${window.location.hostname}`;
   if (sessionStorage.getItem(key) === "complete") return true;
   let posted = 0;
+  let passedCount = 0;
   for (const capability of capabilities) {
+    if (capability.id === "UI-AUTH-SESSION") {
+      const auth = await probeAuthenticatedSession("authenticated-route-sweep");
+      if (auth.posted) posted += 1;
+      if (auth.passed) passedCount += 1;
+      continue;
+    }
     try {
       const response = await fetch(capability.route, {
         method: "GET",
@@ -118,6 +176,7 @@ async function sweepAuthenticatedRoutes() {
         },
       );
       if (ok) posted += 1;
+      if (passed) passedCount += 1;
     } catch (error) {
       await record(
         capability,
@@ -127,8 +186,9 @@ async function sweepAuthenticatedRoutes() {
       ).catch(() => false);
     }
   }
-  const complete = posted === capabilities.length;
+  const complete = posted === capabilities.length && passedCount === capabilities.length;
   if (complete) sessionStorage.setItem(key, "complete");
+  else sessionStorage.removeItem(key);
   return complete;
 }
 
