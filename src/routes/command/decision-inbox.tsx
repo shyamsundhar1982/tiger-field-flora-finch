@@ -88,7 +88,7 @@ function DecisionInbox() {
               <span className="text-xs font-semibold text-accent">Expand register</span>
             </summary>
             <div className="overflow-x-auto border-t border-border">
-              <table className="w-full min-w-[900px] text-left text-xs">
+              <table className="w-full table-auto text-left text-xs">
                 <thead className="sticky top-0 bg-bg-elevated text-[10px] uppercase tracking-wider text-subtle">
                   <tr>
                     <th className="px-3 py-2">Priority</th>
