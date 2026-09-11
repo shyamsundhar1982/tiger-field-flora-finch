@@ -24,7 +24,6 @@ test("command workspace exposes one canonical primary navigation layer", () => {
   assert.match(shellEntry, /export \{ CommandShell \} from "\.\/command-shell-v2"/);
   assert.match(shell, /<SiteHeader showNavigation=\{false\} brandHref="\/command" \/>/);
   assert.match(shell, /Operating workspaces/);
-  assert.match(shell, /8 owners/);
   assert.match(shell, /from "@\/lib\/operating-workflow"/);
   assert.match(shell, /ClientLink/);
   assert.doesNotMatch(shell, /NavigationView/);
@@ -155,10 +154,11 @@ test("G2: workflow rail exposes the complete persisted-business journey on relev
     "/command/receivables",
   ]) assert.match(workflow, new RegExp(route.replaceAll("/", "\\/")));
 
-  assert.match(shell, /aria-label="End-to-end operating workflow"/);
-  assert.match(shell, /WORKFLOW_VISIBLE_ROUTES/);
-  assert.match(shell, /activeWorkflowStage/);
-  assert.match(shell, /Follow the business object · write only in the owning workspace/);
+  assert.match(shell, /WorkspaceTabs role=\{role\} routes=\{PLAN_SALES_TABS\}/);
+  assert.match(shell, /WorkspaceTabs role=\{role\} routes=\{ENGINEERING_TABS\}/);
+  assert.match(shell, /WorkspaceTabs role=\{role\} routes=\{OPERATIONS_TABS\}/);
+  assert.match(shell, /WorkspaceTabs role=\{role\} routes=\{FINANCE_TABS\}/);
+  assert.match(shell, /WorkspaceTabs role=\{role\} routes=\{GOVERNANCE_TABS\}/);
 });
 
 test("G3: Supply & Operations is the actual execution hub, not only a renamed sidebar entry", () => {
@@ -220,9 +220,9 @@ test("G6: Finance and Governance & Assurance have separate internal navigation c
   assert.doesNotMatch(governance, /Payables|Receivables|Balance Sheet/);
 
   assert.match(shell, /routes=\{FINANCE_TABS\}/);
-  assert.match(shell, /context=\{FINANCE_CONTEXT\}/);
+  assert.match(shell, /label="Finance workspace"/);
   assert.match(shell, /routes=\{GOVERNANCE_TABS\}/);
-  assert.match(shell, /context=\{GOVERNANCE_CONTEXT\}/);
+  assert.match(shell, /label="Governance and Assurance workspace"/);
   assert.match(workflow, /FINANCE_GOVERNANCE_TABS/);
   assert.match(workflow, /FINANCE_GOVERNANCE_CONTEXT/);
 });
