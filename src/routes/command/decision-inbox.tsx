@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { GovernedLifecycle } from "@/components/governed-lifecycle";
 import { Kpi } from "@/components/kpi";
 import { getDecisionInboxData } from "@/lib/procure-to-pay-authority";
 import { updateIbpeManagementActionLifecycle } from "@/lib/ibpe-operating-governance";
@@ -114,33 +115,44 @@ function DecisionInbox() {
                         <td className="max-w-[420px] px-3 py-3 text-muted">{text(item, "detail")}</td>
                         <td className="px-3 py-3 text-muted">{isIbpe ? status.replaceAll("_", " ") : "source-owned"}</td>
                         <td className="px-3 py-3">
-                          <div className="flex justify-end gap-2">
-                            {isIbpe && status === "open" ? (
-                              <button
-                                type="button"
-                                disabled={busyAction === id}
-                                onClick={() => transitionIbpeAction(id, "in_progress")}
-                                className="rounded-md border border-border px-3 py-1.5 font-semibold text-fg hover:border-accent hover:text-accent disabled:opacity-50"
-                              >
-                                Start
-                              </button>
-                            ) : null}
+                          <div className="min-w-[260px]">
                             {isIbpe ? (
-                              <button
-                                type="button"
-                                disabled={busyAction === id}
-                                onClick={() => transitionIbpeAction(id, "done")}
-                                className="rounded-md border border-ok/40 px-3 py-1.5 font-semibold text-ok disabled:opacity-50"
+                              <>
+                                <GovernedLifecycle
+                                  status={status}
+                                  tone={status === "blocked" ? "danger" : status === "in_progress" ? "info" : "warn"}
+                                  actions={[
+                                    ...(status === "open"
+                                      ? [{
+                                          label: "Start action",
+                                          onClick: () => transitionIbpeAction(id, "in_progress"),
+                                          disabled: busyAction === id,
+                                          tone: "primary" as const,
+                                        }]
+                                      : []),
+                                    {
+                                      label: "Complete action",
+                                      onClick: () => transitionIbpeAction(id, "done"),
+                                      disabled: busyAction === id,
+                                      tone: "ok" as const,
+                                    },
+                                  ]}
+                                />
+                                <Link
+                                  to={text(item, "route") as never}
+                                  className="mt-2 inline-flex min-h-10 items-center justify-center gap-1 rounded-md border border-border px-3 py-1.5 font-semibold text-accent hover:border-accent"
+                                >
+                                  Open workspace <ArrowRight className="size-3.5" />
+                                </Link>
+                              </>
+                            ) : (
+                              <Link
+                                to={text(item, "route") as never}
+                                className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 font-semibold text-accent hover:border-accent"
                               >
-                                Complete
-                              </button>
-                            ) : null}
-                            <Link
-                              to={text(item, "route") as never}
-                              className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 font-semibold text-accent hover:border-accent"
-                            >
-                              Open <ArrowRight className="size-3.5" />
-                            </Link>
+                                Open <ArrowRight className="size-3.5" />
+                              </Link>
+                            )}
                           </div>
                         </td>
                       </tr>

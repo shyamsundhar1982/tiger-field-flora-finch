@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
+import { GovernedLifecycle } from "@/components/governed-lifecycle";
 import { Kpi, Panel } from "@/components/kpi";
 import { PlanningStudio } from "@/components/planning-studio";
 import { COMPANY, TRANCHES } from "@/lib/data/company";
@@ -103,9 +104,21 @@ function MasterPlan() {
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="rounded-xl border border-border bg-surface/40 p-4">
           <p className="text-[10px] uppercase tracking-wider text-subtle">Current editing basis</p>
-          <p className="mt-2 text-lg font-semibold text-fg">{active ? `Revision ${active.revision} · ${active.status}` : "Initial defaults"}</p>
+          <p className="mt-2 text-lg font-semibold text-fg">{active ? `Revision ${active.revision}` : "Initial defaults"}</p>
           <p className="mt-2 text-xs leading-5 text-muted">Scenario {active?.scenario ?? "base"}. The rolling driver set lives inside this governed revision; browser state is only an editing cache.</p>
-          {plan.draft ? <button disabled={busy} onClick={() => void submit()} className="mt-4 rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-bg disabled:opacity-50">Submit draft for approval</button> : null}
+          <div className="mt-4">
+            <GovernedLifecycle
+              status={active?.status ?? "initial"}
+              tone={active?.status === "approved" ? "ok" : active?.status === "pending_approval" ? "warn" : "info"}
+              hint={plan.draft ? "Draft changes are not company truth until approved." : "Using the current approved company plan."}
+              actions={plan.draft ? [{
+                label: "Submit for approval",
+                onClick: () => void submit(),
+                disabled: busy,
+                tone: "primary",
+              }] : []}
+            />
+          </div>
         </div>
         <div className="rounded-xl border border-border bg-surface/40 p-4">
           <p className="text-[10px] uppercase tracking-wider text-subtle">Approved company plan</p>
@@ -115,7 +128,20 @@ function MasterPlan() {
         <div className="rounded-xl border border-border bg-surface/40 p-4">
           <p className="text-[10px] uppercase tracking-wider text-subtle">Pending approval</p>
           <p className="mt-2 text-lg font-semibold text-fg">{plan.pending.length}</p>
-          <div className="mt-3 space-y-2">{plan.pending.slice(0, 3).map((pending) => <div key={pending.id} className="flex items-center justify-between gap-2 rounded-lg border border-border p-2"><span className="text-xs">R{pending.revision} · {pending.createdBy}</span>{canApprove ? <button disabled={busy} onClick={() => void approve(pending.id)} className="text-xs font-semibold text-accent">Approve</button> : null}</div>)}</div>
+          <div className="mt-3 space-y-2">{plan.pending.slice(0, 3).map((pending) => <div key={pending.id} className="rounded-lg border border-border p-2">
+            <p className="mb-2 text-xs">R{pending.revision} · {pending.createdBy}</p>
+            <GovernedLifecycle
+              status={pending.status}
+              tone="warn"
+              hint="Authorised planning decision required."
+              actions={canApprove ? [{
+                label: "Approve revision",
+                onClick: () => void approve(pending.id),
+                disabled: busy,
+                tone: "ok",
+              }] : []}
+            />
+          </div>)}</div>
         </div>
       </div>
     </Panel>
