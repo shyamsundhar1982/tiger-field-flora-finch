@@ -104,7 +104,6 @@ async function persistReview(data: z.infer<typeof ingestSchema>, role: string) {
 
   const documentId = crypto.randomUUID();
   const actorUserId = `command:${role}`;
-  await sql.begin(async (tx) => {
     await tx`
       update vibpe_knowledge_documents
       set superseded_at = now()
@@ -112,7 +111,7 @@ async function persistReview(data: z.infer<typeof ingestSchema>, role: string) {
         and external_id = ${data.externalId}
         and superseded_at is null
     `;
-    await tx`
+  await sql`
       insert into vibpe_knowledge_documents
         (id, source_id, external_id, external_url, title, review_date, source_revision, content_hash, metadata_json)
       values
@@ -120,8 +119,8 @@ async function persistReview(data: z.infer<typeof ingestSchema>, role: string) {
          ${data.title}, ${data.reviewDate ?? null}, ${data.sourceRevision ?? null}, ${contentHash},
          ${JSON.stringify(data.metadata ?? {})}::jsonb)
     `;
-    for (const claim of data.claims) {
-      await tx`
+  for (const claim of data.claims) {
+    await sql`
         insert into vibpe_knowledge_claims
           (id, document_id, domain, claim_class, subject_key, claim_text, authority, confidence, conflicts_with, source_locator)
         values
@@ -130,13 +129,13 @@ async function persistReview(data: z.infer<typeof ingestSchema>, role: string) {
            ${authorityForWeeklyReviewClaim(claim.claimClass)}, ${claim.confidence},
            ${claim.conflictsWith ?? null}, ${claim.sourceLocator ?? null})
       `;
-    }
-    await tx`
+  }
+  await sql`
       update vibpe_knowledge_sources
       set last_ingested_at = now(), updated_at = now()
       where id = ${WEEKLY_REVIEW_SOURCE_ID}
     `;
-    await tx`
+  await sql`
       insert into vyndi_audit_events
         (id, entity_type, entity_id, entity_revision, action, actor_user_id, actor_role, payload_json)
       values
