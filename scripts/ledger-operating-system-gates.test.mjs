@@ -12,7 +12,8 @@ const lifecycle = read("src/components/governed-lifecycle.tsx");
 test("Gate 0: canonical catalogue migration is idempotent and zero-balance", () => {
   assert.match(migration, /insert into master_inventory_items/);
   assert.match(migration, /on conflict \(ledger_id, sku\)/);
-  assert.match(migration, /\s0,\s0,\s*true/);
+  assert.match(migration, /minimum_stock_level, planned_monthly_use/);
+  assert.match(migration, /\n\s+0,\n\s+0,\n\s+true/);
   assert.match(inventory, /from master_inventory_items/);
 });
 
