@@ -105,13 +105,6 @@ async function persistReview(data: z.infer<typeof ingestSchema>, role: string) {
   const documentId = crypto.randomUUID();
   const actorUserId = `command:${role}`;
   await sql`
-      update vibpe_knowledge_documents
-      set superseded_at = now()
-      where source_id = ${WEEKLY_REVIEW_SOURCE_ID}
-        and external_id = ${data.externalId}
-        and superseded_at is null
-    `;
-  await sql`
       insert into vibpe_knowledge_documents
         (id, source_id, external_id, external_url, title, review_date, source_revision, content_hash, metadata_json)
       values
@@ -130,6 +123,14 @@ async function persistReview(data: z.infer<typeof ingestSchema>, role: string) {
            ${claim.conflictsWith ?? null}, ${claim.sourceLocator ?? null})
       `;
   }
+  await sql`
+      update vibpe_knowledge_documents
+      set superseded_at = now()
+      where source_id = ${WEEKLY_REVIEW_SOURCE_ID}
+        and external_id = ${data.externalId}
+        and id <> ${documentId}
+        and superseded_at is null
+    `;
   await sql`
       update vibpe_knowledge_sources
       set last_ingested_at = now(), updated_at = now()
