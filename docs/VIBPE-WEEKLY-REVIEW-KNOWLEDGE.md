@@ -66,3 +66,10 @@ Example: an old review mentioning a T47 68 mm shell cannot override the governed
 - review-only knowledge remains advisory/assumption context.
 
 The global migration execution test also executes the new schema from an empty database.
+
+
+## Automatic refresh
+
+VIBPE Co-Pilot performs a best-effort source freshness check before answering. If the weekly-review source has not been ingested within the previous 6 hours, it attempts a Google Drive refresh before knowledge retrieval.
+
+A missing/expired Drive OAuth configuration or transient Google failure is non-blocking: governed IBPE analysis continues using the last successfully ingested evidence. The Knowledge page also exposes a manual **Refresh Drive** action and the active review register for auditability.
