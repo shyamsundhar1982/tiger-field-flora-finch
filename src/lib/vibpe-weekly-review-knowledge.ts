@@ -104,7 +104,7 @@ async function persistReview(data: z.infer<typeof ingestSchema>, role: string) {
 
   const documentId = crypto.randomUUID();
   const actorUserId = `command:${role}`;
-    await tx`
+  await sql`
       update vibpe_knowledge_documents
       set superseded_at = now()
       where source_id = ${WEEKLY_REVIEW_SOURCE_ID}
@@ -143,7 +143,6 @@ async function persistReview(data: z.infer<typeof ingestSchema>, role: string) {
          ${actorUserId}, ${role},
          ${JSON.stringify({ sourceId: WEEKLY_REVIEW_SOURCE_ID, externalId: data.externalId, title: data.title, contentHash, claimCount: data.claims.length })}::jsonb)
     `;
-  });
   return { ok: true, idempotent: false, documentId, contentHash };
 }
 
