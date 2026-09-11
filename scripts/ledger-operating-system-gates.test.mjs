@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
-const migration = read("migrations/0061_full_day_to_day_catalogue.sql");
+const migration = read("migrations/0061_full_day_to_day_catalogue.sql").replace(/\r\n/g, "\n");
 const ledger = read("src/routes/command/inventory-ledgers/$ledger.tsx");
 const peopleOffice = read("src/routes/command/people-office.tsx");
 const inventory = read("src/lib/master-inventory.ts");
