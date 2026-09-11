@@ -48,7 +48,7 @@ export const listVibpeAssuranceExceptions = createServerFn({ method: "GET" })
     const rows = await sql.query<Record<string, unknown>>(
       `select exception_key,exception_type,severity,domain,entity_type,entity_id,
               related_entity_type,related_entity_id,gate_id,correlation_id,evidence_json
-         from vyndi_vibpe_all_exceptions
+         from vyndi_vibpe_assurance_exceptions_all
         order by case severity when 'critical' then 1 when 'warning' then 2 else 3 end,
                  domain,exception_type,entity_id`,
     );
