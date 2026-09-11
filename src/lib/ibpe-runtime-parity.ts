@@ -45,6 +45,31 @@ const severityPenalty: Record<PlanningSeverity, number> = {
   low: 2,
 };
 
+const domainPenaltyCap: Record<string, number> = {
+  planning: 8,
+  demand: 8,
+  supply: 15,
+  inventory: 15,
+  procurement: 12,
+  capacity: 10,
+  finance: 12,
+  funding: 12,
+  governance: 8,
+};
+
+function boundedDomainPenalty(findings: PlanningFinding[]) {
+  const byDomain = new Map<string, number>();
+  for (const finding of findings) {
+    const current = byDomain.get(finding.domain) ?? 0;
+    byDomain.set(finding.domain, current + severityPenalty[finding.severity]);
+  }
+  let total = 0;
+  for (const [domain, rawPenalty] of byDomain) {
+    total += Math.min(domainPenaltyCap[domain] ?? 10, rawPenalty);
+  }
+  return Math.min(100, total);
+}
+
 function round(value: number, digits = 4) {
   const factor = 10 ** digits;
   return Math.round((value + Number.EPSILON) * factor) / factor;
@@ -218,7 +243,7 @@ export function runRuntimeIbpe(
   const decisions = rebuildDecisions(base, findings, funding);
   const findingCounts: Record<PlanningSeverity, number> = { critical: 0, high: 0, medium: 0, low: 0 };
   for (const finding of findings) findingCounts[finding.severity] += 1;
-  const penalty = findings.reduce((sum, finding) => sum + severityPenalty[finding.severity], 0);
+  const penalty = boundedDomainPenalty(findings);
   const capacityShortfallRows = base.capacity.filter((row) => row.shortfallUnits > 0);
   const capacityShortfallUniqueMonths = new Set(capacityShortfallRows.map((row) => row.period)).size;
 

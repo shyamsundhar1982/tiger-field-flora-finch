@@ -360,11 +360,19 @@ export const getDecisionInboxData = createServerFn({ method: "GET" }).handler(as
          from vyndi_plan_revisions where status='pending_approval' order by revision`,
     ),
     sql.query<SqlRow>(
-      `select job_card_line_id as id,'Material shortage' as kind,'high' as priority,
-              sku||' short by '||shortage_quantity||' '||unit as title,
-              'Job card '||job_card_id||' · required M'||due_month as detail,
-              '/command/procurement-planning' as route,null::text as created_at
-         from vyndi_live_job_card_requirements where shortage_quantity>0 order by due_month,sku`,
+      `select r.job_card_line_id as id,'Material shortage' as kind,'high' as priority,
+              r.sku||' short by '||r.shortage_quantity||' '||r.unit as title,
+              'Job card '||r.job_card_id||' · required M'||r.due_month as detail,
+              '/command/procurement-planning' as route,null::text as created_at,
+              r.sku as subject_key,r.job_card_id,r.due_month,r.shortage_quantity,r.unit
+         from vyndi_live_job_card_requirements r
+         join vyndi_sales_orders o
+           on o.id=r.sales_order_id
+          and o.status='confirmed'
+          and o.revision=r.sales_order_revision
+        where r.shortage_quantity>0
+          and r.job_card_status in ('released','in_progress')
+        order by r.due_month,r.sku,r.job_card_id`,
     ),
     sql.query<SqlRow>(
       `select id,'IBPE management action' as kind,
