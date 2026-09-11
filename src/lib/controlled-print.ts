@@ -149,7 +149,7 @@ export function printControlledElement(element: HTMLElement, options: Controlled
     <section class="authority"><strong>Source / extract reference:</strong> ${escapeHtml(sourceReference)}<br /><strong>Control rule:</strong> Electronic VYNDI system record is authoritative. Printed copy is uncontrolled unless specifically issued as a controlled copy.</section>
     <footer class="footer"><span>${escapeHtml(options.title)} · ${escapeHtml(route)}</span><span>VYNDI · Vāyú Shastr Pvt Ltd</span></footer>
   </main>
-  <script>window.addEventListener("load",()=>{setTimeout(()=>window.print(),80)});window.addEventListener("afterprint",()=>window.close(),{once:true});<\/script>
+  <script>window.addEventListener("load",()=>{setTimeout(()=>window.print(),80)});window.addEventListener("afterprint",()=>window.close(),{once:true});</script>
 </body>
 </html>`);
   printWindow.document.close();
