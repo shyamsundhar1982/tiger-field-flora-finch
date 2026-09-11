@@ -4,6 +4,7 @@ import { ControlledDocumentToolbar } from "@/components/controlled-document-tool
 import { IbpeCopilot } from "@/components/ibpe-copilot";
 import { IbpeWorkspaceProjection } from "@/components/ibpe-workspace-projection";
 import { ProtectedNavigationBridge } from "@/components/protected-navigation-bridge";
+import { TraceabilityDocumentCentre } from "@/components/traceability-document-centre";
 import { VibpeRuntimeObserver } from "@/components/vibpe-runtime-observer";
 import { getCommandAccess, getCommandRole } from "@/lib/command-access";
 import { canAccessRoute } from "@/lib/page-access";
@@ -43,5 +44,5 @@ export const Route = createFileRoute("/command")({
 
 function CommandRoot() {
   useOperatingPlanSync();
-  return <><ProtectedNavigationBridge /><VibpeRuntimeObserver /><IbpeWorkspaceProjection /><CommandShell /><ControlledDocumentToolbar /><IbpeCopilot /></>;
+  return <><ProtectedNavigationBridge /><VibpeRuntimeObserver /><IbpeWorkspaceProjection /><CommandShell /><ControlledDocumentToolbar /><TraceabilityDocumentCentre /><IbpeCopilot /></>;
 }
