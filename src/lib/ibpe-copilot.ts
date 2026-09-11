@@ -13,6 +13,7 @@ import { RUNTIME_IBPE_ENGINE_VERSION } from "@/lib/ibpe-runtime-parity";
 import { runVibpeCopilot2 } from "@/lib/vibpe-copilot-2";
 import { retrieveVibpeKnowledgeEvidence, type VibpeKnowledgeEvidence } from "@/lib/vibpe-knowledge-retrieval";
 import { refreshVibpeWeeklyReviewsIfStale } from "@/lib/vibpe-weekly-review-knowledge";
+import { refreshVayuShastrDriveIfStale } from "@/lib/vibpe-vayu-shastr-drive";
 
 export type IbpeCopilotRequest = {
   question: string;
@@ -435,10 +436,12 @@ function formatKnowledgeEvidence(evidence: VibpeKnowledgeEvidence[]) {
   const items = evidence.slice(0, 4).map((item) => {
     const date = item.reviewDate ? ` · ${item.reviewDate}` : "";
     const state = item.authority === "unresolved" ? "unresolved" : "advisory evidence";
-    return `• [${state}] ${item.claimText} — ${item.title}${date}`;
+    const tier = item.knowledgeTier ? ` · ${item.knowledgeTier}` : "";
+    const path = item.sourcePath ? ` · ${item.sourcePath}` : "";
+    return `• [${state}${tier}] ${item.claimText} — ${item.title}${date}${path}`;
   });
   return [
-    "VIBPE knowledge evidence (weekly reviews; not master authority):",
+    "VIBPE knowledge evidence (governed Drive references; not automatic master authority):",
     ...items,
     "Governance: governed internal/master data and deterministic IBPE truth override any conflicting review statement.",
   ].join("\n");
@@ -449,7 +452,7 @@ function systemPrompt() {
     `You are ${VIBPE_COPILOT_NAME} for Vayu Shastr Private Limited.`,
     "You are an advisory exploration agent sitting on top of a deterministic Integrated Business Planning Engine.",
     "The deterministic IBPE packet is the authority for quantities, cash, MRP, ATP/MSL, capacity, funding and scenario deltas. Never invent or recompute numbers outside the supplied packet.",
-    "Weekly-review knowledge evidence is advisory or unresolved context only. It may explain progress, blockers, decisions, design, prototype, incubation and launch readiness, but it must never override governed internal/master data or deterministic IBPE transaction truth.",
+    "Google Drive knowledge evidence, including weekly reviews and the broader Vayu Shastr corpus, is advisory or unresolved context unless separately promoted by an owning governance workflow. It may explain design, dossiers, materials, suppliers, incubation, prototype, launch readiness and programme history, but it must never silently override governed internal/master data or deterministic IBPE transaction truth.",
     "When weekly-review evidence conflicts with governed internal knowledge, use the governed value and identify the review item as historical or unresolved evidence.",
     "If you use weekly-review evidence, preserve its provenance by naming the source review date/title when practical and state unresolved status explicitly.",
     "Always distinguish plan, forecast, committed and actual truth. A scenario is hypothetical forecast analysis and must never be described as an approved plan or actual transaction.",
@@ -494,7 +497,10 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
 
     const { sql, row } = await latestRun();
     try {
-      await refreshVibpeWeeklyReviewsIfStale(actor.role, 6);
+      await Promise.all([
+        refreshVibpeWeeklyReviewsIfStale(actor.role, 6),
+        refreshVayuShastrDriveIfStale(actor.role, 12),
+      ]);
     } catch {
       // Drive refresh is supplementary. Missing OAuth or a transient provider
       // failure must never block governed VIBPE analysis.
@@ -611,6 +617,8 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
             reviewDate: item.reviewDate,
             sourceRevision: item.sourceRevision,
             sourceUrl: item.externalUrl,
+            sourcePath: item.sourcePath,
+            knowledgeTier: item.knowledgeTier,
           })),
         };
         try {
@@ -649,7 +657,7 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
 
     if (shouldSurfaceKnowledgeEvidence(data.question) && knowledgeEvidence.length) {
       const evidenceText = formatKnowledgeEvidence(knowledgeEvidence);
-      if (evidenceText && !answer.includes("VIBPE knowledge evidence (weekly reviews; not master authority):")) {
+      if (evidenceText && !answer.includes("VIBPE knowledge evidence (governed Drive references; not automatic master authority):")) {
         answer = `${answer}\n\n${evidenceText}`;
       }
     }

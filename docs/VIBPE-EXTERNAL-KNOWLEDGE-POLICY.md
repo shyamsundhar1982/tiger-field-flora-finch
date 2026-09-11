@@ -30,3 +30,19 @@ The Google Drive folder **VYNDI Weekly Status Reviews — VIBPE Knowledge** is a
 Even a `verified_fact` extracted from a weekly review remains advisory until it is promoted through the owning governed master process. `unresolved_item`, `assumption`, and `blocker` claims remain unresolved context and must never satisfy a master-data or engineering release gate.
 
 When a weekly review conflicts with governed internal knowledge, the governed master record wins. The review is retained with provenance as conflict evidence; it is not silently discarded or promoted.
+
+
+## Vāyu Shastr Drive corpus
+
+The broader private Vāyu Shastr Drive tree is a governed VIBPE reference source. It is recursively indexed with these rules:
+
+- the folder named `google client secret for shyamsundhar1982` is explicitly excluded by folder ID;
+- files/folders with credential-, password-, private-key-, API-key-, OAuth-token-, access-token-, or refresh-token-like names are excluded before content access;
+- `FINAL DOSSIER` and `VAYU_MASTER_ENGINEERING_PACKAGE_REV1` paths are ranked as **controlled-reference** evidence;
+- `VELOXIS ARCHITECTURE ITERATIONS`, draft, rough, sample, copy, old, preliminary, and Rev 0 paths are ranked **legacy-working** and down-ranked in retrieval;
+- all other material is normal **reference** evidence;
+- controlled-reference ranking improves retrieval priority but does **not** grant automatic master authority;
+- unresolved/assumption content remains unresolved;
+- canonical VIBPE master data and deterministic IBPE transaction truth always take precedence.
+
+Text-like files and native Google Docs/Sheets are content-indexed where supported. Unsupported binary files are retained as metadata-only references with their Drive path/provenance so VIBPE can identify their existence without pretending their content has been parsed.

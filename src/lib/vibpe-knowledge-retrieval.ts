@@ -1,5 +1,6 @@
 import type { Sql } from "@/lib/db";
 import { WEEKLY_REVIEW_SOURCE_ID } from "@/lib/vibpe-weekly-review-knowledge";
+import { VAYU_SHASTR_SOURCE_ID } from "@/lib/vibpe-vayu-shastr-drive";
 
 export type VibpeKnowledgeEvidence = {
   claimText: string;
@@ -12,6 +13,9 @@ export type VibpeKnowledgeEvidence = {
   sourceRevision: string | null;
   documentId: string;
   sourceLocator: string | null;
+  sourceId: string;
+  sourcePath: string | null;
+  knowledgeTier: string | null;
 };
 
 type EvidenceRow = {
@@ -25,6 +29,9 @@ type EvidenceRow = {
   source_revision: string | null;
   document_id: string;
   source_locator: string | null;
+  source_id: string;
+  source_path: string | null;
+  knowledge_tier: string | null;
 };
 
 const STOP_WORDS = new Set([
@@ -65,6 +72,7 @@ export function scoreKnowledgeEvidence(question: string, evidence: VibpeKnowledg
     evidence.domain,
     evidence.title,
     evidence.sourceLocator ?? "",
+    evidence.sourcePath ?? "",
   ].join(" ").toLowerCase();
 
   let score = domainBonus(question, evidence.domain);
@@ -73,6 +81,8 @@ export function scoreKnowledgeEvidence(question: string, evidence: VibpeKnowledg
   }
 
   if (evidence.claimClass === "decision" || evidence.claimClass === "material_change") score += 1.25;
+  if (evidence.knowledgeTier === "controlled-reference") score += 2.5;
+  if (evidence.knowledgeTier === "legacy-working") score -= 1.5;
   if (evidence.claimClass === "priority" || evidence.claimClass === "blocker") score += 0.75;
   if (evidence.authority === "unresolved") score -= 0.5;
 
@@ -99,10 +109,13 @@ export async function retrieveVibpeKnowledgeEvidence(
       d.external_url,
       d.source_revision,
       d.id as document_id,
-      c.source_locator
+      c.source_locator,
+      d.source_id,
+      d.metadata_json->>'path' as source_path,
+      d.metadata_json->>'knowledgeTier' as knowledge_tier
     from vibpe_knowledge_claims c
     join vibpe_knowledge_documents d on d.id = c.document_id
-    where d.source_id = ${WEEKLY_REVIEW_SOURCE_ID}
+    where d.source_id in (${WEEKLY_REVIEW_SOURCE_ID}, ${VAYU_SHASTR_SOURCE_ID})
       and d.superseded_at is null
       and c.authority in ('advisory','unresolved')
     order by d.review_date desc nulls last, d.ingested_at desc, c.created_at desc
@@ -121,6 +134,9 @@ export async function retrieveVibpeKnowledgeEvidence(
       sourceRevision: row.source_revision,
       documentId: row.document_id,
       sourceLocator: row.source_locator,
+      sourceId: row.source_id,
+      sourcePath: row.source_path,
+      knowledgeTier: row.knowledge_tier,
     }))
     .map((evidence) => ({ evidence, score: scoreKnowledgeEvidence(question, evidence) }))
     .filter(({ score }) => score > 0)
