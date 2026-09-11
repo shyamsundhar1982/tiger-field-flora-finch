@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { requireBusinessActor } from "@/lib/business-actor";
+import { UnauthorizedError } from "@/lib/auth/verify.server";
 import { getSql } from "@/lib/db";
 
 function json(body: unknown, status = 200) {
@@ -13,18 +14,33 @@ export const Route = createFileRoute("/api/vibpe/ui-assurance")({
   server: {
     handlers: {
       GET: async () => {
-        const actor = await requireBusinessActor("view");
-        const sql = await getSql();
-        const [capabilities, coverage, exceptions] = await Promise.all([
+        try {
+          const actor = await requireBusinessActor("view");
+          const sql = await getSql();
+          const [capabilities, coverage, exceptions] = await Promise.all([
           sql.query("select * from vyndi_vibpe_ui_capability_registry where active=true order by domain,route_path,capability_id"),
           sql.query("select * from vyndi_vibpe_ui_coverage_summary order by domain"),
           sql.query(`select * from vyndi_vibpe_ui_assurance_exceptions
                      order by case severity when 'critical' then 1 else 2 end,domain,entity_id`),
-        ]);
-        return json({ ok: true, actor: { userId: actor.userId, role: actor.role }, capabilities, coverage, exceptions });
+          ]);
+          return json({ ok: true, actor: { userId: actor.userId, role: actor.role }, capabilities, coverage, exceptions });
+        } catch (error) {
+          if (error instanceof UnauthorizedError || (error instanceof Error && error.message === "Unauthorized")) {
+            return json({ ok: false, error: "authentication_required" }, 401, { "www-authenticate": "Bearer" });
+          }
+          throw error;
+        }
       },
       POST: async ({ request }) => {
-        const actor = await requireBusinessActor("edit");
+        let actor;
+        try {
+          actor = await requireBusinessActor("edit");
+        } catch (error) {
+          if (error instanceof UnauthorizedError || (error instanceof Error && error.message === "Unauthorized")) {
+            return json({ ok: false, error: "authentication_required" }, 401, { "www-authenticate": "Bearer" });
+          }
+          throw error;
+        }
         const payload = (await request.json().catch(() => null)) as Record<string, unknown> | null;
         if (!payload) return json({ ok: false, error: "invalid_json" }, 400);
         const capabilityId = String(payload.capabilityId ?? "").trim().slice(0, 120);
