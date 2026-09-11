@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Panel } from "@/components/kpi";
 import {
   ALL_KNOWLEDGE,
@@ -28,7 +28,7 @@ function Knowledge() {
   const [reviewStatus, setReviewStatus] = useState("Loading governed review evidence…");
   const [refreshing, setRefreshing] = useState(false);
 
-  async function loadReviewEvidence() {
+  const loadReviewEvidence = useCallback(async () => {
     try {
       const rows = await listVibpeWeeklyReviewKnowledge();
       setReviewDocs(rows);
@@ -36,11 +36,11 @@ function Knowledge() {
     } catch (error) {
       setReviewStatus(error instanceof Error ? error.message : "Unable to read review evidence");
     }
-  }
+  }, []);
 
   useEffect(() => {
     void loadReviewEvidence();
-  }, []);
+  }, [loadReviewEvidence]);
   // Founder-only records remain in the master register but are not rendered
   // in the general workspace until an authenticated founder view exists.
   const visibleRecords = ALL_KNOWLEDGE.filter((record) => record.sensitivity === "workspace");
