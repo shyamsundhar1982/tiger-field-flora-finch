@@ -40,9 +40,9 @@ function DecisionInbox() {
         </p>
         <h1 className="mt-2 font-display text-4xl text-accent">Business Action Inbox</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-          One queue for decisions and exceptions across planning, procurement, receiving and
-          finance. This page never owns the transaction: every action opens its canonical workspace
-          and preserves separation of duties.
+          One queue for decisions and exceptions across planning, procurement, receiving, finance
+          and governed IBPE management actions. This page never owns protected transactions: each
+          item opens its owning workspace and preserves separation of duties.
         </p>
       </header>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -118,8 +118,8 @@ function DecisionInbox() {
       ))}
       <p className="text-xs leading-5 text-subtle">
         Queue scope: pending plan and PO approvals, matched or blocked supplier invoices, receiving
-        exceptions and live production-material shortages. IBPE recommendations remain advisory
-        until an authorised transaction is completed in the owning workspace.
+        exceptions, live production-material shortages and open IBPE management actions. Protected
+        ERP changes still require an authorised transaction in the owning canonical workspace.
       </p>
     </main>
   );
