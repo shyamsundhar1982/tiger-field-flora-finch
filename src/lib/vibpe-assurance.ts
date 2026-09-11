@@ -27,12 +27,14 @@ export const getVibpeAssuranceCoverage = createServerFn({ method: "GET" })
       context.userId ? { userId: context.userId, email: context.userEmail } : undefined,
     );
     const sql = await getSql();
-    const [entities, gates, workflow] = await Promise.all([
+    const [entities, gates, workflow, surfaces, coverageSummary] = await Promise.all([
       sql.query("select * from vyndi_vibpe_entity_registry order by domain,entity_type"),
       sql.query("select * from vyndi_vibpe_gate_registry where active=true order by gate_id"),
       sql.query("select * from vyndi_vibpe_workflow_registry order by workflow_id,sequence_no"),
+      sql.query("select * from vyndi_vibpe_surface_registry order by domain,surface_type,surface_name"),
+      sql.query("select * from vyndi_vibpe_coverage_summary order by domain"),
     ]);
-    return { entities, gates, workflow };
+    return { entities, gates, workflow, surfaces, coverageSummary };
   });
 
 export const listVibpeAssuranceExceptions = createServerFn({ method: "GET" })
