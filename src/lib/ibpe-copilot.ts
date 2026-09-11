@@ -12,6 +12,7 @@ import { VIBPE_COPILOT_NAME } from "@/lib/ibpe-brand";
 import { RUNTIME_IBPE_ENGINE_VERSION } from "@/lib/ibpe-runtime-parity";
 import { runVibpeCopilot2 } from "@/lib/vibpe-copilot-2";
 import { retrieveVibpeKnowledgeEvidence, type VibpeKnowledgeEvidence } from "@/lib/vibpe-knowledge-retrieval";
+import { refreshVibpeWeeklyReviewsIfStale } from "@/lib/vibpe-weekly-review-knowledge";
 
 export type IbpeCopilotRequest = {
   question: string;
@@ -492,6 +493,12 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
     if (!data.question) return { ok: false, error: "Ask a question first.", advisoryOnly: true };
 
     const { sql, row } = await latestRun();
+    try {
+      await refreshVibpeWeeklyReviewsIfStale(actor.role, 6);
+    } catch {
+      // Drive refresh is supplementary. Missing OAuth or a transient provider
+      // failure must never block governed VIBPE analysis.
+    }
     const lineage = {
       governedRunId: row.id,
       approvedPlanRevision: Number(row.approved_plan_revision),
