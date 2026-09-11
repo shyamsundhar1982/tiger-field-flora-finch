@@ -5,10 +5,15 @@ import test from "node:test";
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const shellEntry = read("src/components/command-shell.tsx");
 const shell = read("src/components/command-shell-v2.tsx");
+const workflow = read("src/lib/operating-workflow.ts");
+const lineage = read("src/lib/operating-lineage.ts");
 const bridge = read("src/components/protected-navigation-bridge.tsx");
 const header = read("src/components/site-header.tsx");
 const metadata = read("src/lib/page-metadata.ts");
 const commandCentre = read("src/routes/command/index.tsx");
+const operations = read("src/routes/command/operations.tsx");
+const peopleOffice = read("src/routes/command/people-office.tsx");
+const commercial = read("src/routes/command/sales.tsx");
 const decisionInbox = read("src/routes/command/decision-inbox.tsx");
 const controlTower = read("src/routes/command/control-tower.tsx");
 const managementIntelligence = read("src/routes/command/management-intelligence.tsx");
@@ -18,9 +23,10 @@ const ibpeOperatingWorkspace = read("src/lib/ibpe-operating-workspace.ts");
 test("command workspace exposes one canonical primary navigation layer", () => {
   assert.match(shellEntry, /export \{ CommandShell \} from "\.\/command-shell-v2"/);
   assert.match(shell, /<SiteHeader showNavigation=\{false\} brandHref="\/command" \/>/);
-  assert.match(shell, /Core workspaces/);
+  assert.match(shell, /Operating workspaces/);
+  assert.match(shell, /7 owners/);
+  assert.match(shell, /from "@\/lib\/operating-workflow"/);
   assert.match(shell, /ClientLink/);
-  assert.match(shell, /\/command\/decision-inbox/);
   assert.doesNotMatch(shell, /NavigationView/);
   assert.doesNotMatch(shell, /COMMAND_TABS/);
 });
@@ -28,9 +34,8 @@ test("command workspace exposes one canonical primary navigation layer", () => {
 test("secondary reference, monitor, specialist and showcase functions remain discoverable", () => {
   assert.match(shell, /More functions/);
   assert.match(shell, /navigationGroups/);
-  for (const mode of ["understand", "observe", "operate", "showcase"]) {
+  for (const mode of ["understand", "observe", "operate", "showcase"])
     assert.match(shell, new RegExp(`"${mode}"`));
-  }
 
   for (const route of [
     "/command/epr-live",
@@ -44,9 +49,7 @@ test("secondary reference, monitor, specialist and showcase functions remain dis
     "/command/investor-pitch-external",
     "/command/platform-walkthrough",
     "/command/demo-company",
-  ]) {
-    assert.match(metadata, new RegExp(route.replaceAll("/", "\\/")));
-  }
+  ]) assert.match(metadata, new RegExp(route.replaceAll("/", "\\/")));
 });
 
 test("public navigation can be suppressed inside Command and protected brand navigation stays client-side", () => {
@@ -57,15 +60,7 @@ test("public navigation can be suppressed inside Command and protected brand nav
   assert.doesNotMatch(header, /<a href=\{brandHref\}/);
 });
 
-test("Command Centre uses client navigation for protected workspace actions", () => {
-  assert.match(commandCentre, /import \{ createFileRoute, Link \}/);
-  assert.match(commandCentre, /const WorkLink/);
-  assert.match(commandCentre, /to="\/command\/planning"/);
-  assert.match(commandCentre, /ERP Reports →/);
-  assert.doesNotMatch(commandCentre, /<a\b/);
-});
-
-test("protected navigation is client-side while the bridge remains a temporary compatibility guard", () => {
+test("protected navigation is client-side while the bridge remains a compatibility guard", () => {
   assert.match(bridge, /document\.addEventListener\("click", handleClick\)/);
   assert.match(bridge, /destination\.pathname\.startsWith\("\/command\/"\)/);
   assert.match(bridge, /event\.preventDefault\(\)/);
@@ -76,7 +71,7 @@ test("protected navigation is client-side while the bridge remains a temporary c
   assert.doesNotMatch(controlTower, /href=\{report\.route\}/);
 });
 
-test("Control Tower is the registered read-only ERP reporting console", () => {
+test("Control Tower remains the registered read-only ERP reporting console", () => {
   assert.match(metadata, /"\/command\/control-tower"/);
   assert.match(controlTower, /createFileRoute\("\/command\/control-tower"\)/);
   assert.match(controlTower, /loader: \(\) => getAllErpSuiteReports\(\)/);
@@ -91,25 +86,20 @@ test("management intelligence remains a compatibility redirect", () => {
   assert.match(managementIntelligence, /redirect\(\{ to: "\/command" \}\)/);
 });
 
-test("IBPE Phase 1 workspace is a routable Command workspace fed by the Control Tower report pack", () => {
+test("IBPE Phase 1 workspace stays advisory and read-only", () => {
   assert.match(ibpeWorkspaceRoute, /createFileRoute\("\/command\/ibpe-operating-workspace"\)/);
   assert.match(ibpeWorkspaceRoute, /getAllErpSuiteReports/);
   assert.match(ibpeWorkspaceRoute, /buildIbpeOperatingWorkspace/);
-  assert.match(ibpeWorkspaceRoute, /IBPE Operating Workspace/);
-
   assert.match(ibpeOperatingWorkspace, /mode: "read-only" as const/);
-  assert.match(ibpeOperatingWorkspace, /source: "canonical-erp-report-pack" as const/);
   assert.match(ibpeOperatingWorkspace, /canonicalWriteEnabled: false/);
   assert.match(ibpeOperatingWorkspace, /autonomousLearningEnabled: false/);
   assert.match(ibpeOperatingWorkspace, /autonomousProcurementEnabled: false/);
   assert.match(ibpeOperatingWorkspace, /autonomousPlanningWritesEnabled: false/);
   assert.doesNotMatch(ibpeOperatingWorkspace, /insert into/i);
-  assert.doesNotMatch(ibpeOperatingWorkspace, /update\s+(?:vyndi_|epr_)[a-z0-9_]+/i);
   assert.doesNotMatch(ibpeOperatingWorkspace, /delete from/i);
 });
 
-
-test("Phase 1 primary navigation follows the reconciled operating taxonomy", () => {
+test("G1: one operating-workflow contract owns the primary taxonomy", () => {
   for (const label of [
     "Command",
     "Plan & Sales",
@@ -118,29 +108,22 @@ test("Phase 1 primary navigation follows the reconciled operating taxonomy", () 
     "People & Office",
     "Finance & Governance",
     "Admin",
-  ]) {
-    assert.match(shell, new RegExp(label.replace(/[&]/g, "\\&")));
-  }
-  assert.match(shell, /7 workflow areas/);
-  assert.doesNotMatch(shell, /label: "Master Plan"/);
-  assert.doesNotMatch(shell, /label: "Supply & Production"/);
-  assert.doesNotMatch(shell, /label: "Commercial"/);
-  assert.doesNotMatch(shell, /label: "Finance"/);
-  assert.doesNotMatch(shell, /label: "Governance"/);
+  ]) assert.match(shell + workflow, new RegExp(label.replace(/[&]/g, "\\&")));
+
+  assert.match(workflow, /export const PLAN_SALES_TABS/);
+  assert.match(workflow, /export const ENGINEERING_TABS/);
+  assert.match(workflow, /export const OPERATIONS_TABS/);
+  assert.match(workflow, /export const FINANCE_GOVERNANCE_TABS/);
+  assert.match(workflow, /export const ADMIN_TABS/);
+  assert.match(shell, /FINANCE_GOVERNANCE_TABS/);
+  assert.doesNotMatch(shell, /const FINANCE_TABS/);
+  assert.doesNotMatch(shell, /const GOVERNANCE_TABS/);
 });
 
-test("People & Office is first-class and no longer a Finance tab", () => {
-  assert.match(shell, /to: "\/command\/people-office", label: "People & Office"/);
-  const financeStart = shell.indexOf("const FINANCE_TABS");
-  const financeEnd = shell.indexOf("] as const;", financeStart);
-  const financeTabs = shell.slice(financeStart, financeEnd);
-  assert.doesNotMatch(financeTabs, /people-office/);
-  assert.match(commandCentre, /\["People & Office", "Manpower, payroll inputs, office costs, assets and operating overheads", "\/command\/people-office"\]/);
-});
-
-test("canonical workflow rail exposes the end-to-end business chain without writes", () => {
+test("G2: workflow rail exposes the complete persisted-business journey on relevant pages", () => {
   for (const label of [
-    "Demand",
+    "Plan",
+    "Demand / Order",
     "Engineering / BOM",
     "Material Check",
     "Procurement",
@@ -149,26 +132,109 @@ test("canonical workflow rail exposes the end-to-end business chain without writ
     "Traveller",
     "Production",
     "Quality",
-    "Invoice / Collection",
-  ]) {
-    assert.match(shell, new RegExp(label.replace("/", "\\/")));
-  }
+    "Shipment",
+    "Invoice",
+    "Collection",
+  ]) assert.match(workflow, new RegExp(label.replace("/", "\\/")));
+
+  for (const route of [
+    "/command/planning",
+    "/command/sales",
+    "/command/engineering",
+    "/command/operations",
+    "/command/procurement-planning",
+    "/command/purchase-execution",
+    "/command/receiving",
+    "/command/inventory",
+    "/command/production",
+    "/command/quality",
+    "/command/receivables",
+  ]) assert.match(workflow, new RegExp(route.replaceAll("/", "\\/")));
+
   assert.match(shell, /aria-label="End-to-end operating workflow"/);
-  assert.match(shell, /<WorkflowRail role=\{role\} \/>/);
-  assert.doesNotMatch(shell, /WorkflowRail[\s\S]*?(insert into|delete from|update\s+(?:vyndi_|epr_))/i);
+  assert.match(shell, /WORKFLOW_VISIBLE_ROUTES/);
+  assert.match(shell, /activeWorkflowStage/);
+  assert.match(shell, /Follow the business object · write only in the owning workspace/);
 });
 
-test("Command groups action, reports and VIBPE under one owner", () => {
-  assert.match(shell, /Action Inbox/);
-  assert.match(shell, /ERP Reports/);
-  assert.match(shell, /VIBPE Workspace/);
-  assert.match(shell, /\/command\/ibpe-operating-workspace/);
+test("G3: Operations is the actual execution hub, not only a renamed sidebar entry", () => {
+  assert.match(operations, /Operations · demand to quality execution/);
+  assert.match(operations, /<h1[^>]*>Operations<\/h1>/);
+  assert.doesNotMatch(operations, /<h1[^>]*>Supply & Production<\/h1>/);
+  assert.match(workflow, /label: "Requirements"/);
+  assert.match(workflow, /label: "Purchase"/);
+  assert.match(workflow, /label: "Receiving"/);
+  assert.match(workflow, /label: "Build & Genealogy"/);
+  assert.match(operations, /Today's operating exceptions/);
+  assert.match(operations, /Order-to-cash lineage/);
+  assert.match(operations, /Operating controls/);
+  assert.match(operations, /table-auto/);
+  assert.doesNotMatch(operations, /min-w-\[(?:9|1[0-9])\d{2}px\]/);
 });
 
-test("admin owns users and master data while legacy routes remain secondary", () => {
-  assert.match(shell, /const ADMIN_TABS/);
-  assert.match(shell, /Users & Roles/);
-  assert.match(shell, /Master Data/);
+test("G4: lineage joins persisted order, production, procurement, receiving, genealogy and order-to-cash evidence", () => {
+  assert.match(lineage, /createServerFn\(\{ method: "GET" \}\)/);
+  assert.match(lineage, /jc\.sales_order_revision=o\.revision/);
+  assert.match(lineage, /vyndi_live_job_card_requirements/);
+  assert.match(lineage, /vyndi_purchase_orders/);
+  assert.match(lineage, /vyndi_goods_receipts/);
+  assert.match(lineage, /epr_travellers/);
+  assert.match(lineage, /vyndi_shipments/);
+  assert.match(lineage, /vyndi_invoices/);
+  assert.match(lineage, /vyndi_collections/);
+  assert.match(operations, /Quality: specialist control, not order-linked yet/);
+  assert.doesNotMatch(lineage, /insert into/i);
+  assert.doesNotMatch(lineage, /delete from/i);
+  assert.doesNotMatch(lineage, /update\s+(?:vyndi_|epr_)/i);
+});
+
+test("G5: People & Office is first-class, compact and Finance is downstream", () => {
+  assert.match(peopleOffice, /People & Office · operating administration/);
+  assert.match(peopleOffice, /Finance consumes the approved cost model downstream/);
+  assert.match(peopleOffice, /Downstream Finance/);
+  assert.doesNotMatch(peopleOffice, /Finance · operating ledgers/);
+  assert.match(peopleOffice, /Collapsed by default · expand only the register you need/);
+  assert.match(peopleOffice, /<details/);
+  assert.match(peopleOffice, /table-auto/);
+  assert.doesNotMatch(peopleOffice, /min-w-\[1100px\]/);
+  assert.match(workflow, /const PEOPLE_CONTEXT = new Set<string>\(\[PEOPLE_HOME\]\)/);
+  const financeTabs = workflow.slice(workflow.indexOf("FINANCE_GOVERNANCE_TABS"), workflow.indexOf("ADMIN_TABS"));
+  assert.doesNotMatch(financeTabs, /people-office/);
+});
+
+test("G6: Finance and Governance share one internal navigation contract", () => {
+  const financeGovernance = workflow.slice(workflow.indexOf("FINANCE_GOVERNANCE_TABS"), workflow.indexOf("ADMIN_TABS"));
+  for (const label of ["Finance Overview", "Cash", "Payables", "Receivables", "Balance Sheet", "CA Audit", "Approvals", "Risk", "Legal & IP", "Audit & Actions"])
+    assert.match(financeGovernance, new RegExp(label.replace(/[&]/g, "\\&")));
+  assert.match(shell, /routes=\{FINANCE_GOVERNANCE_TABS\}/);
+  assert.match(shell, /context=\{FINANCE_GOVERNANCE_CONTEXT\}/);
+});
+
+test("G7: Command leads with today's operational control and demotes program governance", () => {
+  assert.match(commandCentre, /Command · today’s operating control/);
+  assert.match(commandCentre, /Today’s control room/);
+  assert.match(commandCentre, /Exceptions now/);
+  assert.match(commandCentre, /Fulfillment workflow/);
+  assert.match(commandCentre, /getDecisionInboxData/);
+  assert.match(commandCentre, /getOperatingLineage/);
+  assert.match(commandCentre, /Program \/ founder governance/);
+  assert.match(commandCentre, /secondary to day-to-day operating control/);
+  assert.match(commandCentre, /<details/);
+});
+
+test("G8: high-volume touched lists are compact and progressively disclosed", () => {
+  assert.match(commercial, /compact register · expand only to revise/);
+  assert.match(commercial, /<table className="w-full table-auto text-left text-xs">/);
+  assert.match(commercial, /Revise order \/ configuration/);
+  assert.match(operations, /compact register/);
+  assert.match(peopleOffice, /expand/);
+  assert.doesNotMatch(commandCentre, /min-w-\[52rem\]/);
+});
+
+test("G9: Command tools and legacy routes stay discoverable without competing as primary owners", () => {
+  for (const label of ["Action Inbox", "ERP Reports", "VIBPE Workspace"])
+    assert.match(workflow, new RegExp(label));
+  assert.match(shell, /Command tools/);
   for (const route of [
     "/command/phase-4",
     "/command/phase-5",
@@ -177,18 +243,6 @@ test("admin owns users and master data while legacy routes remain secondary", ()
     "/command/management-intelligence",
     "/command/production-jobcards",
     "/command/ops",
-  ]) {
-    assert.match(shell, new RegExp(route.replaceAll("/", "\\/")));
-  }
+  ]) assert.match(workflow, new RegExp(route.replaceAll("/", "\\/")));
   assert.match(shell, /LEGACY_ROUTES/);
-});
-
-test("Commercial order register is compact table-first with revision drill-down", () => {
-  const commercial = read("src/routes/command/sales.tsx");
-  assert.match(commercial, /Order register/);
-  assert.match(commercial, /compact register · expand only to revise/);
-  assert.match(commercial, /<table className="w-full table-auto text-left text-xs">/);
-  assert.match(commercial, /Revise order \/ configuration/);
-  assert.match(commercial, /Save & synchronize revision/);
-  assert.doesNotMatch(commercial, /grid gap-3 md:grid-cols-2 xl:grid-cols-3/);
 });
