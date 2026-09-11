@@ -169,6 +169,12 @@ function InventoryLedger() {
           >
             ← Master Inventory
           </Link>
+          <Link
+            to="/command/inventory-master"
+            className="rounded-lg border border-accent px-3 py-2.5 text-sm font-semibold text-accent"
+          >
+            + Add item / category
+          </Link>
         </div>
       </header>
 
@@ -283,6 +289,85 @@ function InventoryLedger() {
             {message}
           </p>
         ) : null}
+      </section>
+
+      <section
+        className="rounded-xl border border-border bg-bg-elevated"
+        aria-labelledby="item-register-heading"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-5">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-subtle">
+              Controlled catalogue
+            </p>
+            <h2 id="item-register-heading" className="mt-1 font-display text-2xl">
+              Item balance register
+            </h2>
+          </div>
+          <p className="text-xs text-muted">All active items are shown, including zero balance.</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[980px] text-sm">
+            <thead className="text-[10px] uppercase tracking-[0.14em] text-subtle">
+              <tr>
+                <th className="px-4 py-3 text-left">SKU / item</th>
+                <th className="px-3 py-3 text-left">Category</th>
+                <th className="px-3 py-3 text-right">Balance</th>
+                <th className="px-3 py-3 text-right">Reserved</th>
+                <th className="px-3 py-3 text-right">ATP</th>
+                <th className="px-3 py-3 text-right">MSL</th>
+                <th className="px-3 py-3 text-left">Status</th>
+                <th className="px-4 py-3 text-left">Last receipt</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => {
+                const balance = number(item.available_quantity);
+                const msl = number(item.minimum_stock_level);
+                const status = stockHealth(balance, msl);
+                return (
+                  <tr key={item.id} className="border-t border-border/70 hover:bg-surface/50">
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-fg">{item.name}</p>
+                      <p className="font-mono text-[10px] text-subtle">{item.sku}</p>
+                    </td>
+                    <td className="px-3 py-3 text-xs text-muted">
+                      {item.category || "Uncategorised"}
+                    </td>
+                    <td className="px-3 py-3 text-right font-semibold tabular-nums">
+                      {balance.toLocaleString("en-IN")}{" "}
+                      <span className="text-[10px] font-normal text-subtle">{item.unit}</span>
+                    </td>
+                    <td className="px-3 py-3 text-right tabular-nums">
+                      {number(item.reserved_quantity).toLocaleString("en-IN")}
+                    </td>
+                    <td className="px-3 py-3 text-right tabular-nums">
+                      {number(item.available_to_promise).toLocaleString("en-IN")}
+                    </td>
+                    <td className="px-3 py-3 text-right tabular-nums">
+                      {msl.toLocaleString("en-IN")}
+                    </td>
+                    <td
+                      className={cn(
+                        "px-3 py-3 text-xs font-semibold",
+                        status === "Sufficient" ? "text-ok" : "text-warn",
+                      )}
+                    >
+                      {status}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-muted">{item.last_received_on || "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {!items.length ? (
+            <div className="p-8 text-center text-sm text-muted">
+              No items are registered in this ledger yet. Use “Add item / category” to create a
+              controlled catalogue row; its balance will display as 0 until a receipt is posted.
+            </div>
+          ) : null}
+        </div>
       </section>
 
       <section
