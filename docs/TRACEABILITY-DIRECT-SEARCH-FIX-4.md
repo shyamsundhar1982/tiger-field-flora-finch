@@ -1,0 +1,1 @@
+Scope: direct Traceability & Print free-text search only; no mutation, auth, or PR109 changes.
