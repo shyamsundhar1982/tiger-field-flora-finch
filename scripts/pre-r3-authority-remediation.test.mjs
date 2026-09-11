@@ -10,6 +10,9 @@ const qualityMigration = readFileSync(new URL("../migrations/0051_quality_lineag
 const qualityAuthority = readFileSync(new URL("../src/lib/quality-authority.ts", import.meta.url), "utf8");
 const peopleOfficeMigration = readFileSync(new URL("../migrations/0052_people_office_authority.sql", import.meta.url), "utf8");
 const peopleOfficeAuthority = readFileSync(new URL("../src/lib/people-office-authority.ts", import.meta.url), "utf8");
+const dispatchMigration = readFileSync(new URL("../migrations/0053_dispatch_operations_authority.sql", import.meta.url), "utf8");
+const dispatchAuthority = readFileSync(new URL("../src/lib/dispatch-authority.ts", import.meta.url), "utf8");
+const shipmentAuthority = readFileSync(new URL("../src/lib/shipment-authority.ts", import.meta.url), "utf8");
 const models = readFileSync(new URL("../src/lib/data/models.ts", import.meta.url), "utf8");
 
 const currentVariantIds = [...models.matchAll(/\{id:"([^"]+)"/g)].map((match) => match[1]);
@@ -147,4 +150,34 @@ test("G4 makes server authority auditable and approval-gated", () => {
   assert.match(peopleOfficeAuthority, /PEOPLE_RECORD_STATUS_CHANGED/);
   assert.match(peopleOfficeAuthority, /PEOPLE_OFFICE_ASSET_STATUS_CHANGED/);
   assert.match(peopleOfficeAuthority, /canPerform\(role, permission\)/);
+});
+
+// G5 — Dispatch ownership.
+test("G5 makes shipment execution explicitly Operations-owned without moving Finance invoices", () => {
+  assert.match(dispatchMigration, /owner_workspace text not null default 'operations'/);
+  assert.match(dispatchMigration, /check \(owner_workspace='operations'\)/);
+  assert.match(dispatchMigration, /Canonical Operations\/Fulfilment dispatch authority/);
+  assert.match(dispatchMigration, /Finance consumes posted shipment evidence but does not own shipment execution/);
+  assert.match(dispatchMigration, /create or replace view vyndi_dispatch_register/);
+  assert.match(dispatchMigration, /i\.id as invoice_id/);
+});
+
+test("G5 requires current Production completion and serialized Quality release before dispatch", () => {
+  assert.match(dispatchMigration, /sales_order_revision=v_order_revision/);
+  assert.match(dispatchMigration, /v_job_status is distinct from 'complete'/);
+  assert.match(dispatchMigration, /from vyndi_quality_releases q/);
+  assert.match(dispatchMigration, /q\.decision='released'/);
+  assert.match(dispatchMigration, /Dispatch is blocked: only % serialized unit\(s\) have current Quality release evidence/);
+  assert.match(dispatchMigration, /'G12-DISPATCH','pass'/);
+});
+
+test("G5 has one canonical shipment writer implementation with backward-compatible aliases", () => {
+  assert.match(dispatchAuthority, /export const postDispatch/);
+  assert.match(dispatchAuthority, /export const reverseDispatch/);
+  assert.match(dispatchAuthority, /ownerWorkspace: "operations"/);
+  assert.match(shipmentAuthority, /export const postShipment = postDispatch/);
+  assert.match(shipmentAuthority, /export const reverseShipment = reverseDispatch/);
+  assert.doesNotMatch(shipmentAuthority, /select post_vyndi_shipment\(\$1,\$2,\$3,\$4,\$5,\$6,\$7\)/);
+  assert.match(shipmentAuthority, /export const issueInvoice/);
+  assert.match(shipmentAuthority, /export const postCollection/);
 });
