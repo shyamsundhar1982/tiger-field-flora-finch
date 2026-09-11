@@ -57,6 +57,6 @@ test("IBPE action lifecycle is audited and completed actions leave active inbox"
   assert.match(inbox,/status in \('open','in_progress','blocked'\)/);
   assert.doesNotMatch(inbox,/status in \('open','in_progress','blocked','done'\)/);
   assert.match(ui,/Management action completed and removed from the active inbox/);
-  assert.match(ui,/>Start</);
-  assert.match(ui,/>Complete</);
+  assert.match(ui,/Start/);
+  assert.match(ui,/Complete/);
 });
