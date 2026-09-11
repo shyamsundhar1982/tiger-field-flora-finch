@@ -24,7 +24,7 @@ test("command workspace exposes one canonical primary navigation layer", () => {
   assert.match(shellEntry, /export \{ CommandShell \} from "\.\/command-shell-v2"/);
   assert.match(shell, /<SiteHeader showNavigation=\{false\} brandHref="\/command" \/>/);
   assert.match(shell, /Operating workspaces/);
-  assert.match(shell, /7 owners/);
+  assert.match(shell, /8 owners/);
   assert.match(shell, /from "@\/lib\/operating-workflow"/);
   assert.match(shell, /ClientLink/);
   assert.doesNotMatch(shell, /NavigationView/);
@@ -102,22 +102,26 @@ test("IBPE Phase 1 workspace stays advisory and read-only", () => {
 test("G1: one operating-workflow contract owns the primary taxonomy", () => {
   for (const label of [
     "Command",
-    "Plan & Sales",
+    "Plan & Commercial",
     "Product & Engineering",
-    "Operations",
+    "Supply & Operations",
     "People & Office",
-    "Finance & Governance",
+    "Finance",
+    "Governance & Assurance",
     "Admin",
   ]) assert.match(shell + workflow, new RegExp(label.replace(/[&]/g, "\\&")));
 
   assert.match(workflow, /export const PLAN_SALES_TABS/);
   assert.match(workflow, /export const ENGINEERING_TABS/);
   assert.match(workflow, /export const OPERATIONS_TABS/);
+  assert.match(workflow, /export const FINANCE_TABS/);
+  assert.match(workflow, /export const GOVERNANCE_TABS/);
   assert.match(workflow, /export const FINANCE_GOVERNANCE_TABS/);
+  assert.match(workflow, /@deprecated Prefer FINANCE_TABS \+ GOVERNANCE_TABS/);
   assert.match(workflow, /export const ADMIN_TABS/);
-  assert.match(shell, /FINANCE_GOVERNANCE_TABS/);
-  assert.doesNotMatch(shell, /const FINANCE_TABS/);
-  assert.doesNotMatch(shell, /const GOVERNANCE_TABS/);
+  assert.match(shell, /FINANCE_TABS/);
+  assert.match(shell, /GOVERNANCE_TABS/);
+  assert.doesNotMatch(shell, /FINANCE_GOVERNANCE_TABS/);
 });
 
 test("G2: workflow rail exposes the complete persisted-business journey on relevant pages", () => {
@@ -132,7 +136,7 @@ test("G2: workflow rail exposes the complete persisted-business journey on relev
     "Traveller",
     "Production",
     "Quality",
-    "Shipment",
+    "Dispatch",
     "Invoice",
     "Collection",
   ]) assert.match(workflow, new RegExp(label.replace("/", "\\/")));
@@ -157,14 +161,15 @@ test("G2: workflow rail exposes the complete persisted-business journey on relev
   assert.match(shell, /Follow the business object · write only in the owning workspace/);
 });
 
-test("G3: Operations is the actual execution hub, not only a renamed sidebar entry", () => {
+test("G3: Supply & Operations is the actual execution hub, not only a renamed sidebar entry", () => {
   assert.match(operations, /Operations · demand to quality execution/);
   assert.match(operations, /<h1[^>]*>Operations<\/h1>/);
   assert.doesNotMatch(operations, /<h1[^>]*>Supply & Production<\/h1>/);
   assert.match(workflow, /label: "Requirements"/);
   assert.match(workflow, /label: "Purchase"/);
   assert.match(workflow, /label: "Receiving"/);
-  assert.match(workflow, /label: "Build & Genealogy"/);
+  assert.match(workflow, /label: "Build"/);
+  assert.match(workflow, /label: "Overview & Dispatch"/);
   assert.match(operations, /Today's operating exceptions/);
   assert.match(operations, /Order-to-cash lineage/);
   assert.match(operations, /Operating controls/);
@@ -199,16 +204,27 @@ test("G5: People & Office is first-class, compact and Finance is downstream", ()
   assert.match(peopleOffice, /table-auto/);
   assert.doesNotMatch(peopleOffice, /min-w-\[1100px\]/);
   assert.match(workflow, /const PEOPLE_CONTEXT = new Set<string>\(\[PEOPLE_HOME\]\)/);
-  const financeTabs = workflow.slice(workflow.indexOf("FINANCE_GOVERNANCE_TABS"), workflow.indexOf("ADMIN_TABS"));
+  const financeTabs = workflow.slice(workflow.indexOf("FINANCE_TABS"), workflow.indexOf("GOVERNANCE_TABS"));
   assert.doesNotMatch(financeTabs, /people-office/);
 });
 
-test("G6: Finance and Governance share one internal navigation contract", () => {
-  const financeGovernance = workflow.slice(workflow.indexOf("FINANCE_GOVERNANCE_TABS"), workflow.indexOf("ADMIN_TABS"));
-  for (const label of ["Finance Overview", "Cash", "Payables", "Receivables", "Balance Sheet", "CA Audit", "Approvals", "Risk", "Legal & IP", "Audit & Actions"])
-    assert.match(financeGovernance, new RegExp(label.replace(/[&]/g, "\\&")));
-  assert.match(shell, /routes=\{FINANCE_GOVERNANCE_TABS\}/);
-  assert.match(shell, /context=\{FINANCE_GOVERNANCE_CONTEXT\}/);
+test("G6: Finance and Governance & Assurance have separate internal navigation contracts", () => {
+  const finance = workflow.slice(workflow.indexOf("FINANCE_TABS"), workflow.indexOf("GOVERNANCE_TABS"));
+  for (const label of ["Overview", "Cash", "Payables", "Receivables", "Balance Sheet"])
+    assert.match(finance, new RegExp(label));
+  assert.doesNotMatch(finance, /Approvals|Risk|Legal & IP|Audit & Actions|CA Audit/);
+
+  const governance = workflow.slice(workflow.indexOf("GOVERNANCE_TABS"), workflow.indexOf("ADMIN_TABS"));
+  for (const label of ["Approvals", "Risk", "Legal & IP", "Audit & Actions", "CA Audit"])
+    assert.match(governance, new RegExp(label.replace(/[&]/g, "\\&")));
+  assert.doesNotMatch(governance, /Payables|Receivables|Balance Sheet/);
+
+  assert.match(shell, /routes=\{FINANCE_TABS\}/);
+  assert.match(shell, /context=\{FINANCE_CONTEXT\}/);
+  assert.match(shell, /routes=\{GOVERNANCE_TABS\}/);
+  assert.match(shell, /context=\{GOVERNANCE_CONTEXT\}/);
+  assert.match(workflow, /FINANCE_GOVERNANCE_TABS/);
+  assert.match(workflow, /FINANCE_GOVERNANCE_CONTEXT/);
 });
 
 test("G7: Command leads with today's operational control and demotes program governance", () => {
@@ -233,7 +249,7 @@ test("G8: high-volume touched lists are compact and progressively disclosed", ()
 });
 
 test("G9: Command tools and legacy routes stay discoverable without competing as primary owners", () => {
-  for (const label of ["Action Inbox", "ERP Reports", "VIBPE Workspace"])
+  for (const label of ["Action Inbox", "Control Tower", "VIBPE Workspace", "VIBPE Assurance"])
     assert.match(workflow, new RegExp(label));
   assert.match(shell, /Command tools/);
   for (const route of [
