@@ -287,57 +287,73 @@ function Commercial() {
         </details>
       </Panel>
 
-      <Panel title="Order register" kicker="Centrally persisted Commercial commitments · revise here, never inside the Job Card">
+      <Panel title="Order register" kicker="Centrally persisted Commercial commitments · compact register · expand only to revise">
         {orders.length === 0 ? (
           <p className="text-sm text-muted">No centrally persisted orders yet. A successful creation will appear here immediately before Production synchronization is attempted.</p>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {orders.map((order) => {
-              const edit = orderEdits[order.id] ?? order;
-              const editVariant = MODELS.find((entry) => entry.id === edit.variantId) ?? initialVariant;
-              const changed = JSON.stringify(edit) !== JSON.stringify(order);
-              return (
-                <article key={order.id} className="rounded-xl border border-border bg-bg-elevated/25 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div><p className="font-semibold text-fg">{order.variantName ?? order.variantId ?? order.product}</p><p className="mt-1 font-mono text-[10px] text-subtle">{order.id}</p></div>
-                    <span className="text-[10px] font-bold uppercase text-accent">{order.status}</span>
-                  </div>
-                  <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
-                    <Mini label="Family" value={order.modelTier ? modelFamily(order.modelTier) : "—"} />
-                    <Mini label="Configuration" value={`${Object.keys(order.configuration ?? {}).length} controlled selections`} />
-                    <Mini label="Value" value={lakh(order.units * order.aspLakh)} />
-                    <Mini label="Channel" value={order.channel} />
-                  </div>
-
-                  <details className="mt-4 rounded-lg border border-border bg-bg/40 p-3">
-                    <summary className="cursor-pointer text-xs font-semibold text-fg">Revise order / configuration</summary>
-                    <fieldset disabled={busy || !canWrite} className="mt-3 space-y-3 disabled:opacity-60">
-                      <Field label="Model & variant"><select value={edit.variantId ?? editVariant.id} onChange={(event) => editOrderVariant(order.id, event.target.value)} className="control mt-1">{MODELS.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}</select></Field>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Field label="Month"><input type="number" min="1" max="36" value={edit.month} onChange={(event) => editOrder(order.id, { month: Number(event.target.value) })} className="control mt-1" /></Field>
-                        <Field label="Units"><input type="number" min="1" value={edit.units} onChange={(event) => editOrder(order.id, { units: Number(event.target.value) })} className="control mt-1" /></Field>
-                        <Field label="Channel"><select value={edit.channel} onChange={(event) => editOrder(order.id, { channel: event.target.value as SalesChannel })} className="control mt-1">{channelOptions.map((channel) => <option key={channel}>{channel}</option>)}</select></Field>
-                        <Field label="Status"><select value={edit.status} onChange={(event) => editOrder(order.id, { status: event.target.value as SalesOrderStatus })} className="control mt-1">{statusOptions.map((status) => <option key={status}>{status}</option>)}</select></Field>
-                      </div>
-                      <details className="rounded-lg border border-border/70 p-3">
-                        <summary className="cursor-pointer text-[11px] font-semibold text-muted">Component configuration</summary>
-                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                          {CONFIGURATION_CATEGORIES.map(({ key, label }) => {
-                            const choices = optionsFor(editVariant.tier, key);
-                            return <Field key={key} label={label}><select value={edit.configuration?.[key] ?? ""} disabled={key === "groupset"} onChange={(event) => editOrderConfiguration(order.id, key, event.target.value)} className="control mt-1 disabled:opacity-70">{choices.map((choice) => <option key={choice.id} value={choice.id}>{choice.brand} {choice.model}</option>)}</select></Field>;
-                          })}
-                        </div>
-                      </details>
-                    </fieldset>
-                    <div className="mt-3 flex items-center gap-2">
-                      <button type="button" disabled={busy || !canWrite || !changed} onClick={() => void saveOrderRevision(order.id)} className="rounded-md bg-accent px-3 py-2 text-xs font-semibold text-bg disabled:opacity-40">Save & synchronize revision</button>
-                      {changed ? <span className="text-[10px] font-semibold text-warn">Unsaved revision</span> : <span className="text-[10px] text-subtle">Matches persisted order</span>}
-                    </div>
-                    <p className="mt-2 text-[10px] leading-4 text-subtle">Saving creates a Commercial revision first, then revalidates the released BOM and reconciles the Job Card. An already-approved build cannot be silently replaced; it requires a controlled production change.</p>
-                  </details>
-                </article>
-              );
-            })}
+          <div className="overflow-x-auto">
+            <table className="w-full table-auto text-left text-xs">
+              <thead className="bg-bg-elevated text-[10px] uppercase tracking-wider text-subtle">
+                <tr>
+                  <th className="px-3 py-2">Order</th>
+                  <th className="px-3 py-2">Model / variant</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Family</th>
+                  <th className="px-3 py-2">Config</th>
+                  <th className="px-3 py-2">Value</th>
+                  <th className="px-3 py-2">Channel</th>
+                  <th className="px-3 py-2">Control</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((order) => {
+                  const edit = orderEdits[order.id] ?? order;
+                  const editVariant = MODELS.find((entry) => entry.id === edit.variantId) ?? initialVariant;
+                  const changed = JSON.stringify(edit) !== JSON.stringify(order);
+                  return (
+                    <tr key={order.id} className="border-t border-border align-top">
+                      <td className="px-3 py-3 font-mono text-[10px] text-subtle">{order.id}</td>
+                      <td className="px-3 py-3 font-semibold text-fg">{order.variantName ?? order.variantId ?? order.product}</td>
+                      <td className="px-3 py-3"><span className="text-[10px] font-bold uppercase text-accent">{order.status}</span></td>
+                      <td className="px-3 py-3 text-muted">{order.modelTier ? modelFamily(order.modelTier) : "—"}</td>
+                      <td className="px-3 py-3 text-muted">{Object.keys(order.configuration ?? {}).length} selections</td>
+                      <td className="px-3 py-3 font-semibold text-fg">{lakh(order.units * order.aspLakh)}</td>
+                      <td className="px-3 py-3 text-muted">{order.channel}</td>
+                      <td className="px-3 py-3">
+                        <details className="rounded-md border border-border bg-bg/40 p-2">
+                          <summary className="cursor-pointer whitespace-nowrap text-[11px] font-semibold text-accent">Revise order / configuration</summary>
+                          <div className="mt-3 w-full space-y-3">
+                            <fieldset disabled={busy || !canWrite} className="space-y-3 disabled:opacity-60">
+                              <Field label="Model & variant"><select value={edit.variantId ?? editVariant.id} onChange={(event) => editOrderVariant(order.id, event.target.value)} className="control mt-1">{MODELS.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}</select></Field>
+                              <div className="grid gap-2 sm:grid-cols-2">
+                                <Field label="Month"><input type="number" min="1" max="36" value={edit.month} onChange={(event) => editOrder(order.id, { month: Number(event.target.value) })} className="control mt-1" /></Field>
+                                <Field label="Units"><input type="number" min="1" value={edit.units} onChange={(event) => editOrder(order.id, { units: Number(event.target.value) })} className="control mt-1" /></Field>
+                                <Field label="Channel"><select value={edit.channel} onChange={(event) => editOrder(order.id, { channel: event.target.value as SalesChannel })} className="control mt-1">{channelOptions.map((channel) => <option key={channel}>{channel}</option>)}</select></Field>
+                                <Field label="Status"><select value={edit.status} onChange={(event) => editOrder(order.id, { status: event.target.value as SalesOrderStatus })} className="control mt-1">{statusOptions.map((status) => <option key={status}>{status}</option>)}</select></Field>
+                              </div>
+                              <details className="rounded-lg border border-border/70 p-3">
+                                <summary className="cursor-pointer text-[11px] font-semibold text-muted">Component configuration</summary>
+                                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                  {CONFIGURATION_CATEGORIES.map(({ key, label }) => {
+                                    const choices = optionsFor(editVariant.tier, key);
+                                    return <Field key={key} label={label}><select value={edit.configuration?.[key] ?? ""} disabled={key === "groupset"} onChange={(event) => editOrderConfiguration(order.id, key, event.target.value)} className="control mt-1 disabled:opacity-70">{choices.map((choice) => <option key={choice.id} value={choice.id}>{choice.brand} {choice.model}</option>)}</select></Field>;
+                                  })}
+                                </div>
+                              </details>
+                            </fieldset>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <button type="button" disabled={busy || !canWrite || !changed} onClick={() => void saveOrderRevision(order.id)} className="rounded-md bg-accent px-3 py-2 text-xs font-semibold text-bg disabled:opacity-40">Save & synchronize revision</button>
+                              {changed ? <span className="text-[10px] font-semibold text-warn">Unsaved revision</span> : <span className="text-[10px] text-subtle">Matches persisted order</span>}
+                            </div>
+                            <p className="text-[10px] leading-4 text-subtle">Saving creates a Commercial revision first, then revalidates the released BOM and reconciles the Job Card. An already-approved build cannot be silently replaced; it requires a controlled production change.</p>
+                          </div>
+                        </details>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </Panel>

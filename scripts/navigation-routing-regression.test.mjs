@@ -107,3 +107,88 @@ test("IBPE Phase 1 workspace is a routable Command workspace fed by the Control 
   assert.doesNotMatch(ibpeOperatingWorkspace, /update\s+(?:vyndi_|epr_)[a-z0-9_]+/i);
   assert.doesNotMatch(ibpeOperatingWorkspace, /delete from/i);
 });
+
+
+test("Phase 1 primary navigation follows the reconciled operating taxonomy", () => {
+  for (const label of [
+    "Command",
+    "Plan & Sales",
+    "Product & Engineering",
+    "Operations",
+    "People & Office",
+    "Finance & Governance",
+    "Admin",
+  ]) {
+    assert.match(shell, new RegExp(label.replace(/[&]/g, "\\&")));
+  }
+  assert.match(shell, /7 workflow areas/);
+  assert.doesNotMatch(shell, /label: "Master Plan"/);
+  assert.doesNotMatch(shell, /label: "Supply & Production"/);
+  assert.doesNotMatch(shell, /label: "Commercial"/);
+  assert.doesNotMatch(shell, /label: "Finance"/);
+  assert.doesNotMatch(shell, /label: "Governance"/);
+});
+
+test("People & Office is first-class and no longer a Finance tab", () => {
+  assert.match(shell, /to: "\/command\/people-office", label: "People & Office"/);
+  const financeStart = shell.indexOf("const FINANCE_TABS");
+  const financeEnd = shell.indexOf("] as const;", financeStart);
+  const financeTabs = shell.slice(financeStart, financeEnd);
+  assert.doesNotMatch(financeTabs, /people-office/);
+  assert.match(commandCentre, /\["People & Office", "Manpower, payroll inputs, office costs, assets and operating overheads", "\/command\/people-office"\]/);
+});
+
+test("canonical workflow rail exposes the end-to-end business chain without writes", () => {
+  for (const label of [
+    "Demand",
+    "Engineering / BOM",
+    "Material Check",
+    "Procurement",
+    "Receiving",
+    "Job Card",
+    "Traveller",
+    "Production",
+    "Quality",
+    "Invoice / Collection",
+  ]) {
+    assert.match(shell, new RegExp(label.replace("/", "\\/")));
+  }
+  assert.match(shell, /aria-label="End-to-end operating workflow"/);
+  assert.match(shell, /<WorkflowRail role=\{role\} \/>/);
+  assert.doesNotMatch(shell, /WorkflowRail[\s\S]*?(insert into|delete from|update\s+(?:vyndi_|epr_))/i);
+});
+
+test("Command groups action, reports and VIBPE under one owner", () => {
+  assert.match(shell, /Action Inbox/);
+  assert.match(shell, /ERP Reports/);
+  assert.match(shell, /VIBPE Workspace/);
+  assert.match(shell, /\/command\/ibpe-operating-workspace/);
+});
+
+test("admin owns users and master data while legacy routes remain secondary", () => {
+  assert.match(shell, /const ADMIN_TABS/);
+  assert.match(shell, /Users & Roles/);
+  assert.match(shell, /Master Data/);
+  for (const route of [
+    "/command/phase-4",
+    "/command/phase-5",
+    "/command/phase-6",
+    "/command/phase-6a",
+    "/command/management-intelligence",
+    "/command/production-jobcards",
+    "/command/ops",
+  ]) {
+    assert.match(shell, new RegExp(route.replaceAll("/", "\\/")));
+  }
+  assert.match(shell, /LEGACY_ROUTES/);
+});
+
+test("Commercial order register is compact table-first with revision drill-down", () => {
+  const commercial = read("src/routes/command/sales.tsx");
+  assert.match(commercial, /Order register/);
+  assert.match(commercial, /compact register · expand only to revise/);
+  assert.match(commercial, /<table className="w-full table-auto text-left text-xs">/);
+  assert.match(commercial, /Revise order \/ configuration/);
+  assert.match(commercial, /Save & synchronize revision/);
+  assert.doesNotMatch(commercial, /grid gap-3 md:grid-cols-2 xl:grid-cols-3/);
+});
