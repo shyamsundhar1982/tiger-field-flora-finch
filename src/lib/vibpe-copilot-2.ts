@@ -42,9 +42,52 @@ function knowledgeAuthorityLabel(evidence: VibpeKnowledgeEvidence[]) {
   return "ADVISORY / NON-GOVERNING";
 }
 
+const KNOWLEDGE_EVIDENCE_STOP_WORDS = new Set([
+  "about", "authority", "approved", "automatic", "before", "changed", "current", "design",
+  "evidence", "governing", "master", "production", "released", "should", "toward", "treat",
+  "what", "when", "where", "which", "why", "with", "would",
+]);
+
+function knowledgeEvidenceTerms(question: string) {
+  return [...new Set(
+    question
+      .toLowerCase()
+      .replace(/[^a-z0-9.+-]+/g, " ")
+      .split(/\s+/)
+      .map((token) => token.trim())
+      .filter((token) => token.length >= 3 && !KNOWLEDGE_EVIDENCE_STOP_WORDS.has(token)),
+  )].slice(0, 16);
+}
+
+function selectKnowledgeAnswerEvidence(question: string, evidence: VibpeKnowledgeEvidence[]) {
+  if (evidence.length <= 1) return evidence;
+  const primary = evidence[0];
+  const terms = knowledgeEvidenceTerms(question);
+  const seen = new Set([primary.claimText]);
+
+  const supporting = evidence
+    .slice(1)
+    .map((item, index) => {
+      const haystack = [item.claimText, item.title, item.sourceLocator ?? "", item.sourcePath ?? ""]
+        .join(" ")
+        .toLowerCase();
+      const directMatches = terms.filter((term) => haystack.includes(term)).length;
+      return { item, directMatches, index };
+    })
+    .filter(({ item, directMatches }) => directMatches > 0 && !seen.has(item.claimText))
+    .sort((a, b) => b.directMatches - a.directMatches || a.index - b.index)
+    .slice(0, 2)
+    .map(({ item }) => {
+      seen.add(item.claimText);
+      return item;
+    });
+
+  return [primary, ...supporting];
+}
+
 function knowledgeAnswer(question: string, evidence: VibpeKnowledgeEvidence[]) {
   if (!evidence.length) return undefined;
-  const selected = evidence.slice(0, 4);
+  const selected = selectKnowledgeAnswerEvidence(question, evidence);
   const primary = selected[0];
   const asksAuthority = /production authority|design authority|released|approved|governing|master authority|can i treat|can we treat|is .* authority/i.test(question);
   const authority = knowledgeAuthorityLabel(selected);
