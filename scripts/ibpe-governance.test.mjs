@@ -100,3 +100,45 @@ test("governed IBPE procurement cost excludes catalogue references and scopes co
   assert.match(migration, /APPROVED-SUPPLIER-PRICE/);
   assert.match(migration, /APPROVED-PLANNING-PROCUREMENT-PRICE/);
 });
+
+
+test("runtime health score bounds repeated findings by business domain", () => {
+  const noisyInput = {
+    demand: Array.from({ length: 20 }, (_, index) => ({
+      id: `D-${index + 1}`,
+      productId: `P-${index + 1}`,
+      period: 1,
+      planQty: 10,
+      forecastQty: 0,
+      committedQty: 0,
+      actualQty: 0,
+      confidence: 1,
+      sourceRef: "HEALTH-BOUND-TEST",
+    })),
+    bom: [],
+    inventory: [],
+    reservations: [],
+    receipts: [],
+    capacity: [],
+    cashFlows: [],
+    funding: {
+      openingBankCashLakh: 1000,
+      minimumOperatingReserveLakh: 0,
+      restrictedCashLakh: 0,
+      fundraisingLeadMonths: 3,
+    },
+    runtimeControls: { paymentLagBySku: {} },
+  };
+  const result = runRuntimeIbpe(noisyInput, { horizonMonths: 36 });
+  assert.ok(result.findings.length >= 20, "individual findings must remain visible");
+  assert.ok(result.summary.businessHealthScore > 0, "repeated findings in one or two domains must not saturate health to zero");
+  assert.ok(result.summary.findingCounts.high + result.summary.findingCounts.medium > 0);
+});
+
+test("runtime health implementation uses bounded domain penalties while preserving severity counts", async () => {
+  const source = await readFile(join(here, "..", "src", "lib", "ibpe-runtime-parity.ts"), "utf8");
+  assert.match(source, /domainPenaltyCap/);
+  assert.match(source, /boundedDomainPenalty/);
+  assert.match(source, /Math\.min\(domainPenaltyCap\[domain\] \?\? 10, rawPenalty\)/);
+  assert.match(source, /findingCounts\[finding\.severity\] \+= 1/);
+});
