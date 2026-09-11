@@ -14,7 +14,7 @@ export type VibpeAssuranceException = {
   relatedEntityId: string;
   gateId: string;
   correlationId: string;
-  evidence: Record<string, unknown>;
+  evidence: Record<string, string | number | boolean | null>;
 };
 
 const text = (value: unknown) => String(value ?? "");
@@ -63,7 +63,7 @@ export const listVibpeAssuranceExceptions = createServerFn({ method: "GET" })
       relatedEntityId: text(row.related_entity_id),
       gateId: text(row.gate_id),
       correlationId: text(row.correlation_id),
-      evidence: (row.evidence_json ?? {}) as Record<string, unknown>,
+      evidence: Object.fromEntries(Object.entries((row.evidence_json ?? {}) as Record<string, unknown>).map(([key, value]) => [key, value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? value : JSON.stringify(value)])),
     }));
   });
 
