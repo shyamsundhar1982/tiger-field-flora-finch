@@ -73,10 +73,12 @@ test("surface inventory records backend visibility without changing UI structure
   assert.doesNotMatch(surfaces, /command-shell-v2|createFileRoute|WORKFLOW_STAGES|workspaceForRoute/);
 });
 
-// G6 — authority coverage extension after canonical Product/Engineering/Quality/People/Dispatch cutover.
-const g6 = readFileSync(new URL("../migrations/0054_vibpe_authority_coverage.sql", import.meta.url), "utf8");
+// G6 — final converged state after two additive 0054 migrations and forward-only 0055 reconciliation.
+const g6Initial = readFileSync(new URL("../migrations/0054_vibpe_authority_coverage.sql", import.meta.url), "utf8");
+const g6 = readFileSync(new URL("../migrations/0054_vibpe_authority_coverage_extension.sql", import.meta.url), "utf8");
+const g6Reconcile = readFileSync(new URL("../migrations/0055_vibpe_g6_reconciliation.sql", import.meta.url), "utf8");
 
-test("G6 registers every newly canonical authority domain and corrects Dispatch ownership", () => {
+test("G6 extension covers canonical Product, Engineering, Quality, People & Office, Dispatch, Finance and Governance authorities", () => {
   for (const entity of [
     "product_family",
     "product_variant",
@@ -87,48 +89,80 @@ test("G6 registers every newly canonical authority domain and corrects Dispatch 
     "quality_capa",
     "quality_release",
     "people_record",
-    "people_office_cost",
+    "people_office_cost_item",
     "people_office_asset",
+    "supplier_invoice",
+    "supplier_payment",
+    "ibpe_run",
+    "ibpe_management_action",
+    "ibpe_decision",
+    "vibpe_assurance_snapshot",
   ]) assert.match(g6, new RegExp(`'${entity}'`));
-  assert.match(g6, /where entity_type='shipment'/);
-  assert.match(g6, /set domain='dispatch'/);
-  assert.match(g6, /G04-PRODUCT-MASTER/);
-  assert.match(g6, /G08-PEOPLE-OFFICE/);
+
+  assert.match(g6, /G04-ENG-RELEASE/);
+  assert.match(g6, /G08-AP-MATCH/);
+  assert.match(g6, /G11-PEOPLE-OFFICE/);
+  assert.match(g6, /where gate_id='G10-QUALITY'/);
   assert.match(g6, /where gate_id='G12-DISPATCH'/);
+  assert.match(g6, /where gate_id='G13-FINANCE'/);
+  assert.match(g6, /where gate_id='G15-AUDIT'/);
 });
 
-test("G6 makes Quality canonical while preserving unproved Finance/Governance areas as explicit gaps", () => {
-  assert.match(g6, /'route:quality'.+'full'/s);
+test("G6 extends governed workflows through Quality release, Operations Dispatch, procure-to-pay and management assurance", () => {
+  assert.match(g6, /'order-to-cash',65,'quality','Quality Release'/);
+  assert.match(g6, /'order-to-cash',70,'dispatch','Operations Dispatch'/);
+  assert.match(g6, /'procure-to-pay',30,'supplier-invoice'/);
+  assert.match(g6, /'procure-to-pay',40,'supplier-payment'/);
+  assert.match(g6, /'people-office-to-finance'/);
+  assert.match(g6, /'governed-management'/);
+});
+
+test("G6 separates full backend authority from unproved route binding and preserves explicit gaps", () => {
+  assert.match(g6, /'table:quality-releases'[^\n]+'full'/);
+  assert.match(g6, /'service:quality-authority'[^\n]+'full'/);
+  assert.match(g6, /'route:quality'[^\n]+'gap'/);
+
   for (const surface of ["route:cash", "route:payables", "route:balance-sheet", "route:risk", "route:legal"]) {
-    assert.match(g6, new RegExp(`'${surface}'[^\\n]+?'gap'`), `${surface} must remain an explicit gap until canonical authority is proven`);
+    assert.match(g6Initial, new RegExp(`'${surface}'[^\\n]+?'gap'`), `${surface} must be explicitly represented as a gap`);
+    assert.match(g6Reconcile, new RegExp(surface.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `${surface} must survive reconciliation`);
   }
-  assert.match(g6, /assurance_surface_gap/);
-  assert.match(g6, /where r\.coverage_status='gap'/);
+  for (const surface of ["route:product", "route:engineering", "route:people-office", "route:dispatch-visibility"]) {
+    assert.match(g6Reconcile, new RegExp(`surface_id='${surface}'[\\s\\S]+?coverage_status='gap'|coverage_status='gap'[\\s\\S]+?surface_id='${surface}'`));
+  }
 });
 
-test("G6 adds deterministic exception checks for new Product, Engineering, Quality, People & Office and Dispatch authorities", () => {
+test("G6 deterministic exception checks cover the newly canonical authority graph", () => {
   for (const type of [
-    "product_family_missing_released_engineering_baseline",
-    "released_engineering_baseline_missing_approver",
-    "completed_traveller_missing_quality_release",
-    "quality_release_with_open_ncr",
-    "approved_people_record_missing_approver",
-    "approved_people_office_cost_missing_approver",
-    "approved_people_office_asset_missing_approver",
-    "posted_dispatch_missing_job_card",
-    "dispatch_owner_mismatch",
+    "confirmed_order_unknown_product_variant",
+    "approved_product_missing_released_engineering",
+    "quality_release_without_passing_final_inspection",
+    "completed_job_card_missing_quality_release",
+    "people_office_approval_attribution_missing",
+    "dispatch_missing_job_card_lineage",
+    "dispatch_exceeds_quality_release",
+    "supplier_payment_without_approved_invoice",
+    "ibpe_decision_attribution_missing",
   ]) assert.match(g6, new RegExp(type));
 });
 
-test("G6 unifies core and authority exceptions for live reads and immutable snapshots", () => {
-  assert.match(g6, /create or replace view vyndi_vibpe_all_exceptions/);
-  assert.match(g6, /select \* from vyndi_vibpe_assurance_exceptions/);
-  assert.match(g6, /select \* from vyndi_vibpe_authority_exceptions/);
-  assert.match(g6, /from vyndi_vibpe_all_exceptions/);
-  assert.match(g6, /'exceptionView','vyndi_vibpe_all_exceptions'/);
-  assert.match(service, /from vyndi_vibpe_all_exceptions/);
+test("G6 reconciliation removes semantic aliases without rewriting historical migrations", () => {
+  assert.match(g6Reconcile, /delete from vyndi_vibpe_entity_registry[\s\S]+entity_type='people_office_cost'/);
+  assert.match(g6Reconcile, /delete from vyndi_vibpe_gate_registry[\s\S]+G04-PRODUCT-MASTER[\s\S]+G08-PEOPLE-OFFICE/);
+  assert.match(g6Reconcile, /set domain='operations'/);
+  assert.match(g6Reconcile, /drop view if exists vyndi_vibpe_all_exceptions/);
+});
+
+test("G6 standardises live reads and snapshots on the unified assurance exception stream", () => {
+  assert.match(g6, /create or replace view vyndi_vibpe_assurance_exceptions_all/);
+  assert.match(g6, /from vyndi_vibpe_assurance_exceptions_all/);
+  assert.match(g6, /'exceptionView','vyndi_vibpe_assurance_exceptions_all'/);
+  assert.match(g6Reconcile, /view:vibpe-assurance-exceptions-all/);
+  assert.match(service, /from vyndi_vibpe_assurance_exceptions_all/);
+  assert.doesNotMatch(service, /from vyndi_vibpe_all_exceptions/);
 });
 
 test("G6 remains backend-only and does not cross the protected R3 UI boundary", () => {
-  assert.doesNotMatch(g6, /createFileRoute|command-shell-v2|WORKFLOW_STAGES|workspaceForRoute/);
+  for (const sql of [g6Initial, g6, g6Reconcile]) {
+    assert.doesNotMatch(sql, /createFileRoute|command-shell-v2|WORKFLOW_STAGES|workspaceForRoute/);
+  }
 });
