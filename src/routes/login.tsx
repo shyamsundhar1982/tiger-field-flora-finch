@@ -93,120 +93,112 @@ function LoginPage() {
     resize();
     draw();
     window.addEventListener("resize", resize);
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("resize", resize);
-    };
-  }, [granted]);
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setBusy(true);
-    setError("");
-
-    try {
-      // Keep the Better Auth client out of the server-render path. This page is
-      // shared by Node/Vercel and Cloudflare Workers, while authentication itself
-      // is only required after the browser submits the form.
-      const { authClient } = await import("@/lib/auth/client");
-      const normalizedEmail = email.trim().toLowerCase();
-      const result = await authClient.signIn.email(
-        { email: normalizedEmail, password },
-        {
-          onSuccess(ctx) {
-            if (!window.location.hostname.endsWith(".grok-sandbox.com")) return;
-            const token = ctx.response.headers.get("set-auth-token");
-            if (token) window.sessionStorage.setItem(BEARER_KEY, token);
-          },
-        },
-      );
-      if (result.error) {
-        setError(result.error.message ?? "Sign-in failed.");
-        return;
-      }
-      try {
-        await authClient.getSession();
-      } catch {
-        // The preview bearer is used only inside the embedded sandbox. Deployed
-        // hosts authenticate through their first-party HttpOnly cookie.
-      }
-
-      const destination = safeReturnTo(search.returnTo);
-      setGranted(true);
-      await new Promise((resolve) => window.setTimeout(resolve, 900));
-      await navigate({ to: destination as never });
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Sign-in failed.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <main className={`command-entry ${granted ? "command-entry--granted" : ""}`}>
+    return (
+    <main className={`command-entry command-entry--luxury ${granted ? "command-entry--granted" : ""}`}>
       <canvas ref={canvasRef} className="command-entry__canvas" aria-hidden="true" />
-      <div className="command-entry__grid" aria-hidden="true" />
-      <div className="command-entry__hud command-entry__hud--top">
-        CARBON COMPOSITE SYSTEM <span>·</span> VYNDI OS
-      </div>
-      <div className="command-entry__hud command-entry__hud--bottom">
-        STRUCTURAL ENGINEERING / CONFIGURATION CONTROL
-      </div>
-      <section className="command-entry__panel" aria-label="VYNDI Command Centre sign in">
-        <p className="command-entry__eyebrow">
-          VINDY <span>///</span> COMMAND CENTRE
-        </p>
-        <p className="command-entry__legal">VĀYÚ SHASTR PRIVATE LIMITED</p>
-        <h1>Engineering Command Entry</h1>
-        <p className="command-entry__intro">
-          Authenticate your individual authority to enter the operating system.
-        </p>
-        {search.created ? (
-          <p className="mt-5 rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-sm text-emerald-100">
-            Account created successfully. Sign in with the new credentials to continue.
-          </p>
-        ) : null}
-        <form onSubmit={submit} className="command-entry__form">
-          <label>
-            Email
-            <input
-              required
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </label>
-          <label>
-            Password
-            <input
-              required
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </label>
-          {error && (
-            <p role="alert" className="command-entry__error">
-              {error}
-            </p>
-          )}
-          <button disabled={busy || granted}>
-            {granted ? "ACCESS GRANTED" : busy ? "AUTHORIZING…" : "AUTHORIZE ACCESS"}
-          </button>
-        </form>
-        {granted ? (
-          <p className="command-entry__welcome">WELCOME TO VYNDI COMMAND CENTRE</p>
-        ) : (
-          <p className="command-entry__note">
-            Individual authority · Session protected · RBAC enforced
-          </p>
-        )}
-        <Link to="/" className="command-entry__back">
-          ← Return to VYNDI
+      <div className="command-entry__veil" aria-hidden="true" />
+      <div className="command-entry__grain" aria-hidden="true" />
+
+      <header className="command-entry__masthead">
+        <Link to="/" className="command-entry__brand" aria-label="Return to VYNDI">
+          <span className="command-entry__brand-mark">V</span>
+          <span>
+            <strong>VYNDI</strong>
+            <small>VĀYÚ SHASTR PRIVATE LIMITED</small>
+          </span>
         </Link>
+        <div className="command-entry__system">
+          <span className="command-entry__status-dot" />
+          COMMAND SYSTEM · SECURE
+        </div>
+      </header>
+
+      <section className="command-entry__stage">
+        <div className="command-entry__story">
+          <p className="command-entry__kicker">ENGINEERED IN INDIA · BUILT FOR DISTANCE</p>
+          <h1>
+            Precision,
+            <span> without noise.</span>
+          </h1>
+          <p className="command-entry__story-copy">
+            Enter the operating environment behind VYNDI — where product engineering,
+            configuration, commercial control and execution converge.
+          </p>
+          <div className="command-entry__signature" aria-hidden="true">
+            <span>01</span>
+            <div />
+            <p>CARBON PERFORMANCE SYSTEMS</p>
+          </div>
+        </div>
+
+        <section className="command-entry__panel" aria-label="VYNDI Command Centre sign in">
+          <div className="command-entry__panel-head">
+            <p className="command-entry__eyebrow">COMMAND CENTRE</p>
+            <p className="command-entry__panel-index">ACCESS / 01</p>
+          </div>
+          <h2>Authorised entry</h2>
+          <p className="command-entry__intro">
+            Sign in with your individual VYNDI identity.
+          </p>
+
+          {search.created ? (
+            <p className="command-entry__success">
+              Account created successfully. Use the new credentials to continue.
+            </p>
+          ) : null}
+
+          <form onSubmit={submit} className="command-entry__form">
+            <label>
+              <span>Email address</span>
+              <input
+                required
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="name@company.com"
+              />
+            </label>
+            <label>
+              <span>Password</span>
+              <input
+                required
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter password"
+              />
+            </label>
+
+            {error && (
+              <p role="alert" className="command-entry__error">
+                {error}
+              </p>
+            )}
+
+            <button disabled={busy || granted}>
+              <span>{granted ? "ACCESS GRANTED" : busy ? "AUTHENTICATING" : "ENTER COMMAND CENTRE"}</span>
+              <span aria-hidden="true">↗</span>
+            </button>
+          </form>
+
+          <div className="command-entry__trust">
+            <span>Individual authority</span>
+            <span>Protected session</span>
+            <span>RBAC enforced</span>
+          </div>
+
+          <Link to="/" className="command-entry__back">
+            Return to VYNDI
+          </Link>
+        </section>
       </section>
+
+      <footer className="command-entry__footer">
+        <span>VYNDI / VĀYÚ SHASTR</span>
+        <span>PERFORMANCE · ENGINEERING · CONTROL</span>
+      </footer>
     </main>
   );
 }
