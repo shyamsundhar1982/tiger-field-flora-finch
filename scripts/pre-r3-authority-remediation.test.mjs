@@ -6,6 +6,8 @@ const productMigration = readFileSync(new URL("../migrations/0049_canonical_prod
 const productAuthority = readFileSync(new URL("../src/lib/product-authority.ts", import.meta.url), "utf8");
 const engineeringMigration = readFileSync(new URL("../migrations/0050_engineering_revision_authority.sql", import.meta.url), "utf8");
 const engineeringAuthority = readFileSync(new URL("../src/lib/engineering-authority.ts", import.meta.url), "utf8");
+const qualityMigration = readFileSync(new URL("../migrations/0051_quality_lineage_authority.sql", import.meta.url), "utf8");
+const qualityAuthority = readFileSync(new URL("../src/lib/quality-authority.ts", import.meta.url), "utf8");
 const models = readFileSync(new URL("../src/lib/data/models.ts", import.meta.url), "utf8");
 
 const currentVariantIds = [...models.matchAll(/\{id:"([^"]+)"/g)].map((match) => match[1]);
@@ -67,4 +69,44 @@ test("G2 enforces actor-attributed approval and released-baseline implementation
   assert.match(engineeringAuthority, /ECR_STATUS_CHANGED/);
   assert.match(engineeringAuthority, /ENGINEERING_BASELINE_STATUS_CHANGED/);
   assert.match(engineeringAuthority, /actor_user_id,actor_role/);
+});
+
+// G3 — Quality lineage authority.
+test("G3 persists inspection, NCR, CAPA and serialized release evidence", () => {
+  assert.match(qualityMigration, /create table if not exists vyndi_quality_inspections/);
+  assert.match(qualityMigration, /create table if not exists vyndi_quality_ncrs/);
+  assert.match(qualityMigration, /create table if not exists vyndi_quality_capas/);
+  assert.match(qualityMigration, /create table if not exists vyndi_quality_releases/);
+  assert.match(qualityMigration, /traveller_id text references epr_travellers/);
+  assert.match(qualityMigration, /job_card_id text references epr_production_job_cards/);
+  assert.match(qualityMigration, /goods_receipt_id text references vyndi_goods_receipts/);
+  assert.match(qualityMigration, /create or replace view vyndi_quality_lineage/);
+});
+
+test("G3 does not promote static Quality sample data to canonical evidence", () => {
+  assert.match(qualityMigration, /static\/demo quality arrays are deliberately NOT promoted/i);
+  assert.doesNotMatch(qualityMigration, /QUALITY_CHECKS|NCRS|WARRANTY_CASES/);
+});
+
+test("G3 derives traveller lineage and enforces passing final inspection before release", () => {
+  assert.match(qualityAuthority, /resolveQualityLineage/);
+  assert.match(qualityAuthority, /t\.job_card_id as "jobCardId"/);
+  assert.match(qualityAuthority, /c\.sales_order_id as "salesOrderId"/);
+  assert.match(qualityAuthority, /Quality release requires at least one passing final inspection/);
+  assert.match(qualityAuthority, /Quality release is blocked by an open NCR\/CAPA chain/);
+  assert.match(qualityAuthority, /'G10-QUALITY'/);
+  assert.match(qualityAuthority, /QUALITY_RELEASE_DECIDED/);
+});
+
+test("G3 quality decisions preserve actor and audit evidence", () => {
+  for (const action of [
+    "QUALITY_INSPECTION_RECORDED",
+    "QUALITY_NCR_CREATED",
+    "QUALITY_NCR_STATUS_CHANGED",
+    "QUALITY_CAPA_CREATED",
+    "QUALITY_CAPA_STATUS_CHANGED",
+    "QUALITY_RELEASE_DECIDED",
+  ]) assert.match(qualityAuthority, new RegExp(action));
+  assert.match(qualityAuthority, /actor_user_id,actor_role/);
+  assert.match(qualityAuthority, /requirePermission\("approve"\)/);
 });
