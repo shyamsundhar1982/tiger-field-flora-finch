@@ -3,6 +3,7 @@ import type { IntegratedPlanningResult } from "@/lib/integrated-business-plannin
 import type { IbpeScenarioComparison, IbpeScenarioRequest } from "@/lib/ibpe-scenario-lab";
 import { evaluateScenario } from "@/lib/ibpe-scenario-lab";
 import { parseVibpeIntent, type VibpeScenarioParse } from "@/lib/vibpe-intent";
+import { retrieveVibpeKnowledgeEvidence, type VibpeKnowledgeEvidence } from "@/lib/vibpe-knowledge-retrieval";
 import { explainVibpeHorizon } from "@/lib/vibpe-planning";
 import { vibpeBusinessOperatorContext } from "@/lib/vibpe-business-operator";
 import { getVibpeSession, updateVibpeSession } from "@/lib/vibpe-session";
@@ -25,6 +26,48 @@ function money(value: number) {
 function signedMoney(value: number) {
   const amount = Number(value || 0);
   return `${amount >= 0 ? "+" : "−"}₹${Math.abs(amount).toFixed(1)}L`;
+}
+
+function isKnowledgeQuestion(question: string) {
+  const q = question.toLowerCase();
+  const knowledgeTopic = /\b(fork|axle[-\s]?to[-\s]?crown|a[-\s]?c|geometry|clearance|tyre|tire|wheelbase|chainstay|head tube|bottom bracket|\bbb\b|t47|headset|crank|stack|reach|trail|offset|layup|laminate|carbon|prepreg|toray|t700|t800|t1100|fea|cfd|dossier|cad|iso 4210|bis|is 10613|quality|apqp|fai|ncr|rcca|traveller|router|warranty|consumer|legal metrology|dpdp|privacy|contract|\bip\b|patent|trademark|trade mark|employment|payroll|epf|labour code|anthropometr|bike fit|ride metric|ftp|vo2|max|spo2)\b/i.test(q);
+  if (!knowledgeTopic) return false;
+
+  const explicitIbpeMetric = /\b(capacity shortfall|production capacity|work centre|work center|cash|liquidity|funding|runway|mrp|atp|msl|procurement total|recommended procurement|demand forecast|scenario|baseline health|business health)\b/i.test(q);
+  return !explicitIbpeMetric;
+}
+
+function knowledgeAuthorityLabel(evidence: VibpeKnowledgeEvidence[]) {
+  if (evidence.some((item) => item.authority === "unresolved")) return "UNRESOLVED / NON-GOVERNING";
+  return "ADVISORY / NON-GOVERNING";
+}
+
+function knowledgeAnswer(question: string, evidence: VibpeKnowledgeEvidence[]) {
+  if (!evidence.length) return undefined;
+  const selected = evidence.slice(0, 4);
+  const primary = selected[0];
+  const asksAuthority = /production authority|design authority|released|approved|governing|master authority|can i treat|can we treat|is .* authority/i.test(question);
+  const authority = knowledgeAuthorityLabel(selected);
+
+  const lines = [
+    `Knowledge-grounded assessment: ${primary.claimText}`,
+  ];
+
+  if (asksAuthority) {
+    if (selected.some((item) => item.authority === "unresolved")) {
+      lines.push("Authority: No. This evidence is unresolved/non-governing and cannot be treated as production or design authority. Verify the current released controlled master before manufacture, release or transaction use.");
+    } else {
+      lines.push("Authority: This is advisory knowledge, not automatic production or design authority. The current released controlled master remains governing.");
+    }
+  } else {
+    lines.push(`Authority: ${authority}. Governed internal/master data takes precedence.`);
+  }
+
+  if (selected.length > 1) {
+    lines.push(`Supporting evidence: ${selected.slice(1).map((item) => item.claimText).join(" ")}`);
+  }
+  lines.push(`Evidence source: ${primary.title}${primary.reviewDate ? ` · ${primary.reviewDate}` : ""}${primary.sourceLocator ? ` · ${primary.sourceLocator}` : ""}.`);
+  return lines.join("\n\n");
 }
 
 function scenarioAnswer(
@@ -69,6 +112,25 @@ export async function runVibpeCopilot2(
   const sessionKey = options.sessionKey ?? "default";
   const session = getVibpeSession(sessionKey);
   const priorScenario = session.activeScenario ?? options.uiScenario;
+
+  if (isKnowledgeQuestion(question)) {
+    try {
+      const evidence = await retrieveVibpeKnowledgeEvidence(sql, question, 8);
+      const answer = knowledgeAnswer(question, evidence);
+      if (answer) {
+        updateVibpeSession(sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
+        return {
+          intent: parsed.intent,
+          answer,
+          doctrine: vibpeBusinessOperatorContext(),
+          advisoryOnly: true,
+        };
+      }
+    } catch {
+      // Knowledge retrieval is supplementary. If unavailable, continue to the
+      // normal deterministic IBPE path instead of making Co-Pilot unavailable.
+    }
+  }
 
   if (parsed.intent === "conversation") {
     updateVibpeSession(sessionKey, { lastIntent: parsed.intent, lastQuestion: question });

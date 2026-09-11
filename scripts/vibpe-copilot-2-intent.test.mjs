@@ -6,6 +6,7 @@ const intent = await readFile(new URL("../src/lib/vibpe-intent.ts", import.meta.
 const doctrine = await readFile(new URL("../src/lib/vibpe-business-operator.ts", import.meta.url), "utf8");
 const architecture = await readFile(new URL("../docs/VIBPE-COPILOT-2-ARCHITECTURE.md", import.meta.url), "utf8");
 const productionCopilot = await readFile(new URL("../src/lib/ibpe-copilot.ts", import.meta.url), "utf8");
+const copilot2 = await readFile(new URL("../src/lib/vibpe-copilot-2.ts", import.meta.url), "utf8");
 
 test("VIBPE recognizes conversational closing instead of returning baseline assessment", () => {
   assert.match(intent, /bye\|goodbye\|see you\|thanks\|thank you/);
@@ -47,7 +48,6 @@ test("architecture separates deterministic truth from advisory reasoning", () =>
   assert.match(architecture, /External knowledge.*reference context only/i);
 });
 
-
 test("VIBPE 2.0 is active ahead of the legacy production fallback", () => {
   assert.match(productionCopilot, /import \{ runVibpeCopilot2 \}/);
   assert.match(productionCopilot, /await runVibpeCopilot2\(/);
@@ -55,9 +55,21 @@ test("VIBPE 2.0 is active ahead of the legacy production fallback", () => {
   assert.match(productionCopilot, /copilotVersion: handledByVibpe2 \? "2\.0" : "legacy-fallback"/);
 });
 
-
 test("VIBPE 2.0 runtime errors fail safely to the governed production fallback", () => {
   assert.match(productionCopilot, /try \{[\s\S]*await runVibpeCopilot2\(/);
   assert.match(productionCopilot, /catch \{[\s\S]*vibpe2FallbackReason = "runtime-error"/);
   assert.match(productionCopilot, /vibpe2FallbackReason: vibpe2FallbackReason \?\? null/);
+});
+
+test("engineering knowledge questions route before IBPE metric fallback", () => {
+  assert.match(copilot2, /function isKnowledgeQuestion/);
+  assert.match(copilot2, /fork\|axle/);
+  assert.match(copilot2, /retrieveVibpeKnowledgeEvidence\(sql, question, 8\)/);
+  assert.match(copilot2, /Authority: No\. This evidence is unresolved\/non-governing/);
+});
+
+test("production authority wording is not treated as production capacity by the knowledge router", () => {
+  assert.match(copilot2, /production authority/);
+  assert.match(copilot2, /production capacity/);
+  assert.match(copilot2, /return !explicitIbpeMetric/);
 });
