@@ -193,11 +193,7 @@ export const ingestVibpeWeeklyReview = createServerFn({ method: "POST" })
     return persistReview(data, role);
   });
 
-export const refreshVibpeWeeklyReviewsFromDrive = createServerFn({ method: "POST" }).handler(async () => {
-  assertSameSiteRequest();
-  const role = await getCommandRole();
-  if (!role || !canPerform(role, "edit")) throw new Error("Knowledge refresh permission denied.");
-
+export async function syncVibpeWeeklyReviewsFromDrive(role: string) {
   const token = await googleAccessToken();
   const q = encodeURIComponent(`'${WEEKLY_REVIEW_FOLDER_ID}' in parents and trashed = false and mimeType = 'application/vnd.google-apps.document'`);
   const fields = encodeURIComponent("files(id,name,modifiedTime,version,webViewLink)");
@@ -224,6 +220,29 @@ export const refreshVibpeWeeklyReviewsFromDrive = createServerFn({ method: "POST
     outcomes.push(await persistReview(data, role));
   }
   return { ok: true, scanned: result.files?.length ?? 0, outcomes };
+}
+
+export async function refreshVibpeWeeklyReviewsIfStale(role: string, maxAgeHours = 6) {
+  const sql = await getSql();
+  const rows = await sql<{ last_ingested_at: string | null }>`
+    select last_ingested_at::text
+    from vibpe_knowledge_sources
+    where id = ${WEEKLY_REVIEW_SOURCE_ID}
+    limit 1
+  `;
+  const last = rows[0]?.last_ingested_at ? Date.parse(rows[0].last_ingested_at) : 0;
+  if (last && Date.now() - last < maxAgeHours * 60 * 60 * 1000) {
+    return { ok: true, skipped: true, reason: "fresh" as const };
+  }
+  const result = await syncVibpeWeeklyReviewsFromDrive(role);
+  return { ...result, skipped: false };
+}
+
+export const refreshVibpeWeeklyReviewsFromDrive = createServerFn({ method: "POST" }).handler(async () => {
+  assertSameSiteRequest();
+  const role = await getCommandRole();
+  if (!role || !canPerform(role, "edit")) throw new Error("Knowledge refresh permission denied.");
+  return syncVibpeWeeklyReviewsFromDrive(role);
 });
 
 export const listVibpeWeeklyReviewKnowledge = createServerFn({ method: "GET" }).handler(async () => {
