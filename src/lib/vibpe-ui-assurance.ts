@@ -34,7 +34,7 @@ export const getVibpeUiAssurance = createServerFn({ method: "GET" })
 
 export const recordVibpeUiObservation = createServerFn({ method: "POST" })
   .middleware([optionalAuthMiddleware])
-  .inputValidator((input: VibpeUiObservationInput) => input)
+  .validator((input: VibpeUiObservationInput) => input)
   .handler(async ({ data, context }) => {
     const actor = await requireBusinessActor(
       "edit",
