@@ -30,13 +30,24 @@ export function checkedUrl(url) {
   return url;
 }
 
+function portableAllowedDir(dir) {
+  // App Builder uses /workspace on Linux.  On Windows that POSIX sentinel is not
+  // a meaningful parent of the checkout, so bind it to the actual checkout root
+  // instead of rejecting every valid output path.  Other allow-list entries are
+  // still resolved normally and no arbitrary directory is added.
+  if (process.platform === "win32" && dir === "/workspace") return resolve(process.cwd());
+  return resolve(dir);
+}
+
 /** Absolute `target` if it is strictly inside `allowedDirs`, else exit 1. */
 export function checkedOutputPath(target, allowedDirs, label = "screenshot") {
-  // Resolve first so `..` cannot slip past the prefix check.
+  // Resolve first so `..` cannot slip past the prefix check. Resolve the allow
+  // roots too so separators/case produced by the platform path library match.
   const abs = resolve(target);
-  const allowed = allowedDirs.some((dir) => abs.startsWith(dir.endsWith(sep) ? dir : dir + sep));
+  const roots = allowedDirs.map(portableAllowedDir);
+  const allowed = roots.some((dir) => abs.startsWith(dir.endsWith(sep) ? dir : dir + sep));
   if (!allowed) {
-    fail(`${label} path must be under ${allowedDirs.join(" or ")}, got ${abs}`);
+    fail(`${label} path must be under ${roots.join(" or ")}, got ${abs}`);
   }
   return abs;
 }
