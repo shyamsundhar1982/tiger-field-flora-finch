@@ -21,8 +21,15 @@ test("traceability search recognizes canonical record types and vernacular alias
     "collection",
   ]) assert.match(searchSource, new RegExp(`\\b${token}\\b`));
 
-  for (const phrase of ["job\\s*sheet", "material\\s*requisition", "goods\\s*receipt", "oda", "panniyacha", "done\\s+ah"]) {
-    assert.match(searchSource, new RegExp(phrase));
+  for (const phrase of [
+    "job\\s*sheet",
+    "material\\s*requisition",
+    "goods\\s*receipt",
+    "oda",
+    "panniyacha",
+    "done\\s+ah",
+  ]) {
+    assert.ok(searchSource.includes(phrase), `missing traceability alias: ${phrase}`);
   }
   assert.match(searchSource, /partial|searchTerms|identifierLike/);
 });
