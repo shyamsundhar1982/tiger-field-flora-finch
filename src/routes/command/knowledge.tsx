@@ -10,6 +10,7 @@ import {
   listVibpeWeeklyReviewKnowledge,
   refreshVibpeWeeklyReviewsFromDrive,
 } from "@/lib/vibpe-weekly-review-knowledge";
+import { listVayuShastrKnowledge, refreshVayuShastrDrive } from "@/lib/vibpe-vayu-shastr-drive";
 
 export const Route = createFileRoute("/command/knowledge")({ component: Knowledge });
 
@@ -27,6 +28,20 @@ function Knowledge() {
   }>>([]);
   const [reviewStatus, setReviewStatus] = useState("Loading governed review evidence…");
   const [refreshing, setRefreshing] = useState(false);
+  const [vayuRefreshing, setVayuRefreshing] = useState(false);
+  const [vayuStatus, setVayuStatus] = useState("Loading Vāyu Shastr Drive corpus…");
+  const [vayuDocs, setVayuDocs] = useState<Array<{
+    document_id: string;
+    title: string;
+    external_url: string | null;
+    source_revision: string | null;
+    ingested_at: string;
+    claim_count: number;
+    unresolved_count: number;
+    path: string | null;
+    knowledge_tier: string | null;
+    binary_metadata_only: string | null;
+  }>>([]);
 
   const loadReviewEvidence = useCallback(async () => {
     try {
@@ -38,9 +53,22 @@ function Knowledge() {
     }
   }, []);
 
+  const loadVayuEvidence = useCallback(async () => {
+    try {
+      const rows = await listVayuShastrKnowledge();
+      setVayuDocs(rows);
+      const controlled = rows.filter((row) => row.knowledge_tier === "controlled-reference").length;
+      const metadataOnly = rows.filter((row) => row.binary_metadata_only === "true").length;
+      setVayuStatus(`${rows.length} indexed files · ${controlled} controlled references · ${metadataOnly} metadata-only binaries`);
+    } catch (error) {
+      setVayuStatus(error instanceof Error ? error.message : "Unable to read Vāyu Shastr corpus");
+    }
+  }, []);
+
   useEffect(() => {
     void loadReviewEvidence();
-  }, [loadReviewEvidence]);
+    void loadVayuEvidence();
+  }, [loadReviewEvidence, loadVayuEvidence]);
   // Founder-only records remain in the master register but are not rendered
   // in the general workspace until an authenticated founder view exists.
   const visibleRecords = ALL_KNOWLEDGE.filter((record) => record.sensitivity === "workspace");
@@ -122,6 +150,76 @@ function Knowledge() {
                 <tr>
                   <td className="py-4 text-sm text-subtle" colSpan={6}>{reviewStatus}</td>
                 </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+
+
+      <Panel title="Vāyu Shastr Drive corpus" kicker={vayuStatus}>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="max-w-3xl text-sm text-muted">
+            Recursive governed reference access to the VAYU SHASTR Drive tree. Final-dossier/master-package paths are ranked as controlled references; legacy iterations are down-ranked. Secret and credential paths are excluded from ingestion.
+          </p>
+          <button
+            type="button"
+            disabled={vayuRefreshing}
+            onClick={async () => {
+              setVayuRefreshing(true);
+              setVayuStatus("Refreshing Vāyu Shastr Drive corpus…");
+              try {
+                const result = await refreshVayuShastrDrive();
+                setVayuStatus(`Drive refresh complete · ${result.scanned} scanned · ${result.excluded} excluded · ${result.claims} claims indexed`);
+                await loadVayuEvidence();
+              } catch (error) {
+                setVayuStatus(error instanceof Error ? error.message : "Vāyu Shastr Drive refresh failed");
+              } finally {
+                setVayuRefreshing(false);
+              }
+            }}
+            className="rounded-lg border border-line px-3 py-2 text-xs font-medium text-fg transition hover:border-accent disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {vayuRefreshing ? "Refreshing…" : "Refresh Vāyu Drive"}
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[980px] text-left text-sm">
+            <thead className="border-b border-line text-xs uppercase tracking-wider text-subtle">
+              <tr>
+                <th className="py-3 pr-4">Tier</th>
+                <th className="py-3 pr-4">Document</th>
+                <th className="py-3 pr-4">Path</th>
+                <th className="py-3 pr-4">Claims</th>
+                <th className="py-3 pr-4">Unresolved</th>
+                <th className="py-3 pr-4">Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              {vayuDocs.length ? vayuDocs.slice(0, 100).map((doc) => (
+                <tr key={doc.document_id} className="border-b border-line/60 align-top">
+                  <td className="py-3 pr-4">
+                    <span className="rounded-full border border-line px-2 py-1 text-xs text-fg">
+                      {doc.knowledge_tier ?? "reference"}
+                    </span>
+                  </td>
+                  <td className="py-3 pr-4 font-medium text-fg">
+                    {doc.title}
+                    {doc.binary_metadata_only === "true" ? <span className="ml-2 text-xs text-subtle">metadata only</span> : null}
+                  </td>
+                  <td className="max-w-[420px] py-3 pr-4 text-xs text-subtle">{doc.path ?? "—"}</td>
+                  <td className="py-3 pr-4 tabular-nums text-fg">{doc.claim_count}</td>
+                  <td className="py-3 pr-4 tabular-nums text-fg">{doc.unresolved_count}</td>
+                  <td className="py-3 pr-4 text-xs">
+                    {doc.external_url ? (
+                      <a className="text-accent hover:underline" href={doc.external_url} target="_blank" rel="noreferrer">
+                        Google Drive
+                      </a>
+                    ) : "—"}
+                  </td>
+                </tr>
+              )) : (
+                <tr><td className="py-4 text-sm text-subtle" colSpan={6}>{vayuStatus}</td></tr>
               )}
             </tbody>
           </table>
