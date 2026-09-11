@@ -61,13 +61,13 @@ function printRequisitionRecord({
   const travellerText = linkedTravellers.length
     ? linkedTravellers.map((traveller: any) => `${traveller.serial_number ?? traveller.id} · ${traveller.id}`).join("<br />")
     : "—";
-  const rows = cardLines.map((line: any, index: number) => {
+  const rows = materialLines.map((line: any, index: number) => {
     const required = Number(line.quantity ?? 0);
     const reservationQuantity = Number(line.reservation_quantity ?? 0);
     const reserved = line.reservation_status === "active" ? reservationQuantity : 0;
     const issued = line.issue_status === "issued" || line.reservation_status === "consumed" ? reservationQuantity || required : 0;
     const shortage = Number(line.shortage_quantity ?? 0);
-    const state = issued > 0 ? "ISSUED" : shortage > 0 ? "SHORT" : line.sku ? "COVERED" : "OPERATION";
+    const state = issued > 0 ? "ISSUED" : shortage > 0 ? "SHORT" : "COVERED";
     const evidence = line.reservation_status === "consumed"
       ? `Issued by ${line.consumed_by ?? "recorded operator"}${line.consumed_at ? ` · ${String(line.consumed_at).replace("T", " ").slice(0, 16)} UTC` : ""}`
       : line.reserved_by
@@ -150,7 +150,7 @@ function printRequisitionRecord({
     <p class="note">Generated from the released BOM. Stores records actual FIFO reservation and issue evidence against the compatible traveller genealogy. This document is a controlled transaction record; it is not a screenshot of the operating workspace.</p>
 
     <table>
-      <thead><tr><th>#</th><th>SKU / operation</th><th>Req.</th><th>Res.</th><th>Issued</th><th>Short</th><th>Status</th><th>Reservation / issue evidence</th></tr></thead>
+      <thead><tr><th>#</th><th>SKU / material item</th><th>Req.</th><th>Res.</th><th>Issued</th><th>Short</th><th>Status</th><th>Reservation / issue evidence</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
 
@@ -394,7 +394,7 @@ function ProductionWorkspace() {
                     </div>
                     <p className="mt-3 text-[11px] leading-5 text-muted">Generated from the released BOM; no duplicate material entry is required. Stores confirms the actual FIFO issue against a compatible traveller serial below.</p>
                     <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                      {cardLines.map((line: any) => {
+                      {materialLines.map((line: any) => {
                         const required = Number(line.quantity ?? 0);
                         const reserved = Number(line.reserved_quantity ?? 0);
                         const shortage = Number(line.shortage_quantity ?? 0);
@@ -410,7 +410,7 @@ function ProductionWorkspace() {
                           <div key={line.id} className="rounded-lg border border-border/70 p-3">
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0"><p className="truncate font-mono text-xs font-semibold text-fg">{line.sku ?? line.item}</p><p className="mt-1 text-[10px] text-subtle">{line.stage_code} · {line.stage_name}</p></div>
-                              <span className={`text-[10px] font-bold uppercase ${shortage > 0 ? "text-warn" : "text-green"}`}>{shortage > 0 ? "Short" : line.sku ? "Covered" : "Operation"}</span>
+                              <span className={`text-[10px] font-bold uppercase ${shortage > 0 ? "text-warn" : "text-green"}`}>{shortage > 0 ? "Short" : "Covered"}</span>
                             </div>
                             <div className="mt-3 grid grid-cols-4 gap-2 text-center text-[10px]">
                               <SmallMetric label="Requested" value={`${required}`} /><SmallMetric label="Reserved" value={`${line.reservation_status === "active" ? reservationQuantity : 0}`} /><SmallMetric label="Issued" value={`${issuedQuantity}`} /><SmallMetric label="Short" value={`${shortage}`} />

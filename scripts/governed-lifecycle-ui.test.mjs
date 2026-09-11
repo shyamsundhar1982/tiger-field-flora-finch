@@ -78,5 +78,9 @@ test("Production prints a dedicated material requisition record instead of the w
   assert.match(source, /Controlled Production Record/);
   assert.match(source, /Stores issue \/ verification/);
   assert.match(source, /Production receipt/);
+  assert.match(source, /const rows = materialLines\.map/);
+  assert.match(source, /\{materialLines\.map\(\(line: any\) =>/);
+  assert.match(source, /SKU \/ material item/);
+  assert.doesNotMatch(source, /<th>SKU \/ operation<\/th>/);
   assert.doesNotMatch(source, /onClick=\{\(\) => window\.print\(\)\}/);
 });
