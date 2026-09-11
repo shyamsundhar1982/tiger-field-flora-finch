@@ -8,6 +8,7 @@ import {
   PackageSearch,
 } from "lucide-react";
 import { useState } from "react";
+import { GovernedLifecycle } from "@/components/governed-lifecycle";
 import { Kpi, Panel } from "@/components/kpi";
 import { getDecisionInboxData } from "@/lib/procure-to-pay-authority";
 import { updateIbpeManagementActionLifecycle } from "@/lib/ibpe-operating-governance";
@@ -129,33 +130,44 @@ function DecisionInbox() {
                         </p>
                       ) : null}
                     </div>
-                    <div className="flex shrink-0 flex-wrap gap-2">
-                      {group === "IBPE management action" && text(item, "status") === "open" ? (
-                        <button
-                          type="button"
-                          disabled={busyAction === text(item, "id")}
-                          onClick={() => transitionIbpeAction(text(item, "id"), "in_progress")}
-                          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border px-4 py-2 text-xs font-semibold text-fg hover:border-accent hover:text-accent disabled:opacity-50"
-                        >
-                          Start
-                        </button>
-                      ) : null}
+                    <div className="min-w-[260px] shrink-0">
                       {group === "IBPE management action" ? (
-                        <button
-                          type="button"
-                          disabled={busyAction === text(item, "id")}
-                          onClick={() => transitionIbpeAction(text(item, "id"), "done")}
-                          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-ok/40 px-4 py-2 text-xs font-semibold text-ok hover:bg-ok/5 disabled:opacity-50"
+                        <>
+                          <GovernedLifecycle
+                            status={text(item, "status") || "open"}
+                            tone={text(item, "status") === "blocked" ? "danger" : text(item, "status") === "in_progress" ? "info" : "warn"}
+                            actions={[
+                              ...(text(item, "status") === "open"
+                                ? [{
+                                    label: "Start action",
+                                    onClick: () => transitionIbpeAction(text(item, "id"), "in_progress"),
+                                    disabled: busyAction === text(item, "id"),
+                                    tone: "primary" as const,
+                                  }]
+                                : []),
+                              {
+                                label: "Complete action",
+                                onClick: () => transitionIbpeAction(text(item, "id"), "done"),
+                                disabled: busyAction === text(item, "id"),
+                                tone: "ok" as const,
+                              },
+                            ]}
+                          />
+                          <Link
+                            to={text(item, "route") as never}
+                            className="mt-2 inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted hover:border-accent hover:text-accent"
+                          >
+                            Open workspace <ArrowRight className="size-4" />
+                          </Link>
+                        </>
+                      ) : (
+                        <Link
+                          to={text(item, "route") as never}
+                          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-xs font-semibold text-fg hover:border-accent hover:text-accent"
                         >
-                          Complete
-                        </button>
-                      ) : null}
-                      <Link
-                        to={text(item, "route") as never}
-                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-xs font-semibold text-fg hover:border-accent hover:text-accent"
-                      >
-                        Open workspace <ArrowRight className="size-4" />
-                      </Link>
+                          Open workspace <ArrowRight className="size-4" />
+                        </Link>
+                      )}
                     </div>
                   </article>
                 );
