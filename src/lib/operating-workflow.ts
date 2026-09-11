@@ -4,8 +4,11 @@ export type WorkspaceId =
   | "engineering"
   | "operations"
   | "people-office"
-  | "finance-governance"
-  | "admin";
+  | "finance"
+  | "governance"
+  | "admin"
+  /** @deprecated Prefer "finance" | "governance". */
+  | "finance-governance";
 
 export type WorkspaceLink = { to: string; label: string };
 export type WorkflowStage = {
@@ -27,49 +30,60 @@ export const FINANCE_HOME = "/command/financial-cockpit";
 export const GOVERNANCE_HOME = "/command/governance";
 export const ADMIN_HOME = "/command/users";
 
+/** Cross-cutting Command tools — not transaction workspaces. */
 export const COMMAND_SHORTCUTS: readonly WorkspaceLink[] = [
   { to: "/command/decision-inbox", label: "Action Inbox" },
-  { to: "/command/control-tower", label: "ERP Reports" },
+  { to: "/command/control-tower", label: "Control Tower" },
   { to: "/command/ibpe-operating-workspace", label: "VIBPE Workspace" },
   { to: "/command/ibpe-operating-workspace/assurance", label: "VIBPE Assurance" },
 ];
 
+/** Plan & Commercial — demand, horizon planning, scenarios. */
 export const PLAN_SALES_TABS: readonly WorkspaceLink[] = [
   { to: PLAN_HOME, label: "Plan" },
   { to: SALES_HOME, label: "Demand & Orders" },
-  { to: "/command/gtm", label: "GTM" },
-  { to: "/command/market-survey", label: "Market" },
   { to: "/command/scenarios", label: "Scenarios" },
+  { to: "/command/gtm", label: "GTM" },
 ];
 
+/** Product & Engineering — product identity, baselines, BOM. */
 export const ENGINEERING_TABS: readonly WorkspaceLink[] = [
-  { to: ENGINEERING_HOME, label: "Overview" },
-  { to: "/command/product", label: "Product & Validation" },
+  { to: ENGINEERING_HOME, label: "Engineering" },
+  { to: "/command/product", label: "Product" },
   { to: "/command/bom-control", label: "BOM Control" },
-  { to: "/command/bom", label: "BOM Cost / Scenario" },
+  { to: "/command/bom", label: "BOM Cost" },
 ];
 
+/**
+ * Supply & Operations — material → build → fulfilment.
+ * Overview is the Operations/dispatch visibility surface (canonical writer remains Operations-owned).
+ */
 export const OPERATIONS_TABS: readonly WorkspaceLink[] = [
-  { to: OPERATIONS_HOME, label: "Overview" },
+  { to: OPERATIONS_HOME, label: "Overview & Dispatch" },
+  { to: "/command/inventory", label: "Inventory" },
   { to: "/command/procurement-planning", label: "Requirements" },
   { to: "/command/purchase-execution", label: "Purchase" },
   { to: "/command/receiving", label: "Receiving" },
-  { to: "/command/inventory", label: "Inventory" },
-  { to: "/command/production", label: "Build & Genealogy" },
+  { to: "/command/production", label: "Build" },
   { to: "/command/quality", label: "Quality" },
 ];
 
-export const FINANCE_GOVERNANCE_TABS: readonly WorkspaceLink[] = [
-  { to: FINANCE_HOME, label: "Finance Overview" },
+/** Finance — money movement only (cash, AP, AR, position). */
+export const FINANCE_TABS: readonly WorkspaceLink[] = [
+  { to: FINANCE_HOME, label: "Overview" },
   { to: "/command/cash", label: "Cash" },
   { to: "/command/payables", label: "Payables" },
   { to: "/command/receivables", label: "Receivables" },
   { to: "/command/balance-sheet", label: "Balance Sheet" },
-  { to: "/command/ca-audit", label: "CA Audit" },
+];
+
+/** Governance & Assurance — control, evidence, risk, legal. */
+export const GOVERNANCE_TABS: readonly WorkspaceLink[] = [
   { to: GOVERNANCE_HOME, label: "Approvals" },
   { to: "/command/risk", label: "Risk" },
   { to: "/command/legal", label: "Legal & IP" },
   { to: "/command/actions", label: "Audit & Actions" },
+  { to: "/command/ca-audit", label: "CA Audit" },
 ];
 
 export const ADMIN_TABS: readonly WorkspaceLink[] = [
@@ -77,20 +91,54 @@ export const ADMIN_TABS: readonly WorkspaceLink[] = [
   { to: "/command/master-data", label: "Master Data" },
 ];
 
+/** @deprecated Prefer FINANCE_TABS + GOVERNANCE_TABS. */
+export const FINANCE_GOVERNANCE_TABS: readonly WorkspaceLink[] = [
+  ...FINANCE_TABS,
+  ...GOVERNANCE_TABS,
+];
+
 export const WORKFLOW_STAGES: readonly WorkflowStage[] = [
   { id: "plan", label: "Plan", shortLabel: "Plan", to: PLAN_HOME, routes: [PLAN_HOME, "/command/scenarios"], owner: "plan-sales" },
   { id: "demand", label: "Demand / Order", shortLabel: "Demand", to: SALES_HOME, routes: [SALES_HOME], owner: "plan-sales" },
-  { id: "engineering", label: "Engineering / BOM", shortLabel: "BOM", to: "/command/bom-control", routes: [ENGINEERING_HOME, "/command/product", "/command/bom-control", "/command/bom"], owner: "engineering" },
-  { id: "material", label: "Material Check", shortLabel: "Material", to: "/command/inventory", routes: [OPERATIONS_HOME, "/command/inventory"], owner: "operations" },
-  { id: "procurement", label: "Procurement", shortLabel: "Procure", to: "/command/purchase-execution", routes: ["/command/procurement-planning", "/command/purchase-execution"], owner: "operations" },
+  {
+    id: "engineering",
+    label: "Engineering / BOM",
+    shortLabel: "BOM",
+    to: "/command/bom-control",
+    routes: [ENGINEERING_HOME, "/command/product", "/command/bom-control", "/command/bom"],
+    owner: "engineering",
+  },
+  {
+    id: "material",
+    label: "Material Check",
+    shortLabel: "Material",
+    to: "/command/inventory",
+    routes: ["/command/inventory"],
+    owner: "operations",
+  },
+  {
+    id: "procurement",
+    label: "Procurement",
+    shortLabel: "Procure",
+    to: "/command/purchase-execution",
+    routes: ["/command/procurement-planning", "/command/purchase-execution"],
+    owner: "operations",
+  },
   { id: "receiving", label: "Receiving", shortLabel: "Receive", to: "/command/receiving", routes: ["/command/receiving"], owner: "operations" },
   { id: "job-card", label: "Job Card", shortLabel: "Job Card", to: "/command/production", routes: [], owner: "operations" },
   { id: "traveller", label: "Traveller", shortLabel: "Traveller", to: "/command/production", routes: [], owner: "operations" },
   { id: "production", label: "Production", shortLabel: "Build", to: "/command/production", routes: ["/command/production"], owner: "operations" },
   { id: "quality", label: "Quality", shortLabel: "Quality", to: "/command/quality", routes: ["/command/quality"], owner: "operations" },
-  { id: "shipment", label: "Shipment", shortLabel: "Ship", to: "/command/receivables", routes: [], owner: "finance-governance" },
-  { id: "invoice", label: "Invoice", shortLabel: "Invoice", to: "/command/receivables", routes: [], owner: "finance-governance" },
-  { id: "collection", label: "Collection", shortLabel: "Collect", to: "/command/receivables", routes: ["/command/receivables"], owner: "finance-governance" },
+  {
+    id: "dispatch",
+    label: "Dispatch",
+    shortLabel: "Ship",
+    to: OPERATIONS_HOME,
+    routes: [OPERATIONS_HOME],
+    owner: "operations",
+  },
+  { id: "invoice", label: "Invoice", shortLabel: "Invoice", to: "/command/receivables", routes: [], owner: "finance" },
+  { id: "collection", label: "Collection", shortLabel: "Collect", to: "/command/receivables", routes: ["/command/receivables"], owner: "finance" },
 ];
 
 export const COMMAND_CONTEXT = new Set<string>([
@@ -107,6 +155,7 @@ export const COMMAND_CONTEXT = new Set<string>([
 
 export const PLAN_SALES_CONTEXT = new Set<string>([
   ...PLAN_SALES_TABS.map((tab) => tab.to),
+  "/command/market-survey",
   "/command/finance-assumptions",
   "/command/funding",
 ]);
@@ -133,16 +182,27 @@ export const OPERATIONS_CONTEXT = new Set<string>([
 
 export const PEOPLE_CONTEXT = new Set<string>([PEOPLE_HOME]);
 
-export const FINANCE_GOVERNANCE_CONTEXT = new Set<string>([
-  ...FINANCE_GOVERNANCE_TABS.map((tab) => tab.to),
+export const FINANCE_CONTEXT = new Set<string>([
+  ...FINANCE_TABS.map((tab) => tab.to),
   "/command/finance",
   "/command/finance-control",
   "/command/master-finance",
   "/command/aluminium-finance",
   "/command/actuals",
+]);
+
+export const GOVERNANCE_CONTEXT = new Set<string>([
+  ...GOVERNANCE_TABS.map((tab) => tab.to),
   "/command/qa-verification",
   "/command/legal-control",
   "/command/epr-live",
+  "/command/ibpe-operating-workspace/assurance",
+]);
+
+/** @deprecated Prefer FINANCE_CONTEXT or GOVERNANCE_CONTEXT. */
+export const FINANCE_GOVERNANCE_CONTEXT = new Set<string>([
+  ...FINANCE_CONTEXT,
+  ...GOVERNANCE_CONTEXT,
 ]);
 
 export const ADMIN_CONTEXT = new Set<string>([...ADMIN_TABS.map((tab) => tab.to)]);
@@ -187,7 +247,8 @@ export function workspaceForRoute(pathname: string): WorkspaceId | null {
   if (ENGINEERING_CONTEXT.has(pathname)) return "engineering";
   if (OPERATIONS_CONTEXT.has(pathname)) return "operations";
   if (PEOPLE_CONTEXT.has(pathname)) return "people-office";
-  if (FINANCE_GOVERNANCE_CONTEXT.has(pathname)) return "finance-governance";
+  if (FINANCE_CONTEXT.has(pathname)) return "finance";
+  if (GOVERNANCE_CONTEXT.has(pathname)) return "governance";
   if (ADMIN_CONTEXT.has(pathname)) return "admin";
   return null;
 }
