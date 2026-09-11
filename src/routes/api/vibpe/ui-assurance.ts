@@ -24,7 +24,7 @@ export const Route = createFileRoute("/api/vibpe/ui-assurance")({
         return json({ ok: true, actor: { userId: actor.userId, role: actor.role }, capabilities, coverage, exceptions });
       },
       POST: async ({ request }) => {
-        const actor = await requireBusinessActor("command");
+        const actor = await requireBusinessActor("edit");
         const payload = (await request.json().catch(() => null)) as Record<string, unknown> | null;
         if (!payload) return json({ ok: false, error: "invalid_json" }, 400);
         const capabilityId = String(payload.capabilityId ?? "").trim().slice(0, 120);
