@@ -25,6 +25,7 @@ export type TraceabilityDocumentRef = {
 };
 
 export type TraceabilitySearchHit = {
+  visibleTypes: TraceabilityDocumentType[];
   salesOrderId: string;
   salesOrderRevision: number;
   planMonth: number;
@@ -41,8 +42,10 @@ export type TraceabilitySearchHit = {
   travellerIds: string[];
   serialNumbers: string[];
   purchaseOrderIds: string[];
+  purchaseOrderStatuses: string[];
   goodsReceiptIds: string[];
   qualityReleaseIds: string[];
+  qualityReleaseStatuses: string[];
   shipmentIds: string[];
   invoiceIds: string[];
   collectionIds: string[];
@@ -88,6 +91,19 @@ type TraceabilityPrintRecord = {
   }>;
 };
 
+const TRACEABLE_TYPES: TraceabilityDocumentType[] = [
+  "commercial_order",
+  "job_card",
+  "material_requisition",
+  "traveller",
+  "purchase_order",
+  "grn",
+  "quality_release",
+  "dispatch",
+  "invoice",
+  "collection",
+];
+
 const ROUTE_BY_TYPE: Record<TraceabilityDocumentType, string> = {
   commercial_order: "/command/sales",
   job_card: "/command/production",
@@ -101,8 +117,11 @@ const ROUTE_BY_TYPE: Record<TraceabilityDocumentType, string> = {
   collection: "/command/receivables",
 };
 
+const OPEN_PO_STATUSES = new Set(["draft", "pending_approval", "approved", "issued", "part_received"]);
+const RELEASED_QUALITY_STATUSES = new Set(["released", "release", "approved"]);
+
 const STOP_WORDS = new Set([
-  "a","an","and","are","all","any","about","for","from","in","is","it","me","of","on","or","please","related","show","search","find","the","this","that","to","with","what","which","where","who","print","pdf","paper","papers","document","documents","doc","docs","record","records","form","forms","oda","ku","kku","la","le","enna","enga","irukka","irukku","panniyacha","panniya","kaatu","kattu","thedu","venum","vendum",
+  "a", "an", "and", "are", "all", "any", "about", "for", "from", "in", "is", "it", "me", "of", "on", "or", "please", "related", "show", "search", "find", "the", "this", "that", "to", "with", "what", "which", "where", "who", "print", "pdf", "paper", "papers", "document", "documents", "doc", "docs", "record", "records", "form", "forms", "oda", "ku", "kku", "la", "le", "enna", "enga", "irukka", "irukku", "panniyacha", "panniya", "kaatu", "kattu", "thedu", "venum", "vendum",
 ]);
 
 const VERNACULAR_REPLACEMENTS: Array<[RegExp, string]> = [
@@ -132,7 +151,12 @@ function unique(values: string[]) {
 }
 
 function sanitizeSearchText(value: string) {
-  return value.toLowerCase().replace(/[%_]/g, " ").replace(/[^a-z0-9@.+\-_/\s]/g, " ").replace(/\s+/g, " ").trim();
+  return value
+    .toLowerCase()
+    .replace(/[%_]/g, " ")
+    .replace(/[^a-z0-9@.+\-_/\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function documentTypesFromText(q: string): TraceabilityDocumentType[] {
@@ -166,7 +190,9 @@ export function interpretTraceabilityQuery(input: string): TraceabilityInterpret
   const traceVerb = /\bfind\b|\bshow\b|\bsearch\b|\btrace\b|\brelated\b|\bwhich\b|\bwhere\b|\bwhat\b|\bstatus\b|\benga\b|\benna\b|\bkaatu\b|\bthedu\b/.test(raw.toLowerCase());
   const recognized = identifierLike || (documentTypes.length > 0 && (traceVerb || wantsPrint || pendingOnly));
 
-  const semanticWords = new Set(["order","demand","commercial","sales","job","card","work","material","requisition","mr","traveller","traveler","serial","genealogy","po","purchase","grn","goods","receipt","receiving","quality","qa","qc","release","dispatch","shipment","invoice","receivable","collection","payment","status","pending","waiting","open"]);
+  const semanticWords = new Set([
+    "order", "demand", "commercial", "sales", "job", "card", "work", "material", "requisition", "mr", "traveller", "traveler", "serial", "genealogy", "po", "purchase", "grn", "goods", "receipt", "receiving", "quality", "qa", "qc", "release", "dispatch", "shipment", "invoice", "receivable", "collection", "payment", "status", "pending", "waiting", "open",
+  ]);
   const searchTerms = unique(
     normalized
       .split(/\s+/)
@@ -181,6 +207,10 @@ function canSee(role: CommandRole, type: TraceabilityDocumentType) {
   return canAccessRoute(role, ROUTE_BY_TYPE[type]);
 }
 
+function visibleTypesFor(role: CommandRole) {
+  return TRACEABLE_TYPES.filter((type) => canSee(role, type));
+}
+
 function addDocument(
   docs: TraceabilityDocumentRef[],
   role: CommandRole,
@@ -193,100 +223,116 @@ function addDocument(
   docs.push({ type, id, status, label, route: ROUTE_BY_TYPE[type] });
 }
 
-function rowToHit(row: SearchRow, role: CommandRole, terms: string[]) {
-  const salesOrderId = clean(row.sales_order_id);
-  const salesOrderRevision = Number(row.sales_order_revision ?? 0);
-  const jobCardId = clean(row.job_card_id);
-  const batchCode = clean(row.batch_code);
-  const materialRequisitionId = batchCode ? `MR-${batchCode.replace(/^BATCH-/i, "")}` : "";
-  const travellerIds = splitPipe(row.traveller_ids);
-  const travellerStatuses = splitPipe(row.traveller_statuses);
-  const serialNumbers = splitPipe(row.serial_numbers);
-  const purchaseOrderIds = splitPipe(row.po_ids);
-  const purchaseOrderStatuses = splitPipe(row.po_statuses);
-  const goodsReceiptIds = splitPipe(row.grn_ids);
-  const goodsReceiptStatuses = splitPipe(row.grn_statuses);
-  const qualityReleaseIds = splitPipe(row.quality_ids);
-  const qualityStatuses = splitPipe(row.quality_statuses);
-  const shipmentIds = splitPipe(row.shipment_ids);
-  const shipmentStatuses = splitPipe(row.shipment_statuses);
-  const invoiceIds = splitPipe(row.invoice_ids);
-  const invoiceStatuses = splitPipe(row.invoice_statuses);
-  const collectionIds = splitPipe(row.collection_ids);
-  const collectionStatuses = splitPipe(row.collection_statuses);
-  const supplierNames = splitPipe(row.supplier_names);
-  const requirementSkus = splitPipe(row.requirement_skus);
+function rowToHit(row: SearchRow, role: CommandRole, terms: string[]): TraceabilitySearchHit {
+  const visibleTypes = visibleTypesFor(role);
+  const visible = (type: TraceabilityDocumentType) => visibleTypes.includes(type);
+
+  const rawSalesOrderId = clean(row.sales_order_id);
+  const rawJobCardId = clean(row.job_card_id);
+  const rawBatchCode = clean(row.batch_code);
+  const rawMaterialRequisitionId = rawBatchCode ? `MR-${rawBatchCode.replace(/^BATCH-/i, "")}` : "";
+  const rawTravellerIds = splitPipe(row.traveller_ids);
+  const rawTravellerStatuses = splitPipe(row.traveller_statuses);
+  const rawSerialNumbers = splitPipe(row.serial_numbers);
+  const rawPurchaseOrderIds = splitPipe(row.po_ids);
+  const rawPurchaseOrderStatuses = splitPipe(row.po_statuses);
+  const rawGoodsReceiptIds = splitPipe(row.grn_ids);
+  const rawGoodsReceiptStatuses = splitPipe(row.grn_statuses);
+  const rawQualityReleaseIds = splitPipe(row.quality_ids);
+  const rawQualityStatuses = splitPipe(row.quality_statuses);
+  const rawShipmentIds = splitPipe(row.shipment_ids);
+  const rawShipmentStatuses = splitPipe(row.shipment_statuses);
+  const rawInvoiceIds = splitPipe(row.invoice_ids);
+  const rawInvoiceStatuses = splitPipe(row.invoice_statuses);
+  const rawCollectionIds = splitPipe(row.collection_ids);
+  const rawCollectionStatuses = splitPipe(row.collection_statuses);
+  const rawSupplierNames = splitPipe(row.supplier_names);
+  const rawRequirementSkus = splitPipe(row.requirement_skus);
 
   const docs: TraceabilityDocumentRef[] = [];
-  addDocument(docs, role, "commercial_order", salesOrderId, clean(row.order_status), `Commercial Order ${salesOrderId}`);
-  addDocument(docs, role, "job_card", jobCardId, clean(row.job_card_status), `Job Card ${jobCardId}`);
-  addDocument(docs, role, "material_requisition", materialRequisitionId, clean(row.job_card_status), `Material Requisition ${materialRequisitionId}`);
-  travellerIds.forEach((id, index) => addDocument(docs, role, "traveller", id, travellerStatuses[index] ?? "", serialNumbers[index] ? `${serialNumbers[index]} · ${id}` : id));
-  purchaseOrderIds.forEach((id, index) => addDocument(docs, role, "purchase_order", id, purchaseOrderStatuses[index] ?? "", id));
-  goodsReceiptIds.forEach((id, index) => addDocument(docs, role, "grn", id, goodsReceiptStatuses[index] ?? "", id));
-  qualityReleaseIds.forEach((id, index) => addDocument(docs, role, "quality_release", id, qualityStatuses[index] ?? "", id));
-  shipmentIds.forEach((id, index) => addDocument(docs, role, "dispatch", id, shipmentStatuses[index] ?? "", id));
-  invoiceIds.forEach((id, index) => addDocument(docs, role, "invoice", id, invoiceStatuses[index] ?? "", id));
-  collectionIds.forEach((id, index) => addDocument(docs, role, "collection", id, collectionStatuses[index] ?? "", id));
+  addDocument(docs, role, "commercial_order", rawSalesOrderId, clean(row.order_status), `Commercial Order ${rawSalesOrderId}`);
+  addDocument(docs, role, "job_card", rawJobCardId, clean(row.job_card_status), `Job Card ${rawJobCardId}`);
+  addDocument(docs, role, "material_requisition", rawMaterialRequisitionId, clean(row.job_card_status), `Material Requisition ${rawMaterialRequisitionId}`);
+  rawTravellerIds.forEach((id, index) => addDocument(docs, role, "traveller", id, rawTravellerStatuses[index] ?? "", rawSerialNumbers[index] ? `${rawSerialNumbers[index]} · ${id}` : id));
+  rawPurchaseOrderIds.forEach((id, index) => addDocument(docs, role, "purchase_order", id, rawPurchaseOrderStatuses[index] ?? "", id));
+  rawGoodsReceiptIds.forEach((id, index) => addDocument(docs, role, "grn", id, rawGoodsReceiptStatuses[index] ?? "", id));
+  rawQualityReleaseIds.forEach((id, index) => addDocument(docs, role, "quality_release", id, rawQualityStatuses[index] ?? "", id));
+  rawShipmentIds.forEach((id, index) => addDocument(docs, role, "dispatch", id, rawShipmentStatuses[index] ?? "", id));
+  rawInvoiceIds.forEach((id, index) => addDocument(docs, role, "invoice", id, rawInvoiceStatuses[index] ?? "", id));
+  rawCollectionIds.forEach((id, index) => addDocument(docs, role, "collection", id, rawCollectionStatuses[index] ?? "", id));
 
   const searchableEntries: Array<[string, string, TraceabilityDocumentType]> = [
-    ["Commercial Order", salesOrderId, "commercial_order"],
+    ["Commercial Order", rawSalesOrderId, "commercial_order"],
     ["Variant", `${clean(row.variant_id)} ${clean(row.variant_name)}`, "commercial_order"],
-    ["Job Card", jobCardId, "job_card"],
-    ["Batch", batchCode, "job_card"],
-    ["Material Requisition", materialRequisitionId, "material_requisition"],
-    ["Material / SKU", requirementSkus.join(" "), "material_requisition"],
-    ["Traveller", travellerIds.join(" "), "traveller"],
-    ["Serial", serialNumbers.join(" "), "traveller"],
-    ["Purchase Order", purchaseOrderIds.join(" "), "purchase_order"],
-    ["Supplier", supplierNames.join(" "), "purchase_order"],
-    ["GRN", goodsReceiptIds.join(" "), "grn"],
-    ["Quality Release", qualityReleaseIds.join(" "), "quality_release"],
-    ["Dispatch", shipmentIds.join(" "), "dispatch"],
-    ["Invoice", invoiceIds.join(" "), "invoice"],
-    ["Collection", collectionIds.join(" "), "collection"],
+    ["Job Card", rawJobCardId, "job_card"],
+    ["Batch", rawBatchCode, "job_card"],
+    ["Material Requisition", rawMaterialRequisitionId, "material_requisition"],
+    ["Material / SKU", rawRequirementSkus.join(" "), "material_requisition"],
+    ["Traveller", rawTravellerIds.join(" "), "traveller"],
+    ["Serial", rawSerialNumbers.join(" "), "traveller"],
+    ["Purchase Order", rawPurchaseOrderIds.join(" "), "purchase_order"],
+    ["Supplier", rawSupplierNames.join(" "), "purchase_order"],
+    ["GRN", rawGoodsReceiptIds.join(" "), "grn"],
+    ["Quality Release", rawQualityReleaseIds.join(" "), "quality_release"],
+    ["Dispatch", rawShipmentIds.join(" "), "dispatch"],
+    ["Invoice", rawInvoiceIds.join(" "), "invoice"],
+    ["Collection", rawCollectionIds.join(" "), "collection"],
   ];
-  const searchable = searchableEntries.filter(([, , type]) => canSee(role, type));
+  const searchable = searchableEntries.filter(([, , type]) => visible(type));
 
   let score = 0;
   const matchedFields: string[] = [];
   for (const term of terms) {
     const lower = term.toLowerCase();
     for (const [label, value] of searchable) {
-      if (value.toLowerCase().includes(lower)) {
-        score += value.toLowerCase() === lower ? 6 : value.toLowerCase().startsWith(lower) ? 4 : 2;
-        matchedFields.push(label);
-      }
+      const haystack = value.toLowerCase();
+      if (!haystack.includes(lower)) continue;
+      score += haystack === lower ? 6 : haystack.startsWith(lower) ? 4 : 2;
+      matchedFields.push(label);
     }
   }
 
+  const commercialVisible = visible("commercial_order");
+  const jobVisible = visible("job_card");
+  const materialVisible = visible("material_requisition");
+  const travellerVisible = visible("traveller");
+  const poVisible = visible("purchase_order");
+  const grnVisible = visible("grn");
+  const qualityVisible = visible("quality_release");
+  const dispatchVisible = visible("dispatch");
+  const invoiceVisible = visible("invoice");
+  const collectionVisible = visible("collection");
+
   return {
-    salesOrderId,
-    salesOrderRevision,
-    planMonth: Number(row.plan_month ?? 0),
-    units: Number(row.units ?? 0),
-    variantId: clean(row.variant_id),
-    variantName: clean(row.variant_name),
-    orderStatus: clean(row.order_status),
-    jobCardId,
-    jobCardStatus: clean(row.job_card_status),
-    batchCode,
-    bomRevision: clean(row.bom_revision),
-    materialRequisitionId,
-    requirementSkus,
-    travellerIds,
-    serialNumbers,
-    purchaseOrderIds,
-    goodsReceiptIds,
-    qualityReleaseIds,
-    shipmentIds,
-    invoiceIds,
-    collectionIds,
-    supplierNames,
+    visibleTypes,
+    salesOrderId: commercialVisible ? rawSalesOrderId : "",
+    salesOrderRevision: commercialVisible ? Number(row.sales_order_revision ?? 0) : 0,
+    planMonth: commercialVisible ? Number(row.plan_month ?? 0) : 0,
+    units: commercialVisible ? Number(row.units ?? 0) : 0,
+    variantId: commercialVisible ? clean(row.variant_id) : "",
+    variantName: commercialVisible ? clean(row.variant_name) : "",
+    orderStatus: commercialVisible ? clean(row.order_status) : "",
+    jobCardId: jobVisible ? rawJobCardId : "",
+    jobCardStatus: jobVisible ? clean(row.job_card_status) : "",
+    batchCode: jobVisible ? rawBatchCode : "",
+    bomRevision: jobVisible ? clean(row.bom_revision) : "",
+    materialRequisitionId: materialVisible ? rawMaterialRequisitionId : "",
+    requirementSkus: materialVisible ? rawRequirementSkus : [],
+    travellerIds: travellerVisible ? rawTravellerIds : [],
+    serialNumbers: travellerVisible ? rawSerialNumbers : [],
+    purchaseOrderIds: poVisible ? rawPurchaseOrderIds : [],
+    purchaseOrderStatuses: poVisible ? rawPurchaseOrderStatuses : [],
+    goodsReceiptIds: grnVisible ? rawGoodsReceiptIds : [],
+    qualityReleaseIds: qualityVisible ? rawQualityReleaseIds : [],
+    qualityReleaseStatuses: qualityVisible ? rawQualityStatuses : [],
+    shipmentIds: dispatchVisible ? rawShipmentIds : [],
+    invoiceIds: invoiceVisible ? rawInvoiceIds : [],
+    collectionIds: collectionVisible ? rawCollectionIds : [],
+    supplierNames: poVisible ? rawSupplierNames : [],
     score,
     matchedFields: unique(matchedFields),
     documents: docs,
-  } satisfies TraceabilitySearchHit;
+  };
 }
 
 async function searchRows(sql: Awaited<ReturnType<typeof getSql>>, interpretation: TraceabilityInterpretation, limit: number) {
@@ -380,22 +426,39 @@ async function searchRows(sql: Awaited<ReturnType<typeof getSql>>, interpretatio
 async function searchTraceabilityInternal(query: string, role: CommandRole, limit = 30): Promise<TraceabilitySearchResponse> {
   const interpretation = interpretTraceabilityQuery(query);
   if (!interpretation.recognized) return { query, interpretation, hits: [], total: 0, limited: false };
+
+  const permittedRequestedTypes = interpretation.documentTypes.filter((type) => canSee(role, type));
+  if (interpretation.documentTypes.length && !permittedRequestedTypes.length) {
+    return { query, interpretation, hits: [], total: 0, limited: false };
+  }
+
   const sql = await getSql();
   const rows = await searchRows(sql, interpretation, limit);
   let hits = rows.map((row) => rowToHit(row, role, interpretation.searchTerms));
 
-  if (interpretation.documentTypes.length) {
-    hits = hits.filter((hit) => interpretation.documentTypes.some((type) => hit.documents.some((doc) => doc.type === type)) || interpretation.pendingOnly);
-  }
-  if (interpretation.pendingOnly && interpretation.documentTypes.includes("quality_release")) {
-    hits = hits.filter((hit) => hit.qualityReleaseIds.length === 0);
-  } else if (interpretation.pendingOnly && interpretation.documentTypes.includes("dispatch")) {
-    hits = hits.filter((hit) => hit.shipmentIds.length === 0);
-  } else if (interpretation.pendingOnly && interpretation.documentTypes.includes("invoice")) {
-    hits = hits.filter((hit) => hit.invoiceIds.length === 0);
+  // The SQL can efficiently discover candidates across the canonical thread, but
+  // a candidate only survives if the user's search term matched a field they are
+  // actually allowed to see. This prevents hidden-domain identifiers from being
+  // used as an existence oracle through the shared search endpoint.
+  if (interpretation.searchTerms.length) hits = hits.filter((hit) => hit.score > 0);
+
+  if (permittedRequestedTypes.length) {
+    hits = hits.filter((hit) => permittedRequestedTypes.some((type) => hit.visibleTypes.includes(type)));
   }
 
-  hits.sort((a, b) => b.score - a.score || b.planMonth - a.planMonth || a.salesOrderId.localeCompare(b.salesOrderId));
+  if (interpretation.pendingOnly && permittedRequestedTypes.includes("purchase_order")) {
+    hits = hits.filter((hit) => hit.purchaseOrderStatuses.some((status) => OPEN_PO_STATUSES.has(status.toLowerCase())));
+  } else if (interpretation.pendingOnly && permittedRequestedTypes.includes("quality_release")) {
+    hits = hits.filter((hit) => !hit.qualityReleaseStatuses.some((status) => RELEASED_QUALITY_STATUSES.has(status.toLowerCase())));
+  } else if (interpretation.pendingOnly && permittedRequestedTypes.includes("dispatch")) {
+    hits = hits.filter((hit) => hit.shipmentIds.length === 0);
+  } else if (interpretation.pendingOnly && permittedRequestedTypes.includes("invoice")) {
+    hits = hits.filter((hit) => hit.invoiceIds.length === 0);
+  } else if (interpretation.pendingOnly && permittedRequestedTypes.includes("collection")) {
+    hits = hits.filter((hit) => hit.collectionIds.length === 0);
+  }
+
+  hits.sort((a, b) => b.score - a.score || b.planMonth - a.planMonth || (a.salesOrderId || a.jobCardId).localeCompare(b.salesOrderId || b.jobCardId));
   const total = hits.length;
   hits = hits.slice(0, limit);
   return { query, interpretation, hits, total, limited: total > hits.length };
@@ -413,10 +476,16 @@ export const searchTraceability = createServerFn({ method: "POST" })
   });
 
 function formatTraceabilityAnswer(result: TraceabilitySearchResponse) {
-  if (!result.hits.length) return `I interpreted this as a traceability search, but I could not find a matching governed business record for “${result.query}”. Try a partial order, Job Card, Traveller/serial, batch, MR, PO, GRN, Quality Release, dispatch, invoice, SKU, supplier or model reference.`;
+  if (!result.hits.length) {
+    return `I interpreted this as a traceability search, but I could not find a matching governed record that you are authorised to view for “${result.query}”. Try a partial Order, Job Card, Traveller/serial, Batch, MR, PO, GRN, Quality Release, Dispatch, Invoice, SKU, supplier or model reference.`;
+  }
+
   const lines = result.hits.slice(0, 5).map((hit, index) => {
-    const traveller = hit.serialNumbers[0] || hit.travellerIds[0] || "pending";
-    return `${index + 1}. ${hit.salesOrderId} R${hit.salesOrderRevision} · ${hit.variantName || hit.variantId}\n   Job Card: ${hit.jobCardId || "pending"} · Batch/MR: ${hit.batchCode || "pending"} / ${hit.materialRequisitionId || "pending"}\n   Traveller/Serial: ${traveller} · PO: ${hit.purchaseOrderIds.join(", ") || "pending"} · GRN: ${hit.goodsReceiptIds.join(", ") || "pending"}\n   Quality: ${hit.qualityReleaseIds.join(", ") || "pending"} · Dispatch: ${hit.shipmentIds.join(", ") || "pending"} · Invoice: ${hit.invoiceIds.join(", ") || "pending"}`;
+    const root = hit.salesOrderId ? `${hit.salesOrderId} R${hit.salesOrderRevision}` : "Commercial root restricted";
+    const product = hit.variantName || hit.variantId;
+    const traveller = hit.serialNumbers[0] || hit.travellerIds[0] || (hit.visibleTypes.includes("traveller") ? "pending" : "restricted");
+    const visible = (type: TraceabilityDocumentType, value: string) => hit.visibleTypes.includes(type) ? value || "pending" : "restricted";
+    return `${index + 1}. ${root}${product ? ` · ${product}` : ""}\n   Job Card: ${visible("job_card", hit.jobCardId)} · Batch/MR: ${visible("job_card", hit.batchCode)} / ${visible("material_requisition", hit.materialRequisitionId)}\n   Traveller/Serial: ${traveller} · PO: ${visible("purchase_order", hit.purchaseOrderIds.join(", "))} · GRN: ${visible("grn", hit.goodsReceiptIds.join(", "))}\n   Quality: ${visible("quality_release", hit.qualityReleaseIds.join(", "))} · Dispatch: ${visible("dispatch", hit.shipmentIds.join(", "))} · Invoice: ${visible("invoice", hit.invoiceIds.join(", "))}`;
   });
   const more = result.total > 5 ? `\n\n${result.total - 5} more matching lineage(s) are available in Traceability & Print.` : "";
   return `Traceability search — ${result.total} matching lineage(s).\n\n${lines.join("\n\n")}${more}\n\nUse Traceability & Print to open or print the exact governed records. This search is read-only and respects the signed-in user’s route permissions.`;
@@ -453,9 +522,13 @@ export const getTraceabilityPrintRecord = createServerFn({ method: "POST" })
     if (data.type === "commercial_order") {
       const row = await firstRow(sql, `select * from vyndi_sales_orders where id=$1 order by revision desc limit 1`, [data.id]);
       if (!row) throw new Error("Commercial Order not found.");
-      return { title: clean(row.id), recordType: "Commercial Demand / Order", status: clean(row.status), authority: "Commercial · central order ledger", sourceReference: `Commercial order ${clean(row.id)}`, fields: [
-        { label: "Order", value: clean(row.id) }, { label: "Revision", value: Number(row.revision ?? 0) }, { label: "Plan month", value: `M${Number(row.plan_month ?? 0)}` }, { label: "Variant", value: clean(row.variant_name || row.variant_id) }, { label: "Units", value: Number(row.units ?? 0) }, { label: "Channel", value: clean(row.channel) }, { label: "Status", value: clean(row.status) },
-      ], lineage: [{ label: "Digital-thread root", value: clean(row.id) }] };
+      return {
+        title: clean(row.id), recordType: "Commercial Demand / Order", status: clean(row.status), authority: "Commercial · central order ledger", sourceReference: `Commercial order ${clean(row.id)}`,
+        fields: [
+          { label: "Order", value: clean(row.id) }, { label: "Revision", value: Number(row.revision ?? 0) }, { label: "Plan month", value: `M${Number(row.plan_month ?? 0)}` }, { label: "Variant", value: clean(row.variant_name || row.variant_id) }, { label: "Units", value: Number(row.units ?? 0) }, { label: "Channel", value: clean(row.channel) }, { label: "Status", value: clean(row.status) },
+        ],
+        lineage: [{ label: "Digital-thread root", value: clean(row.id) }],
+      };
     }
 
     if (data.type === "job_card" || data.type === "material_requisition") {
@@ -465,65 +538,114 @@ export const getTraceabilityPrintRecord = createServerFn({ method: "POST" })
       if (!row) throw new Error(data.type === "job_card" ? "Job Card not found." : "Material Requisition not found.");
       const lines = await sql.query<Record<string, unknown>>(`select sku,stage_code,stage_name,quantity,reservation_status,reservation_quantity,issue_status,shortage_quantity,reservation_id from vyndi_live_job_card_requirements where job_card_id=$1 and sku is not null order by stage_code,sku`, [row.id]);
       const requisitionId = `MR-${clean(row.batch_code || row.id).replace(/^BATCH-/i, "")}`;
-      return { title: data.type === "job_card" ? clean(row.id) : requisitionId, recordType: data.type === "job_card" ? "Production Job Card" : "Material Requisition & Issue Record", status: clean(row.status), authority: data.type === "job_card" ? "Production · controlled build authority" : "Production / Stores · FIFO material issue authority", sourceReference: `Job Card ${clean(row.id)}`, orientation: "landscape", fields: [
-        { label: "Commercial order", value: clean(row.sales_order_id) }, { label: "Job Card", value: clean(row.id) }, { label: "Batch", value: clean(row.batch_code) }, { label: "BOM", value: clean(row.bom_revision) }, { label: "Variant", value: clean(row.variant_name) }, { label: "Units", value: Number(row.units ?? 0) }, { label: "Status", value: clean(row.status) },
-      ], lineage: [{ label: "Commercial order", value: clean(row.sales_order_id) }, { label: "Job Card", value: clean(row.id) }, { label: "Material Requisition", value: requisitionId }], sections: [{ title: "Material requirement / issue", table: { columns: ["SKU","Stage","Required","Reserved","Issue state","Short","Evidence"], rows: lines.map((line) => [clean(line.sku), `${clean(line.stage_code)} · ${clean(line.stage_name)}`, Number(line.quantity ?? 0), Number(line.reservation_quantity ?? 0), clean(line.issue_status || line.reservation_status), Number(line.shortage_quantity ?? 0), clean(line.reservation_id) || "—"]) } }] };
+      return {
+        title: data.type === "job_card" ? clean(row.id) : requisitionId,
+        recordType: data.type === "job_card" ? "Production Job Card" : "Material Requisition & Issue Record",
+        status: clean(row.status),
+        authority: data.type === "job_card" ? "Production · controlled build authority" : "Production / Stores · FIFO material issue authority",
+        sourceReference: `Job Card ${clean(row.id)}`,
+        orientation: "landscape",
+        fields: [
+          { label: "Commercial order", value: clean(row.sales_order_id) }, { label: "Job Card", value: clean(row.id) }, { label: "Batch", value: clean(row.batch_code) }, { label: "BOM", value: clean(row.bom_revision) }, { label: "Variant", value: clean(row.variant_name) }, { label: "Units", value: Number(row.units ?? 0) }, { label: "Status", value: clean(row.status) },
+        ],
+        lineage: [{ label: "Commercial order", value: clean(row.sales_order_id) }, { label: "Job Card", value: clean(row.id) }, { label: "Material Requisition", value: requisitionId }],
+        sections: [{
+          title: "Material requirement / issue",
+          table: {
+            columns: ["SKU", "Stage", "Required", "Reserved", "Issue state", "Short", "Evidence"],
+            rows: lines.map((line) => [clean(line.sku), `${clean(line.stage_code)} · ${clean(line.stage_name)}`, Number(line.quantity ?? 0), Number(line.reservation_quantity ?? 0), clean(line.issue_status || line.reservation_status), Number(line.shortage_quantity ?? 0), clean(line.reservation_id) || "—"]),
+          },
+        }],
+      };
     }
 
     if (data.type === "traveller") {
       const row = await firstRow(sql, `select t.*,c.sales_order_id,c.batch_code,c.bom_revision from epr_travellers t left join epr_production_job_cards c on c.id=t.job_card_id where t.id=$1 limit 1`, [data.id]);
       if (!row) throw new Error("Traveller not found.");
-      return { title: clean(row.serial_number || row.id), recordType: "Traveller Card / Serial Genealogy", status: clean(row.status), authority: "Production · serialized genealogy authority", sourceReference: `Traveller ${clean(row.id)}`, fields: [
-        { label: "Traveller", value: clean(row.id) }, { label: "Serial", value: clean(row.serial_number) }, { label: "Commercial order", value: clean(row.sales_order_id) }, { label: "Job Card", value: clean(row.job_card_id) }, { label: "Batch", value: clean(row.batch_code) }, { label: "BOM", value: clean(row.bom_revision) }, { label: "Status", value: clean(row.status) },
-      ], lineage: [{ label: "Commercial order", value: clean(row.sales_order_id) }, { label: "Job Card", value: clean(row.job_card_id) }, { label: "Traveller / serial", value: `${clean(row.id)} · ${clean(row.serial_number)}` }] };
+      return {
+        title: clean(row.serial_number || row.id), recordType: "Traveller Card / Serial Genealogy", status: clean(row.status), authority: "Production · serialized genealogy authority", sourceReference: `Traveller ${clean(row.id)}`,
+        fields: [
+          { label: "Traveller", value: clean(row.id) }, { label: "Serial", value: clean(row.serial_number) }, { label: "Commercial order", value: clean(row.sales_order_id) }, { label: "Job Card", value: clean(row.job_card_id) }, { label: "Batch", value: clean(row.batch_code) }, { label: "BOM", value: clean(row.bom_revision) }, { label: "Status", value: clean(row.status) },
+        ],
+        lineage: [{ label: "Commercial order", value: clean(row.sales_order_id) }, { label: "Job Card", value: clean(row.job_card_id) }, { label: "Traveller / serial", value: `${clean(row.id)} · ${clean(row.serial_number)}` }],
+      };
     }
 
     if (data.type === "purchase_order") {
       const row = await firstRow(sql, `select * from vyndi_purchase_orders where id=$1 limit 1`, [data.id]);
       if (!row) throw new Error("Purchase Order not found.");
-      return { title: clean(row.id), recordType: "Purchase Order", status: clean(row.status), authority: "Procurement · purchase-order authority", sourceReference: clean(row.source_reference) || `PO ${clean(row.id)}`, fields: [
-        { label: "PO", value: clean(row.id) }, { label: "Supplier", value: clean(row.supplier_name || row.supplier_id) }, { label: "SKU", value: clean(row.sku) }, { label: "Quantity", value: Number(row.quantity ?? 0) }, { label: "Unit", value: clean(row.unit) }, { label: "Unit price INR", value: Number(row.unit_price_inr ?? 0) }, { label: "Order value INR", value: Number(row.order_value_inr ?? 0) }, { label: "Status", value: clean(row.status) }, { label: "Job Card", value: clean(row.job_card_id) },
-      ], lineage: [{ label: "Job Card", value: clean(row.job_card_id) }, { label: "PO", value: clean(row.id) }] };
+      return {
+        title: clean(row.id), recordType: "Purchase Order", status: clean(row.status), authority: "Procurement · purchase-order authority", sourceReference: clean(row.source_reference) || `PO ${clean(row.id)}`,
+        fields: [
+          { label: "PO", value: clean(row.id) }, { label: "Supplier", value: clean(row.supplier_name || row.supplier_id) }, { label: "SKU", value: clean(row.sku) }, { label: "Quantity", value: Number(row.quantity ?? 0) }, { label: "Unit", value: clean(row.unit) }, { label: "Unit price INR", value: Number(row.unit_price_inr ?? 0) }, { label: "Order value INR", value: Number(row.order_value_inr ?? 0) }, { label: "Status", value: clean(row.status) }, { label: "Job Card", value: clean(row.job_card_id) },
+        ],
+        lineage: [{ label: "Job Card", value: clean(row.job_card_id) }, { label: "PO", value: clean(row.id) }],
+      };
     }
 
     if (data.type === "grn") {
       const row = await firstRow(sql, `select g.*,p.job_card_id,p.supplier_name from vyndi_goods_receipts g left join vyndi_purchase_orders p on p.id=g.purchase_order_id where g.id=$1 limit 1`, [data.id]);
       if (!row) throw new Error("GRN not found.");
-      return { title: clean(row.id), recordType: "Goods Receipt Note / Incoming Inspection", status: clean(row.inspection_status), authority: "Receiving · controlled GRN and inventory boundary", sourceReference: clean(row.source_reference) || `GRN ${clean(row.id)}`, fields: [
-        { label: "GRN", value: clean(row.id) }, { label: "PO", value: clean(row.purchase_order_id) }, { label: "Job Card", value: clean(row.job_card_id) }, { label: "Supplier", value: clean(row.supplier_name) }, { label: "SKU", value: clean(row.sku) }, { label: "Received", value: Number(row.quantity_received ?? 0) }, { label: "Accepted", value: Number(row.quantity_accepted ?? 0) }, { label: "Quarantine", value: Number(row.quantity_quarantined ?? 0) }, { label: "Rejected", value: Number(row.quantity_rejected ?? 0) }, { label: "Inspection", value: clean(row.inspection_status) },
-      ], lineage: [{ label: "Job Card", value: clean(row.job_card_id) }, { label: "Purchase Order", value: clean(row.purchase_order_id) }, { label: "GRN", value: clean(row.id) }] };
+      return {
+        title: clean(row.id), recordType: "Goods Receipt Note / Incoming Inspection", status: clean(row.inspection_status), authority: "Receiving · controlled GRN and inventory boundary", sourceReference: clean(row.source_reference) || `GRN ${clean(row.id)}`,
+        fields: [
+          { label: "GRN", value: clean(row.id) }, { label: "PO", value: clean(row.purchase_order_id) }, { label: "Job Card", value: clean(row.job_card_id) }, { label: "Supplier", value: clean(row.supplier_name) }, { label: "SKU", value: clean(row.sku) }, { label: "Received", value: Number(row.quantity_received ?? 0) }, { label: "Accepted", value: Number(row.quantity_accepted ?? 0) }, { label: "Quarantine", value: Number(row.quantity_quarantined ?? 0) }, { label: "Rejected", value: Number(row.quantity_rejected ?? 0) }, { label: "Inspection", value: clean(row.inspection_status) },
+        ],
+        lineage: [{ label: "Job Card", value: clean(row.job_card_id) }, { label: "Purchase Order", value: clean(row.purchase_order_id) }, { label: "GRN", value: clean(row.id) }],
+      };
     }
 
     if (data.type === "quality_release") {
       const row = await firstRow(sql, `select * from vyndi_quality_releases where id=$1 limit 1`, [data.id]);
       if (!row) throw new Error("Quality Release not found.");
-      return { title: clean(row.id), recordType: "Serialized Quality Release", status: clean(row.decision), authority: "Quality · serialized release authority", sourceReference: clean(row.evidence_ref) || `Quality release ${clean(row.id)}`, fields: [
-        { label: "Release", value: clean(row.id) }, { label: "Decision", value: clean(row.decision) }, { label: "Commercial order", value: clean(row.sales_order_id) }, { label: "Job Card", value: clean(row.job_card_id) }, { label: "Traveller", value: clean(row.traveller_id) }, { label: "Serial", value: clean(row.serial_number) }, { label: "Reason", value: clean(row.decision_reason) }, { label: "Evidence", value: clean(row.evidence_ref) }, { label: "Decided by", value: clean(row.decided_by) },
-      ], lineage: [{ label: "Commercial order", value: clean(row.sales_order_id) }, { label: "Job Card", value: clean(row.job_card_id) }, { label: "Traveller", value: clean(row.traveller_id) }, { label: "Quality release", value: clean(row.id) }] };
+      return {
+        title: clean(row.id), recordType: "Serialized Quality Release", status: clean(row.decision), authority: "Quality · serialized release authority", sourceReference: clean(row.evidence_ref) || `Quality release ${clean(row.id)}`,
+        fields: [
+          { label: "Release", value: clean(row.id) }, { label: "Decision", value: clean(row.decision) }, { label: "Commercial order", value: clean(row.sales_order_id) }, { label: "Job Card", value: clean(row.job_card_id) }, { label: "Traveller", value: clean(row.traveller_id) }, { label: "Serial", value: clean(row.serial_number) }, { label: "Reason", value: clean(row.decision_reason) }, { label: "Evidence", value: clean(row.evidence_ref) }, { label: "Decided by", value: clean(row.decided_by) },
+        ],
+        lineage: [{ label: "Commercial order", value: clean(row.sales_order_id) }, { label: "Job Card", value: clean(row.job_card_id) }, { label: "Traveller", value: clean(row.traveller_id) }, { label: "Quality release", value: clean(row.id) }],
+      };
     }
 
     if (data.type === "dispatch") {
       const row = await firstRow(sql, `select * from vyndi_dispatch_register where shipment_id=$1 limit 1`, [data.id]);
       if (!row) throw new Error("Dispatch record not found.");
-      return { title: clean(row.shipment_id), recordType: "Dispatch / Shipment Record", status: clean(row.status), authority: "Operations / Fulfilment · canonical dispatch authority", sourceReference: clean(row.source_reference) || `Dispatch ${clean(row.shipment_id)}`, fields: [
-        { label: "Shipment", value: clean(row.shipment_id) }, { label: "Commercial order", value: clean(row.sales_order_id) }, { label: "Job Card", value: clean(row.job_card_id) }, { label: "Units", value: Number(row.units ?? 0) }, { label: "Plan month", value: `M${Number(row.plan_month ?? 0)}` }, { label: "Quality releases", value: Number(row.current_quality_release_count ?? 0) }, { label: "Invoice", value: clean(row.invoice_id) || "Pending" }, { label: "Status", value: clean(row.status) },
-      ], lineage: [{ label: "Commercial order", value: clean(row.sales_order_id) }, { label: "Job Card", value: clean(row.job_card_id) }, { label: "Dispatch", value: clean(row.shipment_id) }, { label: "Invoice", value: clean(row.invoice_id) || "Pending" }] };
+      return {
+        title: clean(row.shipment_id), recordType: "Dispatch / Shipment Record", status: clean(row.status), authority: "Operations / Fulfilment · canonical dispatch authority", sourceReference: clean(row.source_reference) || `Dispatch ${clean(row.shipment_id)}`,
+        fields: [
+          { label: "Shipment", value: clean(row.shipment_id) }, { label: "Commercial order", value: clean(row.sales_order_id) }, { label: "Job Card", value: clean(row.job_card_id) }, { label: "Units", value: Number(row.units ?? 0) }, { label: "Plan month", value: `M${Number(row.plan_month ?? 0)}` }, { label: "Quality releases", value: Number(row.current_quality_release_count ?? 0) }, { label: "Invoice", value: clean(row.invoice_id) || "Pending" }, { label: "Status", value: clean(row.status) },
+        ],
+        lineage: [{ label: "Commercial order", value: clean(row.sales_order_id) }, { label: "Job Card", value: clean(row.job_card_id) }, { label: "Dispatch", value: clean(row.shipment_id) }, { label: "Invoice", value: clean(row.invoice_id) || "Pending" }],
+      };
     }
 
-    if (data.type === "invoice" || data.type === "collection") {
-      if (data.type === "invoice") {
-        const row = await firstRow(sql, `select * from vyndi_invoices where id=$1 limit 1`, [data.id]);
-        if (!row) throw new Error("Invoice not found.");
-        const collections = await sql.query<Record<string, unknown>>(`select * from vyndi_collections where invoice_id=$1 order by plan_month,id`, [data.id]);
-        return { title: clean(row.id), recordType: "Customer Invoice / Receivable Record", status: clean(row.status), authority: "Finance · shipment-derived receivable authority", sourceReference: clean(row.source_reference) || `Invoice ${clean(row.id)}`, fields: [
+    if (data.type === "invoice") {
+      const row = await firstRow(sql, `select * from vyndi_invoices where id=$1 limit 1`, [data.id]);
+      if (!row) throw new Error("Invoice not found.");
+      const collections = await sql.query<Record<string, unknown>>(`select * from vyndi_collections where invoice_id=$1 order by plan_month,id`, [data.id]);
+      return {
+        title: clean(row.id), recordType: "Customer Invoice / Receivable Record", status: clean(row.status), authority: "Finance · shipment-derived receivable authority", sourceReference: clean(row.source_reference) || `Invoice ${clean(row.id)}`,
+        fields: [
           { label: "Invoice", value: clean(row.id) }, { label: "Commercial order", value: clean(row.sales_order_id) }, { label: "Shipment", value: clean(row.shipment_id) }, { label: "Plan month", value: `M${Number(row.plan_month ?? 0)}` }, { label: "Amount lakh", value: Number(row.amount_lakh ?? 0) }, { label: "Status", value: clean(row.status) },
-        ], lineage: [{ label: "Commercial order", value: clean(row.sales_order_id) }, { label: "Shipment", value: clean(row.shipment_id) }, { label: "Invoice", value: clean(row.id) }], sections: [{ title: "Collection evidence", table: { columns: ["Collection","Month","Amount lakh","Status","Reference"], rows: collections.map((item) => [clean(item.id), `M${Number(item.plan_month ?? 0)}`, Number(item.amount_lakh ?? 0), clean(item.status), clean(item.source_reference) || "—"]) } }] };
-      }
+        ],
+        lineage: [{ label: "Commercial order", value: clean(row.sales_order_id) }, { label: "Shipment", value: clean(row.shipment_id) }, { label: "Invoice", value: clean(row.id) }],
+        sections: [{
+          title: "Collection evidence",
+          table: { columns: ["Collection", "Month", "Amount lakh", "Status", "Reference"], rows: collections.map((item) => [clean(item.id), `M${Number(item.plan_month ?? 0)}`, Number(item.amount_lakh ?? 0), clean(item.status), clean(item.source_reference) || "—"]) },
+        }],
+      };
+    }
+
+    if (data.type === "collection") {
       const row = await firstRow(sql, `select c.*,i.sales_order_id,i.shipment_id from vyndi_collections c left join vyndi_invoices i on i.id=c.invoice_id where c.id=$1 limit 1`, [data.id]);
       if (!row) throw new Error("Collection record not found.");
-      return { title: clean(row.id), recordType: "Customer Collection Record", status: clean(row.status), authority: "Finance · collection authority", sourceReference: clean(row.source_reference) || `Collection ${clean(row.id)}`, fields: [
-        { label: "Collection", value: clean(row.id) }, { label: "Invoice", value: clean(row.invoice_id) }, { label: "Commercial order", value: clean(row.sales_order_id) }, { label: "Shipment", value: clean(row.shipment_id) }, { label: "Plan month", value: `M${Number(row.plan_month ?? 0)}` }, { label: "Amount lakh", value: Number(row.amount_lakh ?? 0) }, { label: "Status", value: clean(row.status) },
-      ], lineage: [{ label: "Commercial order", value: clean(row.sales_order_id) }, { label: "Invoice", value: clean(row.invoice_id) }, { label: "Collection", value: clean(row.id) }] };
+      return {
+        title: clean(row.id), recordType: "Customer Collection Record", status: clean(row.status), authority: "Finance · collection authority", sourceReference: clean(row.source_reference) || `Collection ${clean(row.id)}`,
+        fields: [
+          { label: "Collection", value: clean(row.id) }, { label: "Invoice", value: clean(row.invoice_id) }, { label: "Commercial order", value: clean(row.sales_order_id) }, { label: "Shipment", value: clean(row.shipment_id) }, { label: "Plan month", value: `M${Number(row.plan_month ?? 0)}` }, { label: "Amount lakh", value: Number(row.amount_lakh ?? 0) }, { label: "Status", value: clean(row.status) },
+        ],
+        lineage: [{ label: "Commercial order", value: clean(row.sales_order_id) }, { label: "Invoice", value: clean(row.invoice_id) }, { label: "Collection", value: clean(row.id) }],
+      };
     }
 
     throw new Error("Unsupported traceability document type.");
