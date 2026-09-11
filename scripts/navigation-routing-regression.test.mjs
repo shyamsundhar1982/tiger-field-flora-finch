@@ -196,10 +196,13 @@ test("G4: lineage joins persisted order, production, procurement, receiving, gen
 
 test("G5: People & Office is first-class, compact and Finance is downstream", () => {
   assert.match(peopleOffice, /People & Office · operating administration/);
-  assert.match(peopleOffice, /Finance consumes the approved cost model downstream/);
+  assert.match(peopleOffice, /Finance\s+consumes approved records only/);
   assert.match(peopleOffice, /Downstream Finance/);
   assert.doesNotMatch(peopleOffice, /Finance · operating ledgers/);
-  assert.match(peopleOffice, /Collapsed by default · expand only the register you need/);
+  assert.match(peopleOffice, /Draft → submit → approve → supersede · expand only the register you need/);
+  assert.match(peopleOffice, /transitionPeopleRecord/);
+  assert.match(peopleOffice, /transitionPeopleOfficeCost/);
+  assert.match(peopleOffice, /transitionPeopleOfficeAsset/);
   assert.match(peopleOffice, /<details/);
   assert.match(peopleOffice, /table-auto/);
   assert.doesNotMatch(peopleOffice, /min-w-\[1100px\]/);

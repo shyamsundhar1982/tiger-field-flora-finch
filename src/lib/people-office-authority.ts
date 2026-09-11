@@ -54,12 +54,31 @@ export const listPeopleOfficeAuthority = createServerFn({ method: "GET" }).handl
   await assertSameSiteRequest();
   await requirePermission("view");
   const sql = await getSql();
-  const [people, costs, assets, financeFeed, summary] = await Promise.all([
+  const [people, costs, assets, financeFeed, summary, auditEvents] = await Promise.all([
     sql`select * from vyndi_people_records order by updated_at desc`,
     sql`select * from vyndi_people_office_cost_items order by cost_group,name`,
     sql`select * from vyndi_people_office_assets order by asset_class,category,name`,
     sql`select * from vyndi_people_office_finance_feed order by plan_month`,
     sql`select * from vyndi_people_office_authority_summary`,
+    sql`
+      select id,
+             entity_type as "entityType",
+             entity_id as "entityId",
+             entity_revision as "entityRevision",
+             action,
+             actor_user_id as "actorUserId",
+             actor_role as "actorRole",
+             source_reference as "sourceReference",
+             payload_json as "payloadJson",
+             previous_state as "previousState",
+             new_state as "newState",
+             reason,
+             created_at as "createdAt"
+      from vyndi_audit_events
+      where entity_type in ('people_record','people_office_cost','people_office_asset','people_office_reconciliation')
+      order by created_at desc
+      limit 200
+    `,
   ]);
   return {
     people: Array.isArray(people) ? [...people] : [],
@@ -67,6 +86,7 @@ export const listPeopleOfficeAuthority = createServerFn({ method: "GET" }).handl
     assets: Array.isArray(assets) ? [...assets] : [],
     financeFeed: Array.isArray(financeFeed) ? [...financeFeed] : [],
     summary: summary[0] ?? null,
+    auditEvents: Array.isArray(auditEvents) ? [...auditEvents] : [],
   };
 });
 
