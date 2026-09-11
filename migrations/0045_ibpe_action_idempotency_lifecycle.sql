@@ -6,18 +6,25 @@ alter table vyndi_ibpe_management_actions
 
 -- Backfill proposal lineage from the append-only audit trail where available.
 update vyndi_ibpe_management_actions a
-   set source_proposal_id = e.payload_json->>'proposalId'
-  from lateral (
-    select payload_json
-      from vyndi_audit_events
-     where entity_type='ibpe_management_action'
-       and entity_id=a.id
-       and action='created_from_confirmed_update'
-       and coalesce(payload_json->>'proposalId','')<>''
-     order by created_at asc
-     limit 1
-  ) e
- where a.source_proposal_id is null;
+   set source_proposal_id = (
+     select e.payload_json->>'proposalId'
+       from vyndi_audit_events e
+      where e.entity_type='ibpe_management_action'
+        and e.entity_id=a.id
+        and e.action='created_from_confirmed_update'
+        and coalesce(e.payload_json->>'proposalId','')<>''
+      order by e.created_at asc
+      limit 1
+   )
+ where a.source_proposal_id is null
+   and exists (
+     select 1
+       from vyndi_audit_events e
+      where e.entity_type='ibpe_management_action'
+        and e.entity_id=a.id
+        and e.action='created_from_confirmed_update'
+        and coalesce(e.payload_json->>'proposalId','')<>''
+   );
 
 create unique index if not exists vyndi_ibpe_management_actions_source_proposal_uidx
   on vyndi_ibpe_management_actions (source_proposal_id)
