@@ -4,17 +4,16 @@ import { assertSameSiteRequest } from "@/lib/auth/isolation.server";
 import { getCommandRole } from "@/lib/command-access";
 import { getSql } from "@/lib/db";
 import { canPerform } from "@/lib/page-access";
+import {
+  authorityForVayuDriveChunk,
+  classifyVayuDrivePath,
+  isExcludedVayuDriveEntry,
+  type VayuDriveKnowledgeTier,
+} from "@/lib/vibpe-vayu-drive-policy";
 
 export const VAYU_SHASTR_SOURCE_ID = "VIBPE-SRC-VAYU-SHASTR-DRIVE";
 export const VAYU_SHASTR_ROOT_FOLDER_ID = "1QDwLydKu5tQthElxTGCT4BO2AP5xXkKS";
 
-const EXCLUDED_FOLDER_IDS = new Set([
-  "12D8SfbcnX9y5E9oOa614SE7BUYBbRQEK", // google client secret for shyamsundhar1982
-]);
-
-const SECRET_NAME_PATTERN = /client\s*secret|credential|password|private\s*key|api\s*key|oauth\s*token|access\s*token|refresh\s*token/i;
-const LOW_AUTHORITY_PATTERN = /\b(draft|rough|sample|copy|old|preliminary|iteration|rev\s*0)\b/i;
-const CONTROLLED_REFERENCE_PATH = /(^|\/)(FINAL DOSSIER|VAYU_MASTER_ENGINEERING_PACKAGE_REV1)(\/|$)/i;
 const FOLDER_MIME = "application/vnd.google-apps.folder";
 const DOC_MIME = "application/vnd.google-apps.document";
 const SHEET_MIME = "application/vnd.google-apps.spreadsheet";
@@ -41,7 +40,7 @@ type DriveItem = {
 type IndexedItem = DriveItem & {
   path: string;
   folderPath: string;
-  knowledgeTier: "controlled-reference" | "reference" | "legacy-working";
+  knowledgeTier: VayuDriveKnowledgeTier;
 };
 
 function hash(value: string) {
@@ -72,12 +71,6 @@ function inferDomain(path: string) {
   return "venture";
 }
 
-function inferKnowledgeTier(path: string) {
-  if (LOW_AUTHORITY_PATTERN.test(path) || /VELOXIS ARCHITECTURE ITERATIONS/i.test(path)) return "legacy-working" as const;
-  if (CONTROLLED_REFERENCE_PATH.test(path)) return "controlled-reference" as const;
-  return "reference" as const;
-}
-
 function chunkText(text: string, maxChunks = 120) {
   const cleaned = text.replace(/\r/g, "").trim();
   if (!cleaned) return [];
@@ -98,13 +91,6 @@ function chunkText(text: string, maxChunks = 120) {
   }
   if (current && chunks.length < maxChunks) chunks.push(current);
   return chunks;
-}
-
-function claimClassForChunk(text: string, tier: IndexedItem["knowledgeTier"]) {
-  if (/unresolved|pending|not verified|not yet|tbd|to be confirmed/i.test(text)) return "unresolved_item" as const;
-  if (/assum|proposal|proposed|target|concept/i.test(text) || tier === "legacy-working") return "assumption" as const;
-  if (/decision|approved|selected|frozen|released/i.test(text)) return "decision" as const;
-  return "verified_fact" as const;
 }
 
 async function googleAccessToken() {
@@ -168,14 +154,14 @@ async function crawlDrive(token: string, maxFiles = 600) {
     for (const item of children) {
       const path = folderPath ? `${folderPath}/${item.name}` : item.name;
       if (item.mimeType === FOLDER_MIME) {
-        if (EXCLUDED_FOLDER_IDS.has(item.id) || SECRET_NAME_PATTERN.test(item.name)) {
+        if (isExcludedVayuDriveEntry(item)) {
           skipped.push({ id: item.id, path, reason: "secret-folder-excluded" });
           continue;
         }
         await walk(item.id, path, depth + 1);
         continue;
       }
-      if (SECRET_NAME_PATTERN.test(item.name)) {
+      if (isExcludedVayuDriveEntry(item)) {
         skipped.push({ id: item.id, path, reason: "secret-name-excluded" });
         continue;
       }
@@ -183,7 +169,7 @@ async function crawlDrive(token: string, maxFiles = 600) {
         ...item,
         path,
         folderPath,
-        knowledgeTier: inferKnowledgeTier(path),
+        knowledgeTier: classifyVayuDrivePath(path),
       });
       if (files.length >= maxFiles) break;
     }
@@ -255,8 +241,7 @@ async function persistDocument(item: IndexedItem, text: string | null, role: str
     const domain = inferDomain(item.path);
     const chunks = chunkText(normalized);
     for (const [index, chunk] of chunks.entries()) {
-      const claimClass = claimClassForChunk(chunk, item.knowledgeTier);
-      const authority = claimClass === "unresolved_item" || claimClass === "assumption" ? "unresolved" : "advisory";
+      const { claimClass, authority } = authorityForVayuDriveChunk(chunk, item.knowledgeTier);
       const confidence = item.knowledgeTier === "controlled-reference" ? 0.88 : item.knowledgeTier === "legacy-working" ? 0.45 : 0.68;
       await sql`
         insert into vibpe_knowledge_claims
