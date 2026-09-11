@@ -5,6 +5,7 @@ import { VIBPE_COPILOT_NAME } from "@/lib/ibpe-brand";
 import { askIbpeCopilot } from "@/lib/ibpe-copilot";
 import type { IbpeScenarioRequest } from "@/lib/ibpe-scenario-lab";
 import { askTraceabilityCopilot } from "@/lib/traceability-search";
+import { askVibpeGovernanceCopilot } from "@/lib/vibpe-governance-server";
 
 type Message = {
   id: string;
@@ -64,6 +65,20 @@ export function IbpeCopilot() {
     setQuestion("");
     setBusy(true);
     try {
+      const governance = await askVibpeGovernanceCopilot({ data: { question: clean } });
+      if (governance.handled) {
+        setMessages((current) => [
+          ...current,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            text: governance.answer,
+            meta: "Governed VIBPE control state · live read-only sources",
+          },
+        ]);
+        return;
+      }
+
       const traceability = await askTraceabilityCopilot({ data: { question: clean } });
       if (traceability.handled) {
         setMessages((current) => [
@@ -113,7 +128,7 @@ export function IbpeCopilot() {
         className="fixed bottom-5 right-5 z-40 flex min-h-12 items-center gap-2 rounded-full border border-accent/35 bg-bg/95 px-4 py-3 text-sm font-semibold text-fg shadow-2xl backdrop-blur-xl transition hover:border-accent hover:bg-surface"
         aria-label={`Open ${VIBPE_COPILOT_NAME}`}
       >
-        <span className="flex size-8 items-center justify-center rounded-full bg-accent/12 text-accent"><BrainCircuit className="size-4" /></span>
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent/12 text-accent"><BrainCircuit className="size-4" /></span>
         <span className="hidden sm:inline">{VIBPE_COPILOT_NAME}</span>
         {scenario ? <span className="size-2 rounded-full bg-green" title={`Scenario context: ${scenario.label}`} /> : null}
       </button>
@@ -169,7 +184,7 @@ export function IbpeCopilot() {
                       {message.meta ? <p className="mt-3 border-t border-border/70 pt-2 text-[10px] text-subtle">{message.meta}</p> : null}
                     </article>
                   ))}
-                  {busy ? <div className="mr-4 rounded-xl border border-border bg-surface/35 p-4 text-sm text-muted">Resolving governed traceability or analysing the IBPE packet…</div> : null}
+                  {busy ? <div className="mr-4 rounded-xl border border-border bg-surface/35 p-4 text-sm text-muted">Resolving governed control state, traceability or analysing the IBPE packet…</div> : null}
                   <div ref={endRef} />
                 </div>
               )}
@@ -199,7 +214,7 @@ export function IbpeCopilot() {
                 />
                 <button type="button" disabled={busy || !question.trim()} onClick={() => void ask()} className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-accent text-bg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40" aria-label={`Ask ${VIBPE_COPILOT_NAME}`}><Send className="size-4" /></button>
               </div>
-              <p className="mt-2 text-[10px] leading-4 text-subtle">Read-only traceability can be searched here; authorised transaction workspaces remain the only place to approve or execute business actions.</p>
+              <p className="mt-2 text-[10px] leading-4 text-subtle">Read-only governance and traceability can be queried here; authorised transaction workspaces remain the only place to approve or execute business actions.</p>
             </footer>
           </aside>
         </div>

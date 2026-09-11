@@ -8,6 +8,9 @@ const architecture = await readFile(new URL("../docs/VIBPE-COPILOT-2-ARCHITECTUR
 const productionCopilot = await readFile(new URL("../src/lib/ibpe-copilot.ts", import.meta.url), "utf8");
 const copilot2 = await readFile(new URL("../src/lib/vibpe-copilot-2.ts", import.meta.url), "utf8");
 const operational = await readFile(new URL("../src/lib/vibpe-operational-queries.ts", import.meta.url), "utf8");
+const governance = await readFile(new URL("../src/lib/vibpe-governance-queries.ts", import.meta.url), "utf8");
+const governanceServer = await readFile(new URL("../src/lib/vibpe-governance-server.ts", import.meta.url), "utf8");
+const copilotUi = await readFile(new URL("../src/components/ibpe-copilot.tsx", import.meta.url), "utf8");
 
 test("VIBPE recognizes conversational closing instead of returning baseline assessment", () => {
   assert.match(intent, /bye\|goodbye\|see you\|thanks\|thank you/);
@@ -99,4 +102,48 @@ test("supplier lookup resolves governed supplier, PO and price records", () => {
   assert.match(operational, /vyndi_procurement_prices/);
   assert.match(operational, /oda\\b/);
   assert.match(operational, /Supplier price authority rows/);
+});
+
+test("traceability exception questions inspect missing job-card origin links instead of literal search", () => {
+  assert.match(governance, /function isTraceabilityExceptionQuestion/);
+  assert.match(governance, /epr_production_job_cards/);
+  assert.match(governance, /left join vyndi_sales_orders/);
+  assert.match(governance, /Traceability exception check: PASS/);
+  assert.match(governance, /sales-order ID and sales-order revision/);
+});
+
+test("governance status questions use live actions assurance gates and workflow ledgers", () => {
+  assert.match(governance, /function isGovernanceOperatingStatusQuestion/);
+  assert.match(governance, /vyndi_operating_actions/);
+  assert.match(governance, /vyndi_vibpe_assurance_exceptions_all/);
+  assert.match(governance, /vyndi_vibpe_gate_registry/);
+  assert.match(governance, /Incomplete workflow — order-to-cash/);
+  assert.match(governance, /Incomplete workflow — procure-to-pay/);
+  assert.match(governance, /People & Office → Finance/);
+});
+
+test("overall VYNDI RAG health synthesizes governed IBPE and live control state", () => {
+  assert.match(governance, /function isOverallRagHealthQuestion/);
+  assert.match(governance, /Current overall VYNDI health/);
+  assert.match(governance, /GREEN — verified controls/);
+  assert.match(governance, /AMBER — execution\/governance hygiene/);
+  assert.match(governance, /RED — current blockers/);
+  assert.match(governance, /reconciliation_mismatch_skus/);
+  assert.match(governance, /vyndi_ibpe_runs/);
+});
+
+test("governance server is RBAC-protected and returns only handled governed questions", () => {
+  assert.match(governanceServer, /requireBusinessActor/);
+  assert.match(governanceServer, /tryGovernanceDataAnswer/);
+  assert.match(governanceServer, /handled: true as const/);
+});
+
+test("Co-Pilot UI routes governance and aggregate exception questions before traceability search", () => {
+  const governanceCall = copilotUi.indexOf("const governance = await askVibpeGovernanceCopilot");
+  const traceabilityCall = copilotUi.indexOf("const traceability = await askTraceabilityCopilot");
+  const ibpeCall = copilotUi.indexOf("const response = await askIbpeCopilot");
+  assert.ok(governanceCall >= 0);
+  assert.ok(traceabilityCall > governanceCall);
+  assert.ok(ibpeCall > traceabilityCall);
+  assert.match(copilotUi, /Governed VIBPE control state · live read-only sources/);
 });
