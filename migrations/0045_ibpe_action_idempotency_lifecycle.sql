@@ -26,10 +26,6 @@ update vyndi_ibpe_management_actions a
         and coalesce(e.payload_json->>'proposalId','')<>''
    );
 
-create unique index if not exists vyndi_ibpe_management_actions_source_proposal_uidx
-  on vyndi_ibpe_management_actions (source_proposal_id)
-  where source_proposal_id is not null;
-
 -- Reconcile existing exact duplicate active actions created during repeated smoke tests.
 -- Preserve the earliest action as canonical; cancel later exact duplicates and audit them.
 with ranked as (
@@ -76,6 +72,10 @@ update vyndi_ibpe_management_actions a
        updated_at=now()
   from ranked r
  where a.id=r.id and r.rn>1;
+
+create unique index if not exists vyndi_ibpe_management_actions_source_proposal_uidx
+  on vyndi_ibpe_management_actions (source_proposal_id)
+  where source_proposal_id is not null and status<>'cancelled';
 
 comment on column vyndi_ibpe_management_actions.source_proposal_id is
   'Authorised IBPE Business Update proposal that created this action. Unique when present so retries cannot create duplicate actions.';
