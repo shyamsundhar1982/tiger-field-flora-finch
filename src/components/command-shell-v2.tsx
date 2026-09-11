@@ -13,14 +13,40 @@ import {
   Presentation,
   Scale,
   Settings2,
-  Wallet,
   UsersRound,
+  Wallet,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { signOut } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { getCommandRole, lockCommand } from "@/lib/command-access";
+import {
+  ADMIN_CONTEXT,
+  ADMIN_HOME,
+  ADMIN_TABS,
+  activeWorkflowStage,
+  COMMAND_CONTEXT,
+  COMMAND_HOME,
+  COMMAND_SHORTCUTS,
+  ENGINEERING_CONTEXT,
+  ENGINEERING_HOME,
+  ENGINEERING_TABS,
+  FINANCE_GOVERNANCE_CONTEXT,
+  FINANCE_GOVERNANCE_TABS,
+  FINANCE_HOME,
+  LEGACY_ROUTES,
+  OPERATIONS_CONTEXT,
+  OPERATIONS_HOME,
+  OPERATIONS_TABS,
+  PEOPLE_CONTEXT,
+  PEOPLE_HOME,
+  PLAN_HOME,
+  PLAN_SALES_CONTEXT,
+  PLAN_SALES_TABS,
+  WORKFLOW_STAGES,
+  WORKFLOW_VISIBLE_ROUTES,
+} from "@/lib/operating-workflow";
 import { canAccessPage, canAccessRoute, type CommandRole } from "@/lib/page-access";
 import {
   navigationGroups,
@@ -30,131 +56,23 @@ import {
 } from "@/lib/page-metadata";
 import { cn } from "@/lib/utils";
 
-const MASTER_PLAN_ROUTE = "/command/planning";
-const FINANCE_HOME_ROUTE = "/command/financial-cockpit";
-const SUPPLY_HOME_ROUTE = "/command/operations";
-const COMMERCIAL_HOME_ROUTE = "/command/sales";
-const ENGINEERING_HOME_ROUTE = "/command/engineering";
-const GOVERNANCE_HOME_ROUTE = "/command/governance";
-
-const FINANCE_TABS = [
-  { to: FINANCE_HOME_ROUTE, label: "Overview" },
-  { to: "/command/finance-assumptions", label: "Plan" },
-  { to: "/command/cash", label: "Cash" },
-  { to: "/command/payables", label: "Payables" },
-  { to: "/command/receivables", label: "Receivables" },
-  { to: "/command/balance-sheet", label: "Balance Sheet" },
-  { to: "/command/ca-audit", label: "CA Audit" },
-] as const;
-
-const SUPPLY_TABS = [
-  { to: SUPPLY_HOME_ROUTE, label: "Overview" },
-  { to: "/command/procurement-planning", label: "Plan" },
-  { to: "/command/purchase-execution", label: "Buy" },
-  { to: "/command/receiving", label: "Receive" },
-  { to: "/command/inventory", label: "Inventory" },
-  { to: "/command/production", label: "Production" },
-  { to: "/command/quality", label: "Quality" },
-] as const;
-
-const PLAN_SALES_TABS = [
-  { to: MASTER_PLAN_ROUTE, label: "Plan" },
-  { to: COMMERCIAL_HOME_ROUTE, label: "Demand & Orders" },
-  { to: "/command/gtm", label: "GTM" },
-  { to: "/command/market-survey", label: "Market" },
-  { to: "/command/scenarios", label: "Scenarios" },
-] as const;
-
-const ENGINEERING_TABS = [
-  { to: ENGINEERING_HOME_ROUTE, label: "Overview" },
-  { to: "/command/product", label: "Product & Validation" },
-  { to: "/command/bom", label: "BOM" },
-  { to: "/command/bom-control", label: "BOM Control" },
-] as const;
-
-const GOVERNANCE_TABS = [
-  { to: GOVERNANCE_HOME_ROUTE, label: "Approvals" },
-  { to: "/command/risk", label: "Risk" },
-  { to: "/command/legal", label: "Legal & IP" },
-  { to: "/command/qa-verification", label: "QA Verification" },
-  { to: "/command/actions", label: "Audit & Actions" },
-] as const;
-
-const ADMIN_TABS = [
-  { to: "/command/users", label: "Users & Roles" },
-  { to: "/command/master-data", label: "Master Data" },
-] as const;
-
-const FINANCE_CONTEXT = new Set<string>([
-  ...FINANCE_TABS.map((tab) => tab.to),
-  "/command/finance",
-  "/command/finance-control",
-  "/command/master-finance",
-  "/command/aluminium-finance",
-  "/command/funding",
-  "/command/actuals",
-]);
-const SUPPLY_CONTEXT = new Set<string>([
-  ...SUPPLY_TABS.map((tab) => tab.to),
-  "/command/procurement",
-  "/command/manufacturing",
-  "/command/inventory-truth",
-  "/command/inventory-ledgers",
-  "/command/inventory-master",
-  "/command/inventory-openings",
-  "/command/inventory-control-audit",
-  "/command/component-control",
-  "/command/inventory-legacy",
-  "/command/bom-inventory-mapping",
-]);
-const PLAN_SALES_CONTEXT = new Set<string>([...PLAN_SALES_TABS.map((tab) => tab.to)]);
-const ENGINEERING_CONTEXT = new Set<string>([...ENGINEERING_TABS.map((tab) => tab.to)]);
-const GOVERNANCE_CONTEXT = new Set<string>([...GOVERNANCE_TABS.map((tab) => tab.to)]);
-const PEOPLE_CONTEXT = new Set<string>(["/command/people-office"]);
-const ADMIN_CONTEXT = new Set<string>([...ADMIN_TABS.map((tab) => tab.to)]);
-const COMMAND_CONTEXT = new Set<string>([
-  "/command",
-  "/command/control-tower",
-  "/command/decision-inbox",
-  "/command/management-intelligence",
-  "/command/founder-command",
-  "/command/founder-control",
-  "/command/decision-engine",
-  "/command/ibpe-operating-workspace",
-]);
-
-const FINANCE_GOVERNANCE_CONTEXT = new Set<string>([
-  ...FINANCE_CONTEXT,
-  ...GOVERNANCE_CONTEXT,
-]);
-
 const WORKSPACES = [
-  { to: "/command", label: "Command", icon: Activity, context: COMMAND_CONTEXT },
-  { to: MASTER_PLAN_ROUTE, label: "Plan & Sales", icon: LineChart, context: PLAN_SALES_CONTEXT },
-  { to: ENGINEERING_HOME_ROUTE, label: "Product & Engineering", icon: DraftingCompass, context: ENGINEERING_CONTEXT },
-  { to: SUPPLY_HOME_ROUTE, label: "Operations", icon: Factory, context: SUPPLY_CONTEXT },
-  { to: "/command/people-office", label: "People & Office", icon: UsersRound, context: PEOPLE_CONTEXT },
-  { to: FINANCE_HOME_ROUTE, label: "Finance & Governance", icon: Wallet, context: FINANCE_GOVERNANCE_CONTEXT },
-  { to: "/command/users", label: "Admin", icon: Settings2, context: ADMIN_CONTEXT, adminOnly: true },
+  { to: COMMAND_HOME, label: "Command", icon: Activity, context: COMMAND_CONTEXT },
+  { to: PLAN_HOME, label: "Plan & Sales", icon: LineChart, context: PLAN_SALES_CONTEXT },
+  { to: ENGINEERING_HOME, label: "Product & Engineering", icon: DraftingCompass, context: ENGINEERING_CONTEXT },
+  { to: OPERATIONS_HOME, label: "Operations", icon: Factory, context: OPERATIONS_CONTEXT },
+  { to: PEOPLE_HOME, label: "People & Office", icon: UsersRound, context: PEOPLE_CONTEXT },
+  { to: FINANCE_HOME, label: "Finance & Governance", icon: Wallet, context: FINANCE_GOVERNANCE_CONTEXT },
+  { to: ADMIN_HOME, label: "Admin", icon: Settings2, context: ADMIN_CONTEXT, adminOnly: true },
 ] as const;
 
 const WORKSPACE_ROUTES = new Set<string>(WORKSPACES.map((item) => item.to));
 const TAB_ROUTES = new Set<string>([
-  ...FINANCE_TABS.map((item) => item.to),
-  ...SUPPLY_TABS.map((item) => item.to),
   ...PLAN_SALES_TABS.map((item) => item.to),
   ...ENGINEERING_TABS.map((item) => item.to),
-  ...GOVERNANCE_TABS.map((item) => item.to),
+  ...OPERATIONS_TABS.map((item) => item.to),
+  ...FINANCE_GOVERNANCE_TABS.map((item) => item.to),
   ...ADMIN_TABS.map((item) => item.to),
-]);
-const LEGACY_ROUTES = new Set<string>([
-  "/command/phase-4",
-  "/command/phase-5",
-  "/command/phase-6",
-  "/command/phase-6a",
-  "/command/management-intelligence",
-  "/command/production-jobcards",
-  "/command/ops",
 ]);
 
 const ICONS: Record<PageDomain, typeof Activity> = {
@@ -228,8 +146,8 @@ function WorkspaceNavigation({ role, onNavigate }: { role: CommandRole | null; o
       <section className="rounded-xl border border-border bg-surface/30 p-2">
         <div className="flex items-center gap-2 px-2 pb-2 pt-1">
           <Activity className="size-3.5 text-accent" />
-          <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-fg">Core workspaces</span>
-          <span className="ml-auto text-[9px] text-muted">7 workflow areas</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-fg">Operating workspaces</span>
+          <span className="ml-auto text-[9px] text-muted">7 owners</span>
         </div>
         <div className="space-y-0.5">
           {WORKSPACES.filter((item) => (!(item as { adminOnly?: boolean }).adminOnly || role === "admin") && isAccessible(role, item.to)).map((item) => {
@@ -251,19 +169,19 @@ function WorkspaceNavigation({ role, onNavigate }: { role: CommandRole | null; o
               </ClientLink>
             );
           })}
-          {[
-            ["/command/decision-inbox", "Action Inbox"],
-            ["/command/control-tower", "ERP Reports"],
-            ["/command/ibpe-operating-workspace", "VIBPE Workspace"],
-          ].filter(([to]) => isAccessible(role, to)).map(([to, label]) => (
+        </div>
+
+        <div className="mt-2 border-t border-border pt-2">
+          <p className="px-3 pb-1 text-[9px] font-bold uppercase tracking-[0.16em] text-subtle">Command tools</p>
+          {COMMAND_SHORTCUTS.filter((item) => isAccessible(role, item.to)).map((item) => (
             <ClientLink
-              key={to}
-              to={to}
+              key={item.to}
+              to={item.to}
               onNavigate={onNavigate}
-              active={pathname === to}
-              className="ml-9 block rounded-md px-2 py-1.5 text-xs text-subtle hover:bg-bg hover:text-fg aria-[current=page]:text-accent"
+              active={pathname === item.to}
+              className="ml-5 block rounded-md px-2 py-1.5 text-xs text-subtle hover:bg-bg hover:text-fg aria-[current=page]:text-accent"
             >
-              {label}
+              {item.label}
             </ClientLink>
           ))}
         </div>
@@ -326,7 +244,7 @@ function WorkspaceTabs({
   const accessible = routes.filter((route) => isAccessible(role, route.to));
   if (accessible.length < 2) return null;
   return (
-    <nav className="mb-6 overflow-x-auto rounded-xl border border-border bg-surface/50 p-1 [scrollbar-width:thin]" aria-label={label}>
+    <nav className="mb-4 overflow-x-auto rounded-xl border border-border bg-surface/50 p-1 [scrollbar-width:thin]" aria-label={label}>
       <div className="flex min-w-max gap-1">
         {accessible.map((tab) => (
           <ClientLink
@@ -343,46 +261,35 @@ function WorkspaceTabs({
   );
 }
 
-const WORKFLOW_STEPS = [
-  { label: "Demand", to: "/command/sales", routes: ["/command/sales"] },
-  { label: "Engineering / BOM", to: "/command/bom-control", routes: ["/command/engineering", "/command/product", "/command/bom", "/command/bom-control"] },
-  { label: "Material Check", to: "/command/inventory", routes: ["/command/inventory"] },
-  { label: "Procurement", to: "/command/purchase-execution", routes: ["/command/procurement-planning", "/command/purchase-execution"] },
-  { label: "Receiving", to: "/command/receiving", routes: ["/command/receiving"] },
-  { label: "Job Card", to: "/command/production", routes: [] },
-  { label: "Traveller", to: "/command/production", routes: [] },
-  { label: "Production", to: "/command/production", routes: ["/command/production"] },
-  { label: "Quality", to: "/command/quality", routes: ["/command/quality"] },
-  { label: "Invoice / Collection", to: "/command/receivables", routes: ["/command/receivables"] },
-] as const;
-
-const WORKFLOW_CONTEXT = new Set<string>(WORKFLOW_STEPS.flatMap((step) => [...step.routes, step.to]));
-
 function WorkflowRail({ role }: { role: CommandRole | null }) {
   const { pathname } = useLocation();
-  if (!WORKFLOW_CONTEXT.has(pathname)) return null;
-  const steps = WORKFLOW_STEPS.filter((step) => isAccessible(role, step.to));
+  if (!WORKFLOW_VISIBLE_ROUTES.has(pathname)) return null;
+  const active = activeWorkflowStage(pathname);
+  const steps = WORKFLOW_STAGES.filter((step) => isAccessible(role, step.to));
   return (
-    <nav aria-label="End-to-end operating workflow" className="mb-4 overflow-x-auto rounded-xl border border-border bg-surface/30 px-2 py-2 [scrollbar-width:thin]">
-      <div className="flex min-w-max items-center gap-1">
-        {steps.map((step, index) => {
-          const active = step.routes.includes(pathname as never);
-          return (
-            <div key={step.label} className="flex items-center gap-1">
+    <nav aria-label="End-to-end operating workflow" className="mb-4 rounded-xl border border-border bg-surface/25 px-3 py-2.5">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-green">Operating flow</p>
+        <p className="text-[10px] text-subtle">Follow the business object · write only in the owning workspace</p>
+      </div>
+      <div className="overflow-x-auto [scrollbar-width:thin]">
+        <div className="flex min-w-max items-center gap-1 pb-1">
+          {steps.map((step, index) => (
+            <div key={step.id} className="flex items-center gap-1">
               {index ? <span className="px-1 text-subtle">→</span> : null}
               <ClientLink
                 to={step.to}
-                active={active}
+                active={active === step.id}
                 className={cn(
                   "rounded-md px-2.5 py-1.5 text-[11px] font-semibold text-muted hover:bg-bg hover:text-fg",
-                  active && "bg-accent/10 text-accent",
+                  active === step.id && "bg-accent/10 text-accent ring-1 ring-accent/25",
                 )}
               >
-                {step.label}
+                <span title={step.label}>{step.shortLabel}</span>
               </ClientLink>
             </div>
-          );
-        })}
+          ))}
+        </div>
       </div>
     </nav>
   );
@@ -448,19 +355,14 @@ export function CommandShell() {
     setLoggingOut(true);
     setLogoutError("");
     try {
-      // Always clear the compatibility session if it exists. A missing legacy
-      // password/session must not block canonical individual sign-out.
       await lockCommand().catch(() => undefined);
       setRole(null);
 
       if (individualUser && !individualUser.isDevFallback) {
-        // The prewired helper clears the Better Auth server session and the
-        // transported preview bearer. Do not replace this with authClient.signOut().
         await signOut("/login");
         return;
       }
 
-      // Legacy-only viewers have no Better Auth session to terminate.
       await navigate({ to: "/login" });
     } catch (cause) {
       setLogoutError(cause instanceof Error ? cause.message : "Unable to confirm sign out. Retry.");
@@ -496,11 +398,10 @@ export function CommandShell() {
           <MobileNavigation role={role} logout={logout} loggingOut={loggingOut} logoutError={logoutError} />
           <div className="px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
             <WorkflowRail role={role} />
-            <WorkspaceTabs role={role} routes={FINANCE_TABS} context={FINANCE_CONTEXT} label="Finance workspace" />
-            <WorkspaceTabs role={role} routes={SUPPLY_TABS} context={SUPPLY_CONTEXT} label="Operations workspace" />
             <WorkspaceTabs role={role} routes={PLAN_SALES_TABS} context={PLAN_SALES_CONTEXT} label="Plan and Sales workspace" />
             <WorkspaceTabs role={role} routes={ENGINEERING_TABS} context={ENGINEERING_CONTEXT} label="Product and Engineering workspace" />
-            <WorkspaceTabs role={role} routes={GOVERNANCE_TABS} context={GOVERNANCE_CONTEXT} label="Governance workspace" />
+            <WorkspaceTabs role={role} routes={OPERATIONS_TABS} context={OPERATIONS_CONTEXT} label="Operations workspace" />
+            <WorkspaceTabs role={role} routes={FINANCE_GOVERNANCE_TABS} context={FINANCE_GOVERNANCE_CONTEXT} label="Finance and Governance workspace" />
             <WorkspaceTabs role={role} routes={ADMIN_TABS} context={ADMIN_CONTEXT} label="Administration workspace" />
             <fieldset disabled={viewer} className="m-0 min-w-0 border-0 p-0">
               <Outlet />
