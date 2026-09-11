@@ -11,6 +11,8 @@ import type { IntegratedPlanningResult } from "@/lib/integrated-business-plannin
 import { VIBPE_COPILOT_NAME } from "@/lib/ibpe-brand";
 import { RUNTIME_IBPE_ENGINE_VERSION } from "@/lib/ibpe-runtime-parity";
 import { runVibpeCopilot2 } from "@/lib/vibpe-copilot-2";
+import { retrieveVibpeKnowledgeEvidence, type VibpeKnowledgeEvidence } from "@/lib/vibpe-knowledge-retrieval";
+import { refreshVibpeWeeklyReviewsIfStale } from "@/lib/vibpe-weekly-review-knowledge";
 
 export type IbpeCopilotRequest = {
   question: string;
@@ -424,11 +426,32 @@ function deterministicAnswer(
   return lines.join("\n\n");
 }
 
+function shouldSurfaceKnowledgeEvidence(question: string) {
+  return /weekly|status|progress|milestone|design|engineering|geometry|clearance|prototype|manufactur|oem|tooling|incubat|tansam|tancam|launch|readiness|blocker|decision|priority|material change/i.test(question);
+}
+
+function formatKnowledgeEvidence(evidence: VibpeKnowledgeEvidence[]) {
+  if (!evidence.length) return "";
+  const items = evidence.slice(0, 4).map((item) => {
+    const date = item.reviewDate ? ` · ${item.reviewDate}` : "";
+    const state = item.authority === "unresolved" ? "unresolved" : "advisory evidence";
+    return `• [${state}] ${item.claimText} — ${item.title}${date}`;
+  });
+  return [
+    "VIBPE knowledge evidence (weekly reviews; not master authority):",
+    ...items,
+    "Governance: governed internal/master data and deterministic IBPE truth override any conflicting review statement.",
+  ].join("\n");
+}
+
 function systemPrompt() {
   return [
     `You are ${VIBPE_COPILOT_NAME} for Vayu Shastr Private Limited.`,
     "You are an advisory exploration agent sitting on top of a deterministic Integrated Business Planning Engine.",
     "The deterministic IBPE packet is the authority for quantities, cash, MRP, ATP/MSL, capacity, funding and scenario deltas. Never invent or recompute numbers outside the supplied packet.",
+    "Weekly-review knowledge evidence is advisory or unresolved context only. It may explain progress, blockers, decisions, design, prototype, incubation and launch readiness, but it must never override governed internal/master data or deterministic IBPE transaction truth.",
+    "When weekly-review evidence conflicts with governed internal knowledge, use the governed value and identify the review item as historical or unresolved evidence.",
+    "If you use weekly-review evidence, preserve its provenance by naming the source review date/title when practical and state unresolved status explicitly.",
     "Always distinguish plan, forecast, committed and actual truth. A scenario is hypothetical forecast analysis and must never be described as an approved plan or actual transaction.",
     "If the user asks multiple distinct questions, answer every question separately and in the same order.",
     "If the user asks for several executive metrics in one question, return one complete IBPE Executive Assessment covering every requested domain.",
@@ -470,6 +493,12 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
     if (!data.question) return { ok: false, error: "Ask a question first.", advisoryOnly: true };
 
     const { sql, row } = await latestRun();
+    try {
+      await refreshVibpeWeeklyReviewsIfStale(actor.role, 6);
+    } catch {
+      // Drive refresh is supplementary. Missing OAuth or a transient provider
+      // failure must never block governed VIBPE analysis.
+    }
     const lineage = {
       governedRunId: row.id,
       approvedPlanRevision: Number(row.approved_plan_revision),
@@ -477,6 +506,14 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
       sourceSha: row.source_sha,
     };
     const questions = splitQuestions(data.question);
+    let knowledgeEvidence: VibpeKnowledgeEvidence[] = [];
+    try {
+      knowledgeEvidence = await retrieveVibpeKnowledgeEvidence(sql, data.question, 10);
+    } catch {
+      // Knowledge evidence is supplementary. A migration/configuration lag must
+      // not make the governed deterministic Co-Pilot unavailable.
+      knowledgeEvidence = [];
+    }
     const scenarioCache = new Map<string, Awaited<ReturnType<typeof evaluateScenario>>>();
 
     async function resolveQuestion(question: string) {
@@ -565,6 +602,16 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
           scenario: resolved.scenarioContext,
           ibpe: compactResult(resolved.result),
           validation: compactValidation(row.validation_json ?? {}),
+          knowledgeEvidence: knowledgeEvidence.map((item) => ({
+            claim: item.claimText,
+            class: item.claimClass,
+            authority: item.authority,
+            domain: item.domain,
+            sourceTitle: item.title,
+            reviewDate: item.reviewDate,
+            sourceRevision: item.sourceRevision,
+            sourceUrl: item.externalUrl,
+          })),
         };
         try {
           const response = await fetch("https://api.x.ai/v1/chat/completions", {
@@ -600,6 +647,13 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
       }
     }
 
+    if (shouldSurfaceKnowledgeEvidence(data.question) && knowledgeEvidence.length) {
+      const evidenceText = formatKnowledgeEvidence(knowledgeEvidence);
+      if (evidenceText && !answer.includes("VIBPE knowledge evidence (weekly reviews; not master authority):")) {
+        answer = `${answer}\n\n${evidenceText}`;
+      }
+    }
+
     const questionHash = createHash("sha256").update(data.question).digest("hex");
     await sql.query(
       `insert into vyndi_audit_events
@@ -620,6 +674,8 @@ export const askIbpeCopilot = createServerFn({ method: "POST" })
           mode,
           executiveAssessment,
           answerChars: answer.length,
+          knowledgeEvidenceCount: knowledgeEvidence.length,
+          knowledgeEvidenceDocumentIds: [...new Set(knowledgeEvidence.map((item) => item.documentId))],
           copilotVersion: handledByVibpe2 ? "2.0" : "legacy-fallback",
           vibpe2FallbackReason: vibpe2FallbackReason ?? null,
         }),

@@ -22,3 +22,11 @@ External evidence may become a governed VYNDI assumption only through the owning
 ## Prohibited authority substitution
 
 External information must not silently overwrite controlled BOM, inventory, supplier master, controlled unit cost, demand authority, approved plan, production status, accounting actual or transaction state.
+
+## Governed weekly VYNDI reviews
+
+The Google Drive folder **VYNDI Weekly Status Reviews — VIBPE Knowledge** is a registered first-party evidence source. Weekly reviews are intentionally advisory evidence, not master data. Claims are classified as `verified_fact`, `unresolved_item`, `assumption`, `decision`, `blocker`, `priority`, or `material_change`.
+
+Even a `verified_fact` extracted from a weekly review remains advisory until it is promoted through the owning governed master process. `unresolved_item`, `assumption`, and `blocker` claims remain unresolved context and must never satisfy a master-data or engineering release gate.
+
+When a weekly review conflicts with governed internal knowledge, the governed master record wins. The review is retained with provenance as conflict evidence; it is not silently discarded or promoted.
