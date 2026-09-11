@@ -50,6 +50,7 @@ import {
   PLAN_SALES_TABS,
   WORKFLOW_STAGES,
   WORKFLOW_VISIBLE_ROUTES,
+  workspaceForRoute,
 } from "@/lib/operating-workflow";
 import { canAccessPage, canAccessRoute, type CommandRole } from "@/lib/page-access";
 import {
@@ -61,14 +62,14 @@ import {
 import { cn } from "@/lib/utils";
 
 const WORKSPACES = [
-  { to: COMMAND_HOME, label: "Command", icon: Activity, context: COMMAND_CONTEXT },
-  { to: PLAN_HOME, label: "Plan & Commercial", icon: LineChart, context: PLAN_SALES_CONTEXT },
-  { to: ENGINEERING_HOME, label: "Product & Engineering", icon: DraftingCompass, context: ENGINEERING_CONTEXT },
-  { to: OPERATIONS_HOME, label: "Supply & Operations", icon: Factory, context: OPERATIONS_CONTEXT },
-  { to: PEOPLE_HOME, label: "People & Office", icon: UsersRound, context: PEOPLE_CONTEXT },
-  { to: FINANCE_HOME, label: "Finance", icon: Wallet, context: FINANCE_CONTEXT },
-  { to: GOVERNANCE_HOME, label: "Governance & Assurance", icon: ShieldCheck, context: GOVERNANCE_CONTEXT },
-  { to: ADMIN_HOME, label: "Admin", icon: Settings2, context: ADMIN_CONTEXT, adminOnly: true },
+  { to: COMMAND_HOME, label: "Command", icon: Activity, context: COMMAND_CONTEXT, id: "command" as const },
+  { to: PLAN_HOME, label: "Plan & Commercial", icon: LineChart, context: PLAN_SALES_CONTEXT, id: "plan-sales" as const },
+  { to: ENGINEERING_HOME, label: "Product & Engineering", icon: DraftingCompass, context: ENGINEERING_CONTEXT, id: "engineering" as const },
+  { to: OPERATIONS_HOME, label: "Supply & Operations", icon: Factory, context: OPERATIONS_CONTEXT, id: "operations" as const },
+  { to: PEOPLE_HOME, label: "People & Office", icon: UsersRound, context: PEOPLE_CONTEXT, id: "people-office" as const },
+  { to: FINANCE_HOME, label: "Finance", icon: Wallet, context: FINANCE_CONTEXT, id: "finance" as const },
+  { to: GOVERNANCE_HOME, label: "Governance & Assurance", icon: ShieldCheck, context: GOVERNANCE_CONTEXT, id: "governance" as const },
+  { to: ADMIN_HOME, label: "Admin", icon: Settings2, context: ADMIN_CONTEXT, id: "admin" as const, adminOnly: true },
 ] as const;
 
 const WORKSPACE_ROUTES = new Set<string>(WORKSPACES.map((item) => item.to));
@@ -136,6 +137,7 @@ function ClientLink({
 
 function WorkspaceNavigation({ role, onNavigate }: { role: CommandRole | null; onNavigate?: () => void }) {
   const { pathname } = useLocation();
+  const activeOwner = workspaceForRoute(pathname);
   const secondary = useMemo(
     () =>
       Object.values(navigationGroups)
@@ -153,12 +155,13 @@ function WorkspaceNavigation({ role, onNavigate }: { role: CommandRole | null; o
         <div className="flex items-center gap-2 px-2 pb-2 pt-1">
           <Activity className="size-3.5 text-accent" />
           <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-fg">Operating workspaces</span>
-          <span className="ml-auto text-[9px] text-muted">8 owners</span>
+          <span className="ml-auto text-[9px] text-muted">6 + admin</span>
         </div>
         <div className="space-y-0.5">
           {WORKSPACES.filter((item) => (!(item as { adminOnly?: boolean }).adminOnly || role === "admin") && isAccessible(role, item.to)).map((item) => {
             const Icon = item.icon;
-            const active = item.context.has(pathname);
+            // Single owner only — avoids dual highlight when a path sits in overlapping sets.
+            const active = activeOwner === item.id || (activeOwner === null && item.context.has(pathname));
             return (
               <ClientLink
                 key={item.to}
@@ -170,8 +173,8 @@ function WorkspaceNavigation({ role, onNavigate }: { role: CommandRole | null; o
                   active && "bg-bg text-fg shadow-sm",
                 )}
               >
-                <Icon className={cn("size-4 shrink-0", active && "text-accent")} />
-                {item.label}
+                <Icon className={cn("size-4 shrink-0 text-muted", active && "text-accent")} />
+                <span className={cn(active ? "text-fg" : "text-muted")}>{item.label}</span>
               </ClientLink>
             );
           })}
@@ -185,7 +188,7 @@ function WorkspaceNavigation({ role, onNavigate }: { role: CommandRole | null; o
               to={item.to}
               onNavigate={onNavigate}
               active={pathname === item.to}
-              className="ml-5 block rounded-md px-2 py-1.5 text-xs text-subtle hover:bg-bg hover:text-fg aria-[current=page]:text-accent"
+              className="ml-5 block rounded-md px-2 py-1.5 text-xs text-muted hover:bg-bg hover:text-fg aria-[current=page]:text-accent"
             >
               {item.label}
             </ClientLink>
@@ -234,34 +237,49 @@ function WorkspaceNavigation({ role, onNavigate }: { role: CommandRole | null; o
   );
 }
 
+/**
+ * Tab strip for one workspace only.
+ * Membership is the tab list itself — never the broader context set — so
+ * Finance never shows Risk/Legal tabs, and Operations never inherits Finance tabs.
+ */
 function WorkspaceTabs({
   routes,
-  context,
   role,
   label,
 }: {
   routes: readonly { to: string; label: string }[];
-  context: Set<string>;
   role: CommandRole | null;
   label: string;
 }) {
   const { pathname } = useLocation();
-  if (!context.has(pathname)) return null;
+  const tabPaths = useMemo(() => new Set(routes.map((r) => r.to)), [routes]);
+  if (!tabPaths.has(pathname)) return null;
   const accessible = routes.filter((route) => isAccessible(role, route.to));
   if (accessible.length < 2) return null;
   return (
-    <nav className="mb-4 overflow-x-auto rounded-xl border border-border bg-surface/50 p-1 [scrollbar-width:thin]" aria-label={label}>
+    <nav
+      className="mb-4 overflow-x-auto rounded-xl border border-border bg-surface/50 p-1 [scrollbar-width:thin]"
+      aria-label={label}
+    >
       <div className="flex min-w-max gap-1">
-        {accessible.map((tab) => (
-          <ClientLink
-            key={tab.to}
-            to={tab.to}
-            active={pathname === tab.to}
-            className="rounded-lg border border-transparent px-4 py-2 text-xs font-semibold text-muted transition-colors hover:bg-bg/60 hover:text-fg aria-[current=page]:border-accent/35 aria-[current=page]:bg-accent/10 aria-[current=page]:text-accent"
-          >
-            {tab.label}
-          </ClientLink>
-        ))}
+        {accessible.map((tab) => {
+          const active = pathname === tab.to;
+          return (
+            <ClientLink
+              key={tab.to}
+              to={tab.to}
+              active={active}
+              className={cn(
+                "rounded-lg border border-transparent px-4 py-2 text-xs font-semibold transition-colors",
+                active
+                  ? "border-accent/35 bg-accent/10 text-accent"
+                  : "text-muted hover:bg-bg/60 hover:text-fg",
+              )}
+            >
+              {tab.label}
+            </ClientLink>
+          );
+        })}
       </div>
     </nav>
   );
@@ -287,8 +305,10 @@ function WorkflowRail({ role }: { role: CommandRole | null }) {
                 to={step.to}
                 active={active === step.id}
                 className={cn(
-                  "rounded-md px-2.5 py-1.5 text-[11px] font-semibold text-muted hover:bg-bg hover:text-fg",
-                  active === step.id && "bg-accent/10 text-accent ring-1 ring-accent/25",
+                  "rounded-md px-2.5 py-1.5 text-[11px] font-semibold transition-colors",
+                  active === step.id
+                    ? "bg-accent/10 text-accent ring-1 ring-accent/25"
+                    : "text-muted hover:bg-bg hover:text-fg",
                 )}
               >
                 <span title={step.label}>{step.shortLabel}</span>
@@ -404,12 +424,12 @@ export function CommandShell() {
           <MobileNavigation role={role} logout={logout} loggingOut={loggingOut} logoutError={logoutError} />
           <div className="px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
             <WorkflowRail role={role} />
-            <WorkspaceTabs role={role} routes={PLAN_SALES_TABS} context={PLAN_SALES_CONTEXT} label="Plan and Commercial workspace" />
-            <WorkspaceTabs role={role} routes={ENGINEERING_TABS} context={ENGINEERING_CONTEXT} label="Product and Engineering workspace" />
-            <WorkspaceTabs role={role} routes={OPERATIONS_TABS} context={OPERATIONS_CONTEXT} label="Supply and Operations workspace" />
-            <WorkspaceTabs role={role} routes={FINANCE_TABS} context={FINANCE_CONTEXT} label="Finance workspace" />
-            <WorkspaceTabs role={role} routes={GOVERNANCE_TABS} context={GOVERNANCE_CONTEXT} label="Governance and Assurance workspace" />
-            <WorkspaceTabs role={role} routes={ADMIN_TABS} context={ADMIN_CONTEXT} label="Administration workspace" />
+            <WorkspaceTabs role={role} routes={PLAN_SALES_TABS} label="Plan and Commercial workspace" />
+            <WorkspaceTabs role={role} routes={ENGINEERING_TABS} label="Product and Engineering workspace" />
+            <WorkspaceTabs role={role} routes={OPERATIONS_TABS} label="Supply and Operations workspace" />
+            <WorkspaceTabs role={role} routes={FINANCE_TABS} label="Finance workspace" />
+            <WorkspaceTabs role={role} routes={GOVERNANCE_TABS} label="Governance and Assurance workspace" />
+            <WorkspaceTabs role={role} routes={ADMIN_TABS} label="Administration workspace" />
             <fieldset disabled={viewer} className="m-0 min-w-0 border-0 p-0">
               <Outlet />
             </fieldset>
