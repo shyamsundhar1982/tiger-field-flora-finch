@@ -23,6 +23,7 @@ import { signOut } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { getCommandRole, lockCommand } from "@/lib/command-access";
 import {
+  ADMIN_CONTEXT,
   ADMIN_HOME,
   ADMIN_TABS,
   COMMAND_CONTEXT,
@@ -65,12 +66,8 @@ const WORKSPACES = [
   { to: PEOPLE_HOME, label: "People & Office", icon: UsersRound, context: PEOPLE_CONTEXT, id: "people-office" as const },
   { to: FINANCE_HOME, label: "Finance", icon: Wallet, context: FINANCE_CONTEXT, id: "finance" as const },
   { to: GOVERNANCE_HOME, label: "Governance & Assurance", icon: ShieldCheck, context: GOVERNANCE_CONTEXT, id: "governance" as const },
-  { to: ADMIN_HOME, label: "Admin", icon: Settings2, context: ADMIN_CONTEXT_PLACEHOLDER(), id: "admin" as const, adminOnly: true },
+  { to: ADMIN_HOME, label: "Admin", icon: Settings2, context: ADMIN_CONTEXT, id: "admin" as const, adminOnly: true },
 ] as const;
-
-function ADMIN_CONTEXT_PLACEHOLDER() {
-  return new Set<string>([ADMIN_HOME, "/command/master-data"]);
-}
 
 const WORKSPACE_ROUTES = new Set<string>(WORKSPACES.map((item) => item.to));
 const TAB_ROUTES = new Set<string>([
@@ -236,10 +233,6 @@ function WorkspaceNavigation({ role, onNavigate }: { role: CommandRole | null; o
   );
 }
 
-/**
- * Tab strip for one workspace only.
- * Membership is the tab list itself — never the broader context set.
- */
 function WorkspaceTabs({
   routes,
   role,
@@ -385,7 +378,6 @@ export function CommandShell() {
         <div className="min-w-0 flex-1">
           <MobileNavigation role={role} logout={logout} loggingOut={loggingOut} logoutError={logoutError} />
           <div className="px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
-            {/* Operating Flow rail removed — it cluttered transactional pages. */}
             <WorkspaceTabs role={role} routes={PLAN_SALES_TABS} label="Plan and Commercial workspace" />
             <WorkspaceTabs role={role} routes={ENGINEERING_TABS} label="Product and Engineering workspace" />
             <WorkspaceTabs role={role} routes={OPERATIONS_TABS} label="Supply and Operations workspace" />
