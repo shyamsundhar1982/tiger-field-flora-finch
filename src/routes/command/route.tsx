@@ -1,5 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { CommandShell } from "@/components/command-shell";
+import { ControlledDocumentToolbar } from "@/components/controlled-document-toolbar";
 import { IbpeCopilot } from "@/components/ibpe-copilot";
 import { IbpeWorkspaceProjection } from "@/components/ibpe-workspace-projection";
 import { ProtectedNavigationBridge } from "@/components/protected-navigation-bridge";
@@ -42,5 +43,5 @@ export const Route = createFileRoute("/command")({
 
 function CommandRoot() {
   useOperatingPlanSync();
-  return <><ProtectedNavigationBridge /><VibpeRuntimeObserver /><IbpeWorkspaceProjection /><CommandShell /><IbpeCopilot /></>;
+  return <><ProtectedNavigationBridge /><VibpeRuntimeObserver /><IbpeWorkspaceProjection /><CommandShell /><ControlledDocumentToolbar /><IbpeCopilot /></>;
 }
