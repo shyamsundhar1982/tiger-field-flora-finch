@@ -73,12 +73,11 @@ test("surface inventory records backend visibility without changing UI structure
   assert.doesNotMatch(surfaces, /command-shell-v2|createFileRoute|WORKFLOW_STAGES|workspaceForRoute/);
 });
 
-// G6 — final converged state after two additive 0054 migrations and forward-only 0055 reconciliation.
+// G6 — initial coverage plus one self-contained forward reconciliation.
 const g6Initial = readFileSync(new URL("../migrations/0054_vibpe_authority_coverage.sql", import.meta.url), "utf8");
-const g6 = readFileSync(new URL("../migrations/0054_vibpe_authority_coverage_extension.sql", import.meta.url), "utf8");
-const g6Reconcile = readFileSync(new URL("../migrations/0055_vibpe_g6_reconciliation.sql", import.meta.url), "utf8");
+const g6 = readFileSync(new URL("../migrations/0055_vibpe_g6_reconciliation.sql", import.meta.url), "utf8");
 
-test("G6 extension covers canonical Product, Engineering, Quality, People & Office, Dispatch, Finance and Governance authorities", () => {
+test("G6 covers canonical Product, Engineering, Quality, People & Office, Dispatch, Finance and Governance authorities", () => {
   for (const entity of [
     "product_family",
     "product_variant",
@@ -94,8 +93,10 @@ test("G6 extension covers canonical Product, Engineering, Quality, People & Offi
     "supplier_invoice",
     "supplier_payment",
     "ibpe_run",
+    "ibpe_report_snapshot",
     "ibpe_management_action",
     "ibpe_decision",
+    "ibpe_business_update_proposal",
     "vibpe_assurance_snapshot",
   ]) assert.match(g6, new RegExp(`'${entity}'`));
 
@@ -120,14 +121,15 @@ test("G6 extends governed workflows through Quality release, Operations Dispatch
 test("G6 separates full backend authority from unproved route binding and preserves explicit gaps", () => {
   assert.match(g6, /'table:quality-releases'[^\n]+'full'/);
   assert.match(g6, /'service:quality-authority'[^\n]+'full'/);
-  assert.match(g6, /'route:quality'[^\n]+'gap'/);
+
+  for (const surface of ["route:product", "route:engineering", "route:quality", "route:people-office", "route:dispatch-visibility"]) {
+    const escaped = surface.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    assert.match(g6, new RegExp(`coverage_status='gap'[\\s\\S]+?surface_id='${escaped}'`));
+  }
 
   for (const surface of ["route:cash", "route:payables", "route:balance-sheet", "route:risk", "route:legal"]) {
     assert.match(g6Initial, new RegExp(`'${surface}'[^\\n]+?'gap'`), `${surface} must be explicitly represented as a gap`);
-    assert.match(g6Reconcile, new RegExp(surface.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `${surface} must survive reconciliation`);
-  }
-  for (const surface of ["route:product", "route:engineering", "route:people-office", "route:dispatch-visibility"]) {
-    assert.match(g6Reconcile, new RegExp(`surface_id='${surface}'[\\s\\S]+?coverage_status='gap'|coverage_status='gap'[\\s\\S]+?surface_id='${surface}'`));
+    assert.match(g6, new RegExp(surface.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `${surface} must survive reconciliation`);
   }
 });
 
@@ -142,27 +144,28 @@ test("G6 deterministic exception checks cover the newly canonical authority grap
     "dispatch_exceeds_quality_release",
     "supplier_payment_without_approved_invoice",
     "ibpe_decision_attribution_missing",
+    "assurance_surface_gap",
   ]) assert.match(g6, new RegExp(type));
 });
 
-test("G6 reconciliation removes semantic aliases without rewriting historical migrations", () => {
-  assert.match(g6Reconcile, /delete from vyndi_vibpe_entity_registry[\s\S]+entity_type='people_office_cost'/);
-  assert.match(g6Reconcile, /delete from vyndi_vibpe_gate_registry[\s\S]+G04-PRODUCT-MASTER[\s\S]+G08-PEOPLE-OFFICE/);
-  assert.match(g6Reconcile, /set domain='operations'/);
-  assert.match(g6Reconcile, /drop view if exists vyndi_vibpe_all_exceptions/);
+test("G6 reconciliation removes semantic aliases and standardises Dispatch ownership", () => {
+  assert.match(g6, /delete from vyndi_vibpe_entity_registry where entity_type='people_office_cost'/);
+  assert.match(g6, /delete from vyndi_vibpe_gate_registry where gate_id in \('G04-PRODUCT-MASTER','G08-PEOPLE-OFFICE'\)/);
+  assert.match(g6, /set domain='operations'/);
+  assert.match(g6, /drop view if exists vyndi_vibpe_all_exceptions/);
 });
 
 test("G6 standardises live reads and snapshots on the unified assurance exception stream", () => {
   assert.match(g6, /create or replace view vyndi_vibpe_assurance_exceptions_all/);
   assert.match(g6, /from vyndi_vibpe_assurance_exceptions_all/);
   assert.match(g6, /'exceptionView','vyndi_vibpe_assurance_exceptions_all'/);
-  assert.match(g6Reconcile, /view:vibpe-assurance-exceptions-all/);
+  assert.match(g6, /view:vibpe-assurance-exceptions-all/);
   assert.match(service, /from vyndi_vibpe_assurance_exceptions_all/);
   assert.doesNotMatch(service, /from vyndi_vibpe_all_exceptions/);
 });
 
 test("G6 remains backend-only and does not cross the protected R3 UI boundary", () => {
-  for (const sql of [g6Initial, g6, g6Reconcile]) {
+  for (const sql of [g6Initial, g6]) {
     assert.doesNotMatch(sql, /createFileRoute|command-shell-v2|WORKFLOW_STAGES|workspaceForRoute/);
   }
 });
