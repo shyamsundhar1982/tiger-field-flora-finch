@@ -19,9 +19,12 @@ for (const path of activeWorkflowFiles) {
 }
 
 const shell = read("src/components/command-shell-v2.tsx");
+const operatingWorkflow = read("src/lib/operating-workflow.ts");
 assert.equal(shell.includes('{ to: "/command/production-jobcards", label: "Release" }'), false);
-assert.ok(shell.includes('"/command/production-jobcards"'), "job-card alias must remain hidden as compatibility");
-assert.ok(shell.includes('"/command/ops"'), "Ops alias must remain hidden as compatibility");
+assert.equal(hasQuotedRoute(shell, "/command/production-jobcards"), false, "compatibility aliases must not be embedded in the active shell");
+assert.ok(hasQuotedRoute(operatingWorkflow, "/command/production-jobcards"), "job-card alias must remain registered as hidden compatibility");
+assert.ok(hasQuotedRoute(operatingWorkflow, "/command/ops"), "Ops alias must remain registered as hidden compatibility");
+assert.ok(operatingWorkflow.includes("LEGACY_ROUTES"), "compatibility aliases must be owned by the canonical workflow contract");
 
 const decisionInbox = read("src/routes/command/decision-inbox.tsx");
 assert.equal(decisionInbox.includes('href={text(item, "route")}'), false);
