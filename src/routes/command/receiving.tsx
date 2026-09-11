@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { ArrowRight, ClipboardCheck, PackageCheck, ShieldAlert } from "lucide-react";
 import { useState } from "react";
+import { GovernedLifecycle } from "@/components/governed-lifecycle";
 import { Kpi, Panel } from "@/components/kpi";
 import {
   getReceivingData,
@@ -314,21 +315,27 @@ function Receiving() {
                       {number(row, "quantity_quarantined")} {text(row, "unit")} · {text(row, "sku")}
                     </p>
                   </div>
-                  <div className="flex gap-4">
-                    <button
-                      disabled={busy}
-                      onClick={() => void resolve(text(row, "id"), "accepted")}
-                      className="min-h-11 text-xs font-semibold text-ok"
-                    >
-                      Accept to stock
-                    </button>
-                    <button
-                      disabled={busy}
-                      onClick={() => void resolve(text(row, "id"), "rejected")}
-                      className="min-h-11 text-xs font-semibold text-danger"
-                    >
-                      Reject material
-                    </button>
+                  <div className="min-w-[300px]">
+                    <GovernedLifecycle
+                      label="Inspection lifecycle"
+                      status="quarantine"
+                      tone="warn"
+                      hint="Disposition evidence is mandatory."
+                      actions={[
+                        {
+                          label: "Accept to stock",
+                          onClick: () => void resolve(text(row, "id"), "accepted"),
+                          disabled: busy,
+                          tone: "ok",
+                        },
+                        {
+                          label: "Reject material",
+                          onClick: () => void resolve(text(row, "id"), "rejected"),
+                          disabled: busy,
+                          tone: "danger",
+                        },
+                      ]}
+                    />
                   </div>
                 </article>
               ))}
