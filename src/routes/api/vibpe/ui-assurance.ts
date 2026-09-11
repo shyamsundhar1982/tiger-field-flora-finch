@@ -3,10 +3,14 @@ import { requireBusinessActor } from "@/lib/business-actor";
 import { UnauthorizedError } from "@/lib/auth/verify.server";
 import { getSql } from "@/lib/db";
 
-function json(body: unknown, status = 200) {
+function json(body: unknown, status = 200, extraHeaders: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+      ...extraHeaders,
+    },
   });
 }
 
