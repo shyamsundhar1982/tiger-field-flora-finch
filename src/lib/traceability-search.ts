@@ -229,7 +229,7 @@ function rowToHit(row: SearchRow, role: CommandRole, terms: string[]) {
   invoiceIds.forEach((id, index) => addDocument(docs, role, "invoice", id, invoiceStatuses[index] ?? "", id));
   collectionIds.forEach((id, index) => addDocument(docs, role, "collection", id, collectionStatuses[index] ?? "", id));
 
-  const searchable: Array<[string, string, TraceabilityDocumentType]> = [
+  const searchableEntries: Array<[string, string, TraceabilityDocumentType]> = [
     ["Commercial Order", salesOrderId, "commercial_order"],
     ["Variant", `${clean(row.variant_id)} ${clean(row.variant_name)}`, "commercial_order"],
     ["Job Card", jobCardId, "job_card"],
@@ -245,7 +245,8 @@ function rowToHit(row: SearchRow, role: CommandRole, terms: string[]) {
     ["Dispatch", shipmentIds.join(" "), "dispatch"],
     ["Invoice", invoiceIds.join(" "), "invoice"],
     ["Collection", collectionIds.join(" "), "collection"],
-  ].filter(([, , type]) => canSee(role, type));
+  ];
+  const searchable = searchableEntries.filter(([, , type]) => canSee(role, type));
 
   let score = 0;
   const matchedFields: string[] = [];
