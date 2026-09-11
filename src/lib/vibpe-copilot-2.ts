@@ -4,6 +4,7 @@ import type { IbpeScenarioComparison, IbpeScenarioRequest } from "@/lib/ibpe-sce
 import { evaluateScenario } from "@/lib/ibpe-scenario-lab";
 import { parseVibpeIntent, type VibpeScenarioParse } from "@/lib/vibpe-intent";
 import { retrieveVibpeKnowledgeEvidence, type VibpeKnowledgeEvidence } from "@/lib/vibpe-knowledge-retrieval";
+import { tryGovernanceDataAnswer } from "@/lib/vibpe-governance-queries";
 import { tryOperationalDataAnswer } from "@/lib/vibpe-operational-queries";
 import { explainVibpeHorizon } from "@/lib/vibpe-planning";
 import { vibpeBusinessOperatorContext } from "@/lib/vibpe-business-operator";
@@ -156,6 +157,22 @@ export async function runVibpeCopilot2(
   const sessionKey = options.sessionKey ?? "default";
   const session = getVibpeSession(sessionKey);
   const priorScenario = session.activeScenario ?? options.uiScenario;
+
+  try {
+    const governanceAnswer = await tryGovernanceDataAnswer(sql, question);
+    if (governanceAnswer) {
+      updateVibpeSession(sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
+      return {
+        intent: parsed.intent,
+        answer: governanceAnswer,
+        doctrine: vibpeBusinessOperatorContext(),
+        advisoryOnly: true,
+      };
+    }
+  } catch {
+    // Cross-workspace governance/health queries are read-only. If a governed
+    // source is temporarily unavailable, continue through normal VIBPE routing.
+  }
 
   try {
     const operationalAnswer = await tryOperationalDataAnswer(sql, question);
