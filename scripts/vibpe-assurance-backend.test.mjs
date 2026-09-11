@@ -70,5 +70,5 @@ test("surface inventory records backend visibility without changing UI structure
   assert.match(surfaces, /route:quality/);
   assert.match(surfaces, /'gap'/);
   assert.match(surfaces, /order\/job-card-linked inspection evidence is not yet persisted/i);
-  assert.doesNotMatch(surfaces, /command-shell|navigation|createFileRoute/);
+  assert.doesNotMatch(surfaces, /command-shell-v2|createFileRoute|WORKFLOW_STAGES|workspaceForRoute/);
 });
