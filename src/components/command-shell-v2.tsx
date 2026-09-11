@@ -23,10 +23,8 @@ import { signOut } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { getCommandRole, lockCommand } from "@/lib/command-access";
 import {
-  ADMIN_CONTEXT,
   ADMIN_HOME,
   ADMIN_TABS,
-  activeWorkflowStage,
   COMMAND_CONTEXT,
   COMMAND_HOME,
   COMMAND_SHORTCUTS,
@@ -48,8 +46,6 @@ import {
   PLAN_HOME,
   PLAN_SALES_CONTEXT,
   PLAN_SALES_TABS,
-  WORKFLOW_STAGES,
-  WORKFLOW_VISIBLE_ROUTES,
   workspaceForRoute,
 } from "@/lib/operating-workflow";
 import { canAccessPage, canAccessRoute, type CommandRole } from "@/lib/page-access";
@@ -69,8 +65,12 @@ const WORKSPACES = [
   { to: PEOPLE_HOME, label: "People & Office", icon: UsersRound, context: PEOPLE_CONTEXT, id: "people-office" as const },
   { to: FINANCE_HOME, label: "Finance", icon: Wallet, context: FINANCE_CONTEXT, id: "finance" as const },
   { to: GOVERNANCE_HOME, label: "Governance & Assurance", icon: ShieldCheck, context: GOVERNANCE_CONTEXT, id: "governance" as const },
-  { to: ADMIN_HOME, label: "Admin", icon: Settings2, context: ADMIN_CONTEXT, id: "admin" as const, adminOnly: true },
+  { to: ADMIN_HOME, label: "Admin", icon: Settings2, context: ADMIN_CONTEXT_PLACEHOLDER(), id: "admin" as const, adminOnly: true },
 ] as const;
+
+function ADMIN_CONTEXT_PLACEHOLDER() {
+  return new Set<string>([ADMIN_HOME, "/command/master-data"]);
+}
 
 const WORKSPACE_ROUTES = new Set<string>(WORKSPACES.map((item) => item.to));
 const TAB_ROUTES = new Set<string>([
@@ -160,7 +160,6 @@ function WorkspaceNavigation({ role, onNavigate }: { role: CommandRole | null; o
         <div className="space-y-0.5">
           {WORKSPACES.filter((item) => (!(item as { adminOnly?: boolean }).adminOnly || role === "admin") && isAccessible(role, item.to)).map((item) => {
             const Icon = item.icon;
-            // Single owner only — avoids dual highlight when a path sits in overlapping sets.
             const active = activeOwner === item.id || (activeOwner === null && item.context.has(pathname));
             return (
               <ClientLink
@@ -239,8 +238,7 @@ function WorkspaceNavigation({ role, onNavigate }: { role: CommandRole | null; o
 
 /**
  * Tab strip for one workspace only.
- * Membership is the tab list itself — never the broader context set — so
- * Finance never shows Risk/Legal tabs, and Operations never inherits Finance tabs.
+ * Membership is the tab list itself — never the broader context set.
  */
 function WorkspaceTabs({
   routes,
@@ -280,42 +278,6 @@ function WorkspaceTabs({
             </ClientLink>
           );
         })}
-      </div>
-    </nav>
-  );
-}
-
-function WorkflowRail({ role }: { role: CommandRole | null }) {
-  const { pathname } = useLocation();
-  if (!WORKFLOW_VISIBLE_ROUTES.has(pathname)) return null;
-  const active = activeWorkflowStage(pathname);
-  const steps = WORKFLOW_STAGES.filter((step) => isAccessible(role, step.to));
-  return (
-    <nav aria-label="End-to-end operating workflow" className="mb-4 rounded-xl border border-border bg-surface/25 px-3 py-2.5">
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-green">Operating flow</p>
-        <p className="text-[10px] text-subtle">Follow the business object · write only in the owning workspace</p>
-      </div>
-      <div className="overflow-x-auto [scrollbar-width:thin]">
-        <div className="flex min-w-max items-center gap-1 pb-1">
-          {steps.map((step, index) => (
-            <div key={step.id} className="flex items-center gap-1">
-              {index ? <span className="px-1 text-subtle">→</span> : null}
-              <ClientLink
-                to={step.to}
-                active={active === step.id}
-                className={cn(
-                  "rounded-md px-2.5 py-1.5 text-[11px] font-semibold transition-colors",
-                  active === step.id
-                    ? "bg-accent/10 text-accent ring-1 ring-accent/25"
-                    : "text-muted hover:bg-bg hover:text-fg",
-                )}
-              >
-                <span title={step.label}>{step.shortLabel}</span>
-              </ClientLink>
-            </div>
-          ))}
-        </div>
       </div>
     </nav>
   );
@@ -423,7 +385,7 @@ export function CommandShell() {
         <div className="min-w-0 flex-1">
           <MobileNavigation role={role} logout={logout} loggingOut={loggingOut} logoutError={logoutError} />
           <div className="px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
-            <WorkflowRail role={role} />
+            {/* Operating Flow rail removed — it cluttered transactional pages. */}
             <WorkspaceTabs role={role} routes={PLAN_SALES_TABS} label="Plan and Commercial workspace" />
             <WorkspaceTabs role={role} routes={ENGINEERING_TABS} label="Product and Engineering workspace" />
             <WorkspaceTabs role={role} routes={OPERATIONS_TABS} label="Supply and Operations workspace" />
