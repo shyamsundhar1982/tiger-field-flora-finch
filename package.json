@@ -16,7 +16,7 @@
     "preview:stop": "node scripts/preview.mjs stop",
     "typecheck": "npm run build:dev && tsc --noEmit",
     "check:auth": "node scripts/check-auth-invariant.mjs",
-    "test": "node --test scripts/migration-execution.test.mjs scripts/canonical-business-truth.test.mjs scripts/navigation-routing-regression.test.mjs scripts/auth-runtime-hotfix.test.mjs scripts/purchase-history-ledger.test.mjs scripts/ibpe-operating-workspace-governance.test.mjs scripts/ibpe-action-inbox-integration.test.mjs scripts/ibpe-copilot-intent.test.mjs scripts/vibpe-copilot-2-intent.test.mjs scripts/production-batch-release.test.mjs scripts/vibpe-assurance-backend.test.mjs scripts/vibpe-assurance-api.test.mjs scripts/governed-lifecycle-ui.test.mjs && node --experimental-strip-types --test scripts/ibpe-governance.test.mjs scripts/ibpe-workbook-v5-parity.test.mjs scripts/ibpe-committed-material-reconciliation.test.mjs scripts/vibpe-weekly-review-knowledge.test.mjs scripts/vibpe-vayu-drive-policy.test.mjs && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/auth/gate-identity.test.ts src/lib/auth/runtime-config.test.ts src/lib/commercial-response-contract.test.ts src/lib/master-ledger.test.ts src/lib/master-inventory-db.test.ts src/lib/postgres-pool.test.ts src/lib/route-ownership.test.ts",
+    "test": "node --test scripts/migration-execution.test.mjs scripts/canonical-business-truth.test.mjs scripts/navigation-routing-regression.test.mjs scripts/auth-runtime-hotfix.test.mjs scripts/purchase-history-ledger.test.mjs scripts/ibpe-operating-workspace-governance.test.mjs scripts/ibpe-action-inbox-integration.test.mjs scripts/ibpe-copilot-intent.test.mjs scripts/vibpe-copilot-2-intent.test.mjs scripts/production-batch-release.test.mjs scripts/vibpe-assurance-backend.test.mjs scripts/vibpe-assurance-api.test.mjs scripts/governed-lifecycle-ui.test.mjs scripts/pre-r3-authority-remediation.test.mjs && node --experimental-strip-types --test scripts/ibpe-governance.test.mjs scripts/ibpe-workbook-v5-parity.test.mjs scripts/ibpe-committed-material-reconciliation.test.mjs scripts/vibpe-weekly-review-knowledge.test.mjs scripts/vibpe-vayu-drive-policy.test.mjs && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/auth/gate-identity.test.ts src/lib/auth/runtime-config.test.ts src/lib/commercial-response-contract.test.ts src/lib/master-ledger.test.ts src/lib/master-inventory-db.test.ts src/lib/postgres-pool.test.ts src/lib/route-ownership.test.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
     "check:routes": "node scripts/check-route-invariants.mjs"
@@ -77,22 +77,21 @@
   "devDependencies": {
     "@eslint/js": "^9.20.0",
     "@types/node": "^22.16.5",
-    "@types/pg": "^8.11.10",
+    "@types/pg": "^8.16.3",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.2.0",
+    "better-auth": "~1.6.30",
     "eslint": "^9.20.0",
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-prettier": "^5.2.6",
-    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.20",
-    "globals": "^15.15.0",
-    "lightningcss": "^1.28.0",
-    "nitro": "3.0.260610-beta",
-    "playwright": "^1.62.0",
-    "prettier": "^3.4.0",
-    "typescript": "^5.7.0",
-    "typescript-eslint": "^8.56.1",
-    "vite": "^8.2.0"
+    "globals": "^15.14.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.22.0",
+    "vite": "^6.1.0",
+    "vite-tsconfig-paths": "^5.1.4"
   }
 }
