@@ -37,7 +37,7 @@ export const recordVibpeUiObservation = createServerFn({ method: "POST" })
   .inputValidator((input: VibpeUiObservationInput) => input)
   .handler(async ({ data, context }) => {
     const actor = await requireBusinessActor(
-      "command",
+      "edit",
       context.userId ? { userId: context.userId, email: context.userEmail } : undefined,
     );
     const capabilityId = clean(data.capabilityId, 120);
