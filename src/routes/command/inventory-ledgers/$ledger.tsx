@@ -9,7 +9,7 @@ import {
   type MasterInventoryLedgerId,
 } from "@/lib/inventory-navigation";
 import { forecastStock, stockHealth } from "@/lib/master-ledger";
-import { getMasterInventoryData, issueMasterInventoryFifo } from "@/lib/master-inventory";
+import { archiveMasterInventoryItem, getMasterInventoryData, issueMasterInventoryFifo, updateMasterInventoryItem, type MasterInventoryItemRecord } from "@/lib/master-inventory";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/command/inventory-ledgers/$ledger")({
@@ -55,7 +55,31 @@ function InventoryLedger() {
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", category: "", unit: "ea", minimumStockLevel: "0", plannedMonthlyUse: "0", reason: "" });
   const selectedItem = items.find((item) => item.id === itemId);
+
+  function beginEdit(item: MasterInventoryItemRecord) {
+    setEditing(item.id);
+    setEditForm({ name: item.name, category: item.category, unit: item.unit, minimumStockLevel: String(item.minimum_stock_level), plannedMonthlyUse: String(item.planned_monthly_use), reason: "" });
+  }
+
+  async function saveEdit() {
+    if (!editing) return;
+    setBusy(true); setMessage("");
+    try {
+      await updateMasterInventoryItem({ data: { itemId: editing, ...editForm, minimumStockLevel: Number(editForm.minimumStockLevel), plannedMonthlyUse: Number(editForm.plannedMonthlyUse) } });
+      setEditing(null); setMessage("Item metadata saved and audited. Stock transactions were not changed."); await router.invalidate();
+    } catch (error) { setMessage(error instanceof Error ? error.message : "The item could not be updated."); } finally { setBusy(false); }
+  }
+
+  async function archiveItem(item: MasterInventoryItemRecord) {
+    const reason = window.prompt(`Reason for archiving ${item.sku}?`);
+    if (!reason?.trim()) return;
+    setBusy(true); setMessage("");
+    try { await archiveMasterInventoryItem({ data: { itemId: item.id, reason } }); setMessage("Item archived. Its transaction history remains preserved."); await router.invalidate(); }
+    catch (error) { setMessage(error instanceof Error ? error.message : "The item could not be archived."); } finally { setBusy(false); }
+  }
 
   const available = items.reduce((sum, item) => sum + number(item.available_quantity), 0);
   const mslAlerts = items.filter((item) =>
@@ -318,6 +342,7 @@ function InventoryLedger() {
                 <th className="px-3 py-3 text-right">MSL</th>
                 <th className="px-3 py-3 text-left">Status</th>
                 <th className="px-4 py-3 text-left">Last receipt</th>
+                <th className="px-4 py-3 text-left">Controls</th>
               </tr>
             </thead>
             <tbody>
@@ -356,6 +381,10 @@ function InventoryLedger() {
                       {status}
                     </td>
                     <td className="px-4 py-3 text-xs text-muted">{item.last_received_on || "—"}</td>
+                    <td className="px-4 py-3 text-xs">
+                      <button type="button" className="font-semibold text-accent" onClick={() => beginEdit(item)}>Edit</button>
+                      <button type="button" className="ml-3 font-semibold text-warn" onClick={() => void archiveItem(item)} disabled={busy}>Archive</button>
+                    </td>
                   </tr>
                 );
               })}
@@ -368,6 +397,19 @@ function InventoryLedger() {
             </div>
           ) : null}
         </div>
+        {editing ? (
+          <div className="border-t border-border p-5" aria-label="Edit inventory item">
+            <p className="text-xs font-semibold uppercase tracking-wider text-accent">Governed metadata edit</p>
+            <p className="mt-1 text-xs text-muted">Changes are audited; balances and receipt/issue history cannot be edited here.</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              {([["Name","name"],["Category","category"],["Unit","unit"],["Minimum stock","minimumStockLevel"],["Planned / month","plannedMonthlyUse"]] as const).map(([label, key]) => (
+                <label key={key} className="text-xs text-muted">{label}<input className="control mt-1" type={key.includes("Stock") || key.includes("Monthly") ? "number" : "text"} value={editForm[key]} onChange={(event) => setEditForm({ ...editForm, [key]: event.target.value })} /></label>
+              ))}
+            </div>
+            <label className="mt-3 block text-xs text-muted">Reason for change<input className="control mt-1" value={editForm.reason} onChange={(event) => setEditForm({ ...editForm, reason: event.target.value })} placeholder="Required for audit trail" /></label>
+            <div className="mt-3 flex gap-2"><button type="button" disabled={busy || !editForm.reason.trim()} onClick={() => void saveEdit()} className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-40">{busy ? "Saving…" : "Save audited change"}</button><button type="button" onClick={() => setEditing(null)} className="rounded-lg border border-border px-4 py-2 text-sm">Cancel</button></div>
+          </div>
+        ) : null}
       </section>
 
       <section

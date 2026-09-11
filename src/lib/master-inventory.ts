@@ -23,6 +23,7 @@ export type MasterInventoryItemRecord = {
   lot_count: number;
   last_received_on: string | null;
   updated_at: string;
+  active?: boolean;
 };
 
 export type MasterInventoryLotRecord = {
@@ -75,6 +76,21 @@ const issueSchema = z.object({
   issuedOn: z.string().date(),
   reference: z.string().trim().min(1).max(200),
   notes: z.string().trim().max(1000),
+});
+
+const updateItemSchema = z.object({
+  itemId: z.string().min(1).max(200),
+  name: z.string().trim().min(1).max(200),
+  category: z.string().trim().min(1).max(100),
+  unit: z.string().trim().min(1).max(30),
+  minimumStockLevel: z.number().min(0).max(1_000_000_000),
+  plannedMonthlyUse: z.number().min(0).max(1_000_000_000),
+  reason: z.string().trim().min(1).max(500),
+});
+
+const archiveItemSchema = z.object({
+  itemId: z.string().min(1).max(200),
+  reason: z.string().trim().min(1).max(500),
 });
 
 async function requireInventoryView() {
@@ -204,6 +220,52 @@ export const issueMasterInventoryFifo = createServerFn({ method: "POST" })
     const rows = await sql.query<{ issue_id: string; quantity_issued: number | string; issue_value_inr: number | string }>(
       `select * from issue_vyndi_master_inventory_fifo($1,$2,$3,$4,$5::date,$6,$7,$8,$9)`,
       [movementId,ledgerEntryId,data.itemId,data.quantity,data.issuedOn,data.reference,data.notes,actor.userId,actor.role],
+    );
+    return rows[0];
+  });
+
+/** Metadata edits never change stock. Every change is written to the shared audit trail. */
+export const updateMasterInventoryItem = createServerFn({ method: "POST" })
+  .validator(updateItemSchema)
+  .handler(async ({ data }) => {
+    const actor = await requireInventoryWrite();
+    const sql = await getSql();
+    const rows = await sql.query<MasterInventoryItemRecord>(
+      `update master_inventory_items
+          set name=$2, category=$3, unit=$4, minimum_stock_level=$5,
+              planned_monthly_use=$6, updated_by=$7, updated_at=now()
+        where id=$1 and active=true
+        returning id, ledger_id, sku, name, category, unit, minimum_stock_level,
+                  planned_monthly_use, updated_at::text as updated_at`,
+      [data.itemId, data.name.trim(), data.category.trim(), data.unit.trim(),
+       data.minimumStockLevel, data.plannedMonthlyUse, actor.userId],
+    );
+    if (!rows[0]) throw new Error("Active inventory item not found.");
+    await sql.query(
+      `insert into vyndi_audit_events
+        (id, entity_type, entity_id, entity_revision, action, actor_user_id, actor_role, source_reference, payload_json)
+       values ($1,'inventory_item',$2,1,'metadata_updated',$3,$4,'INVENTORY_LEDGER_EDIT',$5::jsonb)`,
+      [crypto.randomUUID(), data.itemId, actor.userId, actor.role, JSON.stringify({ ...data, itemId: data.itemId })],
+    );
+    return rows[0];
+  });
+
+export const archiveMasterInventoryItem = createServerFn({ method: "POST" })
+  .validator(archiveItemSchema)
+  .handler(async ({ data }) => {
+    const actor = await requireInventoryWrite();
+    const sql = await getSql();
+    const rows = await sql.query<{ id: string }>(
+      `update master_inventory_items set active=false, updated_by=$2, updated_at=now()
+        where id=$1 and active=true returning id`,
+      [data.itemId, actor.userId],
+    );
+    if (!rows[0]) throw new Error("Active inventory item not found.");
+    await sql.query(
+      `insert into vyndi_audit_events
+        (id, entity_type, entity_id, entity_revision, action, actor_user_id, actor_role, source_reference, payload_json)
+       values ($1,'inventory_item',$2,1,'archived',$3,$4,'INVENTORY_LEDGER_ARCHIVE',$5::jsonb)`,
+      [crypto.randomUUID(), data.itemId, actor.userId, actor.role, JSON.stringify({ reason: data.reason })],
     );
     return rows[0];
   });

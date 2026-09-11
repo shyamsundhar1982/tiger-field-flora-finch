@@ -23,6 +23,10 @@ test("Gate 1: ledger renders catalogue rows independently of receipt lots", () =
   assert.match(ledger, /balance\.toLocaleString/);
   assert.match(ledger, /including zero balance/);
   assert.match(peopleOffice, /Office Assets Register/);
+  assert.match(ledger, /Governed metadata edit/);
+  assert.match(ledger, /Archive/);
+  assert.match(read("src/lib/master-inventory.ts"), /metadata_updated/);
+  assert.match(read("src/lib/master-inventory.ts"), /archived/);
 });
 
 test("Gate 2: operational surfaces use tables for registers", () => {
