@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "@tanstack/react-router";
-import { Bot, BrainCircuit, ChevronRight, Send, ShieldCheck, Sparkles, X } from "lucide-react";
+import { Bot, BrainCircuit, ChevronRight, FileSearch, Send, ShieldCheck, Sparkles, X } from "lucide-react";
 import { VIBPE_COPILOT_NAME } from "@/lib/ibpe-brand";
 import { askIbpeCopilot } from "@/lib/ibpe-copilot";
 import type { IbpeScenarioRequest } from "@/lib/ibpe-scenario-lab";
+import { askTraceabilityCopilot } from "@/lib/traceability-search";
 
 type Message = {
   id: string;
   role: "user" | "assistant";
   text: string;
   meta?: string;
+  traceabilityQuery?: string;
 };
 
 type ScenarioEvent = CustomEvent<IbpeScenarioRequest | null>;
@@ -18,7 +20,7 @@ const suggestions = [
   "What is the biggest constraint to the current 36-month plan?",
   "Where will cash become critical after recommended procurement?",
   "Which material shortages need management action first?",
-  "What should I change to improve feasibility without breaking commitments?",
+  "Find the records related to a Job Card, serial number or PO reference.",
 ];
 
 function workspaceLabel(pathname: string) {
@@ -62,6 +64,21 @@ export function IbpeCopilot() {
     setQuestion("");
     setBusy(true);
     try {
+      const traceability = await askTraceabilityCopilot({ data: { question: clean } });
+      if (traceability.handled) {
+        setMessages((current) => [
+          ...current,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            text: traceability.answer,
+            meta: "Governed traceability search · read-only · RBAC filtered",
+            traceabilityQuery: traceability.query,
+          },
+        ]);
+        return;
+      }
+
       const response = await askIbpeCopilot({ data: { question: clean, scenario: scenario ?? undefined } });
       setMessages((current) => [
         ...current,
@@ -119,6 +136,7 @@ export function IbpeCopilot() {
               </div>
               <div className="mt-3 flex flex-wrap gap-2 text-[10px] uppercase tracking-wider">
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-bg/60 px-2.5 py-1 text-muted"><ShieldCheck className="size-3 text-green" /> Advisory only</span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-bg/60 px-2.5 py-1 text-muted"><FileSearch className="size-3 text-accent" /> Vernacular traceability</span>
                 {scenario ? <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/8 px-2.5 py-1 text-accent"><Sparkles className="size-3" /> {scenario.label}</span> : <span className="rounded-full border border-border bg-bg/60 px-2.5 py-1 text-muted">Governed baseline</span>}
               </div>
             </header>
@@ -127,8 +145,8 @@ export function IbpeCopilot() {
               {messages.length === 0 ? (
                 <div className="space-y-5">
                   <div className="rounded-xl border border-border bg-surface/35 p-4">
-                    <p className="font-medium text-fg">Explore the operating model, not a generic chatbot.</p>
-                    <p className="mt-2 text-sm leading-6 text-muted">Ask why a funding gap appears, what material drives a shortage, how a demand change affects procurement, or which controlled action improves feasibility. Numbers come from the governed IBPE packet.</p>
+                    <p className="font-medium text-fg">Explore the operating model and trace governed records.</p>
+                    <p className="mt-2 text-sm leading-6 text-muted">Ask about cash, demand, procurement and capacity, or use ordinary shorthand and mixed Tamil-English wording to find an Order, Job Card, Traveller/serial, MR, PO, GRN, Quality Release, Dispatch or Invoice. Partial identifiers are accepted.</p>
                   </div>
                   <div>
                     <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-green">Useful questions</p>
@@ -147,10 +165,11 @@ export function IbpeCopilot() {
                     <article key={message.id} className={message.role === "user" ? "ml-8 rounded-xl border border-accent/25 bg-accent/8 p-4" : "mr-4 rounded-xl border border-border bg-surface/35 p-4"}>
                       <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-green">{message.role === "user" ? "You" : VIBPE_COPILOT_NAME}</p>
                       <div className="whitespace-pre-wrap text-sm leading-6 text-fg">{message.text}</div>
+                      {message.traceabilityQuery ? <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("vyndi:traceability-search", { detail: { query: message.traceabilityQuery } }))} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-accent/40 px-3 py-2 text-xs font-semibold text-accent hover:bg-accent/10"><FileSearch className="size-3.5" /> Open Traceability & Print</button> : null}
                       {message.meta ? <p className="mt-3 border-t border-border/70 pt-2 text-[10px] text-subtle">{message.meta}</p> : null}
                     </article>
                   ))}
-                  {busy ? <div className="mr-4 rounded-xl border border-border bg-surface/35 p-4 text-sm text-muted">Analysing the governed IBPE packet…</div> : null}
+                  {busy ? <div className="mr-4 rounded-xl border border-border bg-surface/35 p-4 text-sm text-muted">Resolving governed traceability or analysing the IBPE packet…</div> : null}
                   <div ref={endRef} />
                 </div>
               )}
@@ -175,12 +194,12 @@ export function IbpeCopilot() {
                   }}
                   rows={2}
                   maxLength={1800}
-                  placeholder={`Ask ${VIBPE_COPILOT_NAME} about demand, materials, procurement, cash, funding or capacity…`}
+                  placeholder={`Ask ${VIBPE_COPILOT_NAME} normally — e.g. “061E6697 related papers”, “C3 cycles oda pending PO”, or an IBPE question…`}
                   className="min-h-12 flex-1 resize-none rounded-xl border border-border bg-bg px-3 py-2.5 text-sm text-fg outline-none transition placeholder:text-subtle focus:border-accent/60"
                 />
                 <button type="button" disabled={busy || !question.trim()} onClick={() => void ask()} className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-accent text-bg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40" aria-label={`Ask ${VIBPE_COPILOT_NAME}`}><Send className="size-4" /></button>
               </div>
-              <p className="mt-2 text-[10px] leading-4 text-subtle">AI explains and explores; authorised transaction workspaces remain the only place to approve or execute business actions.</p>
+              <p className="mt-2 text-[10px] leading-4 text-subtle">Read-only traceability can be searched here; authorised transaction workspaces remain the only place to approve or execute business actions.</p>
             </footer>
           </aside>
         </div>
