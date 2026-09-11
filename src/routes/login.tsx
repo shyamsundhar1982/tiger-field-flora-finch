@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 
 type LoginSearch = {
   returnTo?: string;
@@ -39,6 +39,65 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [granted, setGranted] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    let frame = 0;
+    let raf = 0;
+    const resize = () => {
+      const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
+      canvas.width = Math.floor(window.innerWidth * ratio);
+      canvas.height = Math.floor(window.innerHeight * ratio);
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    };
+    const draw = () => {
+      const w = window.innerWidth,
+        h = window.innerHeight;
+      ctx.clearRect(0, 0, w, h);
+      const cx = w * 0.58,
+        cy = h * 0.48;
+      ctx.strokeStyle = "rgba(92, 213, 232, .16)";
+      ctx.lineWidth = 1;
+      for (let ring = 0; ring < 7; ring++) {
+        ctx.beginPath();
+        const rx = Math.min(w, h) * (0.18 + ring * 0.045);
+        const ry = rx * (0.24 + ring * 0.015);
+        ctx.ellipse(cx, cy, rx, ry, -0.22 + Math.sin(frame / 180) * 0.02, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      for (let strand = 0; strand < 8; strand++) {
+        ctx.beginPath();
+        for (let i = 0; i <= 100; i++) {
+          const t = i / 100;
+          const angle = t * Math.PI * 2 + strand * 0.78 + frame / 900;
+          const radius = Math.min(w, h) * (0.11 + strand * 0.018);
+          const x = cx + Math.cos(angle) * radius * 1.65;
+          const y = cy + Math.sin(angle) * radius * (0.38 + t * 0.12) + (t - 0.5) * h * 0.12;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = strand % 3 === 0 ? "rgba(255, 150, 63, .3)" : "rgba(100, 220, 240, .28)";
+        ctx.stroke();
+      }
+      if (!reduced) {
+        frame += granted ? 3 : 1;
+        raf = requestAnimationFrame(draw);
+      }
+    };
+    resize();
+    draw();
+    window.addEventListener("resize", resize);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", resize);
+    };
+  }, [granted]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -73,6 +132,8 @@ function LoginPage() {
       }
 
       const destination = safeReturnTo(search.returnTo);
+      setGranted(true);
+      await new Promise((resolve) => window.setTimeout(resolve, 900));
       await navigate({ to: destination as never });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Sign-in failed.");
@@ -82,25 +143,70 @@ function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-6 py-16 text-white">
-      <div className="mx-auto max-w-md rounded-3xl border border-white/10 bg-white/[0.06] p-8 shadow-2xl">
-        <p className="text-xs font-bold uppercase tracking-[0.28em] text-orange-400">VINDY</p>
-        <h1 className="mt-3 text-3xl font-semibold">Secure sign in</h1>
-        <p className="mt-2 text-sm text-white/60">Individual account access for the VINDY operating system.</p>
+    <main className={`command-entry ${granted ? "command-entry--granted" : ""}`}>
+      <canvas ref={canvasRef} className="command-entry__canvas" aria-hidden="true" />
+      <div className="command-entry__grid" aria-hidden="true" />
+      <div className="command-entry__hud command-entry__hud--top">
+        CARBON COMPOSITE SYSTEM <span>·</span> VYNDI OS
+      </div>
+      <div className="command-entry__hud command-entry__hud--bottom">
+        STRUCTURAL ENGINEERING / CONFIGURATION CONTROL
+      </div>
+      <section className="command-entry__panel" aria-label="VYNDI Command Centre sign in">
+        <p className="command-entry__eyebrow">
+          VINDY <span>///</span> COMMAND CENTRE
+        </p>
+        <p className="command-entry__legal">VĀYÚ SHASTR PRIVATE LIMITED</p>
+        <h1>Engineering Command Entry</h1>
+        <p className="command-entry__intro">
+          Authenticate your individual authority to enter the operating system.
+        </p>
         {search.created ? (
           <p className="mt-5 rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-sm text-emerald-100">
             Account created successfully. Sign in with the new credentials to continue.
           </p>
         ) : null}
-        <form onSubmit={submit} className="mt-8 space-y-4">
-          <label className="block text-sm text-white/70">Email<input required type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none focus:border-orange-400" /></label>
-          <label className="block text-sm text-white/70">Password<input required type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none focus:border-orange-400" /></label>
-          {error && <p className="rounded-xl border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-200">{error}</p>}
-          <button disabled={busy} className="w-full rounded-xl bg-orange-500 px-4 py-3 font-semibold text-black disabled:opacity-50">{busy ? "Signing in…" : "Sign in"}</button>
+        <form onSubmit={submit} className="command-entry__form">
+          <label>
+            Email
+            <input
+              required
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </label>
+          <label>
+            Password
+            <input
+              required
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </label>
+          {error && (
+            <p role="alert" className="command-entry__error">
+              {error}
+            </p>
+          )}
+          <button disabled={busy || granted}>
+            {granted ? "ACCESS GRANTED" : busy ? "AUTHORIZING…" : "AUTHORIZE ACCESS"}
+          </button>
         </form>
-        <p className="mt-6 text-xs text-white/45">Accounts and permissions are managed individually. Never share passwords.</p>
-        <Link to="/" className="mt-6 inline-block text-sm text-orange-300 hover:text-orange-200">← Back</Link>
-      </div>
+        {granted ? (
+          <p className="command-entry__welcome">WELCOME TO VYNDI COMMAND CENTRE</p>
+        ) : (
+          <p className="command-entry__note">
+            Individual authority · Session protected · RBAC enforced
+          </p>
+        )}
+        <Link to="/" className="command-entry__back">
+          ← Return to VYNDI
+        </Link>
+      </section>
     </main>
   );
 }

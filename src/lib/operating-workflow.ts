@@ -145,10 +145,6 @@ export const COMMAND_CONTEXT = new Set<string>([
   COMMAND_HOME,
   "/command/control-tower",
   "/command/decision-inbox",
-  "/command/management-intelligence",
-  "/command/founder-command",
-  "/command/founder-control",
-  "/command/decision-engine",
   "/command/ibpe-operating-workspace",
   "/command/ibpe-operating-workspace/assurance",
 ]);
@@ -157,7 +153,6 @@ export const PLAN_SALES_CONTEXT = new Set<string>([
   ...PLAN_SALES_TABS.map((tab) => tab.to),
   "/command/market-survey",
   "/command/finance-assumptions",
-  "/command/funding",
 ]);
 
 export const ENGINEERING_CONTEXT = new Set<string>([
@@ -191,12 +186,12 @@ export const FINANCE_CONTEXT = new Set<string>([
   "/command/actuals",
 ]);
 
+/** Governance tabs only — Assurance stays under Command tools. */
 export const GOVERNANCE_CONTEXT = new Set<string>([
   ...GOVERNANCE_TABS.map((tab) => tab.to),
   "/command/qa-verification",
   "/command/legal-control",
   "/command/epr-live",
-  "/command/ibpe-operating-workspace/assurance",
 ]);
 
 /** @deprecated Prefer FINANCE_CONTEXT or GOVERNANCE_CONTEXT. */
@@ -215,6 +210,21 @@ export const LEGACY_ROUTES = new Set<string>([
   "/command/management-intelligence",
   "/command/production-jobcards",
   "/command/ops",
+  "/command/founder-command",
+  "/command/founder-control",
+  "/command/decision-engine",
+  "/command/investor-pitch",
+  "/command/investor-pitch-external",
+  "/command/investor-board",
+  "/command/stakeholder-portal",
+  "/command/demo-company",
+  "/command/platform-walkthrough",
+  "/command/knowledge",
+  "/command/technical",
+  "/command/design-philosophy",
+  "/command/ai-knowledge",
+  "/command/deployment-readiness",
+  "/command/funding",
 ]);
 
 export const WORKFLOW_VISIBLE_ROUTES = new Set<string>([

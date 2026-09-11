@@ -173,9 +173,9 @@ function IbpeOperatingWorkspace() {
       </Panel>
 
       <Panel title="Management Report" kicker="Demand → BOM → Inventory → Procurement → Production → Finance → Governance">
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div className="divide-y divide-border">
           {data.sections.map((section) => (
-            <article key={section.key} className="rounded-xl border border-border bg-surface/30 p-4">
+            <article key={section.key} className="grid gap-2 py-3 first:pt-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-medium text-fg">{section.label}</p>
@@ -183,7 +183,7 @@ function IbpeOperatingWorkspace() {
                 </div>
                 <span className={`text-xs font-semibold ${statusClass(section.status)}`}>{section.status}</span>
               </div>
-              <div className="mt-4 flex items-center justify-between text-xs">
+              <div className="flex items-center justify-between gap-3 text-xs sm:justify-end">
                 <span className="text-muted">{section.rows.length} evidence row{section.rows.length === 1 ? "" : "s"} · {section.attentionCount} exception{section.attentionCount === 1 ? "" : "s"}</span>
                 <Link to={section.authorityRoute as never} className="font-semibold text-accent hover:underline print:hidden">Open authority →</Link>
               </div>
@@ -224,12 +224,15 @@ function IbpeOperatingWorkspace() {
             </pre>
           ) : null}
         </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <Kpi label="Interpretation" value="Preview first" hint="No direct LLM-to-database write" />
-          <Kpi label="Approval" value="Required" hint="Approve permission enforced server-side" />
-          <Kpi label="Protected domains" value="Adapter only" hint="No bypass of canonical authority" tone="ok" />
-          <Kpi label="Autonomous learning" value="Disabled" hint="Not permitted in Phase 1" tone="ok" />
-        </div>
+        <details className="mt-4 rounded-md border border-border bg-bg/20 px-3 py-2 text-xs text-muted">
+          <summary className="cursor-pointer font-semibold text-subtle">How this workspace controls updates</summary>
+          <div className="mt-3 grid gap-2 border-t border-border pt-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div><span className="font-semibold text-fg">Preview first</span><p className="mt-1">Your text is interpreted before anything can change.</p></div>
+            <div><span className="font-semibold text-fg">Approval required</span><p className="mt-1">A person authorises a proposal server-side.</p></div>
+            <div><span className="font-semibold text-fg">Adapter only</span><p className="mt-1">Protected records change only through their canonical service.</p></div>
+            <div><span className="font-semibold text-fg">Learning disabled</span><p className="mt-1">This workspace does not silently learn or rewrite business truth.</p></div>
+          </div>
+        </details>
       </Panel>
 
       <section className="rounded-xl border border-border bg-surface/20 p-5 print:border-black print:bg-white" aria-label="Detailed Operating Report">
