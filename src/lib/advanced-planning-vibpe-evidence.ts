@@ -10,6 +10,11 @@ import {
   type AdvancedPlanningVibpeAuthority,
   type AdvancedPlanningVibpeEvidence,
 } from "./advanced-planning-vibpe-evidence-format.ts";
+import {
+  formatAdvancedOptimizationVibpeEvidence,
+  readAdvancedOptimizationVibpeEvidence,
+  shouldSurfaceOptimizationEvidence,
+} from "./advanced-optimization-vibpe-evidence.ts";
 
 export {
   formatAdvancedPlanningVibpeEvidence,
@@ -101,10 +106,23 @@ export const getAdvancedPlanningVibpeEvidence = createServerFn({ method: "POST" 
       const sql = await getSql();
       const evidence = await readAdvancedPlanningVibpeEvidence(sql, data.parentIbpeRunId);
       if (!evidence) return { handled: false as const, packetId: null, text: "" };
+
+      const blocks = [formatAdvancedPlanningVibpeEvidence(evidence)];
+      if (shouldSurfaceOptimizationEvidence(data.question)) {
+        try {
+          const optimization = await readAdvancedOptimizationVibpeEvidence(sql, evidence.packetId);
+          if (optimization) blocks.push(formatAdvancedOptimizationVibpeEvidence(optimization));
+        } catch {
+          // Mathematical optimization is supplementary to the deterministic
+          // advanced-planning baseline. Migration/runtime lag must not suppress
+          // the already-governed planning evidence.
+        }
+      }
+
       return {
         handled: true as const,
         packetId: evidence.packetId,
-        text: formatAdvancedPlanningVibpeEvidence(evidence),
+        text: blocks.join("\n\n"),
       };
     } catch {
       // The advanced packet is supplementary advisory evidence. A migration or
