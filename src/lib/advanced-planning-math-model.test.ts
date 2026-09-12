@@ -117,6 +117,12 @@ test("compiler emits governed MILP algebra for demand, material, supplier and re
   assert.equal(coefficient(demandBalance, "FULFILL__D_COMMIT__1"), 1);
   assert.equal(coefficient(demandBalance, "FULFILL__D_COMMIT__2"), 1);
 
+  const productionCap = byId(model.constraints, "PRODUCTION_TOTAL_CAP__BIKE_M");
+  assert.equal(productionCap.sense, "le");
+  assert.equal(productionCap.rhs, 8);
+  assert.equal(coefficient(productionCap, "PROD__BIKE_M__1"), 1);
+  assert.equal(coefficient(productionCap, "PROD__BIKE_M__2"), 1);
+
   const materialM1 = byId(model.constraints, "MATERIAL_CUMULATIVE__FRAME_M__1");
   assert.equal(materialM1.sense, "ge");
   // Protected opening = 8 - 1 reserved - 2 safety + 4 committed receipt = 9.

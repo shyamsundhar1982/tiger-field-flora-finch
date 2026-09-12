@@ -152,6 +152,13 @@ export function compileAdvancedPlanningMathematicalModel(
       }
       addConstraint({ id: c("FG_CUMULATIVE", productId, period), sense: "ge", rhs: 0, terms, semantic: `cumulative finished-goods coverage ${productId} M${period}` });
     }
+    addConstraint({
+      id: c("PRODUCTION_TOTAL_CAP", productId),
+      sense: "le",
+      rhs: totalProductDemand(source, productId),
+      terms: Array.from({ length: H }, (_, index) => ({ variableId: v("PROD", productId, index + 1), coefficient: 1 })),
+      semantic: `total production cannot exceed governed demand for ${productId}`,
+    });
   }
 
   const skuRequirements = new Map<string, Array<{ productId: string; factor: number }>>();
