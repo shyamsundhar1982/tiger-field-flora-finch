@@ -285,7 +285,7 @@ export function CommandShell() {
       <SiteHeader showNavigation={false} brandHref="/command" />
       <div className="mx-auto flex max-w-7xl">
         <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-72 shrink-0 flex-col border-r border-border py-6 lg:flex">
-          <p className="px-5 pb-3 text-[10px] uppercase tracking-[0.2em] text-subtle">VINDY 2.0 · Operating System</p>
+          <p className="px-5 pb-3 text-[10px] uppercase tracking-[0.2em] text-subtle">VYNDI 2.0 · Operating System</p>
           <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-4 pr-1 [scrollbar-width:thin]">
             <WorkspaceNavigation role={role} />
           </nav>
