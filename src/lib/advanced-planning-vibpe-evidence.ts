@@ -1,4 +1,7 @@
-import type { Sql } from "./db.ts";
+import { createServerFn } from "@tanstack/react-start";
+import { getCommandRole } from "./command-access.ts";
+import { canPerform } from "./page-access.ts";
+import { getSql, type Sql } from "./db.ts";
 import type { AdvancedPlanningDecisionPacket } from "./advanced-planning-decision-packet.ts";
 import type { FeasibilityBindingConstraint, FeasibilityStatus } from "./deterministic-feasibility.ts";
 
@@ -144,3 +147,31 @@ export function formatAdvancedPlanningVibpeEvidence(evidence: AdvancedPlanningVi
   lines.push(`Advanced lineage: ${evidence.packetId} · ${evidence.advancedModelVersion} · IBPE ${evidence.parentIbpeRunId} · input ${evidence.sourceInputHash.slice(0, 12)}. Advisory evidence only; it does not alter IBPE financial metrics or create business transactions.`);
   return lines.join("\n\n");
 }
+
+export const getAdvancedPlanningVibpeEvidence = createServerFn({ method: "POST" })
+  .validator((input: { parentIbpeRunId: string; question: string }) => ({
+    parentIbpeRunId: String(input.parentIbpeRunId ?? "").trim().slice(0, 240),
+    question: String(input.question ?? "").trim().slice(0, 1800),
+  }))
+  .handler(async ({ data }) => {
+    const role = await getCommandRole();
+    if (!role || !canPerform(role, "view")) throw new Error("Advanced VIBPE evidence permission denied.");
+    if (!data.parentIbpeRunId || !shouldSurfaceAdvancedPlanningEvidence(data.question)) {
+      return { handled: false as const, packetId: null, text: "" };
+    }
+
+    try {
+      const sql = await getSql();
+      const evidence = await readAdvancedPlanningVibpeEvidence(sql, data.parentIbpeRunId);
+      if (!evidence) return { handled: false as const, packetId: null, text: "" };
+      return {
+        handled: true as const,
+        packetId: evidence.packetId,
+        text: formatAdvancedPlanningVibpeEvidence(evidence),
+      };
+    } catch {
+      // The advanced packet is supplementary advisory evidence. A migration or
+      // deployment lag must never take down the existing governed VIBPE path.
+      return { handled: false as const, packetId: null, text: "" };
+    }
+  });
