@@ -120,7 +120,7 @@ export function compilePersistedRoutingForPlanning(input: {
     if (!compiled.solverReady) continue;
 
     revisionIds.push(revisionId);
-    routingOperations.push(...compiled.routingOperations);
+    routingOperations.push(...compiled.operations);
   }
 
   const complete =
