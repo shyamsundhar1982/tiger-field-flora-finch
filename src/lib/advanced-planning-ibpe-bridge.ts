@@ -3,7 +3,11 @@ import {
   compileAdvancedPlanningModel,
   type GovernedCapacityStandard,
 } from "./advanced-planning-adapter.ts";
-import type { RoutingOperation, SupplierLane } from "./advanced-planning-constraints.ts";
+import type {
+  AdvancedPlanningConstraintModel,
+  RoutingOperation,
+  SupplierLane,
+} from "./advanced-planning-constraints.ts";
 import {
   buildAdvancedPlanningDecisionPacket,
   type AdvancedPlanningDecisionPacketBuildResult,
@@ -42,6 +46,7 @@ export type BuildAdvancedPlanningFromIbpeInput = {
 
 export type BuildAdvancedPlanningFromIbpeResult = {
   authority: AdvancedPlanningAuthorityAssessment;
+  model: AdvancedPlanningConstraintModel;
   adapterNotices: ReturnType<typeof compileAdvancedPlanningModel>["notices"];
   packetBuild: AdvancedPlanningDecisionPacketBuildResult;
 };
@@ -121,6 +126,7 @@ export function buildAdvancedPlanningFromGovernedIbpe(
 
   return {
     authority,
+    model: compiled.model,
     adapterNotices: compiled.notices,
     packetBuild,
   };
