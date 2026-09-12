@@ -39,15 +39,19 @@ export type BuildAdvancedPlanningFromIbpeResult = {
   packetBuild: AdvancedPlanningDecisionPacketBuildResult;
 };
 
-const NON_OPTIMISING_OBJECTIVE_WEIGHTS = {
-  unmetCommittedDemand: 0,
-  unmetForecastDemand: 0,
-  lateness: 0,
-  resourceOverload: 0,
-  supplierOverload: 0,
-  procurementCost: 0,
-  workingCapital: 0,
-  scheduleChange: 0,
+// These are the governed objective semantics already used by the advanced model
+// tests/contracts. Keeping a valid objective basis is different from invoking a
+// solver: this bridge only computes deterministic feasibility/CTP evidence and
+// leaves optimisation disabled in the authority assessment below.
+const GOVERNED_OBJECTIVE_WEIGHTS = {
+  unmetCommittedDemand: 100,
+  unmetForecastDemand: 30,
+  lateness: 50,
+  resourceOverload: 100,
+  supplierOverload: 100,
+  procurementCost: 5,
+  workingCapital: 3,
+  scheduleChange: 2,
 };
 
 export function buildAdvancedPlanningFromGovernedIbpe(
@@ -68,7 +72,7 @@ export function buildAdvancedPlanningFromGovernedIbpe(
     },
     capacityStandards,
     supplierLanes: [],
-    objectiveWeights: NON_OPTIMISING_OBJECTIVE_WEIGHTS,
+    objectiveWeights: GOVERNED_OBJECTIVE_WEIGHTS,
     committedDemandPriority: 100,
     forecastDemandPriority: 50,
   });
@@ -83,7 +87,7 @@ export function buildAdvancedPlanningFromGovernedIbpe(
     limitations: [
       "Routing operations are currently derived from capacity standards rather than persisted approved routing revisions.",
       "Supplier-lane landed cost, reliability and finite capacity are not yet compiled into the governed source packet.",
-      "Objective weights are deliberately zero because this bridge performs feasibility/CTP evidence preparation, not mathematical optimisation.",
+      "The model carries governed objective weights for validation and future solver parity, but this bridge does not invoke mathematical optimisation.",
       "Any CTP result remains advisory until governed routing authority is persisted and the owning Commercial workspace approves a customer commitment.",
     ],
   };
