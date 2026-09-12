@@ -284,7 +284,7 @@ export function CommandShell() {
     <div className="min-h-dvh bg-bg">
       <SiteHeader showNavigation={false} brandHref="/command" />
       <div className="mx-auto flex w-full max-w-[1920px]">
-        <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-64 shrink-0 flex-col border-r border-border py-4 xl:w-68 2xl:w-72 lg:flex">
+        <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-64 shrink-0 flex-col border-r border-border py-4 xl:w-[17rem] 2xl:w-72 lg:flex">
           <p className="px-4 pb-2 text-[9px] uppercase tracking-[0.18em] text-subtle xl:px-5 xl:text-[10px]">VINDY 2.0 · Operating System</p>
           <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-4 pr-1 [scrollbar-width:thin]">
             <WorkspaceNavigation role={role} />
