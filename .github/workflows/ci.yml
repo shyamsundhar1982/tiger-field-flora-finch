@@ -38,6 +38,9 @@ jobs:
       - name: Generate route tree and typecheck
         run: npm run typecheck
 
+      - name: Client bundle invariant gate
+        run: node scripts/check-client-bundle.mjs
+
       - name: Lint
         run: npm run lint
 
