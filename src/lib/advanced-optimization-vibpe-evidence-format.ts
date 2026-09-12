@@ -54,7 +54,7 @@ function cashStatusText(status: NonNullable<AdvancedOptimizationVibpeEvidence["c
 
 export function formatAdvancedOptimizationVibpeEvidence(evidence: AdvancedOptimizationVibpeEvidence) {
   const lines = [
-    `Mathematical optimization evidence: ${statusText(evidence.optimizationStatus)}. Governed acceptance=${evidence.accepted ? "yes" : "no"}.`,
+    `Mathematical optimization evidence: ${statusText(evidence.optimizationStatus)}. Governed validator acceptance=${evidence.accepted ? "yes" : "no"}.`,
   ];
 
   if (evidence.cashGuardrailStatus) {
