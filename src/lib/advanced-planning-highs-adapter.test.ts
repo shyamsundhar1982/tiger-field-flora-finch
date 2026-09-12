@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import loadHighs from "highs";
 import {
   createHighsAdvancedPlanningOptimizer,
   encodeAdvancedMathModelToCplexLp,
@@ -157,4 +158,19 @@ test("time-limited HiGHS result is feasible only when a primal solution exists",
   const indeterminate = await createHighsAdvancedPlanningOptimizer(withoutPrimal).solve(sourceModel(), { requestId: "TL-2" });
   assert.equal(indeterminate.status, "indeterminate");
   assert.equal(indeterminate.solution, undefined);
+});
+
+test("published HiGHS 1.15.3 runtime solves the governed smoke model", async () => {
+  const runtime = await loadHighs();
+  const run = await runGovernedAdvancedOptimizer(
+    sourceModel(),
+    createHighsAdvancedPlanningOptimizer(runtime as unknown as HighsLegacyLike),
+    { requestId: "REAL-HIGHS-1", maxRuntimeMs: 5000, mipGap: 0 },
+  );
+
+  assert.equal(run.accepted, true, run.issues.map((issue) => `${issue.code}: ${issue.message}`).join("\n"));
+  assert.equal(run.result?.status, "optimal");
+  assert.equal(run.result?.solution?.demandOutcomes[0].unmetQty, 0);
+  assert.equal(run.result?.solution?.production.reduce((sum, row) => sum + row.quantity, 0), 2);
+  assert.equal(run.result?.objectiveValue, 0);
 });
