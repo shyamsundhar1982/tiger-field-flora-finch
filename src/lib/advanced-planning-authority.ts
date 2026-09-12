@@ -7,6 +7,10 @@ import type { RuntimeIbpeInput } from "./ibpe-runtime-parity.ts";
 import { ADVANCED_PLANNING_MODEL_VERSION } from "./advanced-planning-constraints.ts";
 import { ADVANCED_PLANNING_PACKET_VERSION } from "./advanced-planning-decision-packet.ts";
 import { buildAdvancedPlanningFromGovernedIbpe } from "./advanced-planning-ibpe-bridge.ts";
+import {
+  compilePersistedRoutingForPlanning,
+  type PersistedRoutingOperationRow,
+} from "./persisted-routing-planning.ts";
 
 export type PersistedAdvancedPlanningPacket = {
   id: string;
@@ -87,6 +91,36 @@ export const runAdvancedPlanningFromLatestIbpe = createServerFn({ method: "POST"
       order by sequence,work_centre_id`,
   );
 
+  let persistedRoutingRows: PersistedRoutingOperationRow[] = [];
+  try {
+    persistedRoutingRows = await sql.query<PersistedRoutingOperationRow>(
+      `select revision_id,product_id,revision_code,effective_from::text,effective_to::text,
+              revision_source_ref,operation_id,operation_code,sequence,run_hours_per_unit,
+              setup_hours,yield_pct,epr_gate_id,traveller_operation,operation_source_ref,
+              eligible_resource_ids,predecessor_operation_ids
+         from vyndi_approved_routing_operations
+        order by product_id,effective_from desc,sequence,operation_id`,
+    );
+  } catch {
+    // The persisted-routing migration may lag the application deployment. In
+    // that state advanced planning must remain on the existing provisional
+    // capacity-derived routing rather than fail or invent authority.
+    persistedRoutingRows = [];
+  }
+
+  const plannedProductIds = [
+    ...new Set([
+      ...source.input_json.demand.map((row) => row.productId),
+      ...source.input_json.bom.filter((row) => row.approved).map((row) => row.productId),
+    ]),
+  ];
+  const persistedRouting = compilePersistedRoutingForPlanning({
+    rows: persistedRoutingRows,
+    productIds: plannedProductIds,
+    knownResourceIds: capacityRows.map((row) => row.work_centre_id),
+    asOfDate: source.snapshot_at,
+  });
+
   const createdAt = new Date().toISOString();
   const packetId = `ADV-${source.id}-${ADVANCED_PLANNING_PACKET_VERSION}-${ADVANCED_PLANNING_MODEL_VERSION}`;
   const built = buildAdvancedPlanningFromGovernedIbpe({
@@ -113,7 +147,23 @@ export const runAdvancedPlanningFromLatestIbpe = createServerFn({ method: "POST"
       sourceRef: `${row.source_ref}:${row.work_centre_id}`,
       planningStatus: row.planning_status,
     })),
+    governedRoutingOperations: persistedRouting.complete ? persistedRouting.routingOperations : undefined,
+    persistedRoutingRevisionIds: persistedRouting.complete ? persistedRouting.revisionIds : undefined,
   });
+
+  const routingDiscoveryNotices = persistedRouting.complete
+    ? []
+    : [
+        {
+          code: "PERSISTED_ROUTING_NOT_COMPLETE",
+          message: `Persisted approved routing was not complete for the governed product set. Missing=${persistedRouting.missingProductIds.join(",") || "none"}; ambiguous=${persistedRouting.ambiguousProductIds.join(",") || "none"}. Capacity-derived routing remains provisional.`,
+        },
+        ...persistedRouting.issues
+          .filter((issue) => issue.level === "error")
+          .slice(0, 6)
+          .map((issue) => ({ code: issue.code, message: issue.message })),
+      ];
+  const adapterNotices = [...built.adapterNotices, ...routingDiscoveryNotices];
 
   if (!built.packetBuild.valid || !built.packetBuild.packet) {
     const detail = built.packetBuild.issues.map((row) => `${row.code}: ${row.message}`).join(" · ");
@@ -135,7 +185,7 @@ export const runAdvancedPlanningFromLatestIbpe = createServerFn({ method: "POST"
       source.snapshot_at,
       JSON.stringify(packet),
       JSON.stringify(built.authority),
-      JSON.stringify(built.adapterNotices),
+      JSON.stringify(adapterNotices),
       actor.userId,
       actor.role,
     ],
@@ -146,7 +196,7 @@ export const runAdvancedPlanningFromLatestIbpe = createServerFn({ method: "POST"
     parentIbpeRunId: source.id,
     packet,
     authority: built.authority,
-    adapterNotices: built.adapterNotices,
+    adapterNotices,
     packetIssues: built.packetBuild.issues,
   };
 });
