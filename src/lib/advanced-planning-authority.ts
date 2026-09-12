@@ -4,6 +4,8 @@ import { canPerform } from "./page-access.ts";
 import { requireBusinessActor } from "./business-actor.ts";
 import { getSql, type JsonValue, type SqlRow } from "./db.ts";
 import type { RuntimeIbpeInput } from "./ibpe-runtime-parity.ts";
+import { ADVANCED_PLANNING_MODEL_VERSION } from "./advanced-planning-constraints.ts";
+import { ADVANCED_PLANNING_PACKET_VERSION } from "./advanced-planning-decision-packet.ts";
 import { buildAdvancedPlanningFromGovernedIbpe } from "./advanced-planning-ibpe-bridge.ts";
 
 export type PersistedAdvancedPlanningPacket = {
@@ -86,7 +88,7 @@ export const runAdvancedPlanningFromLatestIbpe = createServerFn({ method: "POST"
   );
 
   const createdAt = new Date().toISOString();
-  const packetId = `ADV-${source.id}`;
+  const packetId = `ADV-${source.id}-${ADVANCED_PLANNING_PACKET_VERSION}-${ADVANCED_PLANNING_MODEL_VERSION}`;
   const built = buildAdvancedPlanningFromGovernedIbpe({
     packetId,
     createdAt,
