@@ -50,7 +50,7 @@ function SignupPage() {
   return (
     <main className="min-h-screen bg-slate-950 px-6 py-16 text-white">
       <div className="mx-auto max-w-md rounded-3xl border border-white/10 bg-white/[0.06] p-8 shadow-2xl">
-        <p className="text-xs font-bold uppercase tracking-[0.28em] text-orange-400">VINDY</p>
+        <p className="text-xs font-bold uppercase tracking-[0.28em] text-orange-400">VYNDI</p>
         <h1 className="mt-3 text-3xl font-semibold">Create account</h1>
         <p className="mt-2 text-sm text-white/60">New accounts start as Viewer until an administrator assigns a role.</p>
         <form onSubmit={submit} className="mt-8 space-y-4">
