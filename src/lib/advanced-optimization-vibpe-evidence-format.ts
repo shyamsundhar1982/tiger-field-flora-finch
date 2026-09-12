@@ -16,6 +16,12 @@ export type AdvancedOptimizationVibpeEvidence = {
   deterministic: boolean;
   accepted: boolean;
   optimizationStatus: AdvancedOptimizationStatus | "blocked";
+  cashGuardrailStatus?: "feasible" | "infeasible" | "indeterminate" | "not-evaluated";
+  cashGuardrail?: {
+    totalProposedProcurementLakh?: number;
+    firstBaselineBreachPeriod?: number;
+    firstProposedBreachPeriod?: number;
+  };
   objectiveValue?: number;
   objectiveContributions: AdvancedObjectiveContribution[];
   bindingConstraints: AdvancedBindingConstraint[];
@@ -27,7 +33,7 @@ export type AdvancedOptimizationVibpeEvidence = {
 export function shouldSurfaceOptimizationEvidence(question: string) {
   const q = question.toLowerCase().trim();
   if (!q) return false;
-  return /optim|solver|milp|mathemat|best plan|best option|alternative|trade.?off|binding|constraint|bottleneck|production plan|procurement plan|supplier plan|resource plan|why this plan/.test(q);
+  return /optim|solver|milp|mathemat|best plan|best option|alternative|trade.?off|binding|constraint|bottleneck|production plan|procurement plan|supplier plan|resource plan|cash|liquidity|afford|funding|why this plan/.test(q);
 }
 
 function statusText(status: AdvancedOptimizationVibpeEvidence["optimizationStatus"]) {
@@ -39,10 +45,30 @@ function statusText(status: AdvancedOptimizationVibpeEvidence["optimizationStatu
   return "solver error; no executable proposal is implied";
 }
 
+function cashStatusText(status: NonNullable<AdvancedOptimizationVibpeEvidence["cashGuardrailStatus"]>) {
+  if (status === "feasible") return "within governed reserve-preserving liquidity headroom";
+  if (status === "infeasible") return "breaches governed reserve-preserving liquidity headroom";
+  if (status === "indeterminate") return "indeterminate because governed cash evidence is incomplete or invalid";
+  return "not evaluated for this optimization record";
+}
+
 export function formatAdvancedOptimizationVibpeEvidence(evidence: AdvancedOptimizationVibpeEvidence) {
   const lines = [
-    `Mathematical optimization evidence: ${statusText(evidence.optimizationStatus)}. Governed validator acceptance=${evidence.accepted ? "yes" : "no"}.`,
+    `Mathematical optimization evidence: ${statusText(evidence.optimizationStatus)}. Governed acceptance=${evidence.accepted ? "yes" : "no"}.`,
   ];
+
+  if (evidence.cashGuardrailStatus) {
+    lines.push(`Liquidity governance: ${cashStatusText(evidence.cashGuardrailStatus)}.`);
+    if (evidence.cashGuardrail?.totalProposedProcurementLakh !== undefined) {
+      lines.push(`Optimizer-proposed incremental procurement: ₹${evidence.cashGuardrail.totalProposedProcurementLakh.toFixed(2)}L.`);
+    }
+    if (evidence.cashGuardrail?.firstBaselineBreachPeriod !== undefined) {
+      lines.push(`The governed IBPE baseline is already below reserve from M${evidence.cashGuardrail.firstBaselineBreachPeriod}.`);
+    }
+    if (evidence.cashGuardrail?.firstProposedBreachPeriod !== undefined) {
+      lines.push(`The optimizer proposal first exceeds reserve-preserving headroom in M${evidence.cashGuardrail.firstProposedBreachPeriod}.`);
+    }
+  }
 
   if (evidence.objectiveValue !== undefined && Number.isFinite(evidence.objectiveValue)) {
     lines.push(`Governed objective value: ${evidence.objectiveValue.toFixed(4)}.`);
@@ -76,7 +102,7 @@ export function formatAdvancedOptimizationVibpeEvidence(evidence: AdvancedOptimi
     `Optimizer provenance: ${evidence.optimizerEngine} · ${evidence.optimizerId} ${evidence.optimizerVersion} · ${evidence.solverClass.toUpperCase()} · deterministic=${evidence.deterministic ? "yes" : "no"} · request ${evidence.requestId} · run ${evidence.runId}.`,
   );
   lines.push(
-    "Governance: advisory optimization evidence only. It cannot create transactions, does not replace the deterministic feasibility baseline, and any business action still requires approval in the owning workspace.",
+    "Governance: advisory optimization evidence only. Mathematical feasibility and liquidity acceptance are separate controls. This evidence cannot create transactions, does not replace the deterministic feasibility baseline, and any business action still requires approval in the owning workspace.",
   );
   return lines.join("\n\n");
 }
