@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-export const VIBPE_OPTIMIZER_RELEASE_CONTRACT = "VIBPE-OPTIMIZER-CLOSURE-3";
+export const VIBPE_OPTIMIZER_RELEASE_CONTRACT = "VIBPE-OPTIMIZER-CLOSURE-5";
 
 export const Route = createFileRoute("/api/runtime/release-marker")({
   server: {
@@ -11,6 +11,7 @@ export const Route = createFileRoute("/api/runtime/release-marker")({
           component: "vibpe-governed-optimizer",
           releaseContract: VIBPE_OPTIMIZER_RELEASE_CONTRACT,
           productionTarget: "cloudflare-workers",
+          closureRoute: "/command/ibpe-operating-workspace/release",
         }),
         {
           status: 200,
