@@ -1,14 +1,10 @@
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
 import { requestSafePostgresPoolConfig } from "./postgres-pool";
-import type { DbSource, Sql, SqlRow } from "./db.ts";
-
-// An empty/whitespace DATABASE_URL (an easy misconfig in deploy UIs) must mean
-// "unset" — otherwise production would silently run on the PGLite fallback.
-const rawDatabaseUrl = typeof process !== "undefined" ? process.env.DATABASE_URL : undefined;
-const databaseUrl = rawDatabaseUrl && rawDatabaseUrl.trim() ? rawDatabaseUrl : undefined;
-
-/** Active backend, server-side only. */
-export const dbSource: DbSource = databaseUrl ? "neon" : "pglite";
+import {
+  resolvePostgresTransport,
+  type PostgresTransport,
+} from "./postgres-runtime";
+import type { Sql, SqlRow } from "./db.ts";
 
 const globalRef = globalThis as typeof globalThis & {
   __pgSqlPromise__?: Promise<Sql>;
@@ -33,9 +29,18 @@ function toSql(run: Run): Sql {
   return sql;
 }
 
-function createNeonSql(): Promise<Sql> {
-  if (!databaseUrl) throw new Error("DATABASE_URL is required for the Neon database backend");
-  const connectionString = databaseUrl;
+let postgresTransportPromise: Promise<PostgresTransport | null> | null = null;
+
+function getPostgresTransport(): Promise<PostgresTransport | null> {
+  postgresTransportPromise ??= resolvePostgresTransport().catch((err) => {
+    postgresTransportPromise = null;
+    throw err;
+  });
+  return postgresTransportPromise;
+}
+
+function createPostgresSql(transport: PostgresTransport): Promise<Sql> {
+  const connectionString = transport.connectionString;
   globalRef.__pgSqlPromise__ ??= (async () => {
     const { Pool, types } = await import("pg");
     types.setTypeParser(OID_INT8, Number);
@@ -102,7 +107,10 @@ async function createPgliteSql(): Promise<Sql> {
 let sqlPromise: Promise<Sql> | null = null;
 
 export async function getSqlServer(): Promise<Sql> {
-  sqlPromise ??= (dbSource === "neon" ? createNeonSql() : createPgliteSql()).catch((err) => {
+  sqlPromise ??= (async () => {
+    const transport = await getPostgresTransport();
+    return transport ? createPostgresSql(transport) : createPgliteSql();
+  })().catch((err) => {
     sqlPromise = null;
     throw err;
   });
@@ -110,8 +118,9 @@ export async function getSqlServer(): Promise<Sql> {
 }
 
 export async function getPgliteServer(): Promise<import("@electric-sql/pglite").PGlite> {
-  if (dbSource !== "pglite") {
-    throw new Error("getPglite() is only available on the PGLite fallback (no DATABASE_URL)");
+  const transport = await getPostgresTransport();
+  if (transport) {
+    throw new Error("getPglite() is only available when neither Hyperdrive nor DATABASE_URL is configured");
   }
   await getSqlServer();
   const pg = await globalRef.__pgliteInstance__;
@@ -119,18 +128,17 @@ export async function getPgliteServer(): Promise<import("@electric-sql/pglite").
   return pg;
 }
 
-export function ensureDbReadyServer(): Promise<void> {
-  if (dbSource !== "pglite") return Promise.resolve();
-  return getSqlServer().then(() => undefined);
+export async function ensureDbReadyServer(): Promise<void> {
+  const transport = await getPostgresTransport();
+  if (transport) return;
+  await getSqlServer();
 }
 
 const globalBoot = globalThis as typeof globalThis & {
   __pgBootstrapPromise__?: Promise<void>;
 };
-if (dbSource === "pglite") {
-  globalBoot.__pgBootstrapPromise__ ??= ensureDbReadyServer().catch((err) => {
-    globalBoot.__pgBootstrapPromise__ = undefined;
-    console.error("[db] PGLite bootstrap failed:", err);
-    throw err;
-  });
-}
+globalBoot.__pgBootstrapPromise__ ??= ensureDbReadyServer().catch((err) => {
+  globalBoot.__pgBootstrapPromise__ = undefined;
+  console.error("[db] bootstrap failed:", err);
+  throw err;
+});
