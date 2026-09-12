@@ -100,8 +100,12 @@ function WorkspaceNavigation({ role, onNavigate }: { role: CommandRole | null; o
           const Icon = item.icon;
           const active = activeOwner === item.id || (activeOwner === null && item.context.has(pathname));
           const sections = WORKSPACE_NAVIGATION[item.id];
+          const activeChildRoute = sections
+            .flatMap((section) => section.items)
+            .filter((child) => pathname === child.to || pathname.startsWith(`${child.to}/`))
+            .sort((left, right) => right.to.length - left.to.length)[0]?.to;
           return (
-            <div key={item.to} className={cn("rounded-lg", active && "bg-bg/45")}> 
+            <div key={item.to} className={cn("rounded-lg", active && "bg-bg/45")}>
               <ClientLink
                 to={item.to}
                 active={active}
@@ -127,7 +131,7 @@ function WorkspaceNavigation({ role, onNavigate }: { role: CommandRole | null; o
                         </p>
                         <div className="space-y-0.5">
                           {links.map((child) => {
-                            const childActive = pathname === child.to || pathname.startsWith(`${child.to}/`);
+                            const childActive = activeChildRoute === child.to;
                             return (
                               <ClientLink
                                 key={child.to}
