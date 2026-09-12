@@ -3,7 +3,7 @@ declare module "*.wasm?module" {
   export default wasmModule;
 }
 
-declare module "highs/runtime?module" {
+declare module "highs/runtime" {
   const wasmModule: WebAssembly.Module;
   export default wasmModule;
 }
