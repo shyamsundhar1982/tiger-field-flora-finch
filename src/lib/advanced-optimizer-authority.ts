@@ -155,72 +155,77 @@ function assertExactLineage(
   }
 }
 
+export async function loadPreparedAdvancedOptimizerEnvelope(packetId: string) {
+  const exactPacketId = String(packetId ?? "").trim().slice(0, 240);
+  if (!exactPacketId) throw new Error("Optimizer preparation requires an exact advanced packet ID.");
+
+  const sql = await getSql();
+  const packetRows = await sql.query<FrozenAdvancedPacketRow>(
+    `select id,parent_ibpe_run_id,packet_version,advanced_model_version,source_sha,source_input_hash,
+            source_snapshot_at::text,packet_json,model_json,authority_json
+       from vyndi_advanced_planning_packets
+      where id=$1 and status='complete'
+      limit 1`,
+    [exactPacketId],
+  );
+  const packet = packetRows[0];
+  if (!packet) throw new Error("Optimizer preparation blocked: exact complete advanced packet was not found.");
+  if (!isFrozenModel(packet.model_json)) {
+    throw new Error(
+      "Optimizer preparation blocked: advanced packet lacks valid frozen model evidence. Create a new governed advanced packet from an exact IBPE snapshot.",
+    );
+  }
+  if (!isFrozenAuthority(packet.authority_json)) {
+    throw new Error(
+      "Optimizer preparation blocked: advanced packet lacks frozen capacity/routing/supplier authority evidence. Create a new governed advanced packet.",
+    );
+  }
+  const lineage = readPacketLineage(packet.packet_json);
+  if (!lineage) throw new Error("Optimizer preparation blocked: advanced packet lineage is incomplete or malformed.");
+  if (!isRecord(packet.packet_json) || readString(packet.packet_json, "packetId") !== packet.id) {
+    throw new Error("Optimizer preparation blocked: persisted packet ID differs from packet evidence.");
+  }
+
+  const parentRows = await sql.query<ParentIbpeRunRow>(
+    `select id,engine_version,source_sha,input_hash,approved_plan_id,approved_plan_revision,
+            snapshot_at::text,result_json
+       from vyndi_ibpe_runs
+      where id=$1 and status='complete'
+      limit 1`,
+    [packet.parent_ibpe_run_id],
+  );
+  const parent = parentRows[0];
+  if (!parent) throw new Error("Optimizer preparation blocked: exact parent governed IBPE run is missing or invalidated.");
+
+  assertExactLineage(packet, lineage, parent, packet.model_json);
+
+  const prepared = prepareFrozenAdvancedOptimizerEnvelope({
+    lineage: {
+      sourceSnapshotId: lineage.sourceSnapshotId,
+      sourceSnapshotAt: lineage.sourceSnapshotAt,
+      sourceSha: lineage.sourceSha,
+      sourceInputHash: lineage.sourceInputHash,
+      sourceEngineVersion: lineage.sourceEngineVersion,
+      approvedPlanId: lineage.approvedPlanId,
+      approvedPlanRevision: lineage.approvedPlanRevision,
+    },
+    result: parent.result_json,
+    model: packet.model_json,
+    authority: packet.authority_json,
+    packetId: packet.id,
+  });
+
+  return {
+    parentIbpeRunId: parent.id,
+    packetVersion: packet.packet_version,
+    advancedModelVersion: packet.advanced_model_version,
+    ...prepared,
+  };
+}
+
 export const prepareAdvancedOptimizerFromPacket = createServerFn({ method: "POST" })
   .validator((input: { packetId: string }) => ({ packetId: String(input.packetId ?? "").trim().slice(0, 240) }))
   .handler(async ({ data }) => {
     await requireBusinessActor("view");
-    if (!data.packetId) throw new Error("Optimizer preparation requires an exact advanced packet ID.");
-
-    const sql = await getSql();
-    const packetRows = await sql.query<FrozenAdvancedPacketRow>(
-      `select id,parent_ibpe_run_id,packet_version,advanced_model_version,source_sha,source_input_hash,
-              source_snapshot_at::text,packet_json,model_json,authority_json
-         from vyndi_advanced_planning_packets
-        where id=$1 and status='complete'
-        limit 1`,
-      [data.packetId],
-    );
-    const packet = packetRows[0];
-    if (!packet) throw new Error("Optimizer preparation blocked: exact complete advanced packet was not found.");
-    if (!isFrozenModel(packet.model_json)) {
-      throw new Error(
-        "Optimizer preparation blocked: advanced packet lacks valid frozen model evidence. Create a new governed advanced packet from an exact IBPE snapshot.",
-      );
-    }
-    if (!isFrozenAuthority(packet.authority_json)) {
-      throw new Error(
-        "Optimizer preparation blocked: advanced packet lacks frozen capacity/routing/supplier authority evidence. Create a new governed advanced packet.",
-      );
-    }
-    const lineage = readPacketLineage(packet.packet_json);
-    if (!lineage) throw new Error("Optimizer preparation blocked: advanced packet lineage is incomplete or malformed.");
-    if (!isRecord(packet.packet_json) || readString(packet.packet_json, "packetId") !== packet.id) {
-      throw new Error("Optimizer preparation blocked: persisted packet ID differs from packet evidence.");
-    }
-
-    const parentRows = await sql.query<ParentIbpeRunRow>(
-      `select id,engine_version,source_sha,input_hash,approved_plan_id,approved_plan_revision,
-              snapshot_at::text,result_json
-         from vyndi_ibpe_runs
-        where id=$1 and status='complete'
-        limit 1`,
-      [packet.parent_ibpe_run_id],
-    );
-    const parent = parentRows[0];
-    if (!parent) throw new Error("Optimizer preparation blocked: exact parent governed IBPE run is missing or invalidated.");
-
-    assertExactLineage(packet, lineage, parent, packet.model_json);
-
-    const prepared = prepareFrozenAdvancedOptimizerEnvelope({
-      lineage: {
-        sourceSnapshotId: lineage.sourceSnapshotId,
-        sourceSnapshotAt: lineage.sourceSnapshotAt,
-        sourceSha: lineage.sourceSha,
-        sourceInputHash: lineage.sourceInputHash,
-        sourceEngineVersion: lineage.sourceEngineVersion,
-        approvedPlanId: lineage.approvedPlanId,
-        approvedPlanRevision: lineage.approvedPlanRevision,
-      },
-      result: parent.result_json,
-      model: packet.model_json,
-      authority: packet.authority_json,
-      packetId: packet.id,
-    });
-
-    return {
-      parentIbpeRunId: parent.id,
-      packetVersion: packet.packet_version,
-      advancedModelVersion: packet.advanced_model_version,
-      ...prepared,
-    };
+    return loadPreparedAdvancedOptimizerEnvelope(data.packetId);
   });
