@@ -159,7 +159,7 @@ export const runAdvancedPlanningFromLatestIbpe = createServerFn({ method: "POST"
           message: `Persisted approved routing was not complete for the governed product set. Missing=${persistedRouting.missingProductIds.join(",") || "none"}; ambiguous=${persistedRouting.ambiguousProductIds.join(",") || "none"}. Capacity-derived routing remains provisional.`,
         },
         ...persistedRouting.issues
-          .filter((issue) => issue.level === "error")
+          .filter((issue) => issue.severity === "error")
           .slice(0, 6)
           .map((issue) => ({ code: issue.code, message: issue.message })),
       ];
