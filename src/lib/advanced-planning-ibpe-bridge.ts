@@ -21,6 +21,8 @@ export type IbpeCapacityStandardEvidence = GovernedCapacityStandard & {
 
 export type AdvancedPlanningAuthorityAssessment = {
   sourceTruth: "persisted-governed-ibpe-input";
+  capacityAuthority: "approved-frozen-evidence" | "not-approved";
+  capacitySourceRefs: string[];
   routingMode: "capacity-standard-derived" | "persisted-approved";
   routingAuthority: "provisional" | "approved-capacity-standards" | "approved-persisted";
   persistedRoutingRevisionIds?: string[];
@@ -69,6 +71,9 @@ export function buildAdvancedPlanningFromGovernedIbpe(
   const allCapacityApproved =
     source.capacityStandards.length > 0 &&
     source.capacityStandards.every((row) => row.planningStatus === "approved");
+  const capacitySourceRefs = [
+    ...new Set(source.capacityStandards.map((row) => row.sourceRef?.trim()).filter((value): value is string => Boolean(value))),
+  ].sort();
   const hasPersistedRouting = (source.governedRoutingOperations?.length ?? 0) > 0;
   const hasPersistedSupplierLanes = (source.supplierLanes?.length ?? 0) > 0;
 
@@ -90,6 +95,8 @@ export function buildAdvancedPlanningFromGovernedIbpe(
 
   const authority: AdvancedPlanningAuthorityAssessment = {
     sourceTruth: "persisted-governed-ibpe-input",
+    capacityAuthority: allCapacityApproved ? "approved-frozen-evidence" : "not-approved",
+    capacitySourceRefs,
     routingMode: hasPersistedRouting ? "persisted-approved" : "capacity-standard-derived",
     routingAuthority: hasPersistedRouting
       ? "approved-persisted"
@@ -104,6 +111,9 @@ export function buildAdvancedPlanningFromGovernedIbpe(
     firmCtpEligible: false,
     optimisationEligible: false,
     limitations: [
+      ...(allCapacityApproved
+        ? ["Finite resource availability was compiled from approved capacity standards and frozen inside this packet's immutable model evidence."]
+        : ["One or more capacity standards were not approved when this packet was compiled; governed optimization must remain blocked."]),
       ...(hasPersistedRouting
         ? ["Operation sequence and resource eligibility come from approved, effective persisted routing revisions; finite availability remains governed by capacity standards."]
         : ["Routing operations are currently derived from capacity standards rather than persisted approved routing revisions."]),
