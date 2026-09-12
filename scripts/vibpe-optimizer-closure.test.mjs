@@ -61,7 +61,24 @@ test("runtime exposes protected optimizer health and a public no-business-data d
   const marker = await source("src/routes/api/runtime/release-marker.ts");
   assert.match(healthRoute, /requireBusinessActor\("view"\)/);
   assert.match(healthRoute, /readOptimizerProductionReadiness/);
-  assert.match(marker, /VIBPE-OPTIMIZER-CLOSURE-3/);
+  assert.match(marker, /VIBPE-OPTIMIZER-CLOSURE-5/);
   assert.match(marker, /cloudflare-workers/);
+  assert.match(marker, /ibpe-operating-workspace\/release/);
   assert.doesNotMatch(marker, /DATABASE_URL|connectionString|password|secret/i);
+});
+
+test("final release closure can only report GREEN when every runtime, run, governance, actor and audit gate passes", async () => {
+  const closure = await source("src/lib/vibpe-optimizer-release-closure.ts");
+  const page = await source("src/routes/command/ibpe-operating-workspace_.release.tsx");
+  assert.match(closure, /verdict: gates\.every\(\(gate\) => gate\.pass\) \? "GREEN" : "NOT GREEN"/);
+  assert.match(closure, /entity_type='advanced_optimization_run'/);
+  assert.match(closure, /action='computed'/);
+  assert.match(closure, /advisoryOnly/);
+  assert.match(closure, /mayCreateTransactions/);
+  assert.match(closure, /humanApprovalRequiredForBusinessAction/);
+  assert.match(closure, /optimization_status === "optimal"/);
+  assert.match(closure, /cash_guardrail_status === "feasible"/);
+  assert.match(page, /Release verdict/);
+  assert.match(page, /GREEN/);
+  assert.match(page, /NOT GREEN/);
 });
