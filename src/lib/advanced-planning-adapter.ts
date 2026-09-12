@@ -4,13 +4,13 @@ import type {
   IntegratedPlanningInput,
   InventoryPosition,
   InventoryReceipt,
-} from "./integrated-business-planning-engine";
+} from "./integrated-business-planning-engine.ts";
 import {
   ADVANCED_PLANNING_MODEL_VERSION,
   type AdvancedPlanningConstraintModel,
   type PlanningObjectiveWeights,
   type SupplierLane,
-} from "./advanced-planning-constraints";
+} from "./advanced-planning-constraints.ts";
 
 export type GovernedCapacityStandard = {
   workCentreId: string;
