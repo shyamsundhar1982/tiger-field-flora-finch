@@ -51,6 +51,18 @@ function BrandMigration() {
   return null;
 }
 
+function LegalFooter() {
+  return (
+    <footer className="vyndi-legal-footer" aria-label="Vāyú Shastr copyright notice">
+      <span className="vyndi-legal-footer__company">© 2026 Vāyú Shastr Pvt. Ltd.</span>
+      <span className="vyndi-legal-footer__separator" aria-hidden="true">•</span>
+      <span>All Rights Reserved</span>
+      <span className="vyndi-legal-footer__separator" aria-hidden="true">•</span>
+      <span>Designed &amp; Developed by S. Shyam Sundhar</span>
+    </footer>
+  );
+}
+
 function Root() {
   return (
     <html lang="en" className="antialiased" suppressHydrationWarning>
@@ -60,6 +72,7 @@ function Root() {
         <AuthProvider>
           <BrandMigration />
           <Outlet />
+          <LegalFooter />
         </AuthProvider>
         <Scripts />
         <Analytics />
