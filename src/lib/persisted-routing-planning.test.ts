@@ -102,7 +102,7 @@ test("unknown resource in a persisted revision blocks solver routing", () => {
 
   assert.equal(result.complete, false);
   assert.deepEqual(result.routingOperations, []);
-  assert.ok(result.issues.some((issue) => issue.code === "ROUTING_RESOURCE_UNKNOWN"));
+  assert.ok(result.issues.some((issue) => issue.code === "ROUTING_UNKNOWN_RESOURCE"));
 });
 
 test("out-of-effectivity routing is treated as missing", () => {
