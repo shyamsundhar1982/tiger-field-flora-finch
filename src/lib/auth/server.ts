@@ -15,6 +15,7 @@ import {
   PREVIEW_CLIENT_SECRET,
 } from "./preview";
 import { requestSafePostgresPoolConfig } from "../postgres-pool";
+import { resolvePostgresTransport } from "../postgres-runtime";
 import { AUTH_TRUSTED_ORIGINS, resolveAuthBaseURL, resolveAuthSecret } from "./runtime-config";
 
 void ensureDbReady();
@@ -66,6 +67,9 @@ const trustedOrigins: string[] = [
   ...previewAllowedHosts.flatMap((host) => [`https://${host}`, `http://${host}`]),
 ];
 
+// Keep auth-secret derivation tied to the stable configured database URL rather
+// than Hyperdrive's generated runtime connection string. The database transport
+// itself is resolved independently below so Cloudflare can use Hyperdrive.
 const databaseUrl = env("DATABASE_URL");
 const authSecret = resolveAuthSecret({
   configuredSecret: env("BETTER_AUTH_SECRET"),
@@ -78,8 +82,9 @@ const grokAuthorizationUrl = `${issuerBase}/api/auth/oauth2/authorize`;
 const grokTokenUrl = `${issuerBase}/api/auth/oauth2/token`;
 const grokUserInfoUrl = `${issuerBase}/api/auth/oauth2/userinfo`;
 
-const database = databaseUrl
-  ? new Pool(requestSafePostgresPoolConfig(databaseUrl))
+const postgresTransport = await resolvePostgresTransport();
+const database = postgresTransport
+  ? new Pool(requestSafePostgresPoolConfig(postgresTransport.connectionString))
   : { dialect: pgliteDialect(() => getPglite()), type: "postgres" as const };
 
 export const SESSION_TOKEN_COOKIE = "__Host-grok-auth.session_token";
