@@ -5,6 +5,7 @@ import {
   shouldSurfaceAdvancedPlanningEvidence,
   type AdvancedPlanningVibpeEvidence,
 } from "./advanced-planning-vibpe-evidence-format.ts";
+import { isGovernedOptimizerExecutionRequest } from "./vibpe-optimizer-copilot.ts";
 
 function evidence(): AdvancedPlanningVibpeEvidence {
   return {
@@ -64,4 +65,12 @@ test("advanced evidence keeps feasibility, authority limits and lineage explicit
   assert.match(text, /mathematical optimisation=not yet eligible/);
   assert.match(text, /IBPE IBPE-1/);
   assert.match(text, /does not alter IBPE financial metrics or create business transactions/);
+});
+
+test("VIBPE recognizes explicit optimizer execution intent without treating ordinary analysis as execution", () => {
+  assert.equal(isGovernedOptimizerExecutionRequest("run the governed optimizer now"), true);
+  assert.equal(isGovernedOptimizerExecutionRequest("execute HiGHS for the current plan"), true);
+  assert.equal(isGovernedOptimizerExecutionRequest("optimise the IBPE procurement plan"), true);
+  assert.equal(isGovernedOptimizerExecutionRequest("what did the last optimization show?"), false);
+  assert.equal(isGovernedOptimizerExecutionRequest("show current cash risk"), false);
 });
