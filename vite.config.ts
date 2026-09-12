@@ -2,10 +2,10 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Plugin } from "vite";
 import { defineConfig, isRunnableDevEnvironment } from "vite";
+import { cloudflare } from "@cloudflare/vite-plugin";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import { nitro } from "nitro/vite";
 // @ts-expect-error JS plugin alongside the TS vite config
 import { grokPwaPlugin } from "./scripts/grok-pwa-plugin.mjs";
 // @ts-expect-error JS plugin alongside the TS vite config
@@ -33,9 +33,9 @@ function pgliteBootstrapPlugin(): Plugin {
     async configureServer(server) {
       if (!hasGlobbedMigrations(server.config.root)) return;
       const environment = server.environments.ssr;
-      // Nitro supplies a fetchable SSR environment under Vite 8. Lazy database
-      // initialisation in getSql() remains authoritative when no module runner
-      // is available; calling the removed legacy shim would abort dev startup.
+      // TanStack Start's SSR environment is supplied by the Cloudflare Vite
+      // plugin in deployed/local Worker mode. Lazy database initialisation in
+      // getSql() remains authoritative when no module runner is available.
       if (!isRunnableDevEnvironment(environment)) return;
       try {
         const mod = (await environment.runner.import("/src/lib/db.ts")) as {
@@ -151,13 +151,13 @@ export default defineConfig(() => ({
     exclude: ["@electric-sql/pglite"],
   },
   plugins: [
+    cloudflare({ viteEnvironment: { name: "ssr" } }),
     pgliteBootstrapPlugin(),
     authPopupPlugin(),
     appEnvPlugin(),
     grokPwaPlugin(),
     tailwindcss(),
     tanstackStart(),
-    nitro(),
     viteReact(),
   ],
 }));
