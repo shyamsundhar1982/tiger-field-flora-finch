@@ -42,9 +42,11 @@ export function selectPostgresTransport(candidates: TransportCandidates): Postgr
 
 async function cloudflareHyperdriveConnectionString(): Promise<string | undefined> {
   try {
-    // TanStack Start on Cloudflare exposes platform bindings through this
-    // runtime module. Dynamic import keeps Node/Vercel builds portable.
-    const workers = await import("cloudflare:workers");
+    // Keep the Cloudflare built-in module runtime-resolved. A literal dynamic
+    // import is eagerly resolved by the portable Vite client/typecheck build,
+    // where cloudflare:workers intentionally does not exist.
+    const cloudflareWorkersModule = "cloudflare:workers";
+    const workers = await import(/* @vite-ignore */ cloudflareWorkersModule);
     const runtimeEnv = workers.env as CloudflareRuntimeEnv | undefined;
     return nonBlank(runtimeEnv?.HYPERDRIVE?.connectionString);
   } catch {
