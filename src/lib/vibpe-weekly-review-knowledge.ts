@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { assertSameSiteRequest } from "@/lib/auth/isolation.server";
@@ -35,8 +34,9 @@ const ingestSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
-function hashContent(content: string) {
-  return createHash("sha256").update(content, "utf8").digest("hex");
+async function hashContent(content: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(content));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 function inferReviewDate(title: string) {
@@ -92,7 +92,7 @@ export function extractWeeklyReviewClaims(content: string) {
 
 async function persistReview(data: z.infer<typeof ingestSchema>, role: string) {
   const sql = await getSql();
-  const contentHash = hashContent(data.content);
+  const contentHash = await hashContent(data.content);
   const existing = await sql<{ id: string }>`
     select id from vibpe_knowledge_documents
     where source_id = ${WEEKLY_REVIEW_SOURCE_ID}
