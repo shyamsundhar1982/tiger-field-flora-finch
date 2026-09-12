@@ -62,6 +62,20 @@ const lineage = {
   approvedPlanRevision: 1,
 };
 
+const capacity = [
+  {
+    workCentreId: "WC-010",
+    workCentreName: "Kitting",
+    travellerOperation: "Kitting",
+    sequence: 10,
+    availableHoursPerPeriod: 160,
+    efficiency: 0.85,
+    standardHoursPerUnit: 0.35,
+    sourceRef: "CAPACITY-APPROVED",
+    planningStatus: "approved",
+  },
+];
+
 test("advanced packet is derived from governed IBPE input and remains provisional on planning-default capacity", () => {
   const result = buildAdvancedPlanningFromGovernedIbpe({
     lineage,
@@ -70,13 +84,7 @@ test("advanced packet is derived from governed IBPE input and remains provisiona
     packetId: "ADV-IBPE-1",
     capacityStandards: [
       {
-        workCentreId: "WC-010",
-        workCentreName: "Kitting",
-        travellerOperation: "Kitting",
-        sequence: 10,
-        availableHoursPerPeriod: 160,
-        efficiency: 0.85,
-        standardHoursPerUnit: 0.35,
+        ...capacity[0],
         sourceRef: "WORKBOOK-V5",
         planningStatus: "planning-default",
       },
@@ -99,23 +107,45 @@ test("approved capacity standards improve evidence status but do not become pers
     input: governedInput(),
     createdAt: "2026-09-12T03:31:00.000Z",
     packetId: "ADV-IBPE-2",
-    capacityStandards: [
-      {
-        workCentreId: "WC-010",
-        workCentreName: "Kitting",
-        travellerOperation: "Kitting",
-        sequence: 10,
-        availableHoursPerPeriod: 160,
-        efficiency: 0.85,
-        standardHoursPerUnit: 0.35,
-        sourceRef: "CAPACITY-APPROVED",
-        planningStatus: "approved",
-      },
-    ],
+    capacityStandards: capacity,
   });
 
   assert.equal(result.authority.routingAuthority, "approved-capacity-standards");
   assert.equal(result.authority.routingMode, "capacity-standard-derived");
   assert.equal(result.authority.firmCtpEligible, false);
   assert.equal(result.packetBuild.valid, true);
+});
+
+test("complete persisted approved routing owns operation sequence and elevates routing authority", () => {
+  const result = buildAdvancedPlanningFromGovernedIbpe({
+    lineage,
+    input: governedInput(),
+    createdAt: "2026-09-12T03:31:00.000Z",
+    packetId: "ADV-IBPE-3",
+    capacityStandards: capacity,
+    governedRoutingOperations: [
+      {
+        id: "ROUTE-CARBON-R1:20",
+        productId: "carbon",
+        operationCode: "FINAL-KIT",
+        sequence: 20,
+        eligibleResourceIds: ["WC-010"],
+        runHoursPerUnit: 0.4,
+        setupHours: 0.1,
+        yieldPct: 0.99,
+        sourceRef: "ROUTING:CARBON:R1 | ROUTING:CARBON:R1:20",
+      },
+    ],
+    persistedRoutingRevisionIds: ["ROUTE-CARBON-R1"],
+  });
+
+  assert.equal(result.authority.routingMode, "persisted-approved");
+  assert.equal(result.authority.routingAuthority, "approved-persisted");
+  assert.deepEqual(result.authority.persistedRoutingRevisionIds, ["ROUTE-CARBON-R1"]);
+  assert.equal(result.authority.firmCtpEligible, false);
+  assert.equal(result.authority.optimisationEligible, false);
+  assert.ok(result.adapterNotices.some((row) => row.code === "PERSISTED_ROUTING_AUTHORITY_COMPILED"));
+  assert.equal(result.packetBuild.valid, true);
+  assert.equal(result.packetBuild.packet?.model.routingOperations[0]?.operationCode, "FINAL-KIT");
+  assert.equal(result.packetBuild.packet?.model.routingOperations[0]?.sequence, 20);
 });
