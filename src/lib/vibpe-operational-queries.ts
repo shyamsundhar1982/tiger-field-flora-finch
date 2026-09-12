@@ -258,6 +258,81 @@ async function committedDemandFeasibilityAnswer(sql: Sql) {
   return lines.join("\n\n");
 }
 
+function isCommittedProcurementPriorityQuestion(question: string) {
+  const q = question.toLowerCase().replace(/\s+/g, " ").trim();
+  const procurement = /\b(procure|procurement|buy|purchase|replenish|materials?|shortages?)\b/.test(q);
+  const committed = /\b(committed|confirmed)\b|customer\s+(?:orders?|demand|commitments?)/.test(q);
+  const priority = /\b(now|urgent|urgently|priority|prioritise|prioritize|protect|shortage|shortages|first)\b/.test(q);
+  return procurement && committed && priority;
+}
+
+async function committedProcurementPriorityAnswer(sql: Sql) {
+  const [demand] = await sql.query<{ confirmed_orders: string | number; confirmed_units: string | number }>(`
+    select count(*)::int as confirmed_orders,
+           coalesce(sum(units),0)::numeric as confirmed_units
+      from vyndi_sales_orders
+     where status='confirmed'
+  `);
+
+  const gaps = await sql.query<{
+    requirement_month: string | number;
+    sku: string;
+    item_name: string | null;
+    committed_requirement: string | number;
+    reserved_quantity: string | number;
+    physical_quantity: string | number;
+    available_to_promise: string | number;
+    net_committed_shortage: string | number;
+    open_po_qty: string | number;
+  }>(`
+    select p.requirement_month,
+           p.sku,
+           i.name as item_name,
+           p.committed_requirement,
+           p.reserved_quantity,
+           p.physical_quantity,
+           p.available_to_promise,
+           p.net_committed_shortage,
+           coalesce(r.open_po_qty,0) as open_po_qty
+      from vyndi_committed_procurement_requirements p
+      left join master_inventory_items i on i.sku=p.sku
+      left join vyndi_report_procurement_net_requirement r on r.sku=p.sku
+     where p.net_committed_shortage > 0
+     order by p.requirement_month asc,p.net_committed_shortage desc,p.sku
+  `);
+
+  const confirmedOrders = n(demand?.confirmed_orders);
+  const confirmedUnits = n(demand?.confirmed_units);
+  const shortageUnits = gaps.reduce((sum, row) => sum + n(row.net_committed_shortage), 0);
+  const openPoForGaps = gaps.reduce((sum, row) => sum + n(row.open_po_qty), 0);
+  const uniqueSkus = new Set(gaps.map((row) => row.sku)).size;
+
+  if (confirmedUnits <= 0) {
+    return "Committed-order procurement priority: no confirmed customer demand is currently open, so there is no commitment-specific buy list. Use the governed planning procurement view for forecast/plan replenishment instead.";
+  }
+
+  if (!gaps.length) {
+    return [
+      `Committed-order procurement priority: no exact material shortage is currently open for ${confirmedUnits.toFixed(0)} confirmed unit${confirmedUnits === 1 ? "" : "s"} across ${confirmedOrders.toFixed(0)} order${confirmedOrders === 1 ? "" : "s"}.`,
+      "Do not create commitment-specific replenishment solely from the broader 36-month planning recommendation; use that planning signal separately for forecast/stock policy.",
+    ].join("\n\n");
+  }
+
+  const top = gaps.slice(0, 10).map((row) => {
+    const name = row.item_name ? ` (${row.item_name})` : "";
+    const po = n(row.open_po_qty);
+    return `${row.sku}${name} M${n(row.requirement_month).toFixed(0)}: procure/cover ${n(row.net_committed_shortage).toFixed(1)} of ${n(row.committed_requirement).toFixed(1)} required${po > 0 ? `; ${po.toFixed(1)} open PO recorded for this SKU` : "; no open PO coverage"}`;
+  }).join("; ");
+
+  return [
+    `Committed-order procurement priority: ${shortageUnits.toFixed(1)} exact component units across ${uniqueSkus} SKU${uniqueSkus === 1 ? "" : "s"} are currently short for ${confirmedUnits.toFixed(0)} confirmed bike${confirmedUnits === 1 ? "" : "s"} across ${confirmedOrders.toFixed(0)} customer order${confirmedOrders === 1 ? "" : "s"}.`,
+    `Open-PO quantity recorded against the currently short committed SKU rows is ${openPoForGaps.toFixed(1)}.`,
+    `Most urgent exact shortages: ${top}.`,
+    "Controlled action: raise/approve replenishment, approved substitutes or confirmed receipts against these exact committed SKU gaps in the Procurement workspace before promising production. VIBPE is advisory and does not create RFQs, POs or substitutions automatically.",
+    "Scope note: this answer protects confirmed customer orders only. The broader ₹0.9L / 36-month planning recommendation is a separate forecast-and-buffer procurement signal and must not replace this commitment-specific shortage list.",
+  ].join("\n\n");
+}
+
 function isOperationalReconciliationQuestion(question: string) {
   const q = question.toLowerCase();
   const asksReconcile = /reconcil|match|align|consistent|tie out|ties out/.test(q);
@@ -417,6 +492,7 @@ async function supplierAnswer(sql: Sql, question: string) {
 export async function tryOperationalDataAnswer(sql: Sql, question: string) {
   if (isBusinessHealthQuestion(question)) return businessHealthAnswer(sql);
   if (isCommittedDemandFeasibilityQuestion(question)) return committedDemandFeasibilityAnswer(sql);
+  if (isCommittedProcurementPriorityQuestion(question)) return committedProcurementPriorityAnswer(sql);
   if (isOperationalReconciliationQuestion(question)) return reconciliationAnswer(sql);
   return supplierAnswer(sql, question);
 }
