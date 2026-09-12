@@ -1,21 +1,17 @@
 import type { Sql } from "./db.ts";
 import { loadPreparedAdvancedOptimizerEnvelope } from "./advanced-optimizer-authority.ts";
+import {
+  GOVERNED_OPTIMIZER_ROUTE,
+  isGovernedOptimizerExecutionRequest,
+} from "./vibpe-optimizer-intent.ts";
+
+export { GOVERNED_OPTIMIZER_ROUTE, isGovernedOptimizerExecutionRequest } from "./vibpe-optimizer-intent.ts";
 
 type LatestPacketRow = {
   id: string;
   parent_ibpe_run_id: string;
   created_at: string;
 };
-
-export const GOVERNED_OPTIMIZER_ROUTE = "/command/ibpe-operating-workspace/optimizer";
-
-export function isGovernedOptimizerExecutionRequest(question: string) {
-  const q = question.toLowerCase().replace(/\s+/g, " ").trim();
-  const asksExecution = /\b(run|execute|start|invoke|launch)\b/.test(q);
-  const namesOptimizer = /\b(optimizer|optimiser|optimization|optimisation|highs|milp)\b/.test(q);
-  const asksPlanOptimization = /\b(optimi[sz]e)\b/.test(q) && /\b(plan|planning|procurement|production|supply|ibpe|vibpe)\b/.test(q);
-  return (asksExecution && namesOptimizer) || asksPlanOptimization;
-}
 
 export async function answerGovernedOptimizerExecutionRequest(sql: Sql, question: string) {
   if (!isGovernedOptimizerExecutionRequest(question)) return null;
