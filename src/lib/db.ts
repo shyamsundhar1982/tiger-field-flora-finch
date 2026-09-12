@@ -1,3 +1,4 @@
+import "@tanstack/react-start/server-only";
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
 import { requestSafePostgresPoolConfig } from "./postgres-pool";
 
