@@ -9,7 +9,7 @@ type LatestPacketRow = {
   created_at: string;
 };
 
-type LatestOptimizationRunRow = {
+type LatestOptimizationRunDbRow = {
   id: string;
   parent_advanced_packet_id: string;
   request_id: string;
@@ -21,6 +21,8 @@ type LatestOptimizationRunRow = {
   created_role: string;
   created_at: string;
 };
+
+type LatestOptimizationRunRow = Omit<LatestOptimizationRunDbRow, "governance_json">;
 
 type AuditRow = {
   id: string;
@@ -62,7 +64,7 @@ export async function readVibpeOptimizerReleaseClosure(sql: Sql): Promise<VibpeO
   const packet = packetRows[0] ?? null;
 
   const runRows = packet
-    ? await sql.query<LatestOptimizationRunRow>(
+    ? await sql.query<LatestOptimizationRunDbRow>(
         `select id,parent_advanced_packet_id,request_id,accepted,optimization_status,cash_guardrail_status,
                 governance_json,created_by,created_role,created_at::text
            from vyndi_advanced_optimization_runs
@@ -72,7 +74,20 @@ export async function readVibpeOptimizerReleaseClosure(sql: Sql): Promise<VibpeO
         [packet.id],
       ).catch(() => [])
     : [];
-  const run = runRows[0] ?? null;
+  const runDb = runRows[0] ?? null;
+  const run: LatestOptimizationRunRow | null = runDb
+    ? {
+        id: runDb.id,
+        parent_advanced_packet_id: runDb.parent_advanced_packet_id,
+        request_id: runDb.request_id,
+        accepted: runDb.accepted,
+        optimization_status: runDb.optimization_status,
+        cash_guardrail_status: runDb.cash_guardrail_status,
+        created_by: runDb.created_by,
+        created_role: runDb.created_role,
+        created_at: runDb.created_at,
+      }
+    : null;
 
   const auditRows = run
     ? await sql.query<AuditRow>(
@@ -87,10 +102,10 @@ export async function readVibpeOptimizerReleaseClosure(sql: Sql): Promise<VibpeO
   const audit = auditRows[0] ?? null;
 
   const governanceValid = Boolean(
-    run
-      && governanceFlag(run.governance_json, "advisoryOnly") === true
-      && governanceFlag(run.governance_json, "mayCreateTransactions") === false
-      && governanceFlag(run.governance_json, "humanApprovalRequiredForBusinessAction") === true,
+    runDb
+      && governanceFlag(runDb.governance_json, "advisoryOnly") === true
+      && governanceFlag(runDb.governance_json, "mayCreateTransactions") === false
+      && governanceFlag(runDb.governance_json, "humanApprovalRequiredForBusinessAction") === true,
   );
   const acceptedConsistency = Boolean(
     run
