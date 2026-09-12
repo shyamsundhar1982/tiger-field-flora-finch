@@ -65,4 +65,19 @@ test("every deploy-time migration executes from an empty database in production 
     "select table_name from information_schema.views where table_schema='public' and table_name like 'vyndi_report_%' order by table_name",
   );
   assert.equal(reportViews.rows.length, 14);
+
+  const modelEvidenceColumn = await db.query(
+    "select column_name from information_schema.columns where table_schema='public' and table_name='vyndi_advanced_planning_packets' and column_name='model_json'",
+  );
+  assert.equal(modelEvidenceColumn.rows.length, 1);
+
+  const packetV2Function = await db.query(
+    "select proname from pg_proc where proname='persist_vyndi_advanced_planning_packet_v2'",
+  );
+  assert.equal(packetV2Function.rows.length, 1);
+
+  const packetGuardTrigger = await db.query(
+    "select tgname from pg_trigger where tgname='trg_guard_vyndi_advanced_planning_packet' and not tgisinternal",
+  );
+  assert.equal(packetGuardTrigger.rows.length, 1);
 });
