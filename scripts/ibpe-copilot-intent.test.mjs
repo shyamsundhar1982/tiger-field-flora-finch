@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const copilot = await readFile(new URL("../src/lib/ibpe-copilot.ts", import.meta.url), "utf8");
+const copilot2 = await readFile(new URL("../src/lib/vibpe-copilot-2.ts", import.meta.url), "utf8");
 const scenarioLab = await readFile(new URL("../src/lib/ibpe-scenario-lab.ts", import.meta.url), "utf8");
+const workflow = await readFile(new URL("../src/lib/operating-workflow.ts", import.meta.url), "utf8");
 
 test("VIBPE Co-Pilot resolves named scenarios ahead of stale UI scenario context", () => {
   assert.match(copilot, /function namedScenarioFromQuestion/);
@@ -66,4 +68,30 @@ test("VIBPE Co-Pilot refuses packets that predate exact committed-material recon
   assert.match(copilot, /RUNTIME_IBPE_ENGINE_VERSION/);
   assert.match(copilot, /predates exact committed-material reconciliation/);
   assert.match(copilot, /released job-card requirements participate in procurement and funding analysis/);
+});
+
+test("VIBPE Co-Pilot 2 returns intent-specific governed answers instead of an empty fallback", () => {
+  assert.match(copilot2, /function intentAnswer/);
+  assert.match(copilot2, /intent === "demand"/);
+  assert.match(copilot2, /intent === "materials"/);
+  assert.match(copilot2, /intent === "procurement"/);
+  assert.match(copilot2, /intent === "capacity"/);
+  assert.match(copilot2, /intent === "funding"/);
+  assert.match(copilot2, /intent === "baseline" \|\| intent === "assessment"/);
+  assert.match(copilot2, /const answer = intentAnswer\(parsed\.intent, question, governedBaseline\)/);
+  assert.match(copilot2, /answer,/);
+});
+
+test("VIBPE evaluates committed-demand production feasibility across materials and capacity", () => {
+  assert.match(copilot2, /function asksCommittedDemandFeasibility/);
+  assert.match(copilot2, /function committedDemandFeasibilityAnswer/);
+  assert.match(copilot2, /committedFulfillmentShortageQty/);
+  assert.match(copilot2, /capacityShortfalls/);
+  assert.match(copilot2, /Committed-demand feasibility:/);
+  assert.match(copilot2, /should not promise production of all committed demand/);
+});
+
+test("Command navigation exposes the governed VIBPE Optimizer surface", () => {
+  assert.match(workflow, /\/command\/ibpe-operating-workspace\/optimizer", label: "VIBPE Optimizer"/);
+  assert.match(workflow, /\/command\/ibpe-operating-workspace\/optimizer", label: "Optimizer"/);
 });
