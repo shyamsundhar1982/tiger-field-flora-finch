@@ -7,6 +7,8 @@ type LoginSearch = {
   created?: boolean;
 };
 
+type WelcomePhase = "idle" | "appear" | "disperse";
+
 export const Route = createFileRoute("/login")({
   validateSearch: (search: Record<string, unknown>): LoginSearch => ({
     returnTo: typeof search.returnTo === "string" ? search.returnTo : undefined,
@@ -17,6 +19,7 @@ export const Route = createFileRoute("/login")({
 });
 
 const BEARER_KEY = "grok-auth.bearer-token";
+const THREE_CDN = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
 
 function safeReturnTo(value: string | undefined) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/command";
@@ -32,6 +35,28 @@ function safeReturnTo(value: string | undefined) {
   return "/command";
 }
 
+function ensureThreeScript(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  if ((window as typeof window & { THREE?: unknown }).THREE) return Promise.resolve();
+
+  const existing = document.querySelector<HTMLScriptElement>(`script[src="${THREE_CDN}"]`);
+  if (existing) {
+    return new Promise((resolve, reject) => {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", () => reject(new Error("Unable to load visual engine.")), { once: true });
+    });
+  }
+
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = THREE_CDN;
+    script.async = true;
+    script.addEventListener("load", () => resolve(), { once: true });
+    script.addEventListener("error", () => reject(new Error("Unable to load visual engine.")), { once: true });
+    document.head.appendChild(script);
+  });
+}
+
 function LoginPage() {
   const navigate = useNavigate();
   const search = Route.useSearch();
@@ -40,64 +65,134 @@ function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [granted, setGranted] = useState(false);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [welcomePhase, setWelcomePhase] = useState<WelcomePhase>("idle");
+  const sceneHostRef = useRef<HTMLDivElement>(null);
+  const travelSpeedRef = useRef(0.012);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    let frame = 0;
+    const host = sceneHostRef.current;
+    if (!host) return;
+    let disposed = false;
     let raf = 0;
-    const resize = () => {
-      const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
-      canvas.width = Math.floor(window.innerWidth * ratio);
-      canvas.height = Math.floor(window.innerHeight * ratio);
-      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-    };
-    const draw = () => {
-      const w = window.innerWidth,
-        h = window.innerHeight;
-      ctx.clearRect(0, 0, w, h);
-      const cx = w * 0.58,
-        cy = h * 0.48;
-      ctx.strokeStyle = "rgba(92, 213, 232, .16)";
-      ctx.lineWidth = 1;
-      for (let ring = 0; ring < 7; ring++) {
-        ctx.beginPath();
-        const rx = Math.min(w, h) * (0.18 + ring * 0.045);
-        const ry = rx * (0.24 + ring * 0.015);
-        ctx.ellipse(cx, cy, rx, ry, -0.22 + Math.sin(frame / 180) * 0.02, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-      for (let strand = 0; strand < 8; strand++) {
-        ctx.beginPath();
-        for (let i = 0; i <= 100; i++) {
-          const t = i / 100;
-          const angle = t * Math.PI * 2 + strand * 0.78 + frame / 900;
-          const radius = Math.min(w, h) * (0.11 + strand * 0.018);
-          const x = cx + Math.cos(angle) * radius * 1.65;
-          const y = cy + Math.sin(angle) * radius * (0.38 + t * 0.12) + (t - 0.5) * h * 0.12;
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
+    let cleanup = () => {};
+
+    void ensureThreeScript()
+      .then(() => {
+        if (disposed || !sceneHostRef.current) return;
+        const THREE = (window as typeof window & { THREE?: any }).THREE;
+        if (!THREE) return;
+
+        const container = sceneHostRef.current;
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x010208, 0.012);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 400);
+        camera.position.set(0, 1.8, 28);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.domElement.setAttribute("aria-hidden", "true");
+        container.replaceChildren(renderer.domElement);
+
+        const resources: Array<{ dispose?: () => void }> = [];
+
+        function createRing(innerRadius: number, outerRadius: number, particleCount: number, color: number, opacity: number) {
+          const positions = new Float32Array(particleCount * 3);
+          const colors = new Float32Array(particleCount * 3);
+          const colorObj = new THREE.Color(color);
+
+          for (let i = 0; i < particleCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const radius = innerRadius + Math.random() * (outerRadius - innerRadius);
+            const y = (Math.random() - 0.5) * 0.35;
+            positions[i * 3] = Math.cos(angle) * radius;
+            positions[i * 3 + 1] = y;
+            positions[i * 3 + 2] = Math.sin(angle) * radius;
+
+            const variation = 0.75 + Math.random() * 0.25;
+            colors[i * 3] = colorObj.r * variation;
+            colors[i * 3 + 1] = colorObj.g * variation;
+            colors[i * 3 + 2] = colorObj.b * variation;
+          }
+
+          const geometry = new THREE.BufferGeometry();
+          geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+          geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+          const material = new THREE.PointsMaterial({
+            size: 0.045,
+            vertexColors: true,
+            transparent: true,
+            opacity,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            sizeAttenuation: true,
+          });
+          resources.push(geometry, material);
+          return new THREE.Points(geometry, material);
         }
-        ctx.strokeStyle = strand % 3 === 0 ? "rgba(255, 150, 63, .3)" : "rgba(100, 220, 240, .28)";
-        ctx.stroke();
-      }
-      if (!reduced) {
-        frame += granted ? 3 : 1;
-        raf = requestAnimationFrame(draw);
-      }
-    };
-    resize();
-    draw();
-    window.addEventListener("resize", resize);
+
+        const ringGroup = new THREE.Group();
+        ringGroup.rotation.x = 0.38;
+        ringGroup.add(createRing(6.5, 9.8, 9000, 0x66e0ff, 0.75));
+        ringGroup.add(createRing(11.2, 15.5, 11000, 0x44ccff, 0.65));
+        ringGroup.add(createRing(16.2, 19.5, 5000, 0x2288cc, 0.4));
+        scene.add(ringGroup);
+
+        const starGeo = new THREE.BufferGeometry();
+        const starPos = new Float32Array(1200 * 3);
+        for (let i = 0; i < starPos.length; i++) starPos[i] = (Math.random() - 0.5) * 300;
+        starGeo.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
+        const starMaterial = new THREE.PointsMaterial({
+          color: 0xaaccff,
+          size: 0.15,
+          transparent: true,
+          opacity: 0.6,
+        });
+        resources.push(starGeo, starMaterial);
+        scene.add(new THREE.Points(starGeo, starMaterial));
+
+        let travelProgress = 0;
+        const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+        const animate = () => {
+          if (disposed) return;
+          if (!reducedMotion) raf = requestAnimationFrame(animate);
+          ringGroup.rotation.y += reducedMotion ? 0 : 0.0009;
+          travelProgress += reducedMotion ? 0 : travelSpeedRef.current;
+          camera.position.z = 28 - travelProgress * 1.15;
+          camera.position.y = 1.8 + Math.sin(travelProgress * 0.3) * 0.45;
+          camera.lookAt(0, 0, camera.position.z - 14);
+          camera.rotation.z = Math.sin(travelProgress * 0.22) * 0.05;
+          renderer.render(scene, camera);
+        };
+
+        const resize = () => {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        };
+
+        window.addEventListener("resize", resize);
+        animate();
+
+        cleanup = () => {
+          window.removeEventListener("resize", resize);
+          cancelAnimationFrame(raf);
+          for (const resource of resources) resource.dispose?.();
+          renderer.dispose();
+          renderer.domElement.remove();
+        };
+      })
+      .catch(() => {
+        // CSS background remains as a graceful fallback if the visual engine cannot load.
+      });
+
     return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("resize", resize);
+      disposed = true;
+      cleanup();
     };
-  }, [granted]);
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -105,9 +200,6 @@ function LoginPage() {
     setError("");
 
     try {
-      // Keep the Better Auth client out of the server-render path. This page is
-      // shared by Node/Vercel and Cloudflare Workers, while authentication itself
-      // is only required after the browser submits the form.
       const { authClient } = await import("@/lib/auth/client");
       const normalizedEmail = email.trim().toLowerCase();
       const result = await authClient.signIn.email(
@@ -124,18 +216,25 @@ function LoginPage() {
         setError(result.error.message ?? "Sign-in failed.");
         return;
       }
+
       try {
         await authClient.getSession();
       } catch {
-        // The preview bearer is used only inside the embedded sandbox. Deployed
-        // hosts authenticate through their first-party HttpOnly cookie.
+        // Embedded previews use the bearer token above; deployed hosts use their first-party HttpOnly cookie.
       }
 
       const destination = safeReturnTo(search.returnTo);
       setGranted(true);
-      await new Promise((resolve) => window.setTimeout(resolve, 900));
+      setWelcomePhase("appear");
+      await new Promise((resolve) => window.setTimeout(resolve, 3200));
+      travelSpeedRef.current = 0.085;
+      setWelcomePhase("disperse");
+      await new Promise((resolve) => window.setTimeout(resolve, 1700));
       await navigate({ to: destination as never });
     } catch (cause) {
+      setGranted(false);
+      setWelcomePhase("idle");
+      travelSpeedRef.current = 0.012;
       setError(cause instanceof Error ? cause.message : "Sign-in failed.");
     } finally {
       setBusy(false);
@@ -144,28 +243,23 @@ function LoginPage() {
 
   return (
     <main className={`command-entry ${granted ? "command-entry--granted" : ""}`}>
-      <canvas ref={canvasRef} className="command-entry__canvas" aria-hidden="true" />
-      <div className="command-entry__grid" aria-hidden="true" />
+      <div ref={sceneHostRef} className="command-entry__scene" aria-hidden="true" />
+      <div className="command-entry__vignette" aria-hidden="true" />
+
       <div className="command-entry__hud command-entry__hud--top">
-        CARBON COMPOSITE SYSTEM <span>·</span> VYNDI OS
+        VYNDI <span>·</span> VĀYÚ SHASTR PRIVATE LIMITED
       </div>
-      <div className="command-entry__hud command-entry__hud--bottom">
-        STRUCTURAL ENGINEERING / CONFIGURATION CONTROL
-      </div>
+
       <section className="command-entry__panel" aria-label="VYNDI Command Centre sign in">
-        <p className="command-entry__eyebrow">
-          VINDY <span>///</span> COMMAND CENTRE
-        </p>
+        <p className="command-entry__eyebrow">COMMAND CENTRE</p>
         <p className="command-entry__legal">VĀYÚ SHASTR PRIVATE LIMITED</p>
-        <h1>Engineering Command Entry</h1>
-        <p className="command-entry__intro">
-          Authenticate your individual authority to enter the operating system.
-        </p>
+        <h1>Authorised Entry</h1>
+        <p className="command-entry__intro">Authenticate your individual authority to enter the VYNDI operating system.</p>
+
         {search.created ? (
-          <p className="mt-5 rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-sm text-emerald-100">
-            Account created successfully. Sign in with the new credentials to continue.
-          </p>
+          <p className="command-entry__success">Account created successfully. Sign in with the new credentials to continue.</p>
         ) : null}
+
         <form onSubmit={submit} className="command-entry__form">
           <label>
             Email
@@ -174,7 +268,7 @@ function LoginPage() {
               type="email"
               autoComplete="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(event) => setEmail(event.target.value)}
             />
           </label>
           <label>
@@ -184,29 +278,23 @@ function LoginPage() {
               type="password"
               autoComplete="current-password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(event) => setPassword(event.target.value)}
             />
           </label>
-          {error && (
-            <p role="alert" className="command-entry__error">
-              {error}
-            </p>
-          )}
+          {error ? <p role="alert" className="command-entry__error">{error}</p> : null}
           <button disabled={busy || granted}>
             {granted ? "ACCESS GRANTED" : busy ? "AUTHORIZING…" : "AUTHORIZE ACCESS"}
           </button>
         </form>
-        {granted ? (
-          <p className="command-entry__welcome">WELCOME TO VYNDI COMMAND CENTRE</p>
-        ) : (
-          <p className="command-entry__note">
-            Individual authority · Session protected · RBAC enforced
-          </p>
-        )}
-        <Link to="/" className="command-entry__back">
-          ← Return to VYNDI
-        </Link>
+
+        <p className="command-entry__note">Individual authority · Session protected · RBAC enforced</p>
+        <Link to="/" className="command-entry__back">← Return to VYNDI</Link>
       </section>
+
+      <div className={`command-entry__welcome ${welcomePhase === "appear" ? "appear" : ""} ${welcomePhase === "disperse" ? "disperse" : ""}`} aria-live="polite">
+        Welcome to the Command Centre
+        <span>Vāyú Shastr</span>
+      </div>
     </main>
   );
 }
