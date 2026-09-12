@@ -26,6 +26,7 @@ export type PersistedAdvancedPlanningPacket = {
   sourceInputHash: string;
   sourceSnapshotAt: string;
   packet: JsonValue;
+  model?: JsonValue;
   authority: JsonValue;
   adapterNotices: JsonValue;
   status: "complete" | "invalidated";
@@ -66,6 +67,7 @@ function mapPacket(row: SqlRow): PersistedAdvancedPlanningPacket {
     sourceInputHash: String(row.source_input_hash),
     sourceSnapshotAt: String(row.source_snapshot_at),
     packet: row.packet_json ?? {},
+    model: row.model_json ?? undefined,
     authority: row.authority_json ?? {},
     adapterNotices: row.adapter_notices_json ?? [],
     status: row.status as PersistedAdvancedPlanningPacket["status"],
@@ -220,8 +222,8 @@ export const runAdvancedPlanningFromLatestIbpe = createServerFn({ method: "POST"
 
   const packet = built.packetBuild.packet;
   const rows = await sql.query<{ id: string }>(
-    `select persist_vyndi_advanced_planning_packet(
-       $1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10::jsonb,$11,$12
+    `select persist_vyndi_advanced_planning_packet_v2(
+       $1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10::jsonb,$11::jsonb,$12,$13
      ) as id`,
     [
       packet.packetId,
@@ -232,6 +234,7 @@ export const runAdvancedPlanningFromLatestIbpe = createServerFn({ method: "POST"
       source.input_hash,
       source.snapshot_at,
       JSON.stringify(packet),
+      JSON.stringify(built.model),
       JSON.stringify(built.authority),
       JSON.stringify(adapterNotices),
       actor.userId,
@@ -243,6 +246,7 @@ export const runAdvancedPlanningFromLatestIbpe = createServerFn({ method: "POST"
     id: rows[0]?.id ?? packet.packetId,
     parentIbpeRunId: source.id,
     packet,
+    model: built.model,
     authority: built.authority,
     adapterNotices,
     packetIssues: built.packetBuild.issues,
@@ -255,7 +259,7 @@ export const getLatestAdvancedPlanningPacket = createServerFn({ method: "GET" })
   const sql = await getSql();
   const rows = await sql.query<SqlRow>(
     `select id,parent_ibpe_run_id,packet_version,advanced_model_version,source_sha,source_input_hash,
-            source_snapshot_at::text,packet_json,authority_json,adapter_notices_json,status,created_at::text
+            source_snapshot_at::text,packet_json,model_json,authority_json,adapter_notices_json,status,created_at::text
        from vyndi_advanced_planning_packets
       where status='complete'
       order by created_at desc
