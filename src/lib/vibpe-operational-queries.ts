@@ -16,6 +16,25 @@ type ReconciliationRow = {
   open_job_cards: string | number;
 };
 
+type CommittedFeasibilitySummaryRow = {
+  confirmed_orders: string | number;
+  confirmed_units: string | number;
+  active_job_cards: string | number;
+  committed_component_units: string | number;
+  committed_skus: string | number;
+  net_committed_shortage: string | number;
+  open_po_qty: string | number;
+  capacity_shortfall_months: string | number | null;
+  latest_run_id: string | null;
+};
+
+type CommittedGapRow = {
+  requirement_month: string | number;
+  sku: string;
+  committed_requirement: string | number;
+  net_committed_shortage: string | number;
+};
+
 type SupplierRow = {
   id: string;
   name: string;
@@ -47,6 +66,106 @@ type SupplierPriceRow = {
 
 const n = (value: string | number | null | undefined) => Number(value ?? 0);
 const close = (a: number, b: number) => Math.abs(a - b) < 0.0001;
+
+function isCommittedDemandFeasibilityQuestion(question: string) {
+  const q = question.toLowerCase().replace(/\s+/g, " ").trim();
+  const asksCommitted = /\b(committed|confirmed)\b|customer\s+orders?/.test(q);
+  const asksDemand = /\b(demand|orders?|units?|commitments?)\b/.test(q);
+  const asksFeasibility = /\bcan\b[^?.]{0,80}\b(produce|produced|make|build|fulfil|fulfill|deliver)\b|\bproducible\b|production\s+feasibility|meet[^?.]{0,40}\bdemand\b|cover[^?.]{0,40}\bdemand\b/.test(q);
+  return asksCommitted && asksDemand && asksFeasibility;
+}
+
+async function committedDemandFeasibilityAnswer(sql: Sql) {
+  const [summary] = await sql.query<CommittedFeasibilitySummaryRow>(`
+    with current_orders as (
+      select count(*)::int as confirmed_orders,
+             coalesce(sum(units),0)::numeric as confirmed_units
+        from vyndi_sales_orders
+       where status='confirmed'
+    ), current_jobs as (
+      select count(distinct jc.id)::int as active_job_cards
+        from epr_production_job_cards jc
+        join vyndi_sales_orders o
+          on o.id=jc.sales_order_id
+         and o.revision=jc.sales_order_revision
+         and o.status='confirmed'
+       where jc.status in ('released','in_progress')
+    ), committed as (
+      select coalesce(sum(committed_requirement),0)::numeric as committed_component_units,
+             count(distinct sku)::int as committed_skus,
+             coalesce(sum(net_committed_shortage),0)::numeric as net_committed_shortage
+        from vyndi_committed_procurement_requirements
+    ), open_po as (
+      select coalesce(sum(r.open_po_qty),0)::numeric as open_po_qty
+        from (select distinct sku from vyndi_committed_procurement_requirements) c
+        join vyndi_report_procurement_net_requirement r on r.sku=c.sku
+    ), latest as (
+      select id as latest_run_id,
+             coalesce((result_json->'summary'->>'capacityShortfallMonths')::numeric,0) as capacity_shortfall_months
+        from vyndi_ibpe_runs
+       where status='complete'
+       order by created_at desc
+       limit 1
+    )
+    select o.confirmed_orders,o.confirmed_units,j.active_job_cards,
+           c.committed_component_units,c.committed_skus,c.net_committed_shortage,
+           p.open_po_qty,l.capacity_shortfall_months,l.latest_run_id
+      from current_orders o
+      cross join current_jobs j
+      cross join committed c
+      cross join open_po p
+      left join latest l on true
+  `);
+
+  if (!summary || n(summary.confirmed_units) <= 0) {
+    return "Committed-demand feasibility: no confirmed open customer demand is currently recorded. No production promise should be inferred from the planning forecast alone.";
+  }
+
+  const gaps = await sql.query<CommittedGapRow>(`
+    select requirement_month,sku,committed_requirement,net_committed_shortage
+      from vyndi_committed_procurement_requirements
+     where net_committed_shortage > 0
+     order by net_committed_shortage desc,requirement_month,sku
+     limit 8
+  `);
+
+  const confirmedUnits = n(summary.confirmed_units);
+  const confirmedOrders = n(summary.confirmed_orders);
+  const activeJobCards = n(summary.active_job_cards);
+  const committedComponents = n(summary.committed_component_units);
+  const committedSkus = n(summary.committed_skus);
+  const materialShortage = n(summary.net_committed_shortage);
+  const openPo = n(summary.open_po_qty);
+  const capacityShortfallMonths = n(summary.capacity_shortfall_months);
+
+  const status = materialShortage > 0
+    ? "BLOCKED — exact committed material is not currently covered"
+    : capacityShortfallMonths > 0
+      ? "AT RISK — material is covered but the governed capacity model has shortfall months"
+      : "FEASIBLE ON CURRENT MATERIAL/CAPACITY EVIDENCE";
+
+  const lines = [
+    `Committed-demand feasibility: ${status}.`,
+    `Confirmed customer demand is ${confirmedUnits.toFixed(0)} unit${confirmedUnits === 1 ? "" : "s"} across ${confirmedOrders.toFixed(0)} open order${confirmedOrders === 1 ? "" : "s"}; ${activeJobCards.toFixed(0)} current released/in-progress job card${activeJobCards === 1 ? " is" : "s are"} linked to those confirmed orders.`,
+    `Exact committed material demand is ${committedComponents.toFixed(1)} component units across ${committedSkus.toFixed(0)} SKU${committedSkus === 1 ? "" : "s"}. Current committed material shortage is ${materialShortage.toFixed(1)} component units; open-PO coverage recorded for those committed SKUs is ${openPo.toFixed(1)}.`,
+    `Capacity: the latest governed IBPE run${summary.latest_run_id ? ` (${summary.latest_run_id})` : ""} reports ${capacityShortfallMonths.toFixed(0)} capacity shortfall month${capacityShortfallMonths === 1 ? "" : "s"}. This capacity result is broader planning evidence and does not override exact committed-material shortages.`,
+  ];
+
+  if (gaps.length) {
+    lines.push(`Largest exact committed gaps: ${gaps.map((row) => `${row.sku} M${n(row.requirement_month).toFixed(0)}: ${n(row.net_committed_shortage).toFixed(1)} of ${n(row.committed_requirement).toFixed(1)} short`).join("; ")}.`);
+  }
+
+  if (materialShortage > 0) {
+    lines.push("Conclusion: the confirmed demand should not be promised as immediately producible until the exact committed SKU shortages are covered by available stock, approved substitutes, or confirmed receipts. Procurement and production release remain controlled in their owning workspaces.");
+  } else if (capacityShortfallMonths > 0) {
+    lines.push("Conclusion: committed material is covered, but production timing remains constrained by modeled capacity. Resolve the relevant capacity period before confirming the customer promise date.");
+  } else {
+    lines.push("Conclusion: current governed evidence shows no committed-material or modeled capacity blocker. Final production release still depends on the owning production/quality gates.");
+  }
+
+  lines.push("Evidence: confirmed sales orders → current-revision job cards → live committed procurement requirements → inventory/ATP/open-PO evidence, with capacity from the latest governed IBPE run. The broader reconciled planning shortage is intentionally not presented as committed-demand shortage.");
+  return lines.join("\n\n");
+}
 
 function isOperationalReconciliationQuestion(question: string) {
   const q = question.toLowerCase();
@@ -205,6 +324,7 @@ async function supplierAnswer(sql: Sql, question: string) {
 }
 
 export async function tryOperationalDataAnswer(sql: Sql, question: string) {
+  if (isCommittedDemandFeasibilityQuestion(question)) return committedDemandFeasibilityAnswer(sql);
   if (isOperationalReconciliationQuestion(question)) return reconciliationAnswer(sql);
   return supplierAnswer(sql, question);
 }
