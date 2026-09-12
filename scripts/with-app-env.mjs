@@ -7,6 +7,13 @@
  * `VITE_AUTH_ENABLED` — a divergence that only shows up as a built-output
  * mismatch long after the fact. Anything that starts Vite directly bypasses it.
  *
+ * The wrapper also prepares the pinned HiGHS WebAssembly runtime as a relative
+ * source asset. The `highs` package exports its Wasm file, but package-exported
+ * Wasm currently crosses the TanStack/Rolldown split boundary inconsistently.
+ * Copying the exact pinned file into `src/generated` lets Cloudflare's Vite
+ * plugin own normal relative `.wasm` module handling without changing solver
+ * version or fetching runtime code dynamically.
+ *
  * Only `VITE_`-prefixed keys are honored: the file is a build flag carrier, not
  * a secret store, and only `VITE_` vars reach the browser anyway. A real
  * `process.env` entry always wins, so an explicit override still works.
@@ -20,7 +27,7 @@
  * `process.env`, which is why the merge has to happen before Vite starts.
  */
 import { spawn } from "node:child_process";
-import { readFileSync, realpathSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { constants as osConstants } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -63,6 +70,22 @@ export function readAppEnv(root) {
 /** File values under the process environment: an explicit override wins. */
 export function mergeAppEnv(appEnv, processEnv) {
   return { ...appEnv, ...processEnv };
+}
+
+export function preparePinnedHighsWasm(root) {
+  const source = join(root, "node_modules", "highs", "build", "highs.wasm");
+  const targetDir = join(root, "src", "generated");
+  const target = join(targetDir, "highs.wasm");
+  let sourceStat;
+  try {
+    sourceStat = statSync(source);
+  } catch {
+    return false;
+  }
+  if (!sourceStat.isFile()) return false;
+  mkdirSync(targetDir, { recursive: true });
+  copyFileSync(source, target);
+  return true;
 }
 
 /**
@@ -110,7 +133,12 @@ function main(argv) {
     console.error("usage: node scripts/with-app-env.mjs <command> [args…]");
     process.exit(2);
   }
-  const env = mergeAppEnv(readAppEnv(projectRoot()), process.env);
+  const root = projectRoot();
+  if (command === "vite" && !preparePinnedHighsWasm(root)) {
+    console.error("[with-app-env] pinned HiGHS Wasm runtime is missing; run npm ci first.");
+    process.exit(2);
+  }
+  const env = mergeAppEnv(readAppEnv(root), process.env);
   const child = spawn(command, args, { stdio: "inherit", env });
   // The dev server is long-running and is stopped by signalling this wrapper.
   for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
