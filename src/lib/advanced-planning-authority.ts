@@ -11,6 +11,11 @@ import {
   compilePersistedRoutingForPlanning,
   type PersistedRoutingOperationRow,
 } from "./persisted-routing-planning.ts";
+import {
+  compilePersistedSupplierLanesForPlanning,
+  type PersistedSupplierLaneRow,
+  type PersistedSupplierPriceRow,
+} from "./persisted-supplier-lane-planning.ts";
 
 export type PersistedAdvancedPlanningPacket = {
   id: string;
@@ -102,10 +107,31 @@ export const runAdvancedPlanningFromLatestIbpe = createServerFn({ method: "POST"
         order by product_id,effective_from desc,sequence,operation_id`,
     );
   } catch {
-    // The persisted-routing migration may lag the application deployment. In
-    // that state advanced planning must remain on the existing provisional
-    // capacity-derived routing rather than fail or invent authority.
     persistedRoutingRows = [];
+  }
+
+  let supplierLaneRows: PersistedSupplierLaneRow[] = [];
+  let supplierPriceRows: PersistedSupplierPriceRow[] = [];
+  try {
+    supplierLaneRows = await sql.query<PersistedSupplierLaneRow>(
+      `select lane_revision_id,supplier_id,sku,revision_code,effective_from::text,effective_to::text,
+              planning_period_days,horizon_periods,lead_time_days,moq,order_multiple,alternate_rank,
+              landed_unit_cost_inr,landed_cost_source_ref,reliability,reliability_method,
+              reliability_source_ref,policy_source_ref,source_ref,supplier_approval_status,
+              supplier_active,supplier_currency,quality_rating,delivery_rating,supplier_source_ref,capacity_json
+         from vyndi_approved_supplier_lanes
+        order by sku,alternate_rank,supplier_id,effective_from desc`,
+    );
+    supplierPriceRows = await sql.query<PersistedSupplierPriceRow>(
+      `select id,supplier_id,sku,unit_price_inr,currency,source_reference,
+              effective_from::text,effective_to::text
+         from vyndi_procurement_prices
+        where status='approved' and price_type='supplier' and supplier_id is not null
+        order by sku,supplier_id,effective_from desc,updated_at desc`,
+    );
+  } catch {
+    supplierLaneRows = [];
+    supplierPriceRows = [];
   }
 
   const plannedProductIds = [
@@ -118,6 +144,14 @@ export const runAdvancedPlanningFromLatestIbpe = createServerFn({ method: "POST"
     rows: persistedRoutingRows,
     productIds: plannedProductIds,
     knownResourceIds: capacityRows.map((row) => row.work_centre_id),
+    asOfDate: source.snapshot_at,
+  });
+
+  const requiredSkus = [...new Set(source.input_json.bom.filter((row) => row.approved).map((row) => row.sku))];
+  const persistedSupplierLanes = compilePersistedSupplierLanesForPlanning({
+    rows: supplierLaneRows,
+    purchasePrices: supplierPriceRows,
+    requiredSkus,
     asOfDate: source.snapshot_at,
   });
 
@@ -149,6 +183,8 @@ export const runAdvancedPlanningFromLatestIbpe = createServerFn({ method: "POST"
     })),
     governedRoutingOperations: persistedRouting.complete ? persistedRouting.routingOperations : undefined,
     persistedRoutingRevisionIds: persistedRouting.complete ? persistedRouting.revisionIds : undefined,
+    supplierLanes: persistedSupplierLanes.complete ? persistedSupplierLanes.supplierLanes : undefined,
+    persistedSupplierLaneRevisionIds: persistedSupplierLanes.complete ? persistedSupplierLanes.laneRevisionIds : undefined,
   });
 
   const routingDiscoveryNotices = persistedRouting.complete
@@ -163,7 +199,19 @@ export const runAdvancedPlanningFromLatestIbpe = createServerFn({ method: "POST"
           .slice(0, 6)
           .map((issue) => ({ code: issue.code, message: issue.message })),
       ];
-  const adapterNotices = [...built.adapterNotices, ...routingDiscoveryNotices];
+  const supplierDiscoveryNotices = persistedSupplierLanes.complete
+    ? []
+    : [
+        {
+          code: "PERSISTED_SUPPLIER_LANES_NOT_COMPLETE",
+          message: `Approved persisted supplier lanes do not cover every governed BOM SKU. Missing=${persistedSupplierLanes.missingSkus.join(",") || "none"}. Supplier optimisation remains disabled.`,
+        },
+        ...persistedSupplierLanes.notices
+          .filter((notice) => notice.severity === "error")
+          .slice(0, 6)
+          .map((notice) => ({ code: notice.code, message: notice.message })),
+      ];
+  const adapterNotices = [...built.adapterNotices, ...routingDiscoveryNotices, ...supplierDiscoveryNotices];
 
   if (!built.packetBuild.valid || !built.packetBuild.packet) {
     const detail = built.packetBuild.issues.map((row) => `${row.code}: ${row.message}`).join(" · ");
