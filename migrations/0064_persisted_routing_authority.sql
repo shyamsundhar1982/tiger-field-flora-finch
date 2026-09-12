@@ -163,6 +163,9 @@ begin
   select * into v_revision from vyndi_routing_revisions where id=p_revision_id for update;
   if not found then raise exception 'Routing revision % does not exist',p_revision_id; end if;
   if v_revision.status<>'approved' then raise exception 'Only approved routing revisions can be retired'; end if;
+  if nullif(trim(coalesce(p_actor_user_id,'')),'') is null or nullif(trim(coalesce(p_actor_role,'')),'') is null then
+    raise exception 'Routing retirement requires an attributed actor and role';
+  end if;
   if nullif(trim(coalesce(p_reason,'')),'') is null then raise exception 'Retirement requires a reason'; end if;
 
   update vyndi_routing_revisions
@@ -213,29 +216,58 @@ declare
   v_revision_id text;
   v_status text;
 begin
-  v_revision_id := coalesce(new.revision_id,old.revision_id);
+  if tg_op='DELETE' then
+    v_revision_id := old.revision_id;
+  else
+    v_revision_id := new.revision_id;
+  end if;
   select status into v_status from vyndi_routing_revisions where id=v_revision_id;
   if v_status='approved' then
     raise exception 'Operations of approved routing revision % are immutable; create a new revision instead',v_revision_id;
   end if;
-  return coalesce(new,old);
+  if tg_op='DELETE' then return old; end if;
+  return new;
 end;
 $$;
 
 drop trigger if exists trg_guard_vyndi_approved_routing_operation on vyndi_routing_operations;
 create trigger trg_guard_vyndi_approved_routing_operation
-before update or delete on vyndi_routing_operations
+before insert or update or delete on vyndi_routing_operations
 for each row execute function guard_vyndi_approved_routing_operation_mutation();
+
+create or replace function guard_vyndi_approved_routing_child_mutation()
+returns trigger language plpgsql as $$
+declare
+  v_operation_id text;
+  v_revision_id text;
+  v_status text;
+begin
+  if tg_op='DELETE' then
+    v_operation_id := old.operation_id;
+  else
+    v_operation_id := new.operation_id;
+  end if;
+  select o.revision_id,r.status into v_revision_id,v_status
+    from vyndi_routing_operations o
+    join vyndi_routing_revisions r on r.id=o.revision_id
+   where o.id=v_operation_id;
+  if v_status='approved' then
+    raise exception 'Routing child records of approved revision % are immutable; create a new revision instead',v_revision_id;
+  end if;
+  if tg_op='DELETE' then return old; end if;
+  return new;
+end;
+$$;
 
 drop trigger if exists trg_guard_vyndi_approved_routing_resource on vyndi_routing_operation_resources;
 create trigger trg_guard_vyndi_approved_routing_resource
 before insert or update or delete on vyndi_routing_operation_resources
-for each row execute function guard_vyndi_approved_routing_operation_mutation();
+for each row execute function guard_vyndi_approved_routing_child_mutation();
 
 drop trigger if exists trg_guard_vyndi_approved_routing_predecessor on vyndi_routing_operation_predecessors;
 create trigger trg_guard_vyndi_approved_routing_predecessor
 before insert or update or delete on vyndi_routing_operation_predecessors
-for each row execute function guard_vyndi_approved_routing_operation_mutation();
+for each row execute function guard_vyndi_approved_routing_child_mutation();
 
 create or replace view vyndi_approved_routing_operations as
 select
