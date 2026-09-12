@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { IntegratedPlanningResult } from "./integrated-business-planning-engine.ts";
 import type { RuntimeIbpeInput } from "./ibpe-runtime-parity.ts";
-import { prepareAdvancedOptimizerEnvelope } from "./advanced-optimizer-preparation.ts";
+import {
+  prepareAdvancedOptimizerEnvelope,
+  prepareFrozenAdvancedOptimizerEnvelope,
+} from "./advanced-optimizer-preparation.ts";
 
 const lineage = {
   sourceSnapshotId: "IBPE-EXACT-1",
@@ -131,6 +134,8 @@ test("complete exact governed evidence produces a solver-ready preparation envel
   assert.equal(prepared.readyForGovernedOptimization, true);
   assert.equal(prepared.lineage.sourceSnapshotId, lineage.sourceSnapshotId);
   assert.equal(prepared.evidence.sourceInputHash, lineage.sourceInputHash);
+  assert.equal(prepared.authority.capacityAuthority, "approved-frozen-evidence");
+  assert.deepEqual(prepared.evidence.capacitySourceRefs, ["CAPACITY-APPROVED"]);
   assert.equal(prepared.authority.routingAuthority, "approved-persisted");
   assert.equal(prepared.authority.supplierLaneAuthority, "approved-persisted");
   assert.equal(prepared.model.supplierLanes.length, 1);
@@ -172,4 +177,32 @@ test("source lineage is carried atomically into both model packet and cash evide
   assert.equal(prepared.evidence.sourceSnapshotId, prepared.lineage.sourceSnapshotId);
   assert.equal(prepared.evidence.sourceSha, prepared.lineage.sourceSha);
   assert.equal(prepared.evidence.cashSourceRef, `${lineage.sourceSnapshotId}:${lineage.sourceInputHash}:CASH`);
+});
+
+test("frozen model and authority can prepare optimization without re-reading mutable planning standards", () => {
+  const original = prepare();
+  const frozen = prepareFrozenAdvancedOptimizerEnvelope({
+    lineage,
+    result: result(),
+    model: original.model,
+    authority: original.authority,
+    packetId: original.packetId,
+  });
+  assert.equal(frozen.readyForGovernedOptimization, true);
+  assert.strictEqual(frozen.model, original.model);
+  assert.deepEqual(frozen.evidence.persistedRoutingRevisionIds, ["ROUTE-CARBON-R1"]);
+  assert.deepEqual(frozen.evidence.persistedSupplierLaneRevisionIds, ["SUP-A:FRAME-CARBON-M:R1"]);
+});
+
+test("frozen capacity evidence must show approval at packet creation", () => {
+  const original = prepare();
+  const frozen = prepareFrozenAdvancedOptimizerEnvelope({
+    lineage,
+    result: result(),
+    model: original.model,
+    authority: { ...original.authority, capacityAuthority: "not-approved" },
+    packetId: original.packetId,
+  });
+  assert.equal(frozen.readyForGovernedOptimization, false);
+  assert.ok(frozen.issues.some((row) => row.code === "CAPACITY_AUTHORITY_NOT_APPROVED"));
 });
