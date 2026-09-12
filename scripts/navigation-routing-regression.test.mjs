@@ -19,36 +19,41 @@ const controlTower = read("src/routes/command/control-tower.tsx");
 const managementIntelligence = read("src/routes/command/management-intelligence.tsx");
 const ibpeWorkspaceRoute = read("src/routes/command/ibpe-operating-workspace.tsx");
 const ibpeOperatingWorkspace = read("src/lib/ibpe-operating-workspace.ts");
+const ibpeProjection = read("src/components/ibpe-workspace-projection.tsx");
 
 test("command workspace exposes one canonical primary navigation layer", () => {
   assert.match(shellEntry, /export \{ CommandShell \} from "\.\/command-shell-v2"/);
   assert.match(shell, /<SiteHeader showNavigation=\{false\} brandHref="\/command" \/>/);
   assert.match(shell, /Operating workspaces/);
   assert.match(shell, /from "@\/lib\/operating-workflow"/);
+  assert.match(shell, /WORKSPACE_NAVIGATION/);
   assert.match(shell, /ClientLink/);
   assert.doesNotMatch(shell, /NavigationView/);
   assert.doesNotMatch(shell, /COMMAND_TABS/);
 });
 
-test("secondary reference, monitor, specialist and showcase functions remain discoverable", () => {
-  assert.match(shell, /More functions/);
-  assert.match(shell, /navigationGroups/);
-  for (const mode of ["understand", "observe", "operate", "showcase"])
-    assert.match(shell, new RegExp(`"${mode}"`));
+test("secondary functions inherit workspace ownership instead of a global mode bucket", () => {
+  assert.doesNotMatch(shell, /More functions/);
+  assert.doesNotMatch(shell, /navigationGroups/);
+  assert.doesNotMatch(shell, /MODE_LABEL/);
+  assert.doesNotMatch(shell, /PageMode/);
+  assert.match(shell, /const sections = WORKSPACE_NAVIGATION\[item\.id\]/);
+  assert.match(shell, /sections\.map\(\(section\)/);
 
   for (const route of [
-    "/command/epr-live",
-    "/command/receivables",
-    "/command/investor-board",
+    "/command/market-survey",
+    "/command/procurement",
+    "/command/manufacturing",
+    "/command/actuals",
+    "/command/finance-assumptions",
+    "/command/finance-control",
     "/command/epr-workflow",
     "/command/epr-execution",
-    "/command/payables",
+    "/command/epr-live",
+    "/command/qa-verification",
     "/command/legal-control",
-    "/command/investor-pitch",
-    "/command/investor-pitch-external",
-    "/command/platform-walkthrough",
-    "/command/demo-company",
-  ]) assert.match(metadata, new RegExp(route.replaceAll("/", "\\/")));
+    "/command/classification",
+  ]) assert.match(workflow, new RegExp(route.replaceAll("/", "\\/")));
 });
 
 test("public navigation can be suppressed inside Command and protected brand navigation stays client-side", () => {
@@ -98,7 +103,7 @@ test("IBPE Phase 1 workspace stays advisory and read-only", () => {
   assert.doesNotMatch(ibpeOperatingWorkspace, /delete from/i);
 });
 
-test("G1: one operating-workflow contract owns the primary taxonomy", () => {
+test("G1: one operating-workflow contract owns the primary taxonomy and nesting", () => {
   for (const label of [
     "Command",
     "Plan & Commercial",
@@ -110,6 +115,7 @@ test("G1: one operating-workflow contract owns the primary taxonomy", () => {
     "Admin",
   ]) assert.match(shell + workflow, new RegExp(label.replace(/[&]/g, "\\&")));
 
+  assert.match(workflow, /export const WORKSPACE_NAVIGATION/);
   assert.match(workflow, /export const PLAN_SALES_TABS/);
   assert.match(workflow, /export const ENGINEERING_TABS/);
   assert.match(workflow, /export const OPERATIONS_TABS/);
@@ -161,15 +167,19 @@ test("G2: workflow rail exposes the complete persisted-business journey on relev
   assert.match(shell, /WorkspaceTabs role=\{role\} routes=\{GOVERNANCE_TABS\}/);
 });
 
-test("G3: Supply & Operations is the actual execution hub, not only a renamed sidebar entry", () => {
+test("G3: Supply & Operations follows the execution sequence and does not front-load Dispatch", () => {
   assert.match(operations, /Operations · demand to quality execution/);
   assert.match(operations, /<h1[^>]*>Operations<\/h1>/);
   assert.doesNotMatch(operations, /<h1[^>]*>Supply & Production<\/h1>/);
+  assert.match(workflow, /label: "Overview"/);
+  assert.match(workflow, /label: "Inventory"/);
   assert.match(workflow, /label: "Requirements"/);
   assert.match(workflow, /label: "Purchase"/);
   assert.match(workflow, /label: "Receiving"/);
   assert.match(workflow, /label: "Build"/);
-  assert.match(workflow, /label: "Overview & Dispatch"/);
+  assert.match(workflow, /label: "Quality"/);
+  assert.doesNotMatch(workflow, /label: "Overview & Dispatch"/);
+  assert.match(workflow, /id: "dispatch"[\s\S]*label: "Dispatch"/);
   assert.match(operations, /Today's operating exceptions/);
   assert.match(operations, /Order-to-cash lineage/);
   assert.match(operations, /Operating controls/);
@@ -206,7 +216,8 @@ test("G5: People & Office is first-class, compact and Finance is downstream", ()
   assert.match(peopleOffice, /<details/);
   assert.match(peopleOffice, /table-auto/);
   assert.doesNotMatch(peopleOffice, /min-w-\[1100px\]/);
-  assert.match(workflow, /const PEOPLE_CONTEXT = new Set<string>\(\[PEOPLE_HOME\]\)/);
+  assert.match(workflow, /PEOPLE_CONTEXT = new Set<string>\(workspaceRoutes\("people-office"\)\)/);
+  assert.match(workflow, /"people-office": \[/);
   const financeTabs = workflow.slice(workflow.indexOf("FINANCE_TABS"), workflow.indexOf("GOVERNANCE_TABS"));
   assert.doesNotMatch(financeTabs, /people-office/);
 });
@@ -251,10 +262,13 @@ test("G8: high-volume touched lists are compact and progressively disclosed", ()
   assert.doesNotMatch(commandCentre, /min-w-\[52rem\]/);
 });
 
-test("G9: Command tools and legacy routes stay discoverable without competing as primary owners", () => {
+test("G9: Command tools are nested under Command while legacy routes remain compatibility-only", () => {
   for (const label of ["Action Inbox", "Control Tower", "VIBPE Workspace", "VIBPE Assurance"])
     assert.match(workflow, new RegExp(label));
-  assert.match(shell, /Command tools/);
+  assert.match(workflow, /command: \[/);
+  assert.match(shell, /WORKSPACE_NAVIGATION/);
+  assert.doesNotMatch(shell, /Command tools/);
+  assert.doesNotMatch(shell, /LEGACY_ROUTES/);
   for (const route of [
     "/command/phase-4",
     "/command/phase-5",
@@ -264,5 +278,30 @@ test("G9: Command tools and legacy routes stay discoverable without competing as
     "/command/production-jobcards",
     "/command/ops",
   ]) assert.match(workflow, new RegExp(route.replaceAll("/", "\\/")));
-  assert.match(shell, /LEGACY_ROUTES/);
+});
+
+test("G10: route ownership follows business parent rather than historical context", () => {
+  const planNavigation = workflow.slice(workflow.indexOf('"plan-sales": ['), workflow.indexOf("engineering: ["));
+  assert.match(planNavigation, /market-survey/);
+  assert.doesNotMatch(planNavigation, /finance-assumptions/);
+
+  const financeNavigation = workflow.slice(workflow.indexOf("finance: ["), workflow.indexOf("governance: ["));
+  assert.match(financeNavigation, /finance-assumptions/);
+  assert.match(financeNavigation, /finance-control/);
+
+  const governanceNavigation = workflow.slice(workflow.indexOf("governance: ["), workflow.indexOf("admin: ["));
+  for (const route of ["epr-workflow", "epr-execution", "epr-live", "qa-verification", "legal-control"])
+    assert.match(governanceNavigation, new RegExp(route));
+
+  const operationsNavigation = workflow.slice(workflow.indexOf("operations: ["), workflow.indexOf('"people-office": ['));
+  assert.match(operationsNavigation, /actuals/);
+});
+
+test("G11: VIBPE projects the same canonical workspace ownership as the shell", () => {
+  assert.match(ibpeProjection, /workspaceForRoute/);
+  assert.match(ibpeProjection, /Record<CanonicalWorkspaceId/);
+  assert.match(ibpeProjection, /"people-office": \{ label: "People & Office"/);
+  assert.match(ibpeProjection, /governance: \{ label: "Governance & Assurance"/);
+  assert.doesNotMatch(ibpeProjection, /routes:\s*\[/);
+  assert.doesNotMatch(ibpeProjection, /workspaceDomains\.find/);
 });

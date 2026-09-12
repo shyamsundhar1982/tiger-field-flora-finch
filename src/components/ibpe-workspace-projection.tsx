@@ -2,19 +2,25 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "@tanstack/react-router";
 import { IBPE_ENGINE_VERSION, getIbpeReadiness, getLatestIbpeRun, runGovernedIbpe, type IbpeReadiness, type IbpeRun } from "@/lib/ibpe-authority";
 import { IBPE_CORE_LABEL, VIBPE_COPILOT_LABEL } from "@/lib/ibpe-brand";
+import { workspaceForRoute, type CanonicalWorkspaceId } from "@/lib/operating-workflow";
 
-const workspaceDomains: Array<{ routes:string[]; label:string; domains:string[] }> = [
-  { routes:["/command/planning","/command/finance-assumptions","/command/scenarios"], label:"Planning", domains:["planning","demand","funding"] },
-  { routes:["/command/engineering","/command/product","/command/bom","/command/bom-control"], label:"Engineering", domains:["governance","supply"] },
-  { routes:["/command/operations","/command/procurement","/command/procurement-planning","/command/purchase-execution","/command/receiving","/command/inventory","/command/production","/command/manufacturing","/command/quality"], label:"Supply & Production", domains:["supply","inventory","procurement","capacity"] },
-  { routes:["/command/sales","/command/gtm","/command/market-survey"], label:"Commercial", domains:["demand","planning"] },
-  { routes:["/command/financial-cockpit","/command/finance","/command/cash","/command/payables","/command/receivables","/command/balance-sheet","/command/funding","/command/actuals"], label:"Finance", domains:["finance","funding","procurement"] },
-  { routes:["/command/governance","/command/master-data","/command/bom-inventory-mapping","/command/risk","/command/legal","/command/qa-verification","/command/actions"], label:"Governance", domains:["governance","planning","supply"] },
-  { routes:["/command","/command/control-tower","/command/decision-inbox","/command/founder-command","/command/decision-engine"], label:"Command", domains:["planning","demand","supply","inventory","procurement","capacity","finance","funding","governance"] },
-];
+const workspaceDomains: Record<CanonicalWorkspaceId, { label: string; domains: string[] }> = {
+  command: {
+    label: "Command",
+    domains: ["planning", "demand", "supply", "inventory", "procurement", "capacity", "finance", "funding", "governance"],
+  },
+  "plan-sales": { label: "Plan & Commercial", domains: ["planning", "demand", "funding"] },
+  engineering: { label: "Product & Engineering", domains: ["governance", "supply"] },
+  operations: { label: "Supply & Operations", domains: ["supply", "inventory", "procurement", "capacity"] },
+  "people-office": { label: "People & Office", domains: ["capacity", "finance", "governance"] },
+  finance: { label: "Finance", domains: ["finance", "funding", "procurement"] },
+  governance: { label: "Governance & Assurance", domains: ["governance", "planning", "supply"] },
+  admin: { label: "Admin", domains: ["governance"] },
+};
 
-function workspace(pathname:string) {
-  return workspaceDomains.find((entry) => entry.routes.some((route) => route === "/command" ? pathname === route : pathname === route || pathname.startsWith(`${route}/`))) ?? workspaceDomains[6];
+function workspace(pathname: string) {
+  const owner = workspaceForRoute(pathname) ?? "command";
+  return workspaceDomains[owner];
 }
 
 function isUsableRun(value: unknown): value is IbpeRun {
@@ -137,7 +143,7 @@ export function IbpeWorkspaceProjection() {
 
   return <div className="border-b border-border bg-surface/50 px-4 py-2 text-xs">
     <div className="mx-auto flex max-w-[1800px] flex-wrap items-center gap-x-3 gap-y-1">
-      <span className="font-semibold text-fg">{VIBPE_COPILOT_LABEL} · {IBPE_CORE_LABEL} · {current?.label ?? "Command"}</span>
+      <span className="font-semibold text-fg">{VIBPE_COPILOT_LABEL} · {IBPE_CORE_LABEL} · {current.label}</span>
       {run ? <>
         <span className="text-muted">R{run.approvedPlanRevision} · {run.inputHash.slice(0,8)} · {run.sourceSha.slice(0,7)}</span>
         <span className="text-muted">Health {run.result.summary.businessHealthScore}/100</span>
