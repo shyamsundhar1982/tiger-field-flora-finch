@@ -74,10 +74,16 @@ export function prepareAdvancedOptimizerEnvelope(
   for (const issue of built.packetBuild.issues) {
     issues.push({ severity: issue.severity, code: `PACKET_${issue.code}`, message: issue.message });
   }
-  for (const notice of built.adapterNotices) {
-    if (notice.severity === "error") {
-      issues.push({ severity: "error", code: `MODEL_${notice.code}`, message: notice.message });
-    }
+
+  const capacityAuthorityApproved =
+    source.capacityStandards.length > 0 &&
+    source.capacityStandards.every((row) => row.planningStatus === "approved");
+  if (!capacityAuthorityApproved) {
+    issues.push({
+      severity: "error",
+      code: "CAPACITY_AUTHORITY_NOT_APPROVED",
+      message: "Governed optimization requires non-empty approved capacity standards for finite resource availability.",
+    });
   }
 
   if (built.authority.routingAuthority !== "approved-persisted") {
@@ -111,6 +117,7 @@ export function prepareAdvancedOptimizerEnvelope(
 
   const readyForGovernedOptimization =
     built.packetBuild.valid &&
+    capacityAuthorityApproved &&
     built.authority.routingAuthority === "approved-persisted" &&
     built.authority.supplierLaneAuthority === "approved-persisted" &&
     cash.valid &&
