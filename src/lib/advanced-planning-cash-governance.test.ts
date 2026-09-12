@@ -46,6 +46,7 @@ function run(quantity: number): GovernedAdvancedOptimizationRun {
     governance: { advisoryOnly: true, mayCreateTransactions: false, humanApprovalRequiredForBusinessAction: true },
     baseline: {
       modelValid: true,
+      validationIssues: [],
       committedStatus: "feasible",
       totalStatus: "feasible",
       materials: [],
