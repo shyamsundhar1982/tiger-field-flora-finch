@@ -108,6 +108,16 @@ test("committed-demand feasibility uses exact live commitments, not reconciled p
   assert.match(operational, /broader reconciled planning shortage is intentionally not presented as committed-demand shortage/);
 });
 
+test("confirmed-order procurement priority bypasses the generic planning buy recommendation", () => {
+  assert.match(operational, /isCommittedProcurementPriorityQuestion/);
+  assert.match(operational, /committedProcurementPriorityAnswer/);
+  assert.match(operational, /protect\|shortage\|shortages/);
+  assert.match(operational, /where p\.net_committed_shortage > 0/);
+  assert.match(operational, /Most urgent exact shortages/);
+  assert.match(operational, /protects confirmed customer orders only/);
+  assert.match(operational, /36-month planning recommendation is a separate forecast-and-buffer procurement signal/);
+});
+
 test("supplier lookup resolves governed supplier, PO and price records", () => {
   assert.match(operational, /vyndi_suppliers/);
   assert.match(operational, /vyndi_purchase_orders/);
