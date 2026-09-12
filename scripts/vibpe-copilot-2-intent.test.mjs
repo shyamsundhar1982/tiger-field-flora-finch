@@ -96,6 +96,18 @@ test("operational reconciliation routes before generic IBPE assessment", () => {
   assert.match(operational, /issue_status = 'issued'/);
 });
 
+test("committed-demand feasibility uses exact live commitments, not reconciled planning shortage", () => {
+  assert.match(operational, /isCommittedDemandFeasibilityQuestion/);
+  assert.match(operational, /committedDemandFeasibilityAnswer/);
+  assert.match(operational, /where status='confirmed'/);
+  assert.match(operational, /o\.revision=jc\.sales_order_revision/);
+  assert.match(operational, /sum\(committed_requirement\)/);
+  assert.match(operational, /sum\(net_committed_shortage\)/);
+  assert.match(operational, /open_po_qty/);
+  assert.match(operational, /component units/);
+  assert.match(operational, /broader reconciled planning shortage is intentionally not presented as committed-demand shortage/);
+});
+
 test("supplier lookup resolves governed supplier, PO and price records", () => {
   assert.match(operational, /vyndi_suppliers/);
   assert.match(operational, /vyndi_purchase_orders/);
