@@ -53,3 +53,32 @@ test("blank deployed database candidates preserve the local PGLite fallback", ()
     null,
   );
 });
+
+test("Better Auth uses the same Hyperdrive-aware deployed Postgres transport", async () => {
+  const authSource = await readFile(new URL("./auth/server.ts", import.meta.url), "utf8");
+
+  assert.match(authSource, /import \{ resolvePostgresTransport \} from "\.\.\/postgres-runtime"/);
+  assert.match(authSource, /const postgresTransport = await resolvePostgresTransport\(\)/);
+  assert.match(
+    authSource,
+    /new Pool\(requestSafePostgresPoolConfig\(postgresTransport\.connectionString\)\)/,
+  );
+  assert.doesNotMatch(
+    authSource,
+    /const database = databaseUrl\s*\?\s*new Pool/,
+    "Better Auth must not bypass Hyperdrive with DATABASE_URL",
+  );
+});
+
+test("runtime DB health probe exposes transport proof without database credentials", async () => {
+  const probeSource = await readFile(
+    new URL("../routes/api/runtime/db-health.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(probeSource, /requireBusinessActor\("view"\)/);
+  assert.match(probeSource, /source: transport\?\.source \?\? "pglite"/);
+  assert.match(probeSource, /select 1::int as probe/);
+  assert.doesNotMatch(probeSource, /connectionString\s*:/);
+  assert.doesNotMatch(probeSource, /DATABASE_URL/);
+});
