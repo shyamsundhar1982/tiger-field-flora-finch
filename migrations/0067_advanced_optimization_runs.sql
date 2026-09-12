@@ -1,7 +1,7 @@
 -- Persisted VYNDI mathematical-optimization evidence.
--- Advisory only: these records explain a solver run over one immutable advanced
--- planning packet. They never create or mutate Sales, Procurement, Inventory,
--- Production, Finance or Accounting transactions.
+-- Advisory only: every record explains a solver run over one immutable advanced
+-- planning packet. It never mutates Sales, Procurement, Inventory, Production,
+-- Finance or Accounting transaction truth.
 
 create table if not exists vyndi_advanced_optimization_runs (
   id text primary key,
@@ -69,6 +69,9 @@ begin
   if nullif(trim(coalesce(p_optimizer_id,'')),'') is null then raise exception 'Optimizer ID is required.'; end if;
   if nullif(trim(coalesce(p_optimizer_version,'')),'') is null then raise exception 'Optimizer version is required.'; end if;
   if nullif(trim(coalesce(p_optimizer_engine,'')),'') is null then raise exception 'Optimizer engine is required.'; end if;
+  if nullif(trim(coalesce(p_actor_user_id,'')),'') is null or nullif(trim(coalesce(p_actor_role,'')),'') is null then
+    raise exception 'Optimization persistence requires an attributed actor and role.';
+  end if;
   if p_solver_class not in ('lp','milp') then raise exception 'Optimization solver class must be lp or milp.'; end if;
   if p_optimization_status not in ('optimal','feasible','infeasible','indeterminate','error','blocked') then
     raise exception 'Unsupported optimization status %.',p_optimization_status;
@@ -143,11 +146,46 @@ begin
 end;
 $$;
 
+create or replace function guard_vyndi_advanced_optimization_run_mutation()
+returns trigger language plpgsql as $$
+begin
+  if old.status='invalidated' then
+    raise exception 'Invalidated optimization run % is immutable.',old.id;
+  end if;
+  if new.status<>'invalidated' then
+    raise exception 'Persisted optimization run % is immutable; only governed invalidation is allowed.',old.id;
+  end if;
+  if row(
+    new.id,new.parent_advanced_packet_id,new.request_id,new.contract_version,new.optimizer_id,new.optimizer_version,
+    new.optimizer_engine,new.solver_class,new.deterministic,new.accepted,new.optimization_status,new.objective_value,
+    new.request_json,new.governance_json,new.baseline_json,new.result_json,new.issues_json,new.created_by,new.created_role,new.created_at
+  ) is distinct from row(
+    old.id,old.parent_advanced_packet_id,old.request_id,old.contract_version,old.optimizer_id,old.optimizer_version,
+    old.optimizer_engine,old.solver_class,old.deterministic,old.accepted,old.optimization_status,old.objective_value,
+    old.request_json,old.governance_json,old.baseline_json,old.result_json,old.issues_json,old.created_by,old.created_role,old.created_at
+  ) then
+    raise exception 'Optimization evidence % cannot be edited during invalidation.',old.id;
+  end if;
+  if nullif(trim(coalesce(new.invalidated_by,'')),'') is null or new.invalidated_at is null or nullif(trim(coalesce(new.invalidation_reason,'')),'') is null then
+    raise exception 'Optimization invalidation requires actor, time and reason.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_guard_vyndi_advanced_optimization_run on vyndi_advanced_optimization_runs;
+create trigger trg_guard_vyndi_advanced_optimization_run
+before update on vyndi_advanced_optimization_runs
+for each row execute function guard_vyndi_advanced_optimization_run_mutation();
+
 create or replace function invalidate_vyndi_advanced_optimization_run(
   p_id text,p_reason text,p_actor_user_id text,p_actor_role text
 ) returns text language plpgsql as $$
 begin
   if nullif(trim(coalesce(p_reason,'')),'') is null then raise exception 'Optimization invalidation reason is required.'; end if;
+  if nullif(trim(coalesce(p_actor_user_id,'')),'') is null or nullif(trim(coalesce(p_actor_role,'')),'') is null then
+    raise exception 'Optimization invalidation requires an attributed actor and role.';
+  end if;
   update vyndi_advanced_optimization_runs
      set status='invalidated',invalidated_by=p_actor_user_id,invalidated_at=now(),invalidation_reason=p_reason
    where id=p_id and status='complete';
@@ -162,4 +200,4 @@ end;
 $$;
 
 comment on table vyndi_advanced_optimization_runs is
-  'Immutable-by-convention derived advisory mathematical-optimization evidence over one complete advanced planning packet. Persistence grants no transaction authority.';
+  'Immutable derived advisory mathematical-optimization evidence over one complete advanced planning packet. Persistence grants no transaction authority.';
