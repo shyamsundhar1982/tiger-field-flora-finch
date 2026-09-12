@@ -5,7 +5,7 @@ import {
   shouldSurfaceAdvancedPlanningEvidence,
   type AdvancedPlanningVibpeEvidence,
 } from "./advanced-planning-vibpe-evidence-format.ts";
-import { isGovernedOptimizerExecutionRequest } from "./vibpe-optimizer-copilot.ts";
+import { isGovernedOptimizerExecutionRequest } from "./vibpe-optimizer-intent.ts";
 
 function evidence(): AdvancedPlanningVibpeEvidence {
   return {
