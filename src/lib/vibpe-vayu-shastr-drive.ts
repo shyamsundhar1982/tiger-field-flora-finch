@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { assertSameSiteRequest } from "@/lib/auth/isolation.server";
 import { getCommandRole } from "@/lib/command-access";
@@ -43,8 +42,9 @@ type IndexedItem = DriveItem & {
   knowledgeTier: VayuDriveKnowledgeTier;
 };
 
-function hash(value: string) {
-  return createHash("sha256").update(value, "utf8").digest("hex");
+async function hash(value: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 function stripHtml(value: string) {
@@ -200,7 +200,7 @@ async function readText(item: IndexedItem, token: string) {
 async function persistDocument(item: IndexedItem, text: string | null, role: string) {
   const sql = await getSql();
   const normalized = (text ?? "").trim();
-  const contentHash = hash(normalized || JSON.stringify({
+  const contentHash = await hash(normalized || JSON.stringify({
     id: item.id,
     name: item.name,
     path: item.path,
