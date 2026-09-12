@@ -177,7 +177,7 @@ function WorkspaceTabs({
   if (accessible.length < 2) return null;
   return (
     <nav
-      className="mb-4 overflow-x-auto rounded-xl border border-border bg-surface/50 p-1 [scrollbar-width:thin]"
+      className="sticky top-14 z-20 mb-3 overflow-x-auto rounded-xl border border-border bg-bg/90 p-1 shadow-sm backdrop-blur-md [scrollbar-width:thin] lg:top-16"
       aria-label={label}
     >
       <div className="flex min-w-max gap-1">
@@ -189,7 +189,7 @@ function WorkspaceTabs({
               to={tab.to}
               active={active}
               className={cn(
-                "rounded-lg border border-transparent px-4 py-2 text-xs font-semibold transition-colors",
+                "rounded-lg border border-transparent px-3 py-1.5 text-[11px] font-semibold transition-colors xl:px-3.5 xl:py-2",
                 active
                   ? "border-accent/35 bg-accent/10 text-accent"
                   : "text-muted hover:bg-bg/60 hover:text-fg",
@@ -283,9 +283,9 @@ export function CommandShell() {
   return (
     <div className="min-h-dvh bg-bg">
       <SiteHeader showNavigation={false} brandHref="/command" />
-      <div className="mx-auto flex max-w-7xl">
-        <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-72 shrink-0 flex-col border-r border-border py-6 lg:flex">
-          <p className="px-5 pb-3 text-[10px] uppercase tracking-[0.2em] text-subtle">VINDY 2.0 · Operating System</p>
+      <div className="mx-auto flex w-full max-w-[1920px]">
+        <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-64 shrink-0 flex-col border-r border-border py-4 xl:w-68 2xl:w-72 lg:flex">
+          <p className="px-4 pb-2 text-[9px] uppercase tracking-[0.18em] text-subtle xl:px-5 xl:text-[10px]">VINDY 2.0 · Operating System</p>
           <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-4 pr-1 [scrollbar-width:thin]">
             <WorkspaceNavigation role={role} />
           </nav>
@@ -305,7 +305,7 @@ export function CommandShell() {
 
         <div className="min-w-0 flex-1">
           <MobileNavigation role={role} logout={logout} loggingOut={loggingOut} logoutError={logoutError} />
-          <div className="px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
+          <div className="px-3 py-4 sm:px-4 sm:py-5 lg:px-5 lg:py-5 xl:px-6 2xl:px-8 2xl:py-6">
             <WorkspaceTabs role={role} routes={PLAN_SALES_TABS} label="Plan and Commercial workspace" />
             <WorkspaceTabs role={role} routes={ENGINEERING_TABS} label="Product and Engineering workspace" />
             <WorkspaceTabs role={role} routes={OPERATIONS_TABS} label="Supply and Operations workspace" />
