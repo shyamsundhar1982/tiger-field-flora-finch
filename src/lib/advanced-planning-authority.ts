@@ -124,7 +124,7 @@ export const runAdvancedPlanningFromLatestIbpe = createServerFn({ method: "POST"
        $1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10::jsonb,$11,$12
      ) as id`,
     [
-      packet.id ?? packetId,
+      packet.packetId,
       source.id,
       packet.packetVersion,
       packet.lineage.advancedModelVersion,
@@ -140,7 +140,7 @@ export const runAdvancedPlanningFromLatestIbpe = createServerFn({ method: "POST"
   );
 
   return {
-    id: rows[0]?.id ?? packetId,
+    id: rows[0]?.id ?? packet.packetId,
     parentIbpeRunId: source.id,
     packet,
     authority: built.authority,
