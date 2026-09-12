@@ -9,6 +9,7 @@ import {
   ADVANCED_PLANNING_MODEL_VERSION,
   type AdvancedPlanningConstraintModel,
   type PlanningObjectiveWeights,
+  type RoutingOperation,
   type SupplierLane,
 } from "./advanced-planning-constraints.ts";
 
@@ -30,6 +31,7 @@ export type AdvancedPlanningAdapterInput = {
     "demand" | "bom" | "inventory" | "receipts"
   >;
   capacityStandards: GovernedCapacityStandard[];
+  governedRoutingOperations?: RoutingOperation[];
   supplierLanes?: SupplierLane[];
   objectiveWeights: PlanningObjectiveWeights;
   committedDemandPriority: number;
@@ -150,7 +152,7 @@ export function compileAdvancedPlanningModel(
     sourceRef: standard.sourceRef,
   }));
 
-  const routingOperations = productIds.flatMap((productId) =>
+  const capacityDerivedRouting = productIds.flatMap((productId) =>
     standards.map((standard, index) => {
       const predecessor = index > 0 ? standards[index - 1] : undefined;
       return {
@@ -167,6 +169,26 @@ export function compileAdvancedPlanningModel(
       };
     }),
   );
+
+  const routingOperations = input.governedRoutingOperations?.length
+    ? [...input.governedRoutingOperations].sort(
+        (a, b) => a.productId.localeCompare(b.productId) || a.sequence - b.sequence || a.id.localeCompare(b.id),
+      )
+    : capacityDerivedRouting;
+
+  if (input.governedRoutingOperations?.length) {
+    notices.push({
+      code: "PERSISTED_ROUTING_AUTHORITY_COMPILED",
+      message:
+        "Approved persisted routing operations own operation sequence and resource eligibility; capacity standards continue to own finite resource availability.",
+    });
+  } else if (standards.length > 0) {
+    notices.push({
+      code: "ROUTING_DERIVED_FROM_CAPACITY_STANDARDS",
+      message:
+        "No approved persisted routing authority was supplied. Routing remains a provisional derivation from capacity standards.",
+    });
+  }
 
   if ((input.supplierLanes ?? []).length === 0) {
     notices.push({
