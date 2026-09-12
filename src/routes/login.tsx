@@ -1,5 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { LockKeyhole, Mail, ShieldCheck } from "lucide-react";
+import { FormEvent, MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from "react";
+import "../login-rev1.css";
 
 type LoginSearch = {
   returnTo?: string;
@@ -7,7 +9,9 @@ type LoginSearch = {
   created?: boolean;
 };
 
-type WelcomePhase = "idle" | "appear" | "disperse";
+type SceneControls = {
+  startWarp: () => Promise<void>;
+};
 
 export const Route = createFileRoute("/login")({
   validateSearch: (search: Record<string, unknown>): LoginSearch => ({
@@ -65,9 +69,27 @@ function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [granted, setGranted] = useState(false);
-  const [welcomePhase, setWelcomePhase] = useState<WelcomePhase>("idle");
+  const [bootMessage, setBootMessage] = useState<string | null>(null);
+  const [introVisible, setIntroVisible] = useState(true);
+  const [cinematic, setCinematic] = useState(false);
+  const [warping, setWarping] = useState(false);
   const sceneHostRef = useRef<HTMLDivElement>(null);
-  const travelSpeedRef = useRef(0.012);
+  const cardRef = useRef<HTMLFormElement>(null);
+  const sceneControlsRef = useRef<SceneControls | null>(null);
+
+  useEffect(() => {
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) {
+      setIntroVisible(false);
+      setCinematic(true);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setIntroVisible(false);
+      setCinematic(true);
+    }, 3300);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const host = sceneHostRef.current;
@@ -84,10 +106,9 @@ function LoginPage() {
 
         const container = sceneHostRef.current;
         const scene = new THREE.Scene();
-        scene.fog = new THREE.FogExp2(0x010208, 0.012);
-
-        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 400);
-        camera.position.set(0, 1.8, 28);
+        scene.fog = new THREE.FogExp2(0x030508, 0.02);
+        const camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 400);
+        camera.position.set(0, 3.4, 26);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -95,75 +116,292 @@ function LoginPage() {
         renderer.domElement.setAttribute("aria-hidden", "true");
         container.replaceChildren(renderer.domElement);
 
-        const resources: Array<{ dispose?: () => void }> = [];
+        scene.add(new THREE.AmbientLight(0x252b30, 1.35));
+        const keyLight = new THREE.PointLight(0xff7417, 1.55, 140);
+        keyLight.position.set(0, 16, 14);
+        scene.add(keyLight);
+        const rimLight = new THREE.PointLight(0x7fff00, 1.15, 160);
+        rimLight.position.set(-26, 4, -18);
+        scene.add(rimLight);
+        const fillLight = new THREE.PointLight(0xdff4ff, 0.55, 110);
+        fillLight.position.set(18, 8, 4);
+        scene.add(fillLight);
 
-        function createRing(innerRadius: number, outerRadius: number, particleCount: number, color: number, opacity: number) {
-          const positions = new Float32Array(particleCount * 3);
-          const colors = new Float32Array(particleCount * 3);
-          const colorObj = new THREE.Color(color);
-
-          for (let i = 0; i < particleCount; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const radius = innerRadius + Math.random() * (outerRadius - innerRadius);
-            const y = (Math.random() - 0.5) * 0.35;
-            positions[i * 3] = Math.cos(angle) * radius;
-            positions[i * 3 + 1] = y;
-            positions[i * 3 + 2] = Math.sin(angle) * radius;
-
-            const variation = 0.75 + Math.random() * 0.25;
-            colors[i * 3] = colorObj.r * variation;
-            colors[i * 3 + 1] = colorObj.g * variation;
-            colors[i * 3 + 2] = colorObj.b * variation;
+        function makeCarbonTexture(repX: number, repY: number) {
+          const size = 256;
+          const canvas = document.createElement("canvas");
+          canvas.width = canvas.height = size;
+          const context = canvas.getContext("2d");
+          if (!context) return null;
+          context.fillStyle = "#06080b";
+          context.fillRect(0, 0, size, size);
+          const cells = 8;
+          const cell = size / cells;
+          for (let row = 0; row < cells; row++) {
+            for (let col = 0; col < cells; col++) {
+              const horizontal = (row + col) % 2 === 0;
+              const gradient = horizontal
+                ? context.createLinearGradient(0, row * cell, 0, (row + 1) * cell)
+                : context.createLinearGradient(col * cell, 0, (col + 1) * cell, 0);
+              gradient.addColorStop(0, "#04060a");
+              gradient.addColorStop(0.42, "#1b2229");
+              gradient.addColorStop(0.55, "#343d45");
+              gradient.addColorStop(1, "#04060a");
+              context.fillStyle = gradient;
+              context.fillRect(col * cell, row * cell, cell, cell);
+              context.strokeStyle = "rgba(0,0,0,.5)";
+              context.lineWidth = 1;
+              for (let fiber = 1; fiber < 4; fiber++) {
+                context.beginPath();
+                if (horizontal) {
+                  context.moveTo(col * cell, row * cell + (fiber * cell) / 4);
+                  context.lineTo((col + 1) * cell, row * cell + (fiber * cell) / 4);
+                } else {
+                  context.moveTo(col * cell + (fiber * cell) / 4, row * cell);
+                  context.lineTo(col * cell + (fiber * cell) / 4, (row + 1) * cell);
+                }
+                context.stroke();
+              }
+            }
           }
-
-          const geometry = new THREE.BufferGeometry();
-          geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-          geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-          const material = new THREE.PointsMaterial({
-            size: 0.045,
-            vertexColors: true,
-            transparent: true,
-            opacity,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-            sizeAttenuation: true,
-          });
-          resources.push(geometry, material);
-          return new THREE.Points(geometry, material);
+          const sheen = context.createLinearGradient(0, 0, size, size);
+          sheen.addColorStop(0, "rgba(255,116,23,0)");
+          sheen.addColorStop(0.47, "rgba(255,116,23,.08)");
+          sheen.addColorStop(0.56, "rgba(127,255,0,.035)");
+          sheen.addColorStop(1, "rgba(127,255,0,0)");
+          context.fillStyle = sheen;
+          context.fillRect(0, 0, size, size);
+          const texture = new THREE.CanvasTexture(canvas);
+          texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+          texture.repeat.set(repX, repY);
+          texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+          return texture;
         }
 
-        const ringGroup = new THREE.Group();
-        ringGroup.rotation.x = 0.38;
-        ringGroup.add(createRing(6.5, 9.8, 9000, 0x66e0ff, 0.75));
-        ringGroup.add(createRing(11.2, 15.5, 11000, 0x44ccff, 0.65));
-        ringGroup.add(createRing(16.2, 19.5, 5000, 0x2288cc, 0.4));
-        scene.add(ringGroup);
+        const carbonBase = makeCarbonTexture(1, 1);
+        const carbonMaterial = (length: number) => {
+          const texture = carbonBase?.clone();
+          if (texture) {
+            texture.needsUpdate = true;
+            texture.repeat.set(Math.max(2, Math.round(length * 2.2)), Math.max(1, Math.round(length * 1.6)));
+          }
+          return new THREE.MeshPhysicalMaterial({
+            ...(texture ? { map: texture } : {}),
+            color: 0xbfc8d4,
+            roughness: 0.34,
+            metalness: 0.55,
+            clearcoat: 1,
+            clearcoatRoughness: 0.24,
+          });
+        };
 
-        const starGeo = new THREE.BufferGeometry();
-        const starPos = new Float32Array(1200 * 3);
-        for (let i = 0; i < starPos.length; i++) starPos[i] = (Math.random() - 0.5) * 300;
-        starGeo.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
-        const starMaterial = new THREE.PointsMaterial({
-          color: 0xaaccff,
-          size: 0.15,
+        const strandCount = 700;
+        const strandPositions = new Float32Array(strandCount * 6);
+        const strandSpeed = new Float32Array(strandCount);
+        const strandLength = new Float32Array(strandCount);
+        for (let i = 0; i < strandCount; i++) {
+          const x = (Math.random() - 0.5) * 180;
+          const y = (Math.random() - 0.5) * 70;
+          const z = (Math.random() - 0.5) * 120;
+          const length = 1.5 + Math.random() * 4;
+          strandPositions[i * 6] = x;
+          strandPositions[i * 6 + 1] = y;
+          strandPositions[i * 6 + 2] = z;
+          strandPositions[i * 6 + 3] = x + length;
+          strandPositions[i * 6 + 4] = y;
+          strandPositions[i * 6 + 5] = z;
+          strandSpeed[i] = 0.25 + Math.random() * 0.9;
+          strandLength[i] = length;
+        }
+        const strandGeometry = new THREE.BufferGeometry();
+        strandGeometry.setAttribute("position", new THREE.BufferAttribute(strandPositions, 3));
+        const strandMaterial = new THREE.LineBasicMaterial({ color: 0x64717a, transparent: true, opacity: 0.44 });
+        const strands = new THREE.LineSegments(strandGeometry, strandMaterial);
+        scene.add(strands);
+
+        const sheetGeometry = new THREE.PlaneGeometry(44, 9, 140, 10);
+        const sheetBase = sheetGeometry.attributes.position.array.slice();
+        const sheetTexture = carbonBase?.clone();
+        if (sheetTexture) {
+          sheetTexture.needsUpdate = true;
+          sheetTexture.repeat.set(12, 2);
+        }
+        const sheetMaterial = new THREE.MeshPhysicalMaterial({
+          ...(sheetTexture ? { map: sheetTexture } : {}),
+          color: 0xaeb9c6,
+          roughness: 0.32,
+          metalness: 0.58,
+          clearcoat: 1,
+          side: THREE.DoubleSide,
           transparent: true,
-          opacity: 0.6,
+          opacity: 0.93,
         });
-        resources.push(starGeo, starMaterial);
-        scene.add(new THREE.Points(starGeo, starMaterial));
+        const sheet = new THREE.Mesh(sheetGeometry, sheetMaterial);
+        sheet.position.set(0, 2.2, 9);
+        scene.add(sheet);
 
-        let travelProgress = 0;
+        const bike = new THREE.Group();
+        const tube = (p1: any, p2: any, radius: number, material?: any) => {
+          const direction = new THREE.Vector3().subVectors(p2, p1);
+          const length = direction.length();
+          const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, length, 20, 1), material ?? carbonMaterial(length));
+          mesh.position.copy(p1).add(p2).multiplyScalar(0.5);
+          mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+          bike.add(mesh);
+          return mesh;
+        };
+        const vector = (x: number, y: number, z = 0) => new THREE.Vector3(x, y, z);
+        const bb = vector(0, 0);
+        const ht = vector(1.1, 1.3);
+        const hb = vector(1, 1.02);
+        const st = vector(-0.22, 1.42);
+        const rearAxle = vector(-1.38, 0);
+        const frontAxle = vector(1.62, 0);
+        tube(bb, st, 0.055);
+        tube(ht, st, 0.05);
+        tube(hb, bb, 0.068);
+        tube(hb, ht, 0.075);
+        tube(vector(0, 0, -0.06), vector(-1.38, 0, -0.06), 0.032);
+        tube(vector(0, 0, 0.06), vector(-1.38, 0, 0.06), 0.032);
+        tube(vector(-0.22, 1.42, -0.06), vector(-1.38, 0, -0.06), 0.026);
+        tube(vector(-0.22, 1.42, 0.06), vector(-1.38, 0, 0.06), 0.026);
+        tube(vector(1, 1.02, -0.07), vector(1.62, 0, -0.07), 0.038);
+        tube(vector(1, 1.02, 0.07), vector(1.62, 0, 0.07), 0.038);
+        tube(st, vector(-0.26, 1.6), 0.028);
+        tube(ht, vector(1.18, 1.48), 0.03);
+        tube(vector(1.18, 1.48, -0.3), vector(1.18, 1.48, 0.3), 0.026);
+
+        const ghostMaterial = new THREE.MeshBasicMaterial({ color: 0xff7417, wireframe: true, transparent: true, opacity: 0.09 });
+        tube(bb, st, 0.075, ghostMaterial);
+        tube(ht, st, 0.068, ghostMaterial);
+        tube(hb, bb, 0.086, ghostMaterial);
+
+        const addWheel = (axle: any) => {
+          const wheel = new THREE.Group();
+          wheel.position.copy(axle);
+          const rim = new THREE.Mesh(
+            new THREE.TorusGeometry(0.72, 0.045, 14, 60),
+            new THREE.MeshStandardMaterial({ color: 0x141a22, metalness: 0.9, roughness: 0.28 }),
+          );
+          wheel.add(rim);
+          bike.add(wheel);
+          return wheel;
+        };
+        const frontWheel = addWheel(frontAxle);
+        const rearWheel = addWheel(rearAxle);
+        const platform = new THREE.Mesh(
+          new THREE.CylinderGeometry(2.5, 2.7, 0.1, 48),
+          new THREE.MeshPhysicalMaterial({ color: 0x20272d, roughness: 0.35, metalness: 0.62, clearcoat: 1 }),
+        );
+        platform.position.y = -0.85;
+        bike.add(platform);
+        const platformRing = new THREE.Mesh(
+          new THREE.TorusGeometry(2.6, 0.02, 8, 80),
+          new THREE.MeshBasicMaterial({ color: 0x7fff00, transparent: true, opacity: 0.48 }),
+        );
+        platformRing.rotation.x = Math.PI / 2;
+        platformRing.position.y = -0.79;
+        bike.add(platformRing);
+        bike.position.set(0, 0.95, -0.5);
+        bike.rotation.y = -0.5;
+        scene.add(bike);
+
+        let mode: "terminal" | "warp" = "terminal";
+        let strandBoost = 1;
+        let mouseX = 0;
+        let mouseY = 0;
+        let targetMouseX = 0;
+        let targetMouseY = 0;
+        let last = performance.now();
+        let warpStart = 0;
+        let resolveWarp: (() => void) | null = null;
         const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-        const animate = () => {
+        const pointerMove = (event: globalThis.MouseEvent) => {
+          targetMouseX = (event.clientX / window.innerWidth - 0.5) * 2;
+          targetMouseY = (event.clientY / window.innerHeight - 0.5) * 2;
+        };
+        window.addEventListener("mousemove", pointerMove);
+
+        sceneControlsRef.current = {
+          startWarp: () => {
+            if (reducedMotion) return Promise.resolve();
+            mode = "warp";
+            strandBoost = 15;
+            warpStart = performance.now();
+            return new Promise<void>((resolve) => {
+              resolveWarp = resolve;
+            });
+          },
+        };
+
+        const animate = (now: number) => {
           if (disposed) return;
-          if (!reducedMotion) raf = requestAnimationFrame(animate);
-          ringGroup.rotation.y += reducedMotion ? 0 : 0.0009;
-          travelProgress += reducedMotion ? 0 : travelSpeedRef.current;
-          camera.position.z = 28 - travelProgress * 1.15;
-          camera.position.y = 1.8 + Math.sin(travelProgress * 0.3) * 0.45;
-          camera.lookAt(0, 0, camera.position.z - 14);
-          camera.rotation.z = Math.sin(travelProgress * 0.22) * 0.05;
+          raf = requestAnimationFrame(animate);
+          const dt = Math.min((now - last) / 1000, 0.05);
+          last = now;
+          const time = now / 1000;
+          mouseX += (targetMouseX - mouseX) * 0.05;
+          mouseY += (targetMouseY - mouseY) * 0.05;
+
+          if (!reducedMotion) {
+            for (let i = 0; i < strandCount; i++) {
+              let x = strandPositions[i * 6] + strandSpeed[i] * strandBoost;
+              if (x > 90) {
+                x = -90;
+                const y = (Math.random() - 0.5) * 70;
+                const z = (Math.random() - 0.5) * 120;
+                strandPositions[i * 6 + 1] = y;
+                strandPositions[i * 6 + 4] = y;
+                strandPositions[i * 6 + 2] = z;
+                strandPositions[i * 6 + 5] = z;
+              }
+              strandPositions[i * 6] = x;
+              strandPositions[i * 6 + 3] = x + strandLength[i];
+            }
+            strandGeometry.attributes.position.needsUpdate = true;
+
+            const position = sheetGeometry.attributes.position;
+            for (let i = 0; i < position.count; i++) {
+              const baseX = sheetBase[i * 3];
+              const baseY = sheetBase[i * 3 + 1];
+              const angle = baseX * 0.22 + time * 0.7;
+              position.array[i * 3 + 1] = baseY * Math.cos(angle);
+              position.array[i * 3 + 2] = baseY * Math.sin(angle) * 0.8;
+            }
+            position.needsUpdate = true;
+            sheetGeometry.computeVertexNormals();
+            sheet.rotation.z = Math.sin(time * 0.18) * 0.08;
+            bike.position.y = 0.95 + Math.sin(time * 0.9) * 0.05;
+            frontWheel.rotation.z -= dt * 2.2;
+            rearWheel.rotation.z -= dt * 2.2;
+            platformRing.material.opacity = 0.34 + Math.sin(time * 2.2) * 0.18;
+            keyLight.intensity = 1.45 + Math.sin(time * 2.1) * 0.24;
+          }
+
+          if (mode === "terminal") {
+            const targetX = mouseX * 3.5 + Math.sin(time * 0.12) * 1.1;
+            const targetY = 3.4 - mouseY * 2.2;
+            camera.position.x += (targetX - camera.position.x) * 0.05;
+            camera.position.y += (targetY - camera.position.y) * 0.05;
+            camera.position.z += (26 - camera.position.z) * 0.05;
+            camera.fov += (62 - camera.fov) * 0.12;
+            camera.lookAt(0, 1.9, -4);
+          } else {
+            const elapsed = Math.min((now - warpStart) / 1150, 1);
+            const eased = elapsed * elapsed * elapsed;
+            camera.position.set(0, 3.4 - eased * 1.25, 26 - eased * 20.4);
+            camera.fov = 62 + eased * 40;
+            camera.lookAt(0, 1.4, -8);
+            sheet.position.z = 9 - eased * 5.5;
+            if (elapsed >= 1 && resolveWarp) {
+              const resolve = resolveWarp;
+              resolveWarp = null;
+              resolve();
+            }
+          }
+
+          camera.updateProjectionMatrix();
           renderer.render(scene, camera);
         };
 
@@ -174,18 +412,26 @@ function LoginPage() {
         };
 
         window.addEventListener("resize", resize);
-        animate();
+        raf = requestAnimationFrame(animate);
 
         cleanup = () => {
+          sceneControlsRef.current = null;
+          window.removeEventListener("mousemove", pointerMove);
           window.removeEventListener("resize", resize);
           cancelAnimationFrame(raf);
-          for (const resource of resources) resource.dispose?.();
+          scene.traverse((object: any) => {
+            object.geometry?.dispose?.();
+            if (Array.isArray(object.material)) object.material.forEach((material: any) => material.dispose?.());
+            else object.material?.dispose?.();
+          });
+          carbonBase?.dispose?.();
+          sheetTexture?.dispose?.();
           renderer.dispose();
           renderer.domElement.remove();
         };
       })
       .catch(() => {
-        // CSS background remains as a graceful fallback if the visual engine cannot load.
+        sceneControlsRef.current = { startWarp: () => Promise.resolve() };
       });
 
     return () => {
@@ -194,10 +440,30 @@ function LoginPage() {
     };
   }, []);
 
+  function beginCinematic() {
+    setIntroVisible(false);
+    setCinematic(true);
+  }
+
+  function tiltCard(event: ReactMouseEvent<HTMLFormElement>) {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const card = cardRef.current;
+    if (!card || busy || warping) return;
+    const rect = card.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / rect.width - 0.5;
+    const y = (event.clientY - rect.top) / rect.height - 0.5;
+    card.style.transform = `rotateY(${x * 8}deg) rotateX(${-y * 8}deg)`;
+  }
+
+  function resetCardTilt() {
+    if (cardRef.current) cardRef.current.style.transform = "rotateY(0deg) rotateX(0deg)";
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
     setError("");
+    setBootMessage("Verifying credentials");
 
     try {
       const { authClient } = await import("@/lib/auth/client");
@@ -212,7 +478,9 @@ function LoginPage() {
           },
         },
       );
+
       if (result.error) {
+        setBootMessage(null);
         setError(result.error.message ?? "Sign-in failed.");
         return;
       }
@@ -225,76 +493,138 @@ function LoginPage() {
 
       const destination = safeReturnTo(search.returnTo);
       setGranted(true);
-      setWelcomePhase("appear");
-      await new Promise((resolve) => window.setTimeout(resolve, 3200));
-      travelSpeedRef.current = 0.085;
-      setWelcomePhase("disperse");
-      await new Promise((resolve) => window.setTimeout(resolve, 1700));
+      setBootMessage("Clearance granted · session sealed");
+      await new Promise((resolve) => window.setTimeout(resolve, 520));
+      setBootMessage(null);
+      setWarping(true);
+      await (sceneControlsRef.current?.startWarp() ?? Promise.resolve());
+      await new Promise((resolve) => window.setTimeout(resolve, 120));
       await navigate({ to: destination as never });
     } catch (cause) {
       setGranted(false);
-      setWelcomePhase("idle");
-      travelSpeedRef.current = 0.012;
+      setWarping(false);
+      setBootMessage(null);
       setError(cause instanceof Error ? cause.message : "Sign-in failed.");
     } finally {
       setBusy(false);
     }
   }
 
+  const classes = ["vy-login", cinematic ? "is-cinematic" : "", granted ? "is-granted" : "", warping ? "is-warping" : ""]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <main className={`command-entry ${granted ? "command-entry--granted" : ""}`}>
-      <div ref={sceneHostRef} className="command-entry__scene" aria-hidden="true" />
-      <div className="command-entry__vignette" aria-hidden="true" />
+    <main className={classes}>
+      <div ref={sceneHostRef} className="vy-login__scene" aria-hidden="true" />
+      <div className="vy-login__vignette" aria-hidden="true" />
+      <div className="vy-login__scanlines" aria-hidden="true" />
+      <div className="vy-login__grain" aria-hidden="true" />
+      <div className="vy-login__bar vy-login__bar--top" aria-hidden="true" />
+      <div className="vy-login__bar vy-login__bar--bottom" aria-hidden="true" />
+      <div className="vy-login__warp" aria-hidden="true" />
+      <div className="vy-login__flash" aria-hidden="true" />
 
-      <div className="command-entry__hud command-entry__hud--top">
-        VYNDI <span>·</span> VĀYÚ SHASTR PRIVATE LIMITED
-      </div>
-
-      <section className="command-entry__panel" aria-label="VYNDI Command Centre sign in">
-        <p className="command-entry__eyebrow">COMMAND CENTRE</p>
-        <p className="command-entry__legal">VĀYÚ SHASTR PRIVATE LIMITED</p>
-        <h1>Authorised Entry</h1>
-        <p className="command-entry__intro">Authenticate your individual authority to enter the VYNDI operating system.</p>
-
-        {search.created ? (
-          <p className="command-entry__success">Account created successfully. Sign in with the new credentials to continue.</p>
-        ) : null}
-
-        <form onSubmit={submit} className="command-entry__form">
-          <label>
-            Email
-            <input
-              required
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-          </label>
-          <label>
-            Password
-            <input
-              required
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-          </label>
-          {error ? <p role="alert" className="command-entry__error">{error}</p> : null}
-          <button disabled={busy || granted}>
-            {granted ? "ACCESS GRANTED" : busy ? "AUTHORIZING…" : "AUTHORIZE ACCESS"}
-          </button>
-        </form>
-
-        <p className="command-entry__note">Individual authority · Session protected · RBAC enforced</p>
-        <Link to="/" className="command-entry__back">← Return to VYNDI</Link>
+      <section className={`vy-login__intro ${introVisible ? "" : "is-gone"}`} aria-label="VYNDI introduction">
+        <div className="vy-login__intro-company">VĀYÚ <strong>SHASTR</strong> PVT. LTD.</div>
+        <div className="vy-login__intro-sub">Advanced Carbon Composite Division</div>
+        <div className="vy-login__intro-brand">VYNDI</div>
+        <div className="vy-login__intro-tag">Wind — Rendered in Carbon</div>
+        <button type="button" className="vy-login__skip" onClick={beginCinematic}>Skip Intro</button>
       </section>
 
-      <div className={`command-entry__welcome ${welcomePhase === "appear" ? "appear" : ""} ${welcomePhase === "disperse" ? "disperse" : ""}`} aria-live="polite">
-        Welcome to the Command Centre
-        <span>Vāyú Shastr</span>
+      <div className="vy-login__corner vy-login__corner--tl" aria-hidden="true" />
+      <div className="vy-login__corner vy-login__corner--tr" aria-hidden="true" />
+      <div className="vy-login__corner vy-login__corner--bl" aria-hidden="true" />
+      <div className="vy-login__corner vy-login__corner--br" aria-hidden="true" />
+
+      <header className="vy-login__header">
+        <div className="vy-login__brand">
+          <div className="vy-login__brand-mark" aria-hidden="true"><span>VY</span></div>
+          <div className="vy-login__brand-copy">
+            <strong>VĀYÚ SHASTR</strong>
+            <small>Advanced Carbon Composite Division</small>
+          </div>
+        </div>
+        <div className="vy-login__status"><span className="vy-login__status-dot" />Governed System · Online</div>
+      </header>
+
+      <div className="vy-login__main">
+        <section className="vy-login__welcome" aria-label="VYNDI Command Centre">
+          <div className="vy-login__eyebrow">Secure Access · VYNDI Operating System</div>
+          <h1>WIND<span className="vy-login__tagline">— RENDERED IN CARBON —</span></h1>
+          <p className="vy-login__desc">
+            Enter the governed VYNDI business operating system for engineering, planning, supply and production, commercial, finance, and governance.
+          </p>
+          <div className="vy-login__metrics" aria-label="System scope">
+            <div className="vy-login__metric"><strong>36</strong><span>Month Master Plan</span></div>
+            <div className="vy-login__metric"><strong>7</strong><span>Core Workspaces</span></div>
+            <div className="vy-login__metric"><strong>RBAC</strong><span>Access Control</span></div>
+          </div>
+        </section>
+
+        <div className="vy-login__login-wrap">
+          <form
+            ref={cardRef}
+            onSubmit={submit}
+            onMouseMove={tiltCard}
+            onMouseLeave={resetCardTilt}
+            className="vy-login__card"
+            aria-label="VYNDI Command Centre sign in"
+          >
+            <div className="vy-login__card-tag">Controlled Access</div>
+            <h2>AUTHENTICATE</h2>
+            <p className="vy-login__card-sub">VYNDI Program Access</p>
+
+            {search.created ? <p className="vy-login__success">Account created successfully. Sign in with the new credentials.</p> : null}
+            {error ? <p role="alert" className="vy-login__error">{error}</p> : null}
+
+            <div className="vy-login__field">
+              <Mail aria-hidden="true" />
+              <input
+                id="vyndi-email"
+                required
+                type="email"
+                autoComplete="email"
+                placeholder=" "
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+              <label htmlFor="vyndi-email">Authorised Email</label>
+            </div>
+
+            <div className="vy-login__field">
+              <LockKeyhole aria-hidden="true" />
+              <input
+                id="vyndi-password"
+                required
+                type="password"
+                autoComplete="current-password"
+                placeholder=" "
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+              <label htmlFor="vyndi-password">Password</label>
+            </div>
+
+            <div className="vy-login__access-note"><span>Individual authority</span><span>RBAC enforced</span></div>
+
+            <button className="vy-login__launch" disabled={busy || warping} aria-busy={busy || warping}>
+              {granted ? "Clearance Granted" : busy ? "Authorizing" : "Authorize · Enter Command"}
+            </button>
+
+            <div className="vy-login__secure"><ShieldCheck aria-hidden="true" />Session protected · governed access</div>
+            <Link to="/" className="vy-login__back">Return to VYNDI</Link>
+          </form>
+        </div>
       </div>
+
+      {bootMessage ? (
+        <div className="vy-login__boot" role="status" aria-live="polite">
+          <div className="vy-login__boot-ring" aria-hidden="true" />
+          <p>{bootMessage}</p>
+        </div>
+      ) : null}
     </main>
   );
 }
