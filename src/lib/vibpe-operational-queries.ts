@@ -35,6 +35,26 @@ type CommittedGapRow = {
   net_committed_shortage: string | number;
 };
 
+type BusinessHealthRow = {
+  id: string;
+  approved_plan_revision: string | number;
+  created_at: string;
+  business_health_score: string | number;
+  expected_units: string | number;
+  committed_open_units: string | number;
+  shortage_sku_months: string | number;
+  capacity_shortfall_months: string | number;
+  recommended_procurement_lakh: string | number;
+  minimum_free_liquidity_lakh: string | number;
+  incremental_funding_need_lakh: string | number;
+};
+
+type BusinessFindingRow = {
+  severity: string;
+  title: string;
+  recommended_action: string;
+};
+
 type SupplierRow = {
   id: string;
   name: string;
@@ -66,6 +86,77 @@ type SupplierPriceRow = {
 
 const n = (value: string | number | null | undefined) => Number(value ?? 0);
 const close = (a: number, b: number) => Math.abs(a - b) < 0.0001;
+const moneyLakh = (value: string | number | null | undefined) => `₹${n(value).toFixed(1)}L`;
+
+function isBusinessHealthQuestion(question: string) {
+  return /\bbusiness\s+health\b/i.test(question);
+}
+
+async function businessHealthAnswer(sql: Sql) {
+  const [run] = await sql.query<BusinessHealthRow>(`
+    select id,
+           approved_plan_revision,
+           created_at::text,
+           coalesce((result_json->'summary'->>'businessHealthScore')::numeric,0) as business_health_score,
+           coalesce((result_json->'summary'->>'expectedUnits')::numeric,0) as expected_units,
+           coalesce((result_json->'summary'->>'committedOpenUnits')::numeric,0) as committed_open_units,
+           coalesce((result_json->'summary'->>'fulfillmentShortageSkuMonths')::numeric,0) as shortage_sku_months,
+           coalesce((result_json->'summary'->>'capacityShortfallMonths')::numeric,0) as capacity_shortfall_months,
+           coalesce((result_json->'summary'->>'totalRecommendedProcurementLakh')::numeric,0) as recommended_procurement_lakh,
+           coalesce((result_json->'summary'->>'minimumFreeLiquidityAfterRecommendationsLakh')::numeric,0) as minimum_free_liquidity_lakh,
+           coalesce((result_json->'funding'->>'incrementalFundingNeedLakh')::numeric,0) as incremental_funding_need_lakh
+      from vyndi_ibpe_runs
+     where status='complete'
+     order by created_at desc
+     limit 1
+  `);
+
+  if (!run) return "Business health is unavailable because no complete governed IBPE run exists.";
+
+  const findings = await sql.query<BusinessFindingRow>(`
+    with latest as (
+      select result_json
+        from vyndi_ibpe_runs
+       where status='complete'
+       order by created_at desc
+       limit 1
+    ), expanded as (
+      select finding->>'severity' as severity,
+             finding->>'title' as title,
+             finding->>'recommendedAction' as recommended_action,
+             case finding->>'severity'
+               when 'critical' then 0
+               when 'high' then 1
+               when 'medium' then 2
+               else 3
+             end as severity_rank
+        from latest,
+             lateral jsonb_array_elements(result_json->'findings') as finding
+    ), deduped as (
+      select title,recommended_action,min(severity_rank) as severity_rank,
+             (array_agg(severity order by severity_rank))[1] as severity
+        from expanded
+       where coalesce(title,'')<>''
+       group by title,recommended_action
+    )
+    select severity,title,coalesce(recommended_action,'') as recommended_action
+      from deduped
+     order by severity_rank,title
+     limit 4
+  `);
+
+  const top = findings.length
+    ? findings.map((finding) => `${finding.title}${finding.recommended_action ? ` — ${finding.recommended_action}` : ""}`).join(" ")
+    : "No governed findings are currently ranked.";
+
+  return [
+    `Business health: ${n(run.business_health_score).toFixed(0)}/100 across ${n(run.expected_units).toFixed(0)} expected units and ${n(run.committed_open_units).toFixed(0)} committed open units.`,
+    `Planning exposure: ${n(run.shortage_sku_months).toFixed(0)} reconciled supply shortage SKU-months; ${n(run.capacity_shortfall_months).toFixed(0)} capacity shortfall months; recommended procurement ${moneyLakh(run.recommended_procurement_lakh)}.`,
+    `Liquidity: minimum free liquidity after recommendations is ${moneyLakh(run.minimum_free_liquidity_lakh)}; incremental funding need is ${moneyLakh(run.incremental_funding_need_lakh)}.`,
+    `Highest-priority findings: ${top}`,
+    `Evidence: latest complete governed IBPE run R${n(run.approved_plan_revision).toFixed(0)} · ${run.id}. The supply-shortage count is a reconciled plan/commitment planning metric; exact committed-demand feasibility is assessed separately from live confirmed-order and job-card material evidence.`,
+  ].join("\n\n");
+}
 
 function isCommittedDemandFeasibilityQuestion(question: string) {
   const q = question.toLowerCase().replace(/\s+/g, " ").trim();
@@ -324,6 +415,7 @@ async function supplierAnswer(sql: Sql, question: string) {
 }
 
 export async function tryOperationalDataAnswer(sql: Sql, question: string) {
+  if (isBusinessHealthQuestion(question)) return businessHealthAnswer(sql);
   if (isCommittedDemandFeasibilityQuestion(question)) return committedDemandFeasibilityAnswer(sql);
   if (isOperationalReconciliationQuestion(question)) return reconciliationAnswer(sql);
   return supplierAnswer(sql, question);
