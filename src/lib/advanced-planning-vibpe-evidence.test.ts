@@ -4,7 +4,7 @@ import {
   formatAdvancedPlanningVibpeEvidence,
   shouldSurfaceAdvancedPlanningEvidence,
   type AdvancedPlanningVibpeEvidence,
-} from "./advanced-planning-vibpe-evidence.ts";
+} from "./advanced-planning-vibpe-evidence-format.ts";
 
 function evidence(): AdvancedPlanningVibpeEvidence {
   return {
