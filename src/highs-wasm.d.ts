@@ -1,9 +1,9 @@
-declare module "*.wasm?module" {
+declare module "*.wasm" {
   const wasmModule: WebAssembly.Module;
   export default wasmModule;
 }
 
-declare module "highs/runtime" {
+declare module "*.wasm?module" {
   const wasmModule: WebAssembly.Module;
   export default wasmModule;
 }
