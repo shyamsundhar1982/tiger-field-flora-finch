@@ -12,7 +12,7 @@ test("deployed PostgreSQL connections cannot be reused across Worker requests", 
   assert.equal(config.connectionTimeoutMillis, 10_000);
 
   const [databaseSource, authSource] = await Promise.all([
-    readFile(new URL("./db.ts", import.meta.url), "utf8"),
+    readFile(new URL("./db.server.ts", import.meta.url), "utf8"),
     readFile(new URL("./auth/server.ts", import.meta.url), "utf8"),
   ]);
 
