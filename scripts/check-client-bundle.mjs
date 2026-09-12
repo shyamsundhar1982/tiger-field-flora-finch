@@ -1,8 +1,18 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { extname, join, relative } from "node:path";
 
-const publicDir = join(process.cwd(), ".output", "public");
-const assetsDir = join(publicDir, "assets");
+const bundleLayouts = [
+  {
+    name: "cloudflare-vite",
+    publicDir: join(process.cwd(), "dist", "client"),
+    assetsDir: join(process.cwd(), "dist", "client", "assets"),
+  },
+  {
+    name: "nitro-legacy",
+    publicDir: join(process.cwd(), ".output", "public"),
+    assetsDir: join(process.cwd(), ".output", "public", "assets"),
+  },
+];
 const forbiddenName = /(pglite|initdb)/i;
 const forbiddenSource = /@electric-sql\/pglite|electric-sql__pglite/i;
 
@@ -17,15 +27,22 @@ async function walk(dir) {
   return files;
 }
 
-async function main() {
-  try {
-    await stat(assetsDir);
-  } catch {
-    throw new Error(
-      "Client bundle invariant cannot run because .output/public/assets is missing. Run the Vite build/typecheck before this gate.",
-    );
+async function resolveBundleLayout() {
+  for (const layout of bundleLayouts) {
+    try {
+      await stat(layout.assetsDir);
+      return layout;
+    } catch {
+      // Try the next supported Vite deployment layout.
+    }
   }
+  throw new Error(
+    "Client bundle invariant cannot run because neither dist/client/assets nor .output/public/assets exists. Run the Vite build/typecheck before this gate.",
+  );
+}
 
+async function main() {
+  const { name: layoutName, publicDir, assetsDir } = await resolveBundleLayout();
   const files = await walk(assetsDir);
   const violations = [];
   let totalBytes = 0;
@@ -58,7 +75,7 @@ async function main() {
     .join("; ");
 
   console.log(
-    `[client-bundle] ${files.length} public assets, ${(totalBytes / 1024 / 1024).toFixed(2)} MiB raw. Largest: ${largest || "none"}`,
+    `[client-bundle] layout=${layoutName}; ${files.length} public assets, ${(totalBytes / 1024 / 1024).toFixed(2)} MiB raw. Largest: ${largest || "none"}`,
   );
 
   if (violations.length) {
