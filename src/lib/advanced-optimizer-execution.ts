@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import highsWasm from "highs/build/highs.wasm?module";
+import highsWasm from "highs/runtime?module";
 import { requireBusinessActor } from "./business-actor.ts";
 import { getSql } from "./db.ts";
 import { loadPreparedAdvancedOptimizerEnvelope } from "./advanced-optimizer-authority.ts";
