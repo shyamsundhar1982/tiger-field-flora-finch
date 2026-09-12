@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getCommandRole } from "./command-access.ts";
 import { canPerform } from "./page-access.ts";
 import { requireBusinessActor } from "./business-actor.ts";
-import { getSql } from "./db.ts";
+import { getSql, type JsonValue, type SqlRow } from "./db.ts";
 import type { RuntimeIbpeInput } from "./ibpe-runtime-parity.ts";
 import { buildAdvancedPlanningFromGovernedIbpe } from "./advanced-planning-ibpe-bridge.ts";
 
@@ -14,9 +14,9 @@ export type PersistedAdvancedPlanningPacket = {
   sourceSha: string;
   sourceInputHash: string;
   sourceSnapshotAt: string;
-  packet: Record<string, unknown>;
-  authority: Record<string, unknown>;
-  adapterNotices: Array<Record<string, unknown>>;
+  packet: JsonValue;
+  authority: JsonValue;
+  adapterNotices: JsonValue;
   status: "complete" | "invalidated";
   createdAt: string;
 };
@@ -45,7 +45,7 @@ type CapacityStandardRow = {
   source_ref: string;
 };
 
-function mapPacket(row: Record<string, unknown>): PersistedAdvancedPlanningPacket {
+function mapPacket(row: SqlRow): PersistedAdvancedPlanningPacket {
   return {
     id: String(row.id),
     parentIbpeRunId: String(row.parent_ibpe_run_id),
@@ -54,9 +54,9 @@ function mapPacket(row: Record<string, unknown>): PersistedAdvancedPlanningPacke
     sourceSha: String(row.source_sha),
     sourceInputHash: String(row.source_input_hash),
     sourceSnapshotAt: String(row.source_snapshot_at),
-    packet: (row.packet_json ?? {}) as Record<string, unknown>,
-    authority: (row.authority_json ?? {}) as Record<string, unknown>,
-    adapterNotices: (row.adapter_notices_json ?? []) as Array<Record<string, unknown>>,
+    packet: row.packet_json ?? {},
+    authority: row.authority_json ?? {},
+    adapterNotices: row.adapter_notices_json ?? [],
     status: row.status as PersistedAdvancedPlanningPacket["status"],
     createdAt: String(row.created_at),
   };
@@ -153,7 +153,7 @@ export const getLatestAdvancedPlanningPacket = createServerFn({ method: "GET" })
   const role = await getCommandRole();
   if (!role || !canPerform(role, "view")) throw new Error("Advanced planning view permission denied.");
   const sql = await getSql();
-  const rows = await sql.query<Record<string, unknown>>(
+  const rows = await sql.query<SqlRow>(
     `select id,parent_ibpe_run_id,packet_version,advanced_model_version,source_sha,source_input_hash,
             source_snapshot_at::text,packet_json,authority_json,adapter_notices_json,status,created_at::text
        from vyndi_advanced_planning_packets
