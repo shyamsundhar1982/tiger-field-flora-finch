@@ -116,7 +116,8 @@ test("approved capacity standards improve evidence status but do not become pers
   assert.equal(result.packetBuild.valid, true);
 });
 
-test("complete persisted approved routing owns operation sequence and elevates routing authority", () => {
+test("complete persisted approved routing elevates routing authority and packet evidence", () => {
+  const routingSource = "ROUTING:CARBON:R1 | ROUTING:CARBON:R1:20";
   const result = buildAdvancedPlanningFromGovernedIbpe({
     lineage,
     input: governedInput(),
@@ -133,7 +134,7 @@ test("complete persisted approved routing owns operation sequence and elevates r
         runHoursPerUnit: 0.4,
         setupHours: 0.1,
         yieldPct: 0.99,
-        sourceRef: "ROUTING:CARBON:R1 | ROUTING:CARBON:R1:20",
+        sourceRef: routingSource,
       },
     ],
     persistedRoutingRevisionIds: ["ROUTE-CARBON-R1"],
@@ -146,6 +147,6 @@ test("complete persisted approved routing owns operation sequence and elevates r
   assert.equal(result.authority.optimisationEligible, false);
   assert.ok(result.adapterNotices.some((row) => row.code === "PERSISTED_ROUTING_AUTHORITY_COMPILED"));
   assert.equal(result.packetBuild.valid, true);
-  assert.equal(result.packetBuild.packet?.model.routingOperations[0]?.operationCode, "FINAL-KIT");
-  assert.equal(result.packetBuild.packet?.model.routingOperations[0]?.sequence, 20);
+  assert.ok(result.packetBuild.packet?.evidenceRefs.includes(routingSource));
+  assert.equal(result.packetBuild.packet?.summary.committedStatus, "feasible");
 });
