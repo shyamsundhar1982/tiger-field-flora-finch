@@ -5,7 +5,7 @@ import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { useEffect } from "react";
 import appCss from "../styles.css?url";
 
-const APP_NAME = "VINDY";
+const APP_NAME = "VYNDI";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -13,7 +13,7 @@ export const Route = createRootRoute({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: `${APP_NAME} · Vāyú Shastr Pvt Ltd` },
-      { name: "description", content: "VINDY by Vāyú Shastr Pvt Ltd — aerospace-grade carbon bicycles, designed in Coimbatore." },
+      { name: "description", content: "VYNDI by Vāyú Shastr Pvt Ltd — aerospace-grade carbon bicycles, designed in Coimbatore." },
       { name: "theme-color", content: "#0c0c0e" },
     ],
     links: [
@@ -29,6 +29,13 @@ export const Route = createRootRoute({
   component: Root,
 });
 
+function correctBrandCopy(value: string) {
+  return value
+    .replace(/VéLOXIS/gi, "VYNDI")
+    .replace(/\bVINDY\b/g, "VYNDI")
+    .replace(/\bVindy\b/g, "VYNDI");
+}
+
 function BrandMigration() {
   useEffect(() => {
     const migrate = () => {
@@ -37,11 +44,25 @@ function BrandMigration() {
       let node: Node | null;
       while ((node = walker.nextNode())) nodes.push(node as Text);
       for (const text of nodes) {
-        if (/véloxis|veloxis/i.test(text.nodeValue ?? "")) {
-          text.nodeValue = (text.nodeValue ?? "").replace(/VéLOXIS/gi, "VINDY").replace(/VELOXIS/gi, "VINDY").replace(/veloxis/gi, "VINDY");
-        }
+        const current = text.nodeValue ?? "";
+        const corrected = correctBrandCopy(current);
+        if (corrected !== current) text.nodeValue = corrected;
       }
-      document.title = "VINDY · Vāyú Shastr Pvt Ltd";
+
+      document.querySelectorAll<HTMLElement>("[aria-label],[title]").forEach((element) => {
+        for (const attribute of ["aria-label", "title"] as const) {
+          const current = element.getAttribute(attribute);
+          if (!current) continue;
+          const corrected = correctBrandCopy(current);
+          if (corrected !== current) element.setAttribute(attribute, corrected);
+        }
+      });
+      document.querySelectorAll<HTMLImageElement>("img[alt]").forEach((image) => {
+        const corrected = correctBrandCopy(image.alt);
+        if (corrected !== image.alt) image.alt = corrected;
+      });
+
+      document.title = "VYNDI · Vāyú Shastr Pvt Ltd";
     };
     migrate();
     const observer = new MutationObserver(migrate);
