@@ -3,6 +3,7 @@ import { useLocation } from "@tanstack/react-router";
 import { Bot, BrainCircuit, ChevronRight, FileSearch, Send, ShieldCheck, Sparkles, X } from "lucide-react";
 import { VIBPE_COPILOT_NAME } from "@/lib/ibpe-brand";
 import { askIbpeCopilot } from "@/lib/ibpe-copilot";
+import { getAdvancedPlanningVibpeEvidence } from "@/lib/advanced-planning-vibpe-evidence";
 import type { IbpeScenarioRequest } from "@/lib/ibpe-scenario-lab";
 import { askTraceabilityCopilot } from "@/lib/traceability-search";
 import { askVibpeGovernanceCopilot } from "@/lib/vibpe-governance-server";
@@ -95,14 +96,31 @@ export function IbpeCopilot() {
       }
 
       const response = await askIbpeCopilot({ data: { question: clean, scenario: scenario ?? undefined } });
+      let responseText = response.ok ? response.answer ?? "No analysis returned." : response.error ?? `${VIBPE_COPILOT_NAME} is unavailable.`;
+      let advancedPacketId: string | null = null;
+      if (response.ok && response.lineage && !response.scenarioId) {
+        try {
+          const advanced = await getAdvancedPlanningVibpeEvidence({
+            data: { parentIbpeRunId: response.lineage.governedRunId, question: clean },
+          });
+          if (advanced.handled && advanced.text && !responseText.includes("Advanced planning evidence (governed baseline):")) {
+            responseText = `${responseText}\n\n${advanced.text}`;
+            advancedPacketId = advanced.packetId;
+          }
+        } catch {
+          // Advanced-planning evidence is supplementary. Existing governed VIBPE
+          // remains available if the derived packet has not been deployed yet.
+        }
+      }
+
       setMessages((current) => [
         ...current,
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          text: response.ok ? response.answer ?? "No analysis returned." : response.error ?? `${VIBPE_COPILOT_NAME} is unavailable.`,
+          text: responseText,
           meta: response.lineage
-            ? `Governed R${response.lineage.approvedPlanRevision} · ${response.lineage.inputHash.slice(0, 8)}${response.scenarioId ? ` · scenario ${response.scenarioId}` : ""}`
+            ? `Governed R${response.lineage.approvedPlanRevision} · ${response.lineage.inputHash.slice(0, 8)}${response.scenarioId ? ` · scenario ${response.scenarioId}` : ""}${advancedPacketId ? " · advanced evidence linked" : ""}`
             : undefined,
         },
       ]);
