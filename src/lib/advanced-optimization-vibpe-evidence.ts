@@ -29,6 +29,12 @@ type OptimizationRunRow = {
   accepted: boolean;
   optimization_status: AdvancedOptimizationStatus | "blocked";
   objective_value: number | string | null;
+  cash_guardrail_status: "feasible" | "infeasible" | "indeterminate" | "not-evaluated" | null;
+  cash_guardrail_json: {
+    totalProposedProcurementLakh?: number;
+    firstBaselineBreachPeriod?: number;
+    firstProposedBreachPeriod?: number;
+  } | null;
   governance_json: {
     advisoryOnly?: boolean;
     mayCreateTransactions?: boolean;
@@ -49,6 +55,10 @@ function validStatus(value: unknown): value is AdvancedOptimizationStatus | "blo
   return value === "optimal" || value === "feasible" || value === "infeasible" || value === "indeterminate" || value === "error" || value === "blocked";
 }
 
+function validCashStatus(value: unknown): value is NonNullable<OptimizationRunRow["cash_guardrail_status"]> {
+  return value === "feasible" || value === "infeasible" || value === "indeterminate" || value === "not-evaluated";
+}
+
 export async function readAdvancedOptimizationVibpeEvidence(
   sql: Sql,
   parentAdvancedPacketId: string,
@@ -56,7 +66,7 @@ export async function readAdvancedOptimizationVibpeEvidence(
   const rows = await sql.query<OptimizationRunRow>(
     `select id,parent_advanced_packet_id,request_id,contract_version,optimizer_id,optimizer_version,
             optimizer_engine,solver_class,deterministic,accepted,optimization_status,objective_value,
-            governance_json,result_json,issues_json,created_at::text
+            cash_guardrail_status,cash_guardrail_json,governance_json,result_json,issues_json,created_at::text
        from vyndi_advanced_optimization_runs
       where status='complete' and parent_advanced_packet_id=$1
       order by created_at desc
@@ -73,6 +83,8 @@ export async function readAdvancedOptimizationVibpeEvidence(
     return null;
   }
   if (row.accepted && row.optimization_status !== "optimal" && row.optimization_status !== "feasible") return null;
+  if (row.cash_guardrail_status && !validCashStatus(row.cash_guardrail_status)) return null;
+  if (row.accepted && row.cash_guardrail_status && row.cash_guardrail_status !== "feasible") return null;
   if (row.result_json?.status && row.result_json.status !== row.optimization_status) return null;
 
   const objectiveValue = row.objective_value === null ? undefined : Number(row.objective_value);
@@ -90,6 +102,8 @@ export async function readAdvancedOptimizationVibpeEvidence(
     deterministic: row.deterministic,
     accepted: row.accepted,
     optimizationStatus: row.optimization_status,
+    cashGuardrailStatus: row.cash_guardrail_status ?? undefined,
+    cashGuardrail: row.cash_guardrail_json ?? undefined,
     objectiveValue,
     objectiveContributions: Array.isArray(row.result_json?.objectiveContributions) ? row.result_json.objectiveContributions : [],
     bindingConstraints: Array.isArray(row.result_json?.bindingConstraints) ? row.result_json.bindingConstraints : [],
