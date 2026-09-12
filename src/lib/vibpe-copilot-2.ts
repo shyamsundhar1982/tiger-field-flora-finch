@@ -30,6 +30,10 @@ function signedMoney(value: number) {
   return `${amount >= 0 ? "+" : "−"}₹${Math.abs(amount).toFixed(1)}L`;
 }
 
+function quantity(value: number) {
+  return Number(value || 0).toLocaleString("en-IN", { maximumFractionDigits: 1 });
+}
+
 function isKnowledgeQuestion(question: string) {
   const q = question.toLowerCase();
   const knowledgeTopic = /\b(fork|axle[-\s]?to[-\s]?crown|a[-\s]?c|geometry|clearance|tyre|tire|wheelbase|chainstay|head tube|bottom bracket|\bbb\b|t47|headset|crank|stack|reach|trail|offset|layup|laminate|carbon|prepreg|toray|t700|t800|t1100|fea|cfd|dossier|cad|iso 4210|bis|is 10613|quality|apqp|fai|ncr|rcca|traveller|router|warranty|consumer|legal metrology|dpdp|privacy|contract|\bip\b|patent|trademark|trade mark|employment|payroll|epf|labour code|anthropometr|bike fit|ride metric|ftp|vo2|max|spo2)\b/i.test(q);
@@ -136,6 +140,140 @@ function followUpAnswer(result: IntegratedPlanningResult) {
     return "No governed exception is currently ranked for follow-up. Review demand, materials, procurement, capacity and liquidity before changing the plan.";
   }
   return `Next actions: ${top.map((finding) => `${finding.title} — ${finding.recommendedAction}`).join(" ")} Advisory only; approvals remain in owning workspaces.`;
+}
+
+const severityRank = { critical: 0, high: 1, medium: 2, low: 3 } as const;
+
+function rankedFindings(result: IntegratedPlanningResult) {
+  return [...result.findings].sort((a, b) => severityRank[a.severity] - severityRank[b.severity]);
+}
+
+function topActions(result: IntegratedPlanningResult, limit = 4) {
+  return [...new Set(rankedFindings(result).map((finding) => finding.recommendedAction).filter(Boolean))].slice(0, limit);
+}
+
+function asksCommittedDemandFeasibility(question: string) {
+  const q = question.toLowerCase();
+  const committedDemand = /committed[^.?!]{0,30}demand|demand[^.?!]{0,30}committed/.test(q);
+  const feasibility = /\b(produc(?:e|ed|ible|tion)|make|made|build|built|fulfil|fulfill|deliver|meet|cover|feasible|possible)\b/.test(q);
+  return committedDemand && feasibility;
+}
+
+function committedDemandFeasibilityAnswer(result: IntegratedPlanningResult) {
+  const materialShortages = [...result.supply]
+    .filter((row) => row.committedFulfillmentShortageQty > 0)
+    .sort((a, b) => b.committedFulfillmentShortageQty - a.committedFulfillmentShortageQty);
+  const capacityShortfalls = [...result.capacity]
+    .filter((row) => row.shortfallUnits > 0)
+    .sort((a, b) => b.shortfallUnits - a.shortfallUnits);
+  const committedShortageQty = materialShortages.reduce((sum, row) => sum + row.committedFulfillmentShortageQty, 0);
+  const capacityShortfallUnits = capacityShortfalls.reduce((sum, row) => sum + row.shortfallUnits, 0);
+  const fullyCovered = materialShortages.length === 0 && capacityShortfalls.length === 0;
+  const lines = [
+    `Committed-demand feasibility: ${fullyCovered ? "FEASIBLE in the governed model" : "AT RISK / not fully demonstrated"}.`,
+    `Committed open demand is ${quantity(result.summary.committedOpenUnits)} units. Material coverage shows ${materialShortages.length} shortage SKU-month${materialShortages.length === 1 ? "" : "s"} affecting ${quantity(committedShortageQty)} units of committed requirement.`,
+    `Capacity shows ${result.summary.capacityShortfallMonths} shortfall month${result.summary.capacityShortfallMonths === 1 ? "" : "s"}${capacityShortfalls.length ? ` and ${quantity(capacityShortfallUnits)} aggregate modeled shortfall units` : ""}.`,
+  ];
+
+  if (materialShortages.length) {
+    lines.push(`Largest committed material gaps: ${materialShortages.slice(0, 5).map((row) => `${row.sku} M${row.period}: ${quantity(row.committedFulfillmentShortageQty)}`).join("; ")}.`);
+  }
+  if (capacityShortfalls.length) {
+    lines.push(`Largest capacity gaps: ${capacityShortfalls.slice(0, 4).map((row) => `${row.id} M${row.period}: ${quantity(row.shortfallUnits)} units`).join("; ")}.`);
+  }
+
+  const actions = topActions(result, 4);
+  if (actions.length) lines.push(`Required controlled actions: ${actions.join(" ")}`);
+  lines.push("Conclusion: VIBPE should not promise production of all committed demand while any committed material shortage or modeled capacity shortfall remains open. Advisory only; production release and commitments remain in their owning workspaces.");
+  return lines.join("\n\n");
+}
+
+function intentAnswer(intent: VibpeScenarioParse["intent"], question: string, result: IntegratedPlanningResult) {
+  if (asksCommittedDemandFeasibility(question)) return committedDemandFeasibilityAnswer(result);
+
+  const actions = topActions(result, 4);
+  const top = rankedFindings(result).slice(0, 4);
+
+  if (intent === "demand") {
+    const rows = [...result.demand]
+      .sort((a, b) => b.remainingDemandQty - a.remainingDemandQty || Math.abs(b.varianceToPlanQty) - Math.abs(a.varianceToPlanQty))
+      .slice(0, 5);
+    return [
+      `Demand assessment: ${quantity(result.summary.expectedUnits)} expected units, including ${quantity(result.summary.committedOpenUnits)} committed open units in the governed horizon.`,
+      rows.length ? `Largest demand positions: ${rows.map((row) => `${row.productId} M${row.period}: expected ${quantity(row.expectedTotalQty)}, committed ${quantity(row.committedQty)}, variance to plan ${quantity(row.varianceToPlanQty)}`).join("; ")}.` : "No demand rows are available in the governed packet.",
+      actions.length ? `Controlled next actions: ${actions.join(" ")}` : "No demand-related management action is currently ranked.",
+    ].join("\n\n");
+  }
+
+  if (intent === "materials") {
+    const shortages = [...result.supply]
+      .filter((row) => row.committedFulfillmentShortageQty > 0 || row.recommendedPurchaseQty > 0)
+      .sort((a, b) => b.committedFulfillmentShortageQty - a.committedFulfillmentShortageQty || b.recommendedPurchaseQty - a.recommendedPurchaseQty)
+      .slice(0, 6);
+    return [
+      `Materials assessment: ${result.summary.fulfillmentShortageSkuMonths} committed-supply shortage SKU-months are flagged.`,
+      shortages.length ? `Priority material positions: ${shortages.map((row) => `${row.sku} M${row.period}: committed shortage ${quantity(row.committedFulfillmentShortageQty)}, recommended buy ${quantity(row.recommendedPurchaseQty)}`).join("; ")}.` : "No committed material shortage or purchase recommendation is active in the governed packet.",
+      actions.length ? `Controlled next actions: ${actions.join(" ")}` : "No material action is currently ranked.",
+    ].join("\n\n");
+  }
+
+  if (intent === "procurement") {
+    const purchases = [...result.supply]
+      .filter((row) => row.recommendedPurchaseQty > 0)
+      .sort((a, b) => (b.purchaseCostLakh ?? 0) - (a.purchaseCostLakh ?? 0) || b.recommendedPurchaseQty - a.recommendedPurchaseQty)
+      .slice(0, 6);
+    return [
+      `Procurement assessment: recommended procurement is ${money(result.summary.totalRecommendedProcurementLakh)}.`,
+      purchases.length ? `Priority recommendations: ${purchases.map((row) => `${row.sku} M${row.period}: buy ${quantity(row.recommendedPurchaseQty)}${row.purchaseCostLakh != null ? ` (${money(row.purchaseCostLakh)})` : ""}${row.recommendationIsLate ? ", inside lead time" : ""}`).join("; ")}.` : "No purchase recommendation is active in the governed packet.",
+      actions.length ? `Controlled next actions: ${actions.join(" ")}` : "No procurement action is currently ranked.",
+    ].join("\n\n");
+  }
+
+  if (intent === "capacity") {
+    const rows = [...result.capacity]
+      .filter((row) => row.shortfallUnits > 0)
+      .sort((a, b) => b.shortfallUnits - a.shortfallUnits)
+      .slice(0, 6);
+    return [
+      `Capacity assessment: ${result.summary.capacityShortfallMonths} shortfall month${result.summary.capacityShortfallMonths === 1 ? "" : "s"} are flagged in the governed horizon.`,
+      rows.length ? `Largest capacity gaps: ${rows.map((row) => `${row.id} M${row.period}: required ${quantity(row.requiredUnits)}, available ${quantity(row.availableCapacityUnits)}, shortfall ${quantity(row.shortfallUnits)}`).join("; ")}.` : "No modeled capacity shortfall is active.",
+      actions.length ? `Controlled next actions: ${actions.join(" ")}` : "No capacity action is currently ranked.",
+    ].join("\n\n");
+  }
+
+  if (intent === "funding") {
+    const trough = [...result.cash].sort((a, b) => a.freeLiquidityAfterRecommendationsLakh - b.freeLiquidityAfterRecommendationsLakh)[0];
+    return [
+      `Funding assessment: minimum free liquidity after recommendations is ${money(result.summary.minimumFreeLiquidityAfterRecommendationsLakh)}${trough ? ` at M${trough.period}` : ""}.`,
+      `Incremental funding need is ${money(result.funding.incrementalFundingNeedLakh)}; first post-recommendation liquidity breach is ${result.funding.firstLiquidityBreachAfterRecommendationsPeriod ? `M${result.funding.firstLiquidityBreachAfterRecommendationsPeriod}` : "not present in the modeled horizon"}.`,
+      actions.length ? `Controlled next actions: ${actions.join(" ")}` : "No funding action is currently ranked.",
+    ].join("\n\n");
+  }
+
+  if (intent === "root-cause") {
+    return top.length
+      ? `Root-cause view: ${top.map((finding) => `${finding.title} — ${finding.problem} Impact: ${finding.businessImpact} Action: ${finding.recommendedAction}`).join("\n\n")}`
+      : "No governed exception is currently available for root-cause ranking.";
+  }
+
+  if (intent === "baseline" || intent === "assessment") {
+    return [
+      `Business health: ${result.summary.businessHealthScore}/100 across ${quantity(result.summary.expectedUnits)} expected units and ${quantity(result.summary.committedOpenUnits)} committed open units.`,
+      `Operational exposure: ${result.summary.fulfillmentShortageSkuMonths} committed-supply shortage SKU-months; ${result.summary.capacityShortfallMonths} capacity shortfall months; recommended procurement ${money(result.summary.totalRecommendedProcurementLakh)}.`,
+      `Liquidity: minimum free liquidity after recommendations is ${money(result.summary.minimumFreeLiquidityAfterRecommendationsLakh)}; incremental funding need is ${money(result.funding.incrementalFundingNeedLakh)}.`,
+      top.length ? `Highest-priority findings: ${top.map((finding) => `${finding.title} — ${finding.recommendedAction}`).join(" ")}` : "No governed findings are currently ranked.",
+    ].join("\n\n");
+  }
+
+  if (intent === "optimisation") {
+    return "Optimization intent detected. Use Command → VIBPE → Optimizer to execute the governed HiGHS operator surface against an exact immutable advanced-planning packet. Chat remains advisory and cannot auto-run the optimizer.";
+  }
+
+  if (intent === "navigation") {
+    return "Navigation request detected. VIBPE can identify the owning workspace, but protected business actions still require the relevant workspace and human confirmation.";
+  }
+
+  return undefined;
 }
 
 async function resolvePriorScenario(
@@ -273,6 +411,7 @@ export async function runVibpeCopilot2(
     };
   }
 
+  const answer = intentAnswer(parsed.intent, question, governedBaseline);
   updateVibpeSession(sessionKey, {
     referencedProducts: parsed.referencedProducts,
     lastIntent: parsed.intent,
@@ -280,7 +419,7 @@ export async function runVibpeCopilot2(
   });
   return {
     intent: parsed.intent,
-    scenario: priorScenario,
+    answer,
     doctrine: vibpeBusinessOperatorContext(),
     advisoryOnly: true,
   };
