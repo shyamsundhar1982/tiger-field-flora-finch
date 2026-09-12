@@ -63,6 +63,7 @@ function readPacketLineage(value: unknown): PersistedPacketLineage | null {
     !sourceEngineVersion ||
     !approvedPlanId ||
     !advancedModelVersion ||
+    typeof approvedPlanRevision !== "number" ||
     !Number.isInteger(approvedPlanRevision)
   ) {
     return null;
@@ -74,7 +75,7 @@ function readPacketLineage(value: unknown): PersistedPacketLineage | null {
     sourceInputHash,
     sourceEngineVersion,
     approvedPlanId,
-    approvedPlanRevision: Number(approvedPlanRevision),
+    approvedPlanRevision,
     advancedModelVersion,
   };
 }
@@ -83,6 +84,7 @@ function isFrozenModel(value: unknown): value is AdvancedPlanningConstraintModel
   if (!isRecord(value)) return false;
   return (
     typeof value.modelVersion === "string" &&
+    typeof value.horizonPeriods === "number" &&
     Number.isInteger(value.horizonPeriods) &&
     Array.isArray(value.demands) &&
     Array.isArray(value.bom) &&
