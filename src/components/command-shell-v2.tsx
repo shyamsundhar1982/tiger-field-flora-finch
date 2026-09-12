@@ -1,17 +1,10 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import {
   Activity,
-  AlertTriangle,
-  BookOpen,
-  Boxes,
-  ChevronDown,
-  ClipboardCheck,
   DraftingCompass,
   Factory,
   LineChart,
   LogOut,
-  Presentation,
-  Scale,
   Settings2,
   ShieldCheck,
   UsersRound,
@@ -28,7 +21,6 @@ import {
   ADMIN_TABS,
   COMMAND_CONTEXT,
   COMMAND_HOME,
-  COMMAND_SHORTCUTS,
   ENGINEERING_CONTEXT,
   ENGINEERING_HOME,
   ENGINEERING_TABS,
@@ -38,7 +30,6 @@ import {
   GOVERNANCE_CONTEXT,
   GOVERNANCE_HOME,
   GOVERNANCE_TABS,
-  LEGACY_ROUTES,
   OPERATIONS_CONTEXT,
   OPERATIONS_HOME,
   OPERATIONS_TABS,
@@ -47,15 +38,10 @@ import {
   PLAN_HOME,
   PLAN_SALES_CONTEXT,
   PLAN_SALES_TABS,
+  WORKSPACE_NAVIGATION,
   workspaceForRoute,
 } from "@/lib/operating-workflow";
-import { canAccessPage, canAccessRoute, type CommandRole } from "@/lib/page-access";
-import {
-  navigationGroups,
-  type PageDomain,
-  type PageMode,
-  type RouteMeta,
-} from "@/lib/page-metadata";
+import { canAccessRoute, type CommandRole } from "@/lib/page-access";
 import { cn } from "@/lib/utils";
 
 const WORKSPACES = [
@@ -68,40 +54,6 @@ const WORKSPACES = [
   { to: GOVERNANCE_HOME, label: "Governance & Assurance", icon: ShieldCheck, context: GOVERNANCE_CONTEXT, id: "governance" as const },
   { to: ADMIN_HOME, label: "Admin", icon: Settings2, context: ADMIN_CONTEXT, id: "admin" as const, adminOnly: true },
 ] as const;
-
-const WORKSPACE_ROUTES = new Set<string>(WORKSPACES.map((item) => item.to));
-const TAB_ROUTES = new Set<string>([
-  ...PLAN_SALES_TABS.map((item) => item.to),
-  ...ENGINEERING_TABS.map((item) => item.to),
-  ...OPERATIONS_TABS.map((item) => item.to),
-  ...FINANCE_TABS.map((item) => item.to),
-  ...GOVERNANCE_TABS.map((item) => item.to),
-  ...ADMIN_TABS.map((item) => item.to),
-]);
-
-const ICONS: Record<PageDomain, typeof Activity> = {
-  command: Activity,
-  finance: Wallet,
-  manufacturing: Factory,
-  inventory: Boxes,
-  procurement: Boxes,
-  engineering: DraftingCompass,
-  epr: ClipboardCheck,
-  knowledge: BookOpen,
-  sales: LineChart,
-  market: LineChart,
-  legal: Scale,
-  risk: AlertTriangle,
-  leadership: Presentation,
-  admin: Settings2,
-};
-
-const MODE_LABEL: Record<PageMode, string> = {
-  understand: "Reference",
-  observe: "Monitor",
-  operate: "Specialist",
-  showcase: "Showcase",
-};
 
 function isAccessible(role: CommandRole | null, route: string) {
   return canAccessRoute(role, route);
@@ -135,32 +87,22 @@ function ClientLink({
 function WorkspaceNavigation({ role, onNavigate }: { role: CommandRole | null; onNavigate?: () => void }) {
   const { pathname } = useLocation();
   const activeOwner = workspaceForRoute(pathname);
-  const secondary = useMemo(
-    () =>
-      Object.values(navigationGroups)
-        .flat()
-        .filter((page, index, all) => all.findIndex((candidate) => candidate.route === page.route) === index)
-        .filter((page) => !page.navHidden)
-        .filter((page) => !WORKSPACE_ROUTES.has(page.route) && !TAB_ROUTES.has(page.route) && !LEGACY_ROUTES.has(page.route))
-        .filter((page) => canAccessPage(role, page)),
-    [role],
-  );
 
   return (
-    <>
-      <section className="rounded-xl border border-border bg-surface/30 p-2">
-        <div className="flex items-center gap-2 px-2 pb-2 pt-1">
-          <Activity className="size-3.5 text-accent" />
-          <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-fg">Operating workspaces</span>
-          <span className="ml-auto text-[9px] text-muted">6 + admin</span>
-        </div>
-        <div className="space-y-0.5">
-          {WORKSPACES.filter((item) => (!(item as { adminOnly?: boolean }).adminOnly || role === "admin") && isAccessible(role, item.to)).map((item) => {
-            const Icon = item.icon;
-            const active = activeOwner === item.id || (activeOwner === null && item.context.has(pathname));
-            return (
+    <section className="rounded-xl border border-border bg-surface/30 p-2">
+      <div className="flex items-center gap-2 px-2 pb-2 pt-1">
+        <Activity className="size-3.5 text-accent" />
+        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-fg">Operating workspaces</span>
+        <span className="ml-auto text-[9px] text-muted">7 + admin</span>
+      </div>
+      <div className="space-y-1">
+        {WORKSPACES.filter((item) => (!(item as { adminOnly?: boolean }).adminOnly || role === "admin") && isAccessible(role, item.to)).map((item) => {
+          const Icon = item.icon;
+          const active = activeOwner === item.id || (activeOwner === null && item.context.has(pathname));
+          const sections = WORKSPACE_NAVIGATION[item.id];
+          return (
+            <div key={item.to} className={cn("rounded-lg", active && "bg-bg/45")}> 
               <ClientLink
-                key={item.to}
                 to={item.to}
                 active={active}
                 onNavigate={onNavigate}
@@ -172,64 +114,46 @@ function WorkspaceNavigation({ role, onNavigate }: { role: CommandRole | null; o
                 <Icon className={cn("size-4 shrink-0 text-muted", active && "text-accent")} />
                 <span className={cn(active ? "text-fg" : "text-muted")}>{item.label}</span>
               </ClientLink>
-            );
-          })}
-        </div>
 
-        <div className="mt-2 border-t border-border pt-2">
-          <p className="px-3 pb-1 text-[9px] font-bold uppercase tracking-[0.16em] text-subtle">Command tools</p>
-          {COMMAND_SHORTCUTS.filter((item) => isAccessible(role, item.to)).map((item) => (
-            <ClientLink
-              key={item.to}
-              to={item.to}
-              onNavigate={onNavigate}
-              active={pathname === item.to}
-              className="ml-5 block rounded-md px-2 py-1.5 text-xs text-muted hover:bg-bg hover:text-fg aria-[current=page]:text-accent"
-            >
-              {item.label}
-            </ClientLink>
-          ))}
-        </div>
-      </section>
-
-      {secondary.length ? (
-        <details className="mt-3 rounded-xl border border-border bg-surface/20">
-          <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted hover:text-fg [&::-webkit-details-marker]:hidden">
-            <Settings2 className="size-4 text-accent" />
-            <span className="flex-1">More functions</span>
-            <ChevronDown className="size-4" />
-          </summary>
-          <div className="space-y-3 border-t border-border p-2">
-            {(["understand", "observe", "operate", "showcase"] as PageMode[]).map((mode) => {
-              const pages = secondary.filter((page) => page.mode === mode);
-              if (!pages.length) return null;
-              return (
-                <section key={mode}>
-                  <p className="px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-subtle">{MODE_LABEL[mode]}</p>
-                  <div className="space-y-0.5">
-                    {pages.map((page: RouteMeta) => {
-                      const Icon = ICONS[page.domain] ?? Activity;
-                      return (
-                        <ClientLink
-                          key={page.route}
-                          to={page.route}
-                          onNavigate={onNavigate}
-                          active={pathname === page.route || pathname.startsWith(`${page.route}/`)}
-                          className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted hover:bg-bg hover:text-fg aria-[current=page]:text-accent"
-                        >
-                          <Icon className="size-4 shrink-0" />
-                          {page.label}
-                        </ClientLink>
-                      );
-                    })}
-                  </div>
-                </section>
-              );
-            })}
-          </div>
-        </details>
-      ) : null}
-    </>
+              {active ? (
+                <div className="ml-5 border-l border-border/80 pb-2 pl-2 pt-1">
+                  {sections.map((section) => {
+                    const links = section.items.filter((child) => isAccessible(role, child.to));
+                    if (!links.length) return null;
+                    return (
+                      <section key={section.label} className="mt-1 first:mt-0">
+                        <p className="px-2 pb-1 pt-1 text-[9px] font-bold uppercase tracking-[0.14em] text-subtle">
+                          {section.label}
+                        </p>
+                        <div className="space-y-0.5">
+                          {links.map((child) => {
+                            const childActive = pathname === child.to || pathname.startsWith(`${child.to}/`);
+                            return (
+                              <ClientLink
+                                key={child.to}
+                                to={child.to}
+                                active={childActive}
+                                onNavigate={onNavigate}
+                                className={cn(
+                                  "block rounded-md px-2 py-1.5 text-xs text-muted transition-colors hover:bg-surface hover:text-fg",
+                                  childActive && "bg-surface text-accent",
+                                )}
+                              >
+                                {child.label}
+                              </ClientLink>
+                            );
+                          })}
+                        </div>
+                      </section>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
