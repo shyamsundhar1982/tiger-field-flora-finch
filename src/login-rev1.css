@@ -1,0 +1,750 @@
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap");
+
+.vy-login {
+  --vy-orange: #ff7417;
+  --vy-orange-soft: rgb(255 116 23 / 0.32);
+  --vy-green: #7fff00;
+  --vy-green-soft: rgb(127 255 0 / 0.28);
+  --vy-steel: #dff4ff;
+  --vy-deep: #030508;
+  position: relative;
+  min-height: 100dvh;
+  overflow: hidden;
+  color: var(--vy-steel);
+  background: var(--vy-deep);
+  font-family: "Rajdhani", var(--font-sans);
+  isolation: isolate;
+}
+
+.vy-login__scene,
+.vy-login__vignette,
+.vy-login__scanlines,
+.vy-login__grain,
+.vy-login__warp,
+.vy-login__flash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.vy-login__scene {
+  z-index: -5;
+  background:
+    radial-gradient(circle at 52% 48%, rgb(46 31 16 / 0.3), transparent 38%),
+    radial-gradient(circle at 42% 56%, rgb(33 55 17 / 0.22), transparent 46%),
+    var(--vy-deep);
+}
+
+.vy-login__scene canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.vy-login__vignette {
+  z-index: -4;
+  background: radial-gradient(ellipse at center, transparent 40%, rgb(0 2 6 / 0.86) 100%);
+}
+
+.vy-login__scanlines {
+  z-index: 2;
+  opacity: 0.38;
+  background: repeating-linear-gradient(0deg, rgb(255 116 23 / 0.014) 0 1px, transparent 1px 3px);
+}
+
+.vy-login__grain {
+  z-index: 2;
+  inset: -50%;
+  opacity: 0.045;
+  background-image:
+    repeating-radial-gradient(circle at 30% 70%, rgb(255 255 255 / 0.16) 0 0.55px, transparent 0.75px 3px),
+    repeating-radial-gradient(circle at 70% 30%, rgb(127 255 0 / 0.08) 0 0.4px, transparent 0.7px 4px);
+  animation: vy-grain 0.75s steps(4) infinite;
+}
+
+.vy-login__bar {
+  position: fixed;
+  left: 0;
+  z-index: 22;
+  width: 100%;
+  height: 7vh;
+  background: #000;
+  transition: transform 1.55s cubic-bezier(0.77, 0, 0.18, 1);
+}
+
+.vy-login__bar--top { top: 0; }
+.vy-login__bar--bottom { bottom: 0; }
+.vy-login.is-cinematic .vy-login__bar--top { transform: translateY(-101%); }
+.vy-login.is-cinematic .vy-login__bar--bottom { transform: translateY(101%); }
+
+.vy-login__warp {
+  z-index: 24;
+  opacity: 0;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 88px,
+      rgb(255 116 23 / 0.38) 88px 91px,
+      transparent 91px 205px,
+      rgb(127 255 0 / 0.22) 205px 207px,
+      transparent 207px 338px
+    );
+  filter: blur(1px);
+}
+
+.vy-login.is-warping .vy-login__warp {
+  animation: vy-warp-streak 1.15s cubic-bezier(0.55, 0.05, 0.75, 0.3) both;
+}
+
+.vy-login__flash {
+  z-index: 26;
+  background: #f9fff0;
+  opacity: 0;
+}
+
+.vy-login.is-warping .vy-login__flash {
+  animation: vy-flash 0.26s ease-in-out 0.76s both;
+}
+
+.vy-login__intro {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  transition: opacity 0.9s ease, visibility 0.9s ease;
+}
+
+.vy-login__intro.is-gone {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.vy-login__intro-company,
+.vy-login__intro-sub,
+.vy-login__intro-brand,
+.vy-login__intro-tag {
+  opacity: 0;
+  animation: vy-intro-rise 0.9s ease forwards;
+}
+
+.vy-login__intro-company {
+  font-family: "Orbitron", var(--font-sans);
+  font-size: clamp(1.15rem, 3vw, 2.45rem);
+  letter-spacing: 0.48em;
+  text-indent: 0.48em;
+  color: #f4fbff;
+  text-shadow: 0 0 28px rgb(255 116 23 / 0.25);
+  animation-delay: 0.18s;
+}
+
+.vy-login__intro-company strong { color: var(--vy-orange); }
+
+.vy-login__intro-sub,
+.vy-login__intro-tag {
+  margin-top: 1rem;
+  color: rgb(223 244 255 / 0.48);
+  font-size: 0.72rem;
+  letter-spacing: 0.44em;
+  text-indent: 0.44em;
+  text-transform: uppercase;
+  animation-delay: 0.72s;
+}
+
+.vy-login__intro-brand {
+  margin-top: 2.3rem;
+  color: transparent;
+  background: linear-gradient(100deg, #343d46 7%, #f2f7fb 36%, var(--vy-orange) 61%, var(--vy-green) 76%, #343d46 95%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  font-family: "Orbitron", var(--font-sans);
+  font-size: clamp(2rem, 6vw, 4.4rem);
+  font-weight: 900;
+  letter-spacing: 0.32em;
+  text-indent: 0.32em;
+  filter: drop-shadow(0 0 24px rgb(255 116 23 / 0.2));
+  animation-delay: 1.05s;
+}
+
+.vy-login__intro-tag {
+  color: rgb(127 255 0 / 0.62);
+  animation-delay: 1.45s;
+}
+
+.vy-login__skip {
+  position: absolute;
+  bottom: 9vh;
+  min-height: 44px;
+  padding: 0.65rem 1.45rem;
+  border: 1px solid rgb(255 116 23 / 0.28);
+  color: rgb(223 244 255 / 0.52);
+  background: transparent;
+  font-family: "Rajdhani", var(--font-sans);
+  font-size: 0.7rem;
+  letter-spacing: 0.27em;
+  text-transform: uppercase;
+  transition: color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.vy-login__skip:hover {
+  border-color: var(--vy-orange);
+  color: var(--vy-orange);
+  box-shadow: 0 0 20px var(--vy-orange-soft);
+}
+
+.vy-login__corner {
+  position: fixed;
+  z-index: 10;
+  width: 56px;
+  height: 56px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.9s ease 0.45s;
+}
+
+.vy-login.is-cinematic .vy-login__corner { opacity: 1; }
+.vy-login__corner::before,
+.vy-login__corner::after {
+  content: "";
+  position: absolute;
+  background: rgb(255 116 23 / 0.38);
+  box-shadow: 0 0 10px rgb(255 116 23 / 0.12);
+}
+.vy-login__corner::before { width: 100%; height: 1px; }
+.vy-login__corner::after { width: 1px; height: 100%; }
+.vy-login__corner--tl { top: 3vh; left: 3vw; }
+.vy-login__corner--tr { top: 3vh; right: 3vw; transform: scaleX(-1); }
+.vy-login__corner--bl { bottom: 3vh; left: 3vw; transform: scaleY(-1); }
+.vy-login__corner--br { right: 3vw; bottom: 3vh; transform: scale(-1); }
+
+.vy-login__header {
+  position: fixed;
+  top: 5.5vh;
+  left: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 1.25rem 4.5vw;
+  opacity: 0;
+  transform: translateY(-18px);
+  transition: opacity 0.9s ease 0.6s, transform 0.9s ease 0.6s;
+}
+
+.vy-login.is-cinematic .vy-login__header {
+  opacity: 1;
+  transform: none;
+}
+
+.vy-login__brand {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.vy-login__brand-mark {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border: 1px solid rgb(255 116 23 / 0.42);
+  box-shadow: 0 0 22px rgb(255 116 23 / 0.12), inset 0 0 14px rgb(127 255 0 / 0.055);
+  transform: rotate(45deg);
+}
+
+.vy-login__brand-mark span {
+  color: var(--vy-orange);
+  font-family: "Orbitron", var(--font-sans);
+  font-size: 0.67rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 12px rgb(255 116 23 / 0.6);
+  transform: rotate(-45deg);
+}
+
+.vy-login__brand-copy strong {
+  display: block;
+  color: #eef8ff;
+  font-family: "Orbitron", var(--font-sans);
+  font-size: 0.92rem;
+  letter-spacing: 0.27em;
+}
+
+.vy-login__brand-copy small {
+  display: block;
+  margin-top: 0.22rem;
+  color: rgb(255 116 23 / 0.68);
+  font-size: 0.58rem;
+  letter-spacing: 0.29em;
+  text-transform: uppercase;
+}
+
+.vy-login__status {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.54rem 1.08rem;
+  border: 1px solid rgb(127 255 0 / 0.2);
+  color: rgb(223 244 255 / 0.66);
+  background: rgb(127 255 0 / 0.035);
+  backdrop-filter: blur(6px);
+  font-size: 0.65rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+.vy-login__status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--vy-green);
+  box-shadow: 0 0 12px rgb(127 255 0 / 0.72);
+  animation: vy-blink 2s infinite;
+}
+
+.vy-login__main {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(2rem, 5vw, 6rem);
+  padding: 7.2rem 6vw 5.3rem;
+  pointer-events: none;
+}
+
+.vy-login__welcome {
+  max-width: 530px;
+  pointer-events: auto;
+}
+
+.vy-login__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin-bottom: 1.25rem;
+  color: var(--vy-orange);
+  font-size: 0.68rem;
+  letter-spacing: 0.46em;
+  text-transform: uppercase;
+}
+
+.vy-login__eyebrow::before {
+  content: "";
+  width: 44px;
+  height: 1px;
+  background: var(--vy-orange);
+  box-shadow: 0 0 8px var(--vy-orange-soft);
+}
+
+.vy-login__welcome h1 {
+  margin: 0;
+  color: transparent;
+  background: linear-gradient(115deg, #fff 15%, #ced9df 50%, var(--vy-orange) 75%, var(--vy-green) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  font-family: "Orbitron", var(--font-sans);
+  font-size: clamp(2.1rem, 4.7vw, 4rem);
+  font-weight: 900;
+  letter-spacing: 0.035em;
+  line-height: 1.05;
+  filter: drop-shadow(0 0 24px rgb(255 116 23 / 0.15));
+}
+
+.vy-login__tagline {
+  display: block;
+  margin-top: 1rem;
+  -webkit-text-fill-color: rgb(223 244 255 / 0.8);
+  color: rgb(223 244 255 / 0.8);
+  font-size: 0.33em;
+  font-weight: 500;
+  letter-spacing: 0.46em;
+}
+
+.vy-login__desc {
+  max-width: 46ch;
+  margin-top: 1.5rem;
+  color: rgb(223 244 255 / 0.6);
+  font-size: 1rem;
+  line-height: 1.72;
+}
+
+.vy-login__metrics {
+  display: flex;
+  gap: 2.2rem;
+  margin-top: 2rem;
+}
+
+.vy-login__metric strong {
+  display: block;
+  color: var(--vy-orange);
+  font-family: "Orbitron", var(--font-sans);
+  font-size: 1.3rem;
+  text-shadow: 0 0 14px var(--vy-orange-soft);
+}
+
+.vy-login__metric:nth-child(2) strong,
+.vy-login__metric:nth-child(3) strong { color: var(--vy-green); text-shadow: 0 0 14px var(--vy-green-soft); }
+
+.vy-login__metric span {
+  color: rgb(223 244 255 / 0.44);
+  font-size: 0.6rem;
+  letter-spacing: 0.23em;
+  text-transform: uppercase;
+}
+
+.vy-login__login-wrap {
+  perspective: 1200px;
+  pointer-events: none;
+}
+
+.vy-login__card {
+  position: relative;
+  width: min(400px, 88vw);
+  padding: 2.6rem 2.35rem 2.15rem;
+  border: 1px solid rgb(255 116 23 / 0.24);
+  color: var(--vy-steel);
+  background: linear-gradient(150deg, rgb(10 16 24 / 0.84), rgb(6 10 16 / 0.72));
+  box-shadow: 0 30px 70px rgb(0 0 0 / 0.65), inset 0 1px 0 rgb(255 255 255 / 0.06);
+  backdrop-filter: blur(20px);
+  clip-path: polygon(0 0, calc(100% - 24px) 0, 100% 24px, 100% 100%, 24px 100%, 0 calc(100% - 24px));
+  pointer-events: auto;
+  transform-style: preserve-3d;
+  transition: transform 260ms ease, border-color 240ms ease, box-shadow 240ms ease, opacity 420ms ease, filter 420ms ease;
+}
+
+.vy-login__card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.42;
+  pointer-events: none;
+  background: repeating-linear-gradient(45deg, rgb(255 255 255 / 0.022) 0 2px, transparent 2px 6px, rgb(0 0 0 / 0.28) 6px 8px, transparent 8px 12px);
+}
+
+.vy-login__card-tag {
+  position: absolute;
+  top: 0;
+  right: 28px;
+  padding: 0.34rem 0.88rem;
+  color: #140b03;
+  background: var(--vy-orange);
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.27em;
+  text-transform: uppercase;
+}
+
+.vy-login__card h2 {
+  position: relative;
+  margin: 0 0 0.32rem;
+  color: #eef8ff;
+  font-family: "Orbitron", var(--font-sans);
+  font-size: 1rem;
+  letter-spacing: 0.28em;
+}
+
+.vy-login__card-sub {
+  position: relative;
+  margin-bottom: 1.75rem;
+  color: rgb(223 244 255 / 0.45);
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.vy-login__field {
+  position: relative;
+  margin-bottom: 1.25rem;
+}
+
+.vy-login__field svg {
+  position: absolute;
+  top: 50%;
+  left: 0.92rem;
+  width: 16px;
+  height: 16px;
+  color: rgb(255 116 23 / 0.72);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.vy-login__field input {
+  width: 100%;
+  min-height: 50px;
+  padding: 0.95rem 0.95rem 0.95rem 2.75rem;
+  border: 1px solid rgb(255 116 23 / 0.2);
+  border-radius: 0;
+  outline: none;
+  color: #eef8ff;
+  background: rgb(2 8 14 / 0.64);
+  font-family: "Rajdhani", var(--font-sans);
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.055em;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.vy-login__field input:focus {
+  border-color: var(--vy-orange);
+  box-shadow: 0 0 0 1px var(--vy-orange), 0 0 22px rgb(255 116 23 / 0.14);
+}
+
+.vy-login__field label {
+  position: absolute;
+  top: 0.95rem;
+  left: 2.75rem;
+  padding: 0;
+  color: rgb(223 244 255 / 0.4);
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  pointer-events: none;
+  text-transform: uppercase;
+  transition: all 180ms ease;
+}
+
+.vy-login__field input:focus + label,
+.vy-login__field input:not(:placeholder-shown) + label {
+  top: -0.5rem;
+  left: 0.85rem;
+  padding: 0 0.45rem;
+  color: var(--vy-orange);
+  background: #081017;
+  font-size: 0.58rem;
+  letter-spacing: 0.22em;
+}
+
+.vy-login__access-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1.45rem;
+  color: rgb(223 244 255 / 0.52);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.vy-login__access-note span:last-child { color: rgb(127 255 0 / 0.72); }
+
+.vy-login__error,
+.vy-login__success {
+  position: relative;
+  margin-bottom: 1rem;
+  padding: 0.72rem 0.8rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.vy-login__error {
+  border: 1px solid rgb(255 110 92 / 0.38);
+  color: #ffc1b8;
+  background: rgb(107 33 28 / 0.24);
+}
+
+.vy-login__success {
+  border: 1px solid rgb(127 255 0 / 0.26);
+  color: rgb(213 255 172 / 0.9);
+  background: rgb(127 255 0 / 0.045);
+}
+
+.vy-login__launch {
+  position: relative;
+  width: 100%;
+  min-height: 50px;
+  overflow: hidden;
+  border: 0;
+  color: #160b02;
+  background: linear-gradient(100deg, #ff7417, #ff9a4f);
+  font-family: "Orbitron", var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.31em;
+  text-indent: 0.31em;
+  text-transform: uppercase;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+  transition: filter 180ms ease, transform 140ms ease, background 180ms ease;
+}
+
+.vy-login__launch:not(:disabled):hover {
+  filter: brightness(1.1) drop-shadow(0 0 18px rgb(255 116 23 / 0.45));
+  transform: translateY(-1px);
+}
+
+.vy-login__launch::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -80%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(100deg, transparent, rgb(255 255 255 / 0.5), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.58s;
+}
+
+.vy-login__launch:not(:disabled):hover::after { left: 130%; }
+.vy-login__launch:disabled { opacity: 0.7; }
+.vy-login.is-granted .vy-login__launch { background: linear-gradient(100deg, var(--vy-green), #bcff75); }
+
+.vy-login__secure {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1.2rem;
+  color: rgb(223 244 255 / 0.36);
+  font-size: 0.59rem;
+  letter-spacing: 0.2em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.vy-login__secure svg {
+  width: 14px;
+  height: 14px;
+  color: var(--vy-green);
+}
+
+.vy-login__back {
+  position: relative;
+  display: block;
+  margin-top: 1rem;
+  color: rgb(223 244 255 / 0.44);
+  font-size: 0.65rem;
+  letter-spacing: 0.16em;
+  text-align: center;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.vy-login__back:hover { color: var(--vy-orange); }
+
+.vy-login__boot {
+  position: fixed;
+  inset: 0;
+  z-index: 28;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 3 8 / 0.86);
+  backdrop-filter: blur(7px);
+}
+
+.vy-login__boot-ring {
+  width: 80px;
+  height: 80px;
+  border: 2px solid rgb(255 116 23 / 0.16);
+  border-top-color: var(--vy-orange);
+  border-right-color: var(--vy-green);
+  border-radius: 50%;
+  box-shadow: 0 0 30px rgb(255 116 23 / 0.14), inset 0 0 20px rgb(127 255 0 / 0.05);
+  animation: vy-spin 0.8s linear infinite;
+}
+
+.vy-login__boot p {
+  margin-top: 1.35rem;
+  color: var(--vy-orange);
+  font-family: "Orbitron", var(--font-sans);
+  font-size: 0.65rem;
+  letter-spacing: 0.36em;
+  text-transform: uppercase;
+}
+
+.vy-login.is-granted .vy-login__boot p { color: var(--vy-green); }
+
+.vy-login.is-warping .vy-login__welcome {
+  animation: vy-disperse-left 0.55s cubic-bezier(0.55, 0.05, 0.75, 0.3) both;
+}
+
+.vy-login.is-warping .vy-login__login-wrap {
+  animation: vy-disperse-right 0.55s cubic-bezier(0.55, 0.05, 0.75, 0.3) both;
+}
+
+.vy-login.is-warping .vy-login__header,
+.vy-login.is-warping .vy-login__corner {
+  opacity: 0;
+  transition-delay: 0s;
+  transition-duration: 0.28s;
+}
+
+@keyframes vy-grain {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-2%, 3%); }
+  50% { transform: translate(3%, -2%); }
+  75% { transform: translate(-3%, -3%); }
+  100% { transform: translate(2%, 2%); }
+}
+
+@keyframes vy-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.28; }
+}
+
+@keyframes vy-intro-rise {
+  from { opacity: 0; transform: translateY(8px); filter: blur(7px); }
+  to { opacity: 1; transform: none; filter: blur(0); }
+}
+
+@keyframes vy-spin { to { transform: rotate(360deg); } }
+
+@keyframes vy-warp-streak {
+  0% { opacity: 0; background-position: 0 0; }
+  15% { opacity: 0.92; }
+  78% { opacity: 0.72; }
+  100% { opacity: 0; background-position: -5000px 0; }
+}
+
+@keyframes vy-flash {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 0.88; }
+}
+
+@keyframes vy-disperse-left {
+  to { opacity: 0; transform: translateX(-110vw) skewX(20deg); filter: blur(12px); }
+}
+
+@keyframes vy-disperse-right {
+  to { opacity: 0; transform: translateX(110vw) skewX(-20deg); filter: blur(12px); }
+}
+
+@media (max-width: 980px) {
+  .vy-login__welcome { display: none; }
+  .vy-login__main { justify-content: center; }
+}
+
+@media (max-width: 640px) {
+  .vy-login__header {
+    top: 2.8rem;
+    padding-inline: 1rem;
+  }
+  .vy-login__brand-copy small,
+  .vy-login__status { display: none; }
+  .vy-login__main { padding: 6.5rem 1rem 5.5rem; }
+  .vy-login__card { padding: 2.35rem 1.4rem 1.8rem; }
+  .vy-login__corner { width: 34px; height: 34px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vy-login__grain,
+  .vy-login__status-dot,
+  .vy-login__boot-ring,
+  .vy-login__intro-company,
+  .vy-login__intro-sub,
+  .vy-login__intro-brand,
+  .vy-login__intro-tag,
+  .vy-login.is-warping .vy-login__welcome,
+  .vy-login.is-warping .vy-login__login-wrap,
+  .vy-login.is-warping .vy-login__warp,
+  .vy-login.is-warping .vy-login__flash {
+    animation: none !important;
+  }
+}
