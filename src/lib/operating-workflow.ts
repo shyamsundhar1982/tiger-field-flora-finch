@@ -40,6 +40,7 @@ export const COMMAND_SHORTCUTS: readonly WorkspaceLink[] = [
   { to: "/command/decision-inbox", label: "Action Inbox" },
   { to: "/command/control-tower", label: "Control Tower" },
   { to: "/command/ibpe-operating-workspace", label: "VIBPE Workspace" },
+  { to: "/command/ibpe-operating-workspace/optimizer", label: "VIBPE Optimizer" },
   { to: "/command/ibpe-operating-workspace/assurance", label: "VIBPE Assurance" },
 ];
 
@@ -120,6 +121,7 @@ export const WORKSPACE_NAVIGATION: Record<CanonicalWorkspaceId, readonly Workspa
       label: "VIBPE",
       items: [
         { to: "/command/ibpe-operating-workspace", label: "VIBPE Workspace" },
+        { to: "/command/ibpe-operating-workspace/optimizer", label: "Optimizer" },
         { to: "/command/ibpe-operating-workspace/assurance", label: "VIBPE Assurance" },
       ],
     },
