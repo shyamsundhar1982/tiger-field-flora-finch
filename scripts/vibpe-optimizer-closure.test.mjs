@@ -79,6 +79,7 @@ test("final release closure can only report GREEN when every runtime, run, gover
   assert.match(closure, /optimization_status === "optimal"/);
   assert.match(closure, /cash_guardrail_status === "feasible"/);
   assert.match(page, /Release verdict/);
-  assert.match(page, /GREEN/);
-  assert.match(page, /NOT GREEN/);
+  assert.match(page, /closure\.verdict/);
+  assert.match(closure, /"GREEN"/);
+  assert.match(closure, /"NOT GREEN"/);
 });
