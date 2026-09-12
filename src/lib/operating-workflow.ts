@@ -10,7 +10,12 @@ export type WorkspaceId =
   /** @deprecated Prefer "finance" | "governance". */
   | "finance-governance";
 
+export type CanonicalWorkspaceId = Exclude<WorkspaceId, "finance-governance">;
 export type WorkspaceLink = { to: string; label: string };
+export type WorkspaceNavigationSection = {
+  label: string;
+  items: readonly WorkspaceLink[];
+};
 export type WorkflowStage = {
   id: string;
   label: string;
@@ -30,7 +35,7 @@ export const FINANCE_HOME = "/command/financial-cockpit";
 export const GOVERNANCE_HOME = "/command/governance";
 export const ADMIN_HOME = "/command/users";
 
-/** Cross-cutting Command tools — not transaction workspaces. */
+/** Cross-cutting Command tools — owned by Command, not transaction workspaces. */
 export const COMMAND_SHORTCUTS: readonly WorkspaceLink[] = [
   { to: "/command/decision-inbox", label: "Action Inbox" },
   { to: "/command/control-tower", label: "Control Tower" },
@@ -38,7 +43,7 @@ export const COMMAND_SHORTCUTS: readonly WorkspaceLink[] = [
   { to: "/command/ibpe-operating-workspace/assurance", label: "VIBPE Assurance" },
 ];
 
-/** Plan & Commercial — demand, horizon planning, scenarios. */
+/** Plan & Commercial — demand, horizon planning, scenarios and route-to-market. */
 export const PLAN_SALES_TABS: readonly WorkspaceLink[] = [
   { to: PLAN_HOME, label: "Plan" },
   { to: SALES_HOME, label: "Demand & Orders" },
@@ -46,20 +51,17 @@ export const PLAN_SALES_TABS: readonly WorkspaceLink[] = [
   { to: "/command/gtm", label: "GTM" },
 ];
 
-/** Product & Engineering — product identity, baselines, BOM. */
+/** Product & Engineering — product identity → engineering baseline → controlled BOM. */
 export const ENGINEERING_TABS: readonly WorkspaceLink[] = [
-  { to: ENGINEERING_HOME, label: "Engineering" },
   { to: "/command/product", label: "Product" },
+  { to: ENGINEERING_HOME, label: "Engineering" },
   { to: "/command/bom-control", label: "BOM Control" },
   { to: "/command/bom", label: "BOM Cost" },
 ];
 
-/**
- * Supply & Operations — material → build → fulfilment.
- * Overview is the Operations/dispatch visibility surface (canonical writer remains Operations-owned).
- */
+/** Supply & Operations — inventory → requirements → purchase → receive → build → quality. */
 export const OPERATIONS_TABS: readonly WorkspaceLink[] = [
-  { to: OPERATIONS_HOME, label: "Overview & Dispatch" },
+  { to: OPERATIONS_HOME, label: "Overview" },
   { to: "/command/inventory", label: "Inventory" },
   { to: "/command/procurement-planning", label: "Requirements" },
   { to: "/command/purchase-execution", label: "Purchase" },
@@ -68,7 +70,7 @@ export const OPERATIONS_TABS: readonly WorkspaceLink[] = [
   { to: "/command/quality", label: "Quality" },
 ];
 
-/** Finance — money movement only (cash, AP, AR, position). */
+/** Finance — cash → AP/AR → financial position. */
 export const FINANCE_TABS: readonly WorkspaceLink[] = [
   { to: FINANCE_HOME, label: "Overview" },
   { to: "/command/cash", label: "Cash" },
@@ -77,7 +79,7 @@ export const FINANCE_TABS: readonly WorkspaceLink[] = [
   { to: "/command/balance-sheet", label: "Balance Sheet" },
 ];
 
-/** Governance & Assurance — control, evidence, risk, legal. */
+/** Governance & Assurance — approvals, risk, legal, audit. */
 export const GOVERNANCE_TABS: readonly WorkspaceLink[] = [
   { to: GOVERNANCE_HOME, label: "Approvals" },
   { to: "/command/risk", label: "Risk" },
@@ -96,6 +98,116 @@ export const FINANCE_GOVERNANCE_TABS: readonly WorkspaceLink[] = [
   ...FINANCE_TABS,
   ...GOVERNANCE_TABS,
 ];
+
+/**
+ * Canonical navigation ownership.
+ *
+ * This is the user-facing information architecture. PageMode/domain metadata
+ * still classifies behaviour and permissions, but it must not determine where
+ * a page appears in navigation.
+ */
+export const WORKSPACE_NAVIGATION: Record<CanonicalWorkspaceId, readonly WorkspaceNavigationSection[]> = {
+  command: [
+    {
+      label: "Command",
+      items: [
+        { to: COMMAND_HOME, label: "Command Centre" },
+        { to: "/command/decision-inbox", label: "Action Inbox" },
+        { to: "/command/control-tower", label: "Control Tower" },
+      ],
+    },
+    {
+      label: "VIBPE",
+      items: [
+        { to: "/command/ibpe-operating-workspace", label: "VIBPE Workspace" },
+        { to: "/command/ibpe-operating-workspace/assurance", label: "VIBPE Assurance" },
+      ],
+    },
+  ],
+  "plan-sales": [
+    {
+      label: "Commercial flow",
+      items: [...PLAN_SALES_TABS, { to: "/command/market-survey", label: "Market Survey" }],
+    },
+  ],
+  engineering: [
+    {
+      label: "Product flow",
+      items: ENGINEERING_TABS,
+    },
+  ],
+  operations: [
+    {
+      label: "Execution flow",
+      items: OPERATIONS_TABS,
+    },
+    {
+      label: "Controls",
+      items: [
+        { to: "/command/procurement", label: "Procurement Control" },
+        { to: "/command/manufacturing", label: "Manufacturing Controls" },
+        { to: "/command/actuals", label: "Operational Actuals" },
+      ],
+    },
+  ],
+  "people-office": [
+    {
+      label: "Administration",
+      items: [{ to: PEOPLE_HOME, label: "People & Office" }],
+    },
+  ],
+  finance: [
+    {
+      label: "Finance flow",
+      items: [...FINANCE_TABS, { to: "/command/finance-assumptions", label: "Financial Planning" }],
+    },
+    {
+      label: "Controls & analysis",
+      items: [
+        { to: "/command/finance-control", label: "Finance Control" },
+        { to: "/command/finance", label: "Finance Analysis" },
+        { to: "/command/master-finance", label: "Consolidated Finance" },
+        { to: "/command/aluminium-finance", label: "Aluminium Vertical" },
+      ],
+    },
+  ],
+  governance: [
+    {
+      label: "Governance",
+      items: [
+        { to: GOVERNANCE_HOME, label: "Approvals" },
+        { to: "/command/risk", label: "Risk" },
+        { to: "/command/legal", label: "Legal & IP" },
+      ],
+    },
+    {
+      label: "Compliance / EPR",
+      items: [
+        { to: "/command/epr-workflow", label: "EPR Workflow" },
+        { to: "/command/epr-execution", label: "EPR Execution" },
+        { to: "/command/epr-live", label: "EPR Live" },
+        { to: "/command/qa-verification", label: "QA Verification" },
+        { to: "/command/legal-control", label: "Legal Control" },
+      ],
+    },
+    {
+      label: "Audit",
+      items: [
+        { to: "/command/actions", label: "Audit & Actions" },
+        { to: "/command/ca-audit", label: "CA Audit" },
+      ],
+    },
+  ],
+  admin: [
+    {
+      label: "Administration",
+      items: [...ADMIN_TABS, { to: "/command/classification", label: "Classification" }],
+    },
+  ],
+};
+
+const workspaceRoutes = (id: CanonicalWorkspaceId) =>
+  WORKSPACE_NAVIGATION[id].flatMap((section) => section.items.map((item) => item.to));
 
 export const WORKFLOW_STAGES: readonly WorkflowStage[] = [
   { id: "plan", label: "Plan", shortLabel: "Plan", to: PLAN_HOME, routes: [PLAN_HOME, "/command/scenarios"], owner: "plan-sales" },
@@ -141,29 +253,17 @@ export const WORKFLOW_STAGES: readonly WorkflowStage[] = [
   { id: "collection", label: "Collection", shortLabel: "Collect", to: "/command/receivables", routes: ["/command/receivables"], owner: "finance" },
 ];
 
-export const COMMAND_CONTEXT = new Set<string>([
-  COMMAND_HOME,
-  "/command/control-tower",
-  "/command/decision-inbox",
-  "/command/ibpe-operating-workspace",
-  "/command/ibpe-operating-workspace/assurance",
-]);
+export const COMMAND_CONTEXT = new Set<string>(workspaceRoutes("command"));
 
-export const PLAN_SALES_CONTEXT = new Set<string>([
-  ...PLAN_SALES_TABS.map((tab) => tab.to),
-  "/command/market-survey",
-  "/command/finance-assumptions",
-]);
+export const PLAN_SALES_CONTEXT = new Set<string>(workspaceRoutes("plan-sales"));
 
 export const ENGINEERING_CONTEXT = new Set<string>([
-  ...ENGINEERING_TABS.map((tab) => tab.to),
+  ...workspaceRoutes("engineering"),
   "/command/bom-inventory-mapping",
 ]);
 
 export const OPERATIONS_CONTEXT = new Set<string>([
-  ...OPERATIONS_TABS.map((tab) => tab.to),
-  "/command/procurement",
-  "/command/manufacturing",
+  ...workspaceRoutes("operations"),
   "/command/inventory-truth",
   "/command/inventory-ledgers",
   "/command/inventory-master",
@@ -175,24 +275,12 @@ export const OPERATIONS_CONTEXT = new Set<string>([
   "/command/ops",
 ]);
 
-export const PEOPLE_CONTEXT = new Set<string>([PEOPLE_HOME]);
+export const PEOPLE_CONTEXT = new Set<string>(workspaceRoutes("people-office"));
 
-export const FINANCE_CONTEXT = new Set<string>([
-  ...FINANCE_TABS.map((tab) => tab.to),
-  "/command/finance",
-  "/command/finance-control",
-  "/command/master-finance",
-  "/command/aluminium-finance",
-  "/command/actuals",
-]);
+export const FINANCE_CONTEXT = new Set<string>(workspaceRoutes("finance"));
 
-/** Governance tabs only — Assurance stays under Command tools. */
-export const GOVERNANCE_CONTEXT = new Set<string>([
-  ...GOVERNANCE_TABS.map((tab) => tab.to),
-  "/command/qa-verification",
-  "/command/legal-control",
-  "/command/epr-live",
-]);
+/** Governance tabs plus compliance/EPR/QA routes. Assurance stays under Command/VIBPE. */
+export const GOVERNANCE_CONTEXT = new Set<string>(workspaceRoutes("governance"));
 
 /** @deprecated Prefer FINANCE_CONTEXT or GOVERNANCE_CONTEXT. */
 export const FINANCE_GOVERNANCE_CONTEXT = new Set<string>([
@@ -200,7 +288,7 @@ export const FINANCE_GOVERNANCE_CONTEXT = new Set<string>([
   ...GOVERNANCE_CONTEXT,
 ]);
 
-export const ADMIN_CONTEXT = new Set<string>([...ADMIN_TABS.map((tab) => tab.to)]);
+export const ADMIN_CONTEXT = new Set<string>(workspaceRoutes("admin"));
 
 export const LEGACY_ROUTES = new Set<string>([
   "/command/phase-4",
@@ -251,14 +339,19 @@ export function activeWorkflowStage(pathname: string): string | null {
   return null;
 }
 
-export function workspaceForRoute(pathname: string): WorkspaceId | null {
-  if (COMMAND_CONTEXT.has(pathname)) return "command";
-  if (PLAN_SALES_CONTEXT.has(pathname)) return "plan-sales";
-  if (ENGINEERING_CONTEXT.has(pathname)) return "engineering";
-  if (OPERATIONS_CONTEXT.has(pathname)) return "operations";
-  if (PEOPLE_CONTEXT.has(pathname)) return "people-office";
-  if (FINANCE_CONTEXT.has(pathname)) return "finance";
-  if (GOVERNANCE_CONTEXT.has(pathname)) return "governance";
-  if (ADMIN_CONTEXT.has(pathname)) return "admin";
+function matchesContext(context: ReadonlySet<string>, pathname: string) {
+  if (context.has(pathname)) return true;
+  return [...context].some((route) => route !== COMMAND_HOME && pathname.startsWith(`${route}/`));
+}
+
+export function workspaceForRoute(pathname: string): CanonicalWorkspaceId | null {
+  if (matchesContext(COMMAND_CONTEXT, pathname)) return "command";
+  if (matchesContext(PLAN_SALES_CONTEXT, pathname)) return "plan-sales";
+  if (matchesContext(ENGINEERING_CONTEXT, pathname)) return "engineering";
+  if (matchesContext(OPERATIONS_CONTEXT, pathname)) return "operations";
+  if (matchesContext(PEOPLE_CONTEXT, pathname)) return "people-office";
+  if (matchesContext(FINANCE_CONTEXT, pathname)) return "finance";
+  if (matchesContext(GOVERNANCE_CONTEXT, pathname)) return "governance";
+  if (matchesContext(ADMIN_CONTEXT, pathname)) return "admin";
   return null;
 }
