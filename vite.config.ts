@@ -142,7 +142,19 @@ export default defineConfig(() => ({
     port: 8081,
     strictPort: true,
   },
-  resolve: { tsconfigPaths: true },
+  resolve: {
+    tsconfigPaths: true,
+    // Force the governed optimizer onto the exact patched ESM loader prepared
+    // by scripts/with-app-env.mjs. This removes package-condition ambiguity that
+    // can otherwise make the Worker bundle select a CommonJS compatibility path
+    // and recreate createRequire(undefined) even though highs.mjs was patched.
+    alias: [
+      {
+        find: /^highs$/,
+        replacement: join(process.cwd(), "node_modules", "highs", "build", "highs.mjs"),
+      },
+    ],
+  },
   // PGlite uses package-relative WASM/data assets. Keep it out of Vite's
   // dependency pre-bundling during local development. Do not externalize it
   // from SSR because Cloudflare Workers' Vite plugin rejects resolve.external
