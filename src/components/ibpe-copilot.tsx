@@ -12,6 +12,7 @@ type Message = {
   id: string;
   role: "user" | "assistant";
   text: string;
+  question?: string;
   meta?: string;
   traceabilityQuery?: string;
 };
@@ -73,6 +74,7 @@ function printAssistantResult(message: Message, workspace: string) {
   const printWindow = window.open("", "_blank", "width=900,height=900");
   if (!printWindow) return;
   printWindow.opener = null;
+  const includeQuestion = Boolean(message.question && numberedQuestions(message.question).length < 2);
 
   printWindow.document.write(`<!doctype html>
 <html lang="en">
@@ -88,8 +90,11 @@ function printAssistantResult(message: Message, workspace: string) {
     .header { border-bottom: 2px solid #232323; padding-bottom: 12px; margin-bottom: 18px; }
     .eyebrow { margin: 0 0 4px; font-size: 8pt; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
     h1 { margin: 0; font-size: 20pt; line-height: 1.15; }
+    h2 { margin: 0 0 7px; font-size: 9pt; line-height: 1.2; letter-spacing: .08em; text-transform: uppercase; }
     .context { margin-top: 7px; color: #555; font-size: 9pt; }
-    .result { white-space: pre-wrap; overflow-wrap: anywhere; font-family: Arial, Helvetica, sans-serif; }
+    .question { margin-bottom: 18px; border: 1px solid #d7d7d7; border-left: 3px solid #333; padding: 10px 12px; break-inside: avoid; }
+    .question-text, .result { white-space: pre-wrap; overflow-wrap: anywhere; font-family: Arial, Helvetica, sans-serif; }
+    .answer { margin-top: 0; }
     .meta { margin-top: 18px; border-top: 1px solid #bdbdbd; padding-top: 9px; color: #555; font-size: 8.5pt; }
     .footer { margin-top: 24px; border-top: 1px solid #ddd; padding-top: 9px; color: #666; font-size: 8pt; }
     .footer strong { color: #333; }
@@ -106,7 +111,14 @@ function printAssistantResult(message: Message, workspace: string) {
       <h1>VIBPE Co-Pilot Result</h1>
       <div id="context" class="context"></div>
     </header>
-    <section id="result" class="result"></section>
+    <section id="question-section" class="question" hidden>
+      <h2>Question</h2>
+      <div id="question" class="question-text"></div>
+    </section>
+    <section class="answer">
+      <h2>VIBPE Answer</h2>
+      <div id="result" class="result"></div>
+    </section>
     <div id="meta" class="meta"></div>
     <footer class="footer"><strong>Advisory / read-only analysis.</strong> Authorised transaction workspaces and governed records remain the controlling business authority.<br />© 2026 Vāyú Shastr Pvt Ltd. All Rights Reserved.</footer>
   </main>
@@ -115,9 +127,15 @@ function printAssistantResult(message: Message, workspace: string) {
   printWindow.document.close();
 
   const context = printWindow.document.getElementById("context");
+  const questionSection = printWindow.document.getElementById("question-section");
+  const question = printWindow.document.getElementById("question");
   const result = printWindow.document.getElementById("result");
   const meta = printWindow.document.getElementById("meta");
   if (context) context.textContent = `${workspace} · Generated ${new Date().toLocaleString()}`;
+  if (includeQuestion && questionSection && question) {
+    questionSection.hidden = false;
+    question.textContent = message.question ?? "";
+  }
   if (result) result.textContent = message.text;
   if (meta) meta.textContent = message.meta ? `Evidence / lineage: ${message.meta}` : "Evidence / lineage: result displayed from the current governed VIBPE session.";
 
@@ -230,6 +248,7 @@ export function IbpeCopilot() {
             id: crypto.randomUUID(),
             role: "assistant",
             text: sections.join("\n\n"),
+            question: clean,
             meta: `Independent multi-intent review · ${batch.length} questions routed separately${synthesisInstruction ? " · overall synthesis included" : ""}`,
           },
         ]);
@@ -243,6 +262,7 @@ export function IbpeCopilot() {
           id: crypto.randomUUID(),
           role: "assistant",
           text: routed.text,
+          question: clean,
           meta: routed.meta,
           traceabilityQuery: routed.traceabilityQuery,
         },
@@ -254,6 +274,7 @@ export function IbpeCopilot() {
           id: crypto.randomUUID(),
           role: "assistant",
           text: error instanceof Error ? error.message : `${VIBPE_COPILOT_NAME} request failed.`,
+          question: clean,
         },
       ]);
     } finally {
