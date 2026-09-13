@@ -264,8 +264,9 @@ export function compileAdvancedPlanningMathematicalModel(
         for (const proc of procurementVarsBySkuReceipt.get(`${sku}::${receiptPeriod}`) ?? []) addTerm(terms, proc.variableId, proc.qtyPerLot);
       }
       const committed = (receiptsBySku.get(sku) ?? []).filter((row) => row.period <= period).reduce((sum, row) => sum + row.quantity, 0);
+      const materialRhs = -(opening + committed);
       addConstraint({
-        id: c("MATERIAL_CUMULATIVE", sku, period), sense: "ge", rhs: -(opening + committed), terms,
+        id: c("MATERIAL_CUMULATIVE", sku, period), sense: "ge", rhs: Math.abs(materialRhs) <= 1e-12 ? 0 : materialRhs, terms,
         semantic: `protected cumulative material balance ${sku} M${period}`,
       });
     }
