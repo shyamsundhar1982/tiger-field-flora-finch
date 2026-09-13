@@ -27,6 +27,8 @@ export type AdvancedOptimizerExecutionReceipt = {
   peakAdditionalFundingLakh: number | null;
   peakFundingPeriod: number | null;
   baselineReserveFundingNeedLakh: number | null;
+  fundingEvidenceBasis: string | null;
+  authoritativeForFundingDecision: boolean | null;
   accepted: boolean;
   firstInfeasibilityWitness: string | null;
   issueCount: number;
@@ -150,6 +152,8 @@ export const runAdvancedOptimizerFromPacket = createServerFn({ method: "POST" })
       peakAdditionalFundingLakh: fundingRequirement?.peakAdditionalFundingLakh ?? null,
       peakFundingPeriod: fundingRequirement?.peakFundingPeriod ?? null,
       baselineReserveFundingNeedLakh: fundingRequirement?.baselineReserveFundingNeedLakh ?? null,
+      fundingEvidenceBasis: fundingRequirement?.evidenceBasis ?? null,
+      authoritativeForFundingDecision: fundingRequirement?.authoritativeForFundingDecision ?? null,
       accepted: governedRun.accepted,
       firstInfeasibilityWitness,
       issueCount: governedRun.issues.length,
