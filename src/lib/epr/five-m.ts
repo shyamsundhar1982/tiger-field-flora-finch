@@ -1,15 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { getCommandRole } from "@/lib/command-access";
+import { requireBusinessActor } from "@/lib/business-actor";
 import { getSql } from "@/lib/db";
 
 const id = z.string().min(1);
 const resultSchema = z.enum(["pass", "fail", "conditional"]);
 
 async function admin() {
-  const role = await getCommandRole();
-  if (role !== "admin") throw new Error("Admin Command access is required for 5M controls.");
-  return role;
+  const actor = await requireBusinessActor("admin");
+  return actor.userId;
 }
 
 export const startControlledOperation = createServerFn({ method: "POST" })

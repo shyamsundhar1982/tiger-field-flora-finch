@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getCommandRole } from "@/lib/command-access";
+import { requireBusinessActor } from "@/lib/business-actor";
 import { getSql } from "@/lib/db";
 
 const id = z.string().min(1);
@@ -35,10 +36,9 @@ export const getSerialGenealogy = createServerFn({ method: "GET" })
 export const rebuildSerialGenealogy = createServerFn({ method: "POST" })
   .validator(z.object({ travellerId: id }))
   .handler(async ({ data }) => {
-    const role = await command();
-    if (role !== "admin") throw new Error("Admin Command access is required to rebuild genealogy.");
+    const actor = await requireBusinessActor("admin");
     const sql = await getSql();
-    const rows = await sql.query<{ records: number }>(`select rebuild_epr_genealogy($1,$2) as records`, [data.travellerId, role]);
+    const rows = await sql.query<{ records: number }>(`select rebuild_epr_genealogy($1,$2) as records`, [data.travellerId, actor.userId]);
     return { ok: true, records: Number(rows[0]?.records ?? 0) };
   });
 

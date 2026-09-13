@@ -53,6 +53,9 @@ jobs:
       - name: Security boundary regression gate
         run: node --experimental-strip-types --test scripts/security-boundary-regression.test.mjs
 
+      - name: EPR individual mutation authority gate
+        run: node --test scripts/epr-individual-authority.test.mjs
+
       - name: Generate route tree and typecheck
         run: npm run typecheck
 

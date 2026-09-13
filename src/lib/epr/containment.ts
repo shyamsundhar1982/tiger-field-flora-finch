@@ -1,12 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getCommandRole } from "@/lib/command-access";
+import { requireBusinessActor } from "@/lib/business-actor";
 import { getSql } from "@/lib/db";
 
 async function requireCommand(write = false) {
+  if (write) {
+    const actor = await requireBusinessActor("admin");
+    return actor.userId;
+  }
   const role = await getCommandRole();
   if (!role) throw new Error("Command access is required for EPR access.");
-  if (write && role !== "admin") throw new Error("Admin Command access is required for EPR mutations.");
   return role;
 }
 
