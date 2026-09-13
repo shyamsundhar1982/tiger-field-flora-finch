@@ -30,6 +30,15 @@ test("live HiGHS Wasm is prepared from the pinned package and bundled as a relat
   assert.match(execution, /\.\.\/generated\/highs\.wasm/);
 });
 
+test("Worker bundle resolves the governed optimizer to the patched HiGHS ESM entry", async () => {
+  const vite = await source("vite.config.ts");
+  const runtime = await source("src/lib/advanced-planning-highs-runtime.ts");
+  assert.match(runtime, /import loadHighs from "highs"/);
+  assert.match(vite, /find:\s*\/\^highs\$\//);
+  assert.match(vite, /node_modules[\s\S]*highs[\s\S]*build[\s\S]*highs\.mjs/);
+  assert.doesNotMatch(vite, /highs\.js"/);
+});
+
 test("HiGHS ESM loader keeps a valid module URL when Cloudflare strips import.meta.url", async () => {
   const root = await mkdtemp(join(tmpdir(), "vyndi-highs-loader-"));
   try {
