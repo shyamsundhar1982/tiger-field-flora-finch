@@ -4,15 +4,18 @@ import test from "node:test";
 
 const server = fs.readFileSync(new URL("../src/lib/vibpe-governance-server.ts", import.meta.url), "utf8");
 const priority = fs.readFileSync(new URL("../src/lib/vibpe-operational-control-priority.ts", import.meta.url), "utf8");
+const completion = fs.readFileSync(new URL("../src/lib/vibpe-operational-control-completion.ts", import.meta.url), "utf8");
 const audit = fs.readFileSync(new URL("../src/lib/vibpe-operational-control-audit.ts", import.meta.url), "utf8");
 
 test("exact operational controls route before generic planning/governance fallbacks", () => {
   assert.match(server, /tryVibpePriorityOperationalControl/);
+  assert.match(server, /tryVibpeOperationalControlCompletion/);
   assert.match(server, /tryVibpeOperationalControlAudit/);
   assert.match(server, /Exact operational-control answer: NOT VERIFIED/);
   assert.match(server, /will not substitute a planning summary, traceability lookup, knowledge-pack excerpt, or generic recommendation/);
 
   const priorityCall = server.indexOf("await tryVibpePriorityOperationalControl");
+  const completionCall = server.indexOf("await tryVibpeOperationalControlCompletion");
   const auditCall = server.indexOf("await tryVibpeOperationalControlAudit");
   const optimizerCall = server.indexOf("await answerGovernedOptimizerExecutionRequest");
   const specialistCall = server.indexOf("await tryVibpeLiveSpecialistAnswer");
@@ -20,7 +23,8 @@ test("exact operational controls route before generic planning/governance fallba
   const exactGuard = server.lastIndexOf("isExactOperationalControlQuestion(question)");
 
   assert.ok(priorityCall >= 0);
-  assert.ok(auditCall > priorityCall);
+  assert.ok(completionCall > priorityCall);
+  assert.ok(auditCall > completionCall);
   assert.ok(optimizerCall > auditCall);
   assert.ok(specialistCall > optimizerCall);
   assert.ok(governanceCall > specialistCall);
@@ -44,7 +48,39 @@ test("priority P0 audit failures retain direct governed handlers", () => {
   assert.match(priority, /vyndi_suppliers/);
 });
 
-test("operational audit covers order, BOM, inventory, PO, supplier, capacity, routing and CTP authorities", () => {
+test("completion handlers cover the formerly unresolved audit families", () => {
+  for (const evidence of [
+    "Confirmed-order producibility:",
+    "Material-clear non-material blocker check:",
+    "Confirmed-order configuration completeness:",
+    "Active-job-card exact material requirements:",
+    "BOM-to-job-card explosion reconciliation:",
+    "Operation/procurable-material separation:",
+    "Issued-material/open-procurement control:",
+    "ATP consistency control:",
+    "Committed-SKU inventory transaction lineage:",
+    "Procurement backward/forward lineage:",
+    "Committed shortages inside lead time:",
+    "Receipt-vs-job-card due-period check: NOT VERIFIED",
+    "PO lifecycle control:",
+    "Confirmed-order capacity:",
+    "Approved-plan capacity:",
+    "Planning conclusions dependent on provisional authority:",
+  ]) assert.ok(completion.includes(evidence), `missing completion control evidence: ${evidence}`);
+});
+
+test("BOM equality uses released mapping IDs and exact job-card material lines", () => {
+  assert.match(completion, /jsonb_array_elements_text/);
+  assert.match(completion, /released_mapping_set/);
+  assert.match(completion, /epr_bom_inventory_mappings/);
+  assert.match(completion, /epr_production_job_card_lines/);
+  assert.match(completion, /QUANTITY_MISMATCH/);
+  assert.match(completion, /SKU_MISMATCH/);
+  assert.match(completion, /UNIT_MISMATCH/);
+  assert.match(completion, /procurement-ledger agreement is not a substitute/);
+});
+
+test("operational audit covers order, inventory, PO, supplier, capacity, routing and CTP authorities", () => {
   for (const authority of [
     "vyndi_report_order_book_sync",
     "vyndi_report_bom_compliance",
@@ -66,7 +102,6 @@ test("operational audit covers order, BOM, inventory, PO, supplier, capacity, ro
 
   for (const conclusion of [
     "Sales-order/job-card revision control:",
-    "BOM release/compliance control:",
     "Inventory reservation health:",
     "ATP non-negativity control:",
     "Inventory arithmetic reconciliation:",
@@ -82,12 +117,6 @@ test("operational audit covers order, BOM, inventory, PO, supplier, capacity, ro
     "Firm capable-to-promise (CTP): NOT YET ELIGIBLE",
     "Capacity-expansion test:",
   ]) assert.ok(audit.includes(conclusion), `missing exact audit conclusion: ${conclusion}`);
-});
-
-test("BOM questions cannot receive the generic procurement reconciliation PASS", () => {
-  assert.match(audit, /BOM release\/compliance control:/);
-  assert.match(audit, /does not by itself prove every exploded material quantity equals the BOM quantity-per-unit/);
-  assert.doesNotMatch(audit, /Operational reconciliation: PASS/);
 });
 
 test("firm CTP answer is authority gated rather than inferred from zero capacity shortfall", () => {
