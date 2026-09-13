@@ -44,10 +44,27 @@ jobs:
   responsive-browser-acceptance:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: vyndi_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d vyndi_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       COMMAND_PASSWORD: stage-d-ci-disposable-password
       VITE_AUTH_ENABLED: "false"
       STAGE_D_BASE_URL: http://localhost:8080
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vyndi_ci
+      CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE: postgresql://postgres:postgres@localhost:5432/vyndi_ci
+      VYNDI_ALLOW_DB_MIGRATIONS: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,6 +77,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Migrate isolated browser database
+        run: npm run db:migrate
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
