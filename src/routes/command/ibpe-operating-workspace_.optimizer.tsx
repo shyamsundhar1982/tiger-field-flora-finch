@@ -44,8 +44,12 @@ function GovernedOptimizerPage() {
     try {
       const response = await runAdvancedPlanningFromLatestIbpe();
       setPacketMessage(
-        `Governed packet ${response.id} persisted from IBPE run ${response.parentIbpeRunId}. Refreshing readiness evidence…`,
+        `Governed packet ${response.id} persisted from IBPE run ${response.parentIbpeRunId}. Reloading the optimizer against this exact packet…`,
       );
+      if (typeof window !== "undefined") {
+        window.location.reload();
+        return;
+      }
       await router.invalidate();
     } catch (error) {
       setPacketMessage(error instanceof Error ? error.message : "Governed advanced-planning packet preparation failed.");
