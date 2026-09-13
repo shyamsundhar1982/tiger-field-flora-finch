@@ -20,6 +20,10 @@ function fundingText(value: string | number | null | undefined) {
   return Number.isFinite(parsed) ? `₹${parsed.toFixed(parsed % 1 === 0 ? 0 : 1)}L` : "—";
 }
 
+function truthyDatabaseBoolean(value: string | boolean | null | undefined) {
+  return value === true || value === "true";
+}
+
 function GovernedOptimizerPage() {
   const state = Route.useLoaderData();
   const router = useRouter();
@@ -72,12 +76,16 @@ function GovernedOptimizerPage() {
       }
 
       setResult(response as unknown as Record<string, unknown>);
+      const provisionalFunding = response.fundingEvidenceBasis === "provisional-test-or-benchmark"
+        || response.authoritativeForFundingDecision === false;
       const fundingDependency = response.cashPlanningDisposition === "funding-required"
         && response.firstFundingNeedLakh !== null
         && response.firstFundingNeedPeriod !== null
         && response.peakAdditionalFundingLakh !== null
         && response.peakFundingPeriod !== null
-        ? ` Planning disposition funding-required: funding starts with ₹${response.firstFundingNeedLakh}L by period ${response.firstFundingNeedPeriod}; peak additional funding reaches ₹${response.peakAdditionalFundingLakh}L by period ${response.peakFundingPeriod}. Execution remains blocked until funding is evidenced.`
+        ? provisionalFunding
+          ? ` Provisional scenario exposure: first modeled cash gap ₹${response.firstFundingNeedLakh}L by period ${response.firstFundingNeedPeriod}; peak modeled exposure ₹${response.peakAdditionalFundingLakh}L by period ${response.peakFundingPeriod}. Supplier economics are test/benchmark based, so this is not an authoritative fundraising requirement.`
+          : ` Planning disposition funding-required: funding starts with ₹${response.firstFundingNeedLakh}L by period ${response.firstFundingNeedPeriod}; peak additional funding reaches ₹${response.peakAdditionalFundingLakh}L by period ${response.peakFundingPeriod}. Execution remains blocked until funding is evidenced.`
         : "";
       setMessage(
         `Persisted ${response.optimizationRunId}. Mathematical status ${response.mathematicalStatus}; cash governance ${response.cashGovernanceStatus}; planning ${response.cashPlanningDisposition}; accepted=${response.accepted ? "yes" : "no"}.${fundingDependency}${response.firstInfeasibilityWitness ? ` ${response.firstInfeasibilityWitness}` : ""}`,
@@ -89,6 +97,11 @@ function GovernedOptimizerPage() {
       setBusy(false);
     }
   }
+
+  const recentFundingAuthoritative = truthyDatabaseBoolean(state.recentRun?.authoritative_for_funding_decision);
+  const recentFundingProvisional = state.recentRun?.funding_evidence_basis === "provisional-test-or-benchmark"
+    || state.recentRun?.authoritative_for_funding_decision === "false"
+    || state.recentRun?.authoritative_for_funding_decision === false;
 
   return (
     <div className="space-y-6">
@@ -140,7 +153,7 @@ function GovernedOptimizerPage() {
             type="button"
             onClick={() => void preparePacket()}
             disabled={packetBusy || busy}
-            className="rounded-md border border-border px-4 py-2 text-sm font-semibold text-fg hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-md border border-border px-4 py-2 text-sm font-semibold text-fg hover:border-accent hover:text-fg disabled:cursor-not-allowed disabled:opacity-40"
           >
             {packetBusy
               ? "Building governed packet…"
@@ -174,25 +187,39 @@ function GovernedOptimizerPage() {
         {state.recentRun ? (
           <>
             {state.recentRun.cash_planning_disposition === "funding-required" ? (
-              <div className="mb-4 rounded-lg border border-warn/30 bg-warn/5 p-4">
-                <p className="text-sm font-semibold text-warn">Funding-dependent plan · execution blocked until funding is evidenced</p>
-                <p className="mt-1 text-xs leading-5 text-muted">
-                  The mathematical plan is feasible, but current governed liquidity is insufficient to preserve the required reserve.
-                  First funding need: {fundingText(state.recentRun.first_funding_need_lakh)} by period {state.recentRun.first_funding_need_period ?? "—"}.
-                  Peak additional funding requirement: {fundingText(state.recentRun.peak_additional_funding_lakh)} by period {state.recentRun.peak_funding_period ?? "—"}.
-                  This is a conditional planning result, not authority to raise, spend or commit funds.
-                </p>
-              </div>
+              recentFundingProvisional ? (
+                <div className="mb-4 rounded-lg border border-warn/30 bg-warn/5 p-4">
+                  <p className="text-sm font-semibold text-warn">Scenario capital exposure · provisional supplier economics</p>
+                  <p className="mt-1 text-xs leading-5 text-muted">
+                    This is not an authoritative fundraising requirement. Supplier economics include test, benchmark, or assumption evidence.
+                    First modeled cash gap: {fundingText(state.recentRun.first_funding_need_lakh)} by period {state.recentRun.first_funding_need_period ?? "—"}.
+                    Peak modeled scenario exposure: {fundingText(state.recentRun.peak_additional_funding_lakh)} by period {state.recentRun.peak_funding_period ?? "—"}.
+                    Replace provisional supplier evidence before using these values for an actual funding decision.
+                  </p>
+                </div>
+              ) : (
+                <div className="mb-4 rounded-lg border border-warn/30 bg-warn/5 p-4">
+                  <p className="text-sm font-semibold text-warn">Funding-dependent plan · execution blocked until funding is evidenced</p>
+                  <p className="mt-1 text-xs leading-5 text-muted">
+                    The mathematical plan is feasible, but current governed liquidity is insufficient to preserve the required reserve.
+                    First funding need: {fundingText(state.recentRun.first_funding_need_lakh)} by period {state.recentRun.first_funding_need_period ?? "—"}.
+                    Peak additional funding requirement: {fundingText(state.recentRun.peak_additional_funding_lakh)} by period {state.recentRun.peak_funding_period ?? "—"}.
+                    This is a conditional planning result, not authority to raise, spend or commit funds.
+                  </p>
+                </div>
+              )
             ) : null}
             <div className="grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-3">
               <div><p className="text-xs text-muted">Run</p><p className="mt-1 font-mono text-xs text-fg">{state.recentRun.id}</p></div>
               <div><p className="text-xs text-muted">Mathematical status</p><p className="mt-1 text-fg">{state.recentRun.optimization_status}</p></div>
               <div><p className="text-xs text-muted">Cash governance</p><p className="mt-1 text-fg">{state.recentRun.cash_guardrail_status ?? "not-evaluated"}</p></div>
               <div><p className="text-xs text-muted">Planning disposition</p><p className="mt-1 text-fg">{state.recentRun.cash_planning_disposition ?? "legacy / not classified"}</p></div>
-              <div><p className="text-xs text-muted">First funding need</p><p className="mt-1 text-fg">{fundingText(state.recentRun.first_funding_need_lakh)}</p></div>
-              <div><p className="text-xs text-muted">First funding needed by</p><p className="mt-1 text-fg">{state.recentRun.first_funding_need_period ? `Period ${state.recentRun.first_funding_need_period}` : "—"}</p></div>
-              <div><p className="text-xs text-muted">Peak additional funding</p><p className="mt-1 text-fg">{fundingText(state.recentRun.peak_additional_funding_lakh)}</p></div>
-              <div><p className="text-xs text-muted">Peak funding period</p><p className="mt-1 text-fg">{state.recentRun.peak_funding_period ? `Period ${state.recentRun.peak_funding_period}` : "—"}</p></div>
+              <div><p className="text-xs text-muted">Funding evidence basis</p><p className="mt-1 text-fg">{state.recentRun.funding_evidence_basis ?? "legacy / not classified"}</p></div>
+              <div><p className="text-xs text-muted">Authoritative for funding decision</p><p className="mt-1 text-fg">{state.recentRun.funding_evidence_basis ? (recentFundingAuthoritative ? "yes" : "no") : "legacy / not classified"}</p></div>
+              <div><p className="text-xs text-muted">{recentFundingProvisional ? "First modeled cash gap" : "First funding need"}</p><p className="mt-1 text-fg">{fundingText(state.recentRun.first_funding_need_lakh)}</p></div>
+              <div><p className="text-xs text-muted">{recentFundingProvisional ? "First modeled gap period" : "First funding needed by"}</p><p className="mt-1 text-fg">{state.recentRun.first_funding_need_period ? `Period ${state.recentRun.first_funding_need_period}` : "—"}</p></div>
+              <div><p className="text-xs text-muted">{recentFundingProvisional ? "Peak scenario capital exposure" : "Peak additional funding"}</p><p className="mt-1 text-fg">{fundingText(state.recentRun.peak_additional_funding_lakh)}</p></div>
+              <div><p className="text-xs text-muted">{recentFundingProvisional ? "Peak scenario period" : "Peak funding period"}</p><p className="mt-1 text-fg">{state.recentRun.peak_funding_period ? `Period ${state.recentRun.peak_funding_period}` : "—"}</p></div>
               <div><p className="text-xs text-muted">Baseline reserve funding need</p><p className="mt-1 text-fg">{fundingText(state.recentRun.baseline_reserve_funding_need_lakh)}</p></div>
               <div><p className="text-xs text-muted">Accepted for execution</p><p className="mt-1 text-fg">{state.recentRun.accepted ? "yes" : "no"}</p></div>
               <div><p className="text-xs text-muted">Objective</p><p className="mt-1 text-fg">{state.recentRun.objective_value ?? "—"}</p></div>
