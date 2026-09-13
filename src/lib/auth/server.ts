@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth";
+import { createAuthMiddleware } from "better-auth/api";
 import { bearer, genericOAuth } from "better-auth/plugins";
 import { getCookie } from "@tanstack/react-start/server";
 import { randomBytes } from "node:crypto";
@@ -17,6 +18,7 @@ import {
 import { requestSafePostgresPoolConfig } from "../postgres-pool";
 import { resolvePostgresTransport } from "../postgres-runtime";
 import { AUTH_TRUSTED_ORIGINS, resolveAuthBaseURL, resolveAuthSecret } from "./runtime-config";
+import { excessActiveSessionTokens } from "./session-concurrency";
 import { VYNDI_SESSION_POLICY } from "./session-policy";
 
 void ensureDbReady();
@@ -121,6 +123,24 @@ export const auth = betterAuth({
   },
 
   session: VYNDI_SESSION_POLICY,
+
+  hooks: {
+    after: createAuthMiddleware(async (ctx) => {
+      const newSession = ctx.context.newSession;
+      if (!newSession) return;
+      try {
+        const sessions = await ctx.context.internalAdapter.listSessions(newSession.user.id);
+        const excessTokens = excessActiveSessionTokens(sessions, newSession.session.token);
+        await Promise.all(
+          excessTokens.map((token) => ctx.context.internalAdapter.deleteSession(token)),
+        );
+      } catch (error) {
+        // Do not strand a valid newly-created login because cleanup failed.
+        // The 24-hour expiry still bounds exposure and the next login retries.
+        ctx.context.logger.error("VYNDI session-concurrency cleanup failed", error);
+      }
+    }),
+  },
 
   // VINDY administrators create accounts for other people. Creating a user must
   // NEVER sign the administrator into the newly-created account. Better Auth's
