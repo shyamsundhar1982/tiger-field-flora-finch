@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getCommandRole } from "@/lib/command-access";
+import { requireBusinessActor } from "@/lib/business-actor";
 import { getSql } from "@/lib/db";
 
 const venture = z.enum(["carbon", "aluminium"]);
@@ -8,10 +9,14 @@ const modelId = z.enum(["core", "pro", "apex"]);
 const gateIds = ["EPR-04","EPR-05","EPR-06","EPR-07","EPR-08","EPR-09","EPR-10","EPR-11","EPR-12"] as const;
 const makeId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
 
-async function admin() {
+async function admin(write = false) {
+  if (write) {
+    const actor = await requireBusinessActor("admin");
+    return actor.userId;
+  }
   const role = await getCommandRole();
   if (!role) throw new Error("Command access is required.");
-  if (role !== "admin") throw new Error("Admin Command access is required for EPR control mutations.");
+  if (role !== "admin") throw new Error("Admin Command access is required for EPR control views.");
   return role;
 }
 
@@ -31,7 +36,7 @@ export const listEprMappings = createServerFn({ method: "GET" }).handler(async (
 export const createEprMapping = createServerFn({ method: "POST" }).validator(z.object({
   venture, modelId, bomRevision: z.string().min(1).max(120), bomLineKey: z.string().min(1).max(160), sku: z.string().min(1).max(120), quantity: z.number().positive(), unit: z.string().min(1).max(30), notes: z.string().max(2000).default(""),
 })).handler(async ({ data }) => {
-  const actor = await admin();
+  const actor = await admin(true);
   const sql = await getSql();
   const master = await sql.query<{ id: string; status: string; code: string }>(
     `select id,status,code from master_data_records where domain='inventory' and code=$1 and status='approved' order by revision desc limit 1`,
@@ -45,7 +50,7 @@ export const createEprMapping = createServerFn({ method: "POST" }).validator(z.o
 });
 
 export const approveEprMapping = createServerFn({ method: "POST" }).validator(z.object({ mappingId: z.string().min(1) })).handler(async ({ data }) => {
-  const actor = await admin();
+  const actor = await admin(true);
   const sql = await getSql();
   const rows = await sql.query<{id:string;venture:"carbon"|"aluminium";model_id:string;bom_revision:string;bom_line_key:string;sku:string;unit:string;status:string}>(`select id,venture,model_id,bom_revision,bom_line_key,sku,unit,status from epr_bom_inventory_mappings where id=$1`,[data.mappingId]);
   const m = rows[0];
@@ -60,13 +65,13 @@ export const approveEprMapping = createServerFn({ method: "POST" }).validator(z.
 });
 
 export const retireEprMapping = createServerFn({ method: "POST" }).validator(z.object({ mappingId: z.string().min(1), reason: z.string().min(1).max(1000) })).handler(async ({ data }) => {
-  const actor = await admin();
+  const actor = await admin(true);
   const sql = await getSql();
   const rows = await sql.query<{id:string;venture:"carbon"|"aluminium";status:string}>(`select id,venture,status from epr_bom_inventory_mappings where id=$1`,[data.mappingId]);
   const m=rows[0];
   if (!m) throw new Error("BOM-SKU mapping not found.");
   if (m.status !== "active") throw new Error("Only active mappings can be retired.");
-  await sql.query(`update epr_bom_inventory_mappings set status='superseded',effective_to=now(),updated_at=now(),notes=case when notes='' then $1 else notes || E'\\n' || $1 end where id=$2`,[`Retired: ${data.reason}`,m.id]);
+  await sql.query(`update epr_bom_inventory_mappings set status='superseded',effective_to=now(),updated_at=now(),notes=case when notes='' then $1 else notes || E'\n' || $1 end where id=$2`,[`Retired: ${data.reason}`,m.id]);
   await audit(sql,m.venture,"bom_inventory_mapping",m.id,"retired",actor,data);
   return { ok:true };
 });
@@ -74,7 +79,7 @@ export const retireEprMapping = createServerFn({ method: "POST" }).validator(z.o
 export const createInventoryOpeningBalance = createServerFn({ method: "POST" }).validator(z.object({
   venture, sku: z.string().min(1).max(120), unit: z.string().min(1).max(30), quantity: z.number().positive(), unitCostInr: z.number().nonnegative(), reference: z.string().min(1).max(300), notes: z.string().max(2000).default(""),
 })).handler(async ({ data }) => {
-  const actor=await admin(); const sql=await getSql(); const id=makeId("OPEN");
+  const actor=await admin(true); const sql=await getSql(); const id=makeId("OPEN");
   const mapped=await sql.query(`select id from epr_bom_inventory_mappings where venture=$1 and sku=$2 and unit=$3 and status='active' and effective_from<=now() and (effective_to is null or effective_to>now()) limit 1`,[data.venture,data.sku,data.unit]);
   if(!mapped[0]) throw new Error("Opening balance requires an active BOM-SKU mapping for the same venture, SKU and unit.");
   await sql.query(`insert into epr_inventory_opening_balances (id,venture,sku,unit,quantity,unit_cost_inr,reference,notes,created_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,[id,data.venture,data.sku,data.unit,data.quantity,data.unitCostInr,data.reference,data.notes,actor]);
@@ -83,7 +88,7 @@ export const createInventoryOpeningBalance = createServerFn({ method: "POST" }).
 });
 
 export const approveInventoryOpeningBalance = createServerFn({ method: "POST" }).validator(z.object({ openingId:z.string().min(1) })).handler(async ({data})=>{
-  const actor=await admin(); const sql=await getSql();
+  const actor=await admin(true); const sql=await getSql();
   const rows=await sql.query<{id:string;venture:"carbon"|"aluminium";sku:string;unit:string;status:string}>(`select id,venture,sku,unit,status from epr_inventory_opening_balances where id=$1`,[data.openingId]);
   const row=rows[0];
   if(!row) throw new Error("Opening balance not found.");
@@ -96,7 +101,7 @@ export const approveInventoryOpeningBalance = createServerFn({ method: "POST" })
 });
 
 export const postInventoryOpeningBalance = createServerFn({ method: "POST" }).validator(z.object({ openingId:z.string().min(1) })).handler(async ({data})=>{
-  const actor=await admin(); const sql=await getSql();
+  const actor=await admin(true); const sql=await getSql();
   const movementId=makeId("MOV"); const ledgerId=makeId("LED"); const costLedgerId=makeId("COST");
   const rows=await sql.query<{movement_id:string;ledger_id:string;resulting_balance:number|string}>(`select * from post_epr_inventory_opening_balance($1,$2,$3,$4,$5)`,[data.openingId,movementId,ledgerId,costLedgerId,actor]);
   if(!rows[0]) throw new Error("Opening balance was not posted.");
@@ -114,10 +119,10 @@ export const getAuthoritativeInventoryControl = createServerFn({ method: "GET" }
 });
 
 export const acceptEprEvidence = createServerFn({ method: "POST" }).validator(z.object({ evidenceId:z.string().min(1), disposition:z.enum(["accepted","rejected"]), notes:z.string().max(2000).default("") })).handler(async ({data})=>{
-  const actor=await admin(); const sql=await getSql();
+  const actor=await admin(true); const sql=await getSql();
   const rows=await sql.query<{id:string;traveller_id:string;venture:"carbon"|"aluminium";disposition:string}>(`select e.id,e.traveller_id,t.venture,e.disposition from epr_evidence e join epr_travellers t on t.id=e.traveller_id where e.id=$1`,[data.evidenceId]);
   const row=rows[0]; if(!row) throw new Error("Evidence record not found.");
-  await sql.query(`update epr_evidence set disposition=$1,notes=case when $2='' then notes else notes || E'\\n' || $2 end where id=$3`,[data.disposition,data.notes,row.id]);
+  await sql.query(`update epr_evidence set disposition=$1,notes=case when $2='' then notes else notes || E'\n' || $2 end where id=$3`,[data.disposition,data.notes,row.id]);
   await audit(sql,row.venture,"evidence",row.id,`disposition_${data.disposition}`,actor,data);
   return {ok:true};
 });
@@ -146,7 +151,7 @@ export const getEprReleaseReadiness = createServerFn({ method: "GET" }).validato
 });
 
 export const releaseEprTraveller = createServerFn({ method: "POST" }).validator(z.object({ travellerId:z.string().min(1) })).handler(async ({data})=>{
-  const actor=await admin(); const sql=await getSql();
+  const actor=await admin(true); const sql=await getSql();
   const readiness=await getEprReleaseReadiness({data});
   if(!readiness.ready) throw new Error(`EPR release blocked: ${readiness.blockers.join(" ")}`);
   await sql.query(`update epr_travellers set status='completed',updated_at=now() where id=$1`,[data.travellerId]);
