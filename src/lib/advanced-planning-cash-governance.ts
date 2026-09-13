@@ -9,7 +9,7 @@ import {
   type ProcurementCashGuardrailResult,
 } from "./advanced-planning-cash-guardrails.ts";
 
-export const ADVANCED_CASH_GOVERNANCE_VERSION = "VYNDI-ADVANCED-CASH-GOVERNANCE-0.3" as const;
+export const ADVANCED_CASH_GOVERNANCE_VERSION = "VYNDI-ADVANCED-CASH-GOVERNANCE-0.4" as const;
 
 export type CashPlanningDisposition =
   | "execution-ready"
@@ -17,12 +17,16 @@ export type CashPlanningDisposition =
   | "cash-evidence-incomplete"
   | "not-evaluated";
 
+export type FundingEvidenceBasis = "commercially-governed" | "provisional-test-or-benchmark";
+
 export type CashFundingRequirement = {
   firstFundingNeedLakh: number;
   firstFundingNeedPeriod: number;
   peakAdditionalFundingLakh: number;
   peakFundingPeriod: number;
   baselineReserveFundingNeedLakh: number;
+  evidenceBasis: FundingEvidenceBasis;
+  authoritativeForFundingDecision: boolean;
   reason: "reserve-preserving-liquidity-gap";
   executionBlockedUntilFundingEvidenced: true;
   planningScenarioConditionallyFeasible: true;
@@ -51,8 +55,16 @@ function round(value: number) {
   return Number(value.toFixed(6));
 }
 
+function fundingEvidenceBasis(model: AdvancedPlanningConstraintModel): FundingEvidenceBasis {
+  const provisional = model.supplierLanes
+    .filter((lane) => lane.approved)
+    .some((lane) => /TEST|BENCHMARK|ASSUMPTION/i.test([lane.id, lane.supplierId, lane.sourceRef ?? ""].join(" ")));
+  return provisional ? "provisional-test-or-benchmark" : "commercially-governed";
+}
+
 function deriveFundingRequirement(
   result: ProcurementCashGuardrailResult,
+  model: AdvancedPlanningConstraintModel,
 ): CashFundingRequirement | undefined {
   const deficitPeriods = result.periods
     .filter((period) => period.headroomAfterProposedProcurementLakh < -1e-9)
@@ -71,6 +83,7 @@ function deriveFundingRequirement(
     0,
     ...result.periods.map((period) => Math.max(0, -period.cumulativeHeadroomLakh)),
   ));
+  const evidenceBasis = fundingEvidenceBasis(model);
 
   return {
     firstFundingNeedLakh: round(Math.abs(firstDeficit.headroomAfterProposedProcurementLakh)),
@@ -78,6 +91,8 @@ function deriveFundingRequirement(
     peakAdditionalFundingLakh: round(Math.abs(peakDeficit.headroomAfterProposedProcurementLakh)),
     peakFundingPeriod: peakDeficit.period,
     baselineReserveFundingNeedLakh,
+    evidenceBasis,
+    authoritativeForFundingDecision: evidenceBasis === "commercially-governed",
     reason: "reserve-preserving-liquidity-gap",
     executionBlockedUntilFundingEvidenced: true,
     planningScenarioConditionallyFeasible: true,
@@ -160,7 +175,7 @@ export function applyCashGovernanceToOptimizationRun(
 
   const result = evaluateProcurementCashGuardrails(procurement, model.supplierLanes, guardrails);
   const fundingRequirement = result.status === "infeasible"
-    ? deriveFundingRequirement(result)
+    ? deriveFundingRequirement(result, model)
     : undefined;
 
   if (result.status === "infeasible") {
@@ -170,10 +185,19 @@ export function applyCashGovernanceToOptimizationRun(
       `Current evidenced liquidity cannot preserve the governed reserve${result.firstProposedBreachPeriod ? ` from period ${result.firstProposedBreachPeriod}` : result.firstBaselineBreachPeriod ? ` from period ${result.firstBaselineBreachPeriod}` : ""}. The mathematical solution is preserved, but execution remains blocked until sufficient funding or another governed cash action is evidenced.`,
     ));
     if (fundingRequirement) {
+      if (!fundingRequirement.authoritativeForFundingDecision) {
+        issues.push(cashIssue(
+          "warning",
+          "PROVISIONAL_FUNDING_EVIDENCE",
+          `Supplier economics include test, benchmark, or assumption evidence. The modeled first cash gap of ₹${fundingRequirement.firstFundingNeedLakh}L and peak scenario exposure of ₹${fundingRequirement.peakAdditionalFundingLakh}L are not authoritative fundraising requirements.`,
+        ));
+      }
       issues.push(cashIssue(
         "warning",
         "CAPITAL_DEPENDENT_PLAN",
-        `The mathematically feasible plan is funding-dependent: the first reserve-preserving funding need is ₹${fundingRequirement.firstFundingNeedLakh}L by period ${fundingRequirement.firstFundingNeedPeriod}, while the peak additional funding requirement is ₹${fundingRequirement.peakAdditionalFundingLakh}L by period ${fundingRequirement.peakFundingPeriod}. This is a conditional planning result, not authority to raise, spend or commit funds.`,
+        fundingRequirement.authoritativeForFundingDecision
+          ? `The mathematically feasible plan is funding-dependent: the first reserve-preserving funding need is ₹${fundingRequirement.firstFundingNeedLakh}L by period ${fundingRequirement.firstFundingNeedPeriod}, while the peak additional funding requirement is ₹${fundingRequirement.peakAdditionalFundingLakh}L by period ${fundingRequirement.peakFundingPeriod}. This is a conditional planning result, not authority to raise, spend or commit funds.`
+          : `The mathematically feasible plan has provisional scenario cash exposure: the first modeled gap is ₹${fundingRequirement.firstFundingNeedLakh}L by period ${fundingRequirement.firstFundingNeedPeriod}, while peak modeled exposure is ₹${fundingRequirement.peakAdditionalFundingLakh}L by period ${fundingRequirement.peakFundingPeriod}. These values are not an authoritative fundraising requirement.`,
       ));
     }
   } else if (result.status === "indeterminate") {
