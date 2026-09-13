@@ -133,8 +133,13 @@ export async function readVibpeOptimizerReleaseClosure(sql: Sql): Promise<VibpeO
   const audit = auditRows[0] ?? null;
 
   const governanceValid = isReleaseGovernanceReady(runDb?.governance_json);
+  const mathStatusEligible = run?.optimization_status === "optimal" || run?.optimization_status === "feasible";
+  const cashStatusEligible = run?.cash_guardrail_status === "feasible";
   const mathAndCashReady = Boolean(
-    run && isReleaseMathAndCashReady(run.optimization_status, run.cash_guardrail_status),
+    run
+      && mathStatusEligible
+      && cashStatusEligible
+      && isReleaseMathAndCashReady(run.optimization_status, run.cash_guardrail_status),
   );
   const accepted = Boolean(run?.accepted && mathAndCashReady);
   const exactLineage = hasExactReleaseLineage({
