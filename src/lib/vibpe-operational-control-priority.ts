@@ -56,6 +56,38 @@ async function confirmedShortages(sql: Sql) {
   ].join("\n\n");
 }
 
+async function sharedComponentAggregation(sql: Sql) {
+  const rows = await sql.query<Record<string, unknown>>(`
+    with job as (
+      select r.sku,count(distinct r.job_card_id)::int as job_cards,
+             sum(r.required_quantity)::numeric as job_required
+        from vyndi_live_job_card_requirements r
+        join epr_production_job_cards c on c.id=r.job_card_id
+        join vyndi_sales_orders o on o.id=c.sales_order_id and o.revision=c.sales_order_revision
+       where o.status='confirmed' and c.status<>'cancelled' and r.sku is not null
+         and coalesce(r.issue_status,'')<>'issued'
+       group by r.sku
+    ), committed as (
+      select sku,sum(committed_requirement)::numeric as committed_requirement
+        from vyndi_committed_procurement_requirements
+       group by sku
+    )
+    select j.sku,j.job_cards,j.job_required,coalesce(c.committed_requirement,0) as committed_requirement
+      from job j left join committed c on c.sku=j.sku
+     where j.job_cards>1
+     order by j.sku
+  `);
+  const bad = rows.filter((row) => Math.abs(n(row.job_required) - n(row.committed_requirement)) > 0.0001);
+  if (!bad.length) {
+    return `Shared-component aggregation: PASS — ${rows.length} SKU${rows.length === 1 ? "" : "s"} are required by more than one confirmed-order job card, and each aggregated committed requirement equals the summed job-card requirement; no shared component is evidenced as being counted only once.`;
+  }
+  return [
+    `Shared-component aggregation: FAIL — ${bad.length} shared SKU${bad.length === 1 ? "" : "s"} do not reconcile across multiple confirmed-order job cards.`,
+    bad.map((row) => `${clean(row.sku)}: ${n(row.job_cards).toFixed(0)} job cards, summed job requirement ${n(row.job_required).toFixed(1)}, committed procurement requirement ${n(row.committed_requirement).toFixed(1)}`).join("; "),
+    "Controlled next action: repair the cross-job aggregation before relying on procurement demand or shortage conclusions.",
+  ].join("\n\n");
+}
+
 async function draftPoLineage(sql: Sql) {
   const rows = await sql.query<Record<string, unknown>>(`
     select p.id as po_id,p.job_card_id,c.sales_order_id,p.sku,p.quantity
@@ -105,6 +137,7 @@ export async function tryVibpePriorityOperationalControl(sql: Sql, question: str
   if (/\bhow many\b/.test(q) && /\bconfirmed\b/.test(q) && /\b(customer\s+)?orders?\b/.test(q) && /\bunits?\b/.test(q)) return confirmedOrderCount(sql);
   if (/\bconfirmed\b/.test(q) && /\borders?\b/.test(q) && /\b(no|without|missing)\b[^.?!]{0,50}\b(job\s*card|production\s+job\s*card)\b/.test(q)) return missingJobCard(sql);
   if (/\bconfirmed[- ]order|confirmed\s+orders?|committed\b/.test(q) && /\bshortage|shortages|short\b/.test(q) && /\bprocure|procurement|purchase|need|now\b/.test(q)) return confirmedShortages(sql);
+  if (/components? required by more than one bike|counted only once/.test(q)) return sharedComponentAggregation(sql);
   if (/\bdraft\s+(?:purchase\s+orders?|pos?)\b/.test(q) && /\bhow many|which\b/.test(q) && /\b(job\s*card|confirmed\s+order|generated|originat|linked)\b/.test(q)) return draftPoLineage(sql);
   if (/\bdraft\s+(?:purchase\s+orders?|pos?)\b/.test(q) && /\b(no|without|missing|unassigned)\b[^.?!]{0,40}\bsupplier\b/.test(q)) return draftPoMissingSupplier(sql);
   if (/\bsuppliers?\b/.test(q) && /\b(lack|lacks|missing|without|no)\b/.test(q) && /\b(quality|delivery)\s+ratings?\b/.test(q)) return supplierRatingGap(sql, question);
