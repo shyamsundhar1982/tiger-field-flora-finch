@@ -32,5 +32,7 @@ jobs:
         run: node --test scripts/optimizer-resource-budget.test.mjs
       - name: Optimizer stale packet guard
         run: node --test scripts/optimizer-stale-packet-guard.test.mjs
+      - name: Optimizer packet refresh synchronization
+        run: node --test scripts/optimizer-packet-refresh-sync.test.mjs
       - name: Cloudflare bundle reachability
         run: npm run typecheck
