@@ -7,7 +7,7 @@ const priority = fs.readFileSync(new URL("../src/lib/vibpe-operational-control-p
 const completion = fs.readFileSync(new URL("../src/lib/vibpe-operational-control-completion.ts", import.meta.url), "utf8");
 const audit = fs.readFileSync(new URL("../src/lib/vibpe-operational-control-audit.ts", import.meta.url), "utf8");
 
-test("exact operational controls route before generic planning/governance fallbacks", () => {
+test("exact operational controls fail closed before generic planning/governance fallbacks", () => {
   assert.match(server, /tryVibpePriorityOperationalControl/);
   assert.match(server, /tryVibpeOperationalControlCompletion/);
   assert.match(server, /tryVibpeOperationalControlAudit/);
@@ -17,18 +17,18 @@ test("exact operational controls route before generic planning/governance fallba
   const priorityCall = server.indexOf("await tryVibpePriorityOperationalControl");
   const completionCall = server.indexOf("await tryVibpeOperationalControlCompletion");
   const auditCall = server.indexOf("await tryVibpeOperationalControlAudit");
+  const exactGuard = server.lastIndexOf("isExactOperationalControlQuestion(question)");
   const optimizerCall = server.indexOf("await answerGovernedOptimizerExecutionRequest");
   const specialistCall = server.indexOf("await tryVibpeLiveSpecialistAnswer");
   const governanceCall = server.indexOf("await tryGovernanceDataAnswer");
-  const exactGuard = server.lastIndexOf("isExactOperationalControlQuestion(question)");
 
   assert.ok(priorityCall >= 0);
   assert.ok(completionCall > priorityCall);
   assert.ok(auditCall > completionCall);
-  assert.ok(optimizerCall > auditCall);
+  assert.ok(exactGuard > auditCall);
+  assert.ok(optimizerCall > exactGuard, "unsupported exact controls must not reach generic optimizer reasoning");
   assert.ok(specialistCall > optimizerCall);
   assert.ok(governanceCall > specialistCall);
-  assert.ok(exactGuard > governanceCall);
 });
 
 test("priority P0 audit failures retain direct governed handlers", () => {
