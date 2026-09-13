@@ -1,7 +1,6 @@
 import type { AdvancedPlanningConstraintModel } from "./advanced-planning-constraints.ts";
 import {
   compileAdvancedPlanningMathematicalModel,
-  type AdvancedPlanningMathematicalModel,
   type MathConstraint,
   type MathVariable,
 } from "./advanced-planning-math-model.ts";
@@ -55,10 +54,9 @@ function addBoundContribution(
 }
 
 function intervalForConstraint(
-  math: AdvancedPlanningMathematicalModel,
+  variableById: Map<string, MathVariable>,
   constraint: MathConstraint,
 ) {
-  const variableById = new Map(math.variables.map((row) => [row.id, row]));
   const interval = { min: 0, max: 0 };
 
   for (const term of constraint.terms) {
@@ -128,9 +126,10 @@ export function diagnoseAdvancedPlanningInfeasibility(
     };
   }
 
+  const variableById = new Map(compiled.model.variables.map((row) => [row.id, row]));
   const contradictions = compiled.model.constraints
     .map((constraint) => {
-      const interval = intervalForConstraint(compiled.model!, constraint);
+      const interval = intervalForConstraint(variableById, constraint);
       const gap = contradictionGap(constraint, interval.min, interval.max);
       if (!(gap > EPSILON) || !Number.isFinite(gap)) return null;
       return {
