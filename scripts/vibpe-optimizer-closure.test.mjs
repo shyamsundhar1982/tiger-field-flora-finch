@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { patchPinnedHighsEsmLoaderForCloudflare } from "./with-app-env.mjs";
 
 async function source(path) {
   return readFile(new URL(`../${path}`, import.meta.url), "utf8");
@@ -23,7 +26,39 @@ test("live HiGHS Wasm is prepared from the pinned package and bundled as a relat
   assert.equal(pkg.dependencies.highs, "1.15.3");
   assert.match(wrapper, /node_modules[\s\S]*highs[\s\S]*build[\s\S]*highs\.wasm/);
   assert.match(wrapper, /src[\s\S]*generated[\s\S]*highs\.wasm/);
+  assert.match(wrapper, /patchPinnedHighsEsmLoaderForCloudflare/);
   assert.match(execution, /\.\.\/generated\/highs\.wasm/);
+});
+
+test("HiGHS ESM loader keeps a valid module URL when Cloudflare strips import.meta.url", async () => {
+  const root = await mkdtemp(join(tmpdir(), "vyndi-highs-loader-"));
+  try {
+    const loaderDir = join(root, "node_modules", "highs", "build");
+    const loaderPath = join(loaderDir, "highs.mjs");
+    await mkdir(loaderDir, { recursive: true });
+    await writeFile(
+      loaderPath,
+      [
+        'import { createRequire } from "node:module";',
+        "const require = createRequire(import.meta.url);",
+        "const scriptDirectory = import.meta.url;",
+        "export default scriptDirectory;",
+      ].join("\n"),
+      "utf8",
+    );
+
+    assert.equal(patchPinnedHighsEsmLoaderForCloudflare(root), true);
+    const patched = await readFile(loaderPath, "utf8");
+    assert.doesNotMatch(patched, /createRequire\(import\.meta\.url\)/);
+    assert.match(patched, /file:\/\/\/highs\.mjs/);
+    assert.match(patched, /typeof import\.meta\.url === "string"/);
+
+    // A second wrapper invocation must not recursively rewrite the dependency.
+    assert.equal(patchPinnedHighsEsmLoaderForCloudflare(root), true);
+    assert.equal(await readFile(loaderPath, "utf8"), patched);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("VIBPE exposes an explicit human execution surface and chat cannot auto-run HiGHS", async () => {
