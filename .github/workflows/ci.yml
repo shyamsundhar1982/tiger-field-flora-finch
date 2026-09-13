@@ -47,6 +47,9 @@ jobs:
       - name: Session security policy gate
         run: node --experimental-strip-types --test scripts/session-security-policy.test.mjs
 
+      - name: Concurrent session cap gate
+        run: node --experimental-strip-types --test scripts/session-concurrency.test.mjs
+
       - name: Security boundary regression gate
         run: node --experimental-strip-types --test scripts/security-boundary-regression.test.mjs
 
