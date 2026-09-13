@@ -5,6 +5,7 @@ import { loadPreparedAdvancedOptimizerEnvelope } from "./advanced-optimizer-auth
 import { runGovernedAdvancedOptimizer } from "./advanced-planning-optimizer.ts";
 import { applyCashGovernanceToOptimizationRun } from "./advanced-planning-cash-governance.ts";
 import { diagnoseAdvancedPlanningInfeasibility } from "./advanced-planning-infeasibility.ts";
+import { governedOptimizerRuntimeMs } from "./optimizer-resource-budget.ts";
 
 export type RunAdvancedOptimizerFromPacketInput = {
   packetId: string;
@@ -66,6 +67,11 @@ export const runAdvancedOptimizerFromPacket = createServerFn({ method: "POST" })
     if (!data.packetId) throw new Error("Governed optimization requires an exact advanced packet ID.");
     if (!data.requestId) throw new Error("Governed optimization requires a request ID.");
 
+    const effectiveMaxRuntimeMs = governedOptimizerRuntimeMs(data.maxRuntimeMs);
+    if (!Number.isFinite(effectiveMaxRuntimeMs) || effectiveMaxRuntimeMs <= 0) {
+      throw new Error("Governed optimization maximum runtime must be a positive finite value.");
+    }
+
     const prepared = await loadPreparedAdvancedOptimizerEnvelope(data.packetId);
     if (!prepared.readyForGovernedOptimization) {
       const reasons = prepared.issues
@@ -78,7 +84,7 @@ export const runAdvancedOptimizerFromPacket = createServerFn({ method: "POST" })
     const optimizer = await createLazyPrecompiledHighsOptimizer();
     const request = {
       requestId: data.requestId,
-      ...(data.maxRuntimeMs === undefined ? {} : { maxRuntimeMs: data.maxRuntimeMs }),
+      maxRuntimeMs: effectiveMaxRuntimeMs,
       ...(data.mipGap === undefined ? {} : { mipGap: data.mipGap }),
     };
     const mathematicalRun = await runGovernedAdvancedOptimizer(prepared.model, optimizer, request);

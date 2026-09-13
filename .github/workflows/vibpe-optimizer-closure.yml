@@ -28,5 +28,7 @@ jobs:
         run: node --experimental-strip-types --test src/lib/advanced-planning-infeasibility.test.ts
       - name: Cloudflare lazy HiGHS startup boundary
         run: node --test scripts/cloudflare-highs-lazy-boundary.test.mjs
+      - name: Cloudflare optimizer resource budget
+        run: node --test scripts/optimizer-resource-budget.test.mjs
       - name: Cloudflare bundle reachability
         run: npm run typecheck
