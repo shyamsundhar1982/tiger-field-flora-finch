@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "@tanstack/react-router";
-import { Bot, BrainCircuit, ChevronRight, FileSearch, Send, ShieldCheck, Sparkles, X } from "lucide-react";
+import { Bot, BrainCircuit, ChevronRight, FileSearch, Printer, Send, ShieldCheck, Sparkles, X } from "lucide-react";
 import { VIBPE_COPILOT_NAME } from "@/lib/ibpe-brand";
 import { askIbpeCopilot } from "@/lib/ibpe-copilot";
 import { getAdvancedPlanningVibpeEvidence } from "@/lib/advanced-planning-vibpe-evidence";
@@ -67,6 +67,64 @@ function batchSynthesisInstruction(text: string) {
   if (!trailing) return "";
   const asksSynthesis = /finish with|overall assessment|overall operating status|primary blocker|secondary blocker|founder decision|highest-priority executable action|contradiction/i.test(trailing);
   return asksSynthesis ? trailing.slice(0, 1600) : "";
+}
+
+function printAssistantResult(message: Message, workspace: string) {
+  const printWindow = window.open("", "_blank", "width=900,height=900");
+  if (!printWindow) return;
+  printWindow.opener = null;
+
+  printWindow.document.write(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VIBPE Co-Pilot Result</title>
+  <style>
+    @page { size: A4; margin: 16mm 15mm 18mm; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #161616; background: #fff; font-family: Arial, Helvetica, sans-serif; font-size: 10.5pt; line-height: 1.5; }
+    .document { max-width: 180mm; margin: 0 auto; }
+    .header { border-bottom: 2px solid #232323; padding-bottom: 12px; margin-bottom: 18px; }
+    .eyebrow { margin: 0 0 4px; font-size: 8pt; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: 20pt; line-height: 1.15; }
+    .context { margin-top: 7px; color: #555; font-size: 9pt; }
+    .result { white-space: pre-wrap; overflow-wrap: anywhere; font-family: Arial, Helvetica, sans-serif; }
+    .meta { margin-top: 18px; border-top: 1px solid #bdbdbd; padding-top: 9px; color: #555; font-size: 8.5pt; }
+    .footer { margin-top: 24px; border-top: 1px solid #ddd; padding-top: 9px; color: #666; font-size: 8pt; }
+    .footer strong { color: #333; }
+    @media print {
+      body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .document { max-width: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="document">
+    <header class="header">
+      <p class="eyebrow">VYNDI Intelligence</p>
+      <h1>VIBPE Co-Pilot Result</h1>
+      <div id="context" class="context"></div>
+    </header>
+    <section id="result" class="result"></section>
+    <div id="meta" class="meta"></div>
+    <footer class="footer"><strong>Advisory / read-only analysis.</strong> Authorised transaction workspaces and governed records remain the controlling business authority.<br />© 2026 Vāyú Shastr Pvt Ltd. All Rights Reserved.</footer>
+  </main>
+</body>
+</html>`);
+  printWindow.document.close();
+
+  const context = printWindow.document.getElementById("context");
+  const result = printWindow.document.getElementById("result");
+  const meta = printWindow.document.getElementById("meta");
+  if (context) context.textContent = `${workspace} · Generated ${new Date().toLocaleString()}`;
+  if (result) result.textContent = message.text;
+  if (meta) meta.textContent = message.meta ? `Evidence / lineage: ${message.meta}` : "Evidence / lineage: result displayed from the current governed VIBPE session.";
+
+  printWindow.setTimeout(() => {
+    printWindow.focus();
+    printWindow.print();
+  }, 150);
 }
 
 export function IbpeCopilot() {
@@ -263,8 +321,13 @@ export function IbpeCopilot() {
                     <article key={message.id} className={message.role === "user" ? "ml-8 rounded-xl border border-accent/25 bg-accent/8 p-4" : "mr-4 rounded-xl border border-border bg-surface/35 p-4"}>
                       <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-green">{message.role === "user" ? "You" : VIBPE_COPILOT_NAME}</p>
                       <div className="whitespace-pre-wrap text-sm leading-6 text-fg">{message.text}</div>
-                      {message.traceabilityQuery ? <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("vyndi:traceability-search", { detail: { query: message.traceabilityQuery } }))} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-accent/40 px-3 py-2 text-xs font-semibold text-accent hover:bg-accent/10"><FileSearch className="size-3.5" /> Open Traceability & Print</button> : null}
-                      {message.meta ? <p className="mt-3 border-t border-border/70 pt-2 text-[10px] text-subtle">{message.meta}</p> : null}
+                      {message.role === "assistant" ? (
+                        <div className="mt-3 flex flex-wrap gap-2 border-t border-border/70 pt-3">
+                          <button type="button" onClick={() => printAssistantResult(message, workspace)} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-fg" aria-label="Print VIBPE result"><Printer className="size-3.5" /> Print Result</button>
+                          {message.traceabilityQuery ? <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("vyndi:traceability-search", { detail: { query: message.traceabilityQuery } }))} className="inline-flex items-center gap-2 rounded-lg border border-accent/40 px-3 py-2 text-xs font-semibold text-accent hover:bg-accent/10"><FileSearch className="size-3.5" /> Open Traceability & Print</button> : null}
+                        </div>
+                      ) : null}
+                      {message.meta ? <p className="mt-3 text-[10px] text-subtle">{message.meta}</p> : null}
                     </article>
                   ))}
                   {busy ? <div className="mr-4 rounded-xl border border-border bg-surface/35 p-4 text-sm text-muted">Resolving governed control state, traceability or analysing the IBPE packet…</div> : null}
