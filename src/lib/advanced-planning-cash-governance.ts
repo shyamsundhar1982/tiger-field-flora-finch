@@ -137,6 +137,17 @@ export function applyCashGovernanceToOptimizationRun(
       "CASH_GOVERNANCE_INCOMPLETE_HORIZON",
       `Cash governance requires ${model.horizonPeriods} governed periods; received ${guardrails.length}.`,
     ));
+    return {
+      ...run,
+      accepted: false,
+      issues,
+      cashGovernance: {
+        version: ADVANCED_CASH_GOVERNANCE_VERSION,
+        status: "indeterminate",
+        planningDisposition: "cash-evidence-incomplete",
+        requiredForAcceptance: true,
+      },
+    };
   }
 
   const result = evaluateProcurementCashGuardrails(procurement, model.supplierLanes, guardrails);
