@@ -4,7 +4,6 @@ import { Panel } from "@/components/kpi";
 import { runAdvancedPlanningFromLatestIbpe } from "@/lib/advanced-planning-authority";
 import { getAdvancedOptimizerControlState } from "@/lib/advanced-optimizer-control";
 import { runAdvancedOptimizerFromPacket } from "@/lib/advanced-optimizer-execution";
-import { runWithSingleOptimizerTransportRetry } from "@/lib/optimizer-transport-retry";
 
 export const Route = createFileRoute("/command/ibpe-operating-workspace/optimizer")({
   loader: async () => getAdvancedOptimizerControlState(),
@@ -59,23 +58,13 @@ function GovernedOptimizerPage() {
     if (!state.packet || !state.readyForGovernedOptimization || busy || packetBusy) return;
     setBusy(true);
     setMessage("Running governed HiGHS optimization against the exact frozen packet…");
-    const requestId = `VIBPE-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
     try {
-      const response = await runWithSingleOptimizerTransportRetry(
-        () => runAdvancedOptimizerFromPacket({
-          data: {
-            packetId: state.packet!.id,
-            requestId,
-          },
-        }),
-        {
-          onRetry: () => {
-            setMessage(
-              "Optimizer transport was interrupted before a receipt was returned. Retrying once safely with the same governed request ID…",
-            );
-          },
+      const response = await runAdvancedOptimizerFromPacket({
+        data: {
+          packetId: state.packet.id,
+          requestId: `VIBPE-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`,
         },
-      );
+      });
 
       if (!response) {
         setResult(null);
@@ -103,9 +92,7 @@ function GovernedOptimizerPage() {
       );
       await router.invalidate();
     } catch (error) {
-      const detail = error instanceof Error ? error.message : "Governed optimizer execution failed.";
-      setMessage(`${detail} Persisted evidence is being refreshed before another manual attempt.`);
-      await router.invalidate();
+      setMessage(error instanceof Error ? error.message : "Governed optimizer execution failed.");
     } finally {
       setBusy(false);
     }
