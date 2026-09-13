@@ -59,7 +59,7 @@ export const askVibpeGovernanceCopilot = createServerFn({ method: "POST" })
     const specialistAnswer = await tryVibpeLiveSpecialistAnswer(sql, question);
     if (specialistAnswer) return { handled: true as const, answer: specialistAnswer };
 
-    const governanceAnswer = await tryGovernanceDataAnswer(sql, question);
+    const governanceAnswer = await tryGovernanceDataAnswer(sql, data.question);
     if (governanceAnswer) return { handled: true as const, answer: governanceAnswer };
 
     if (isExactOperationalControlQuestion(question)) {
