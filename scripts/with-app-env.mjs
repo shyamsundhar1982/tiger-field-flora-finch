@@ -14,9 +14,16 @@
  * plugin own normal relative `.wasm` module handling without changing solver
  * version or fetching runtime code dynamically.
  *
- * Only `VITE_`-prefixed keys are honored: the file is a build flag carrier, not
- * a secret store, and only `VITE_` vars reach the browser anyway. A real
- * `process.env` entry always wins, so an explicit override still works.
+ * Only `VITE_`-prefixed keys are honored from `.grok/app-env.json`: the file is
+ * a build flag carrier, not a secret store, and only `VITE_` vars reach the
+ * browser anyway. A real `process.env` entry always wins, so an explicit
+ * override still works.
+ *
+ * On Cloudflare Workers Builds, `WORKERS_CI_COMMIT_SHA` is injected by the
+ * platform for the exact Git commit being built. During that ephemeral build
+ * checkout we copy it into `wrangler.jsonc` as the runtime text binding
+ * `VYNDI_SOURCE_SHA`. This makes governed IBPE lineage deterministic without
+ * requiring a manually maintained dashboard value or hardcoding a commit SHA.
  *
  * That precedence also means the file governs this workspace only. A deployed
  * build runs with the provider's project env, where the deployer sets
@@ -27,7 +34,14 @@
  * `process.env`, which is why the merge has to happen before Vite starts.
  */
 import { spawn } from "node:child_process";
-import { copyFileSync, mkdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { constants as osConstants } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,6 +49,8 @@ import { fileURLToPath } from "node:url";
 export const APP_ENV_REL_PATH = ".grok/app-env.json";
 
 const VITE_PREFIX = "VITE_";
+const WORKERS_SHA_KEY = "WORKERS_CI_COMMIT_SHA";
+const RUNTIME_SHA_KEY = "VYNDI_SOURCE_SHA";
 
 /**
  * Parse an app-env document, keeping only `VITE_`-prefixed string entries.
@@ -70,6 +86,43 @@ export function readAppEnv(root) {
 /** File values under the process environment: an explicit override wins. */
 export function mergeAppEnv(appEnv, processEnv) {
   return { ...appEnv, ...processEnv };
+}
+
+/** Return the exact Workers Builds commit SHA when it is a plausible git SHA. */
+export function workersCiCommitSha(processEnv) {
+  const value = typeof processEnv?.[WORKERS_SHA_KEY] === "string"
+    ? processEnv[WORKERS_SHA_KEY].trim()
+    : "";
+  return /^[0-9a-f]{7,64}$/i.test(value) ? value : undefined;
+}
+
+/**
+ * Inject the Workers Builds commit SHA into the ephemeral Wrangler config.
+ *
+ * The repository file is never hardcoded with a SHA. Workers Builds checks out
+ * the repository, this wrapper mutates only that temporary checkout, and the
+ * following `wrangler deploy` publishes the same commit SHA as a runtime text
+ * binding. Existing Wrangler vars are preserved.
+ */
+export function injectWorkersSourceSha(root, processEnv) {
+  const sha = workersCiCommitSha(processEnv);
+  if (!sha) return false;
+
+  const configPath = join(root, "wrangler.jsonc");
+  let config;
+  try {
+    config = JSON.parse(readFileSync(configPath, "utf8"));
+  } catch {
+    return false;
+  }
+  if (!config || typeof config !== "object" || Array.isArray(config)) return false;
+
+  const existingVars = config.vars && typeof config.vars === "object" && !Array.isArray(config.vars)
+    ? config.vars
+    : {};
+  config.vars = { ...existingVars, [RUNTIME_SHA_KEY]: sha };
+  writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+  return true;
 }
 
 export function preparePinnedHighsWasm(root) {
@@ -134,11 +187,19 @@ function main(argv) {
     process.exit(2);
   }
   const root = projectRoot();
+  const env = mergeAppEnv(readAppEnv(root), process.env);
+  const workersSha = workersCiCommitSha(env);
+  if (workersSha) {
+    env[RUNTIME_SHA_KEY] = workersSha;
+    if (!injectWorkersSourceSha(root, env)) {
+      console.error("[with-app-env] Workers commit SHA is present but could not be injected into wrangler.jsonc.");
+      process.exit(2);
+    }
+  }
   if (command === "vite" && !preparePinnedHighsWasm(root)) {
     console.error("[with-app-env] pinned HiGHS Wasm runtime is missing; run npm ci first.");
     process.exit(2);
   }
-  const env = mergeAppEnv(readAppEnv(root), process.env);
   const child = spawn(command, args, { stdio: "inherit", env });
   // The dev server is long-running and is stopped by signalling this wrapper.
   for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
