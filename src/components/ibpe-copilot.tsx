@@ -18,6 +18,12 @@ type Message = {
 
 type ScenarioEvent = CustomEvent<IbpeScenarioRequest | null>;
 
+type RoutedAnswer = {
+  text: string;
+  meta?: string;
+  traceabilityQuery?: string;
+};
+
 const suggestions = [
   "What is the biggest constraint to the current 36-month plan?",
   "Where will cash become critical after recommended procurement?",
@@ -33,6 +39,17 @@ function workspaceLabel(pathname: string) {
   if (pathname.startsWith("/command/engineering") || pathname.startsWith("/command/bom") || pathname.startsWith("/command/product")) return "Engineering";
   if (pathname.startsWith("/command/governance")) return "Governance";
   return "Command";
+}
+
+function numberedQuestions(text: string) {
+  const questions = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .map((line) => line.match(/^(\d{1,2})[.)]\s+(.+?)\s*$/))
+    .filter((match): match is RegExpMatchArray => Boolean(match))
+    .map((match) => ({ number: Number(match[1]), question: match[2].trim() }))
+    .filter((item) => item.question.length > 0);
+  return questions.length >= 2 ? questions.slice(0, 12) : [];
 }
 
 export function IbpeCopilot() {
@@ -58,6 +75,50 @@ export function IbpeCopilot() {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [messages, busy]);
 
+  async function resolveOne(clean: string): Promise<RoutedAnswer> {
+    const governance = await askVibpeGovernanceCopilot({ data: { question: clean } });
+    if (governance.handled) {
+      return {
+        text: governance.answer,
+        meta: "Governed VIBPE control state · live read-only sources",
+      };
+    }
+
+    const traceability = await askTraceabilityCopilot({ data: { question: clean } });
+    if (traceability.handled) {
+      return {
+        text: traceability.answer,
+        meta: "Governed traceability search · read-only · RBAC filtered",
+        traceabilityQuery: traceability.query,
+      };
+    }
+
+    const response = await askIbpeCopilot({ data: { question: clean, scenario: scenario ?? undefined } });
+    let responseText = response.ok ? response.answer ?? "No analysis returned." : response.error ?? `${VIBPE_COPILOT_NAME} is unavailable.`;
+    let advancedPacketId: string | null = null;
+    if (response.ok && response.lineage && !response.scenarioId) {
+      try {
+        const advanced = await getAdvancedPlanningVibpeEvidence({
+          data: { parentIbpeRunId: response.lineage.governedRunId, question: clean },
+        });
+        if (advanced.handled && advanced.text && !responseText.includes("Advanced planning evidence (governed baseline):")) {
+          responseText = `${responseText}\n\n${advanced.text}`;
+          advancedPacketId = advanced.packetId;
+        }
+      } catch {
+        // Advanced-planning evidence is supplementary. Existing governed VIBPE
+        // remains available if the derived packet has not been deployed yet.
+      }
+    }
+
+    return {
+      text: responseText,
+      meta: response.lineage
+        ? `Governed R${response.lineage.approvedPlanRevision} · ${response.lineage.inputHash.slice(0, 8)}${response.scenarioId ? ` · scenario ${response.scenarioId}` : ""}${advancedPacketId ? " · advanced evidence linked" : ""}`
+        : undefined,
+    };
+  }
+
   async function ask(text = question) {
     const clean = text.trim();
     if (!clean || busy) return;
@@ -66,62 +127,38 @@ export function IbpeCopilot() {
     setQuestion("");
     setBusy(true);
     try {
-      const governance = await askVibpeGovernanceCopilot({ data: { question: clean } });
-      if (governance.handled) {
-        setMessages((current) => [
-          ...current,
-          {
-            id: crypto.randomUUID(),
-            role: "assistant",
-            text: governance.answer,
-            meta: "Governed VIBPE control state · live read-only sources",
-          },
-        ]);
-        return;
-      }
-
-      const traceability = await askTraceabilityCopilot({ data: { question: clean } });
-      if (traceability.handled) {
-        setMessages((current) => [
-          ...current,
-          {
-            id: crypto.randomUUID(),
-            role: "assistant",
-            text: traceability.answer,
-            meta: "Governed traceability search · read-only · RBAC filtered",
-            traceabilityQuery: traceability.query,
-          },
-        ]);
-        return;
-      }
-
-      const response = await askIbpeCopilot({ data: { question: clean, scenario: scenario ?? undefined } });
-      let responseText = response.ok ? response.answer ?? "No analysis returned." : response.error ?? `${VIBPE_COPILOT_NAME} is unavailable.`;
-      let advancedPacketId: string | null = null;
-      if (response.ok && response.lineage && !response.scenarioId) {
-        try {
-          const advanced = await getAdvancedPlanningVibpeEvidence({
-            data: { parentIbpeRunId: response.lineage.governedRunId, question: clean },
-          });
-          if (advanced.handled && advanced.text && !responseText.includes("Advanced planning evidence (governed baseline):")) {
-            responseText = `${responseText}\n\n${advanced.text}`;
-            advancedPacketId = advanced.packetId;
+      const batch = numberedQuestions(clean);
+      if (batch.length > 1) {
+        const sections: string[] = [];
+        for (const item of batch) {
+          try {
+            const routed = await resolveOne(item.question);
+            sections.push(`${item.number}. ${item.question}\n${routed.text}`);
+          } catch (error) {
+            sections.push(`${item.number}. ${item.question}\nUnable to resolve this question: ${error instanceof Error ? error.message : "request failed"}.`);
           }
-        } catch {
-          // Advanced-planning evidence is supplementary. Existing governed VIBPE
-          // remains available if the derived packet has not been deployed yet.
         }
+        setMessages((current) => [
+          ...current,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            text: sections.join("\n\n"),
+            meta: `Independent multi-intent review · ${batch.length} questions routed separately`,
+          },
+        ]);
+        return;
       }
 
+      const routed = await resolveOne(clean);
       setMessages((current) => [
         ...current,
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          text: responseText,
-          meta: response.lineage
-            ? `Governed R${response.lineage.approvedPlanRevision} · ${response.lineage.inputHash.slice(0, 8)}${response.scenarioId ? ` · scenario ${response.scenarioId}` : ""}${advancedPacketId ? " · advanced evidence linked" : ""}`
-            : undefined,
+          text: routed.text,
+          meta: routed.meta,
+          traceabilityQuery: routed.traceabilityQuery,
         },
       ]);
     } catch (error) {
@@ -226,13 +263,13 @@ export function IbpeCopilot() {
                     }
                   }}
                   rows={2}
-                  maxLength={1800}
-                  placeholder={`Ask ${VIBPE_COPILOT_NAME} normally — e.g. “061E6697 related papers”, “C3 cycles oda pending PO”, or an IBPE question…`}
+                  maxLength={8000}
+                  placeholder={`Ask ${VIBPE_COPILOT_NAME} normally — e.g. “061E6697 related papers”, “C3 cycles oda pending PO”, or paste a numbered multi-question review…`}
                   className="min-h-12 flex-1 resize-none rounded-xl border border-border bg-bg px-3 py-2.5 text-sm text-fg outline-none transition placeholder:text-subtle focus:border-accent/60"
                 />
                 <button type="button" disabled={busy || !question.trim()} onClick={() => void ask()} className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-accent text-bg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40" aria-label={`Ask ${VIBPE_COPILOT_NAME}`}><Send className="size-4" /></button>
               </div>
-              <p className="mt-2 text-[10px] leading-4 text-subtle">Read-only governance and traceability can be queried here; authorised transaction workspaces remain the only place to approve or execute business actions.</p>
+              <p className="mt-2 text-[10px] leading-4 text-subtle">Read-only governance and traceability can be queried here; numbered multi-question reviews are routed one question at a time. Authorised transaction workspaces remain the only place to approve or execute business actions.</p>
             </footer>
           </aside>
         </div>
