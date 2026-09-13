@@ -28,23 +28,22 @@ const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "migra
 // race CREATE TABLE / _migrations writes.
 const migrationLock = [1982, 1505];
 
-async function collectSqlFiles(dir, prefix = "") {
+/**
+ * Only root migration files are deployable. Subdirectories such as
+ * migrations/auth/ are templates/helpers and may intentionally contain the same
+ * basename as a copied root migration. Descending into them would create
+ * duplicate _migrations keys and, worse, make deploy migration semantics differ
+ * from the PGLite applier and migration-execution acceptance test.
+ */
+async function collectDeploySqlFiles(dir) {
   const entries = await readdir(dir, { withFileTypes: true });
-  const files = [];
-  for (const entry of entries) {
-    if (entry.isDirectory()) {
-      files.push(...(await collectSqlFiles(join(dir, entry.name), `${prefix}${entry.name}/`)));
-    } else {
-      files.push(`${prefix}${entry.name}`);
-    }
-  }
-  return files;
+  return entries.filter((entry) => entry.isFile()).map((entry) => entry.name);
 }
 
 async function main() {
   let entries;
   try {
-    entries = await collectSqlFiles(migrationsDir);
+    entries = await collectDeploySqlFiles(migrationsDir);
   } catch {
     console.log("[migrate] no migrations/ directory — nothing to do.");
     return;
