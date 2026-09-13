@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { Panel } from "@/components/kpi";
+import { runAdvancedPlanningFromLatestIbpe } from "@/lib/advanced-planning-authority";
 import { getAdvancedOptimizerControlState } from "@/lib/advanced-optimizer-control";
 import { runAdvancedOptimizerFromPacket } from "@/lib/advanced-optimizer-execution";
 
@@ -15,12 +16,36 @@ function statusClass(ok: boolean) {
 
 function GovernedOptimizerPage() {
   const state = Route.useLoaderData();
+  const router = useRouter();
+  const [packetBusy, setPacketBusy] = useState(false);
+  const [packetMessage, setPacketMessage] = useState(
+    state.packet
+      ? "The latest complete governed advanced-planning packet is selected."
+      : "No packet has been built in this session.",
+  );
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("No optimizer run started in this session.");
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
 
+  async function preparePacket() {
+    if (packetBusy || busy) return;
+    setPacketBusy(true);
+    setPacketMessage("Building a governed advanced-planning packet from the latest complete IBPE snapshot…");
+    try {
+      const response = await runAdvancedPlanningFromLatestIbpe();
+      setPacketMessage(
+        `Governed packet ${response.id} persisted from IBPE run ${response.parentIbpeRunId}. Refreshing readiness evidence…`,
+      );
+      await router.invalidate();
+    } catch (error) {
+      setPacketMessage(error instanceof Error ? error.message : "Governed advanced-planning packet preparation failed.");
+    } finally {
+      setPacketBusy(false);
+    }
+  }
+
   async function execute() {
-    if (!state.packet || !state.readyForGovernedOptimization || busy) return;
+    if (!state.packet || !state.readyForGovernedOptimization || busy || packetBusy) return;
     setBusy(true);
     setMessage("Running governed HiGHS optimization against the exact frozen packet…");
     try {
@@ -34,6 +59,7 @@ function GovernedOptimizerPage() {
       setMessage(
         `Persisted ${response.optimizationRunId}. Mathematical status ${response.result?.status ?? "error"}; cash governance ${response.cashGovernance.status}; accepted=${response.accepted ? "yes" : "no"}.`,
       );
+      await router.invalidate();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Governed optimizer execution failed.");
     } finally {
@@ -53,6 +79,7 @@ function GovernedOptimizerPage() {
         <div className="mt-4 flex flex-wrap gap-2">
           <Link to="/command/ibpe-operating-workspace" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:border-accent hover:text-fg">VIBPE Workspace</Link>
           <Link to="/command/ibpe-operating-workspace/assurance" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:border-accent hover:text-fg">VIBPE Assurance</Link>
+          <Link to="/command/ibpe-operating-workspace/release" className="rounded-md border border-border px-3 py-2 text-xs text-muted hover:border-accent hover:text-fg">Release Readiness</Link>
         </div>
       </header>
 
@@ -64,7 +91,15 @@ function GovernedOptimizerPage() {
             <div className="rounded-lg border border-border p-3"><p className="text-xs text-muted">Packet / model</p><p className="mt-1 text-fg">{state.packet.packet_version} · {state.packet.advanced_model_version}</p></div>
             <div className="rounded-lg border border-border p-3"><p className="text-xs text-muted">Execution gate</p><p className={`mt-1 font-semibold ${statusClass(state.readyForGovernedOptimization)}`}>{state.readyForGovernedOptimization ? "READY" : "BLOCKED"}</p></div>
           </div>
-        ) : <p className="text-sm text-warn">No complete advanced-planning packet is available.</p>}
+        ) : (
+          <div className="rounded-lg border border-warn/30 bg-warn/5 p-4">
+            <p className="text-sm font-semibold text-warn">No complete advanced-planning packet is available.</p>
+            <p className="mt-1 text-xs leading-5 text-muted">
+              Build the packet from the latest complete governed IBPE snapshot first. Packet preparation freezes planning lineage,
+              model and authority evidence; it does not run the solver or create business transactions.
+            </p>
+          </div>
+        )}
 
         {state.issues.length ? (
           <div className="mt-4 space-y-2">
@@ -76,13 +111,29 @@ function GovernedOptimizerPage() {
             ))}
           </div>
         ) : <p className="mt-4 text-xs text-ok">No preparation-gate issue detected.</p>}
+
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => void preparePacket()}
+            disabled={packetBusy || busy}
+            className="rounded-md border border-border px-4 py-2 text-sm font-semibold text-fg hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {packetBusy
+              ? "Building governed packet…"
+              : state.packet
+                ? "Refresh governed advanced-planning packet"
+                : "Build governed advanced-planning packet"}
+          </button>
+          <p className="max-w-3xl text-xs leading-5 text-muted">{packetMessage}</p>
+        </div>
       </Panel>
 
       <Panel title="Run governed optimizer" kicker="Human initiated · advisory only · immutable evidence">
         <button
           type="button"
           onClick={() => void execute()}
-          disabled={!state.packet || !state.readyForGovernedOptimization || busy}
+          disabled={!state.packet || !state.readyForGovernedOptimization || busy || packetBusy}
           className="rounded-md border border-accent px-4 py-2 text-sm font-semibold text-accent hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {busy ? "Running optimizer…" : "Run governed HiGHS optimization"}
