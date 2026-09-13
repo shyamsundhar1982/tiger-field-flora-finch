@@ -40,8 +40,11 @@ export const COMMAND_SHORTCUTS: readonly WorkspaceLink[] = [
   { to: "/command/decision-inbox", label: "Action Inbox" },
   { to: "/command/control-tower", label: "Control Tower" },
   { to: "/command/ibpe-operating-workspace", label: "VIBPE Workspace" },
+  { to: "/command/ibpe-operating-workspace/authority", label: "VIBPE Planning Authority" },
   { to: "/command/ibpe-operating-workspace/optimizer", label: "VIBPE Optimizer" },
+  { to: "/command/ibpe-operating-workspace/outputs", label: "VIBPE Outputs & Evidence" },
   { to: "/command/ibpe-operating-workspace/assurance", label: "VIBPE Assurance" },
+  { to: "/command/ibpe-operating-workspace/release", label: "VIBPE Release Readiness" },
 ];
 
 /** Plan & Commercial — demand, horizon planning, scenarios and route-to-market. */
@@ -120,9 +123,12 @@ export const WORKSPACE_NAVIGATION: Record<CanonicalWorkspaceId, readonly Workspa
     {
       label: "VIBPE",
       items: [
-        { to: "/command/ibpe-operating-workspace", label: "VIBPE Workspace" },
-        { to: "/command/ibpe-operating-workspace/optimizer", label: "Optimizer" },
-        { to: "/command/ibpe-operating-workspace/assurance", label: "VIBPE Assurance" },
+        { to: "/command/ibpe-operating-workspace", label: "01 · Operating Workspace" },
+        { to: "/command/ibpe-operating-workspace/authority", label: "02 · Planning Authority" },
+        { to: "/command/ibpe-operating-workspace/optimizer", label: "03 · Governed Optimizer" },
+        { to: "/command/ibpe-operating-workspace/outputs", label: "04 · Outputs & Evidence" },
+        { to: "/command/ibpe-operating-workspace/assurance", label: "05 · VIBPE Assurance" },
+        { to: "/command/ibpe-operating-workspace/release", label: "06 · Release Readiness" },
       ],
     },
   ],
