@@ -19,6 +19,21 @@ test("governed optimizer execution is edit-authorized, readiness-gated, cash-gov
   assert.match(execution, /persist_vyndi_advanced_optimization_run_v2/);
 });
 
+test("optimizer browser boundary returns a compact receipt and never dereferences an absent result payload", async () => {
+  const execution = await source("src/lib/advanced-optimizer-execution.ts");
+  const route = await source("src/routes/command/ibpe-operating-workspace_.optimizer.tsx");
+  assert.match(execution, /AdvancedOptimizerExecutionReceipt/);
+  assert.match(execution, /mathematicalStatus: optimizationStatus/);
+  assert.match(execution, /cashGovernanceStatus: governedRun\.cashGovernance\.status/);
+  assert.match(execution, /firstInfeasibilityWitness/);
+  assert.doesNotMatch(execution, /\.\.\.governedRun[\s\S]*return/);
+  assert.match(route, /if \(!response\)/);
+  assert.match(route, /response\.mathematicalStatus/);
+  assert.match(route, /response\.cashGovernanceStatus/);
+  assert.match(route, /response\.firstInfeasibilityWitness/);
+  assert.doesNotMatch(route, /response\.result/);
+});
+
 test("live HiGHS Wasm is prepared from the pinned package and bundled as a relative server asset", async () => {
   const wrapper = await source("scripts/with-app-env.mjs");
   const execution = await source("src/lib/advanced-optimizer-execution.ts");
