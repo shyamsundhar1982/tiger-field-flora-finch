@@ -6,6 +6,10 @@ import { tryGovernanceDataAnswer } from "@/lib/vibpe-governance-queries";
 import { tryVibpeLiveSpecialistAnswer } from "@/lib/vibpe-live-specialist-queries";
 import { answerGovernedOptimizerExecutionRequest } from "@/lib/vibpe-optimizer-copilot";
 
+function normalizeSpecialistQuestion(question: string) {
+  return question.replaceAll("\u2019", "'").replaceAll("\u2018", "'");
+}
+
 export const askVibpeGovernanceCopilot = createServerFn({ method: "POST" })
   .middleware([optionalAuthMiddleware])
   .validator((input: { question: string }) => ({ question: String(input.question ?? "").trim().slice(0, 1800) }))
@@ -18,7 +22,7 @@ export const askVibpeGovernanceCopilot = createServerFn({ method: "POST" })
     const sql = await getSql();
     const optimizerAnswer = await answerGovernedOptimizerExecutionRequest(sql, data.question);
     if (optimizerAnswer) return { handled: true as const, answer: optimizerAnswer };
-    const specialistAnswer = await tryVibpeLiveSpecialistAnswer(sql, data.question);
+    const specialistAnswer = await tryVibpeLiveSpecialistAnswer(sql, normalizeSpecialistQuestion(data.question));
     if (specialistAnswer) return { handled: true as const, answer: specialistAnswer };
     const answer = await tryGovernanceDataAnswer(sql, data.question);
     if (!answer) return { handled: false as const };
