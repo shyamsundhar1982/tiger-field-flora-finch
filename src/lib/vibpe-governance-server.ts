@@ -57,6 +57,10 @@ export const askVibpeGovernanceCopilot = createServerFn({ method: "POST" })
     const operationalAuditAnswer = await tryVibpeOperationalControlAudit(sql, question);
     if (operationalAuditAnswer) return { handled: true as const, answer: operationalAuditAnswer };
 
+    if (isExactOperationalControlQuestion(question)) {
+      return { handled: true as const, answer: exactControlFallback(question) };
+    }
+
     const optimizerAnswer = await answerGovernedOptimizerExecutionRequest(sql, question);
     if (optimizerAnswer) return { handled: true as const, answer: optimizerAnswer };
 
@@ -65,10 +69,6 @@ export const askVibpeGovernanceCopilot = createServerFn({ method: "POST" })
 
     const governanceAnswer = await tryGovernanceDataAnswer(sql, data.question);
     if (governanceAnswer) return { handled: true as const, answer: governanceAnswer };
-
-    if (isExactOperationalControlQuestion(question)) {
-      return { handled: true as const, answer: exactControlFallback(question) };
-    }
 
     return { handled: false as const };
   });
