@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import pg from "pg";
 import { pendingMigrations } from "./migration-plan.mjs";
+import { migrationEnvironmentDecision } from "./migration-environment.mjs";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -14,10 +15,17 @@ if (!databaseUrl) {
   process.exit(0);
 }
 
+const migrationEnvironment = migrationEnvironmentDecision(process.env);
+if (!migrationEnvironment.allowed) {
+  console.log(`[migrate] database migration blocked — ${migrationEnvironment.reason}.`);
+  process.exit(0);
+}
+console.log(`[migrate] database migration authorized — ${migrationEnvironment.reason}.`);
+
 const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "migrations");
-// Both Cloudflare and Vercel deploy from the same push and target the same
-// database. Hold one database-scoped session lock across discovery + apply so
-// concurrent provider builds cannot race CREATE TABLE / _migrations writes.
+// Production deploys can still overlap across providers. Hold one database-scoped
+// session lock across discovery + apply so authorized main-branch deploys cannot
+// race CREATE TABLE / _migrations writes.
 const migrationLock = [1982, 1505];
 
 async function collectSqlFiles(dir, prefix = "") {
