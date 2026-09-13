@@ -24,6 +24,8 @@ export const Route = createFileRoute("/login")({
 
 const BEARER_KEY = "grok-auth.bearer-token";
 const THREE_CDN = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
+const LOGIN_WARP_DURATION_MS = 950;
+const LOGIN_WARP_STRAND_BOOST = 34;
 
 function safeReturnTo(value: string | undefined) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/command";
@@ -327,7 +329,7 @@ function LoginPage() {
           startWarp: () => {
             if (reducedMotion) return Promise.resolve();
             mode = "warp";
-            strandBoost = 15;
+            strandBoost = LOGIN_WARP_STRAND_BOOST;
             warpStart = performance.now();
             return new Promise<void>((resolve) => {
               resolveWarp = resolve;
@@ -388,7 +390,9 @@ function LoginPage() {
             camera.fov += (62 - camera.fov) * 0.12;
             camera.lookAt(0, 1.9, -4);
           } else {
-            const elapsed = Math.min((now - warpStart) / 1150, 1);
+            strands.rotation.z += dt * 3.8;
+            strands.rotation.y += dt * 1.45;
+            const elapsed = Math.min((now - warpStart) / LOGIN_WARP_DURATION_MS, 1);
             const eased = elapsed * elapsed * elapsed;
             camera.position.set(0, 3.4 - eased * 1.25, 26 - eased * 20.4);
             camera.fov = 62 + eased * 40;
@@ -485,20 +489,18 @@ function LoginPage() {
         return;
       }
 
-      try {
-        await authClient.getSession();
-      } catch {
-        // Embedded previews use the bearer token above; deployed hosts use their first-party HttpOnly cookie.
-      }
+      void authClient.getSession().catch(() => {
+        // Session hydration is non-blocking after credentials are accepted.
+        // Production already has the first-party HttpOnly cookie and embedded
+        // preview already has the bearer captured above.
+      });
 
       const destination = safeReturnTo(search.returnTo);
       setGranted(true);
-      setBootMessage("Clearance granted · session sealed");
-      await new Promise((resolve) => window.setTimeout(resolve, 520));
-      setBootMessage(null);
+      setBootMessage("Clearance granted · engaging warp");
       setWarping(true);
       await (sceneControlsRef.current?.startWarp() ?? Promise.resolve());
-      await new Promise((resolve) => window.setTimeout(resolve, 120));
+      setBootMessage(null);
       await navigate({ to: destination as never });
     } catch (cause) {
       setGranted(false);

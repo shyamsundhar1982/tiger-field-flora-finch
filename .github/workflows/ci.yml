@@ -35,6 +35,9 @@ jobs:
       - name: Route invariant gate
         run: npm run check:routes
 
+      - name: Login warp transition gate
+        run: node --test scripts/login-warp-transition.test.mjs
+
       - name: Generate route tree and typecheck
         run: npm run typecheck
 
