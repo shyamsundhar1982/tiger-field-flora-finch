@@ -55,10 +55,19 @@ function GovernedOptimizerPage() {
           requestId: `VIBPE-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`,
         },
       });
+
+      if (!response) {
+        setResult(null);
+        setMessage(
+          "The optimizer request completed without a browser execution receipt. Refreshing persisted run evidence; no business action was taken.",
+        );
+        await router.invalidate();
+        return;
+      }
+
       setResult(response as unknown as Record<string, unknown>);
-      const firstWitness = response.result?.diagnostics.find((line) => line.startsWith("INFEASIBILITY_WITNESS "));
       setMessage(
-        `Persisted ${response.optimizationRunId}. Mathematical status ${response.result?.status ?? "error"}; cash governance ${response.cashGovernance.status}; accepted=${response.accepted ? "yes" : "no"}.${firstWitness ? ` ${firstWitness}` : ""}`,
+        `Persisted ${response.optimizationRunId}. Mathematical status ${response.mathematicalStatus}; cash governance ${response.cashGovernanceStatus}; accepted=${response.accepted ? "yes" : "no"}.${response.firstInfeasibilityWitness ? ` ${response.firstInfeasibilityWitness}` : ""}`,
       );
       await router.invalidate();
     } catch (error) {
@@ -142,7 +151,7 @@ function GovernedOptimizerPage() {
         <p className="mt-3 text-xs leading-5 text-muted">{message}</p>
         {result ? (
           <details className="mt-4 rounded-lg border border-border p-3">
-            <summary className="cursor-pointer text-xs font-semibold text-fg">Execution evidence</summary>
+            <summary className="cursor-pointer text-xs font-semibold text-fg">Execution receipt</summary>
             <pre className="mt-3 overflow-x-auto text-[11px] leading-5 text-muted">{JSON.stringify(result, null, 2)}</pre>
           </details>
         ) : null}
