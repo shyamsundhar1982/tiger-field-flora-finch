@@ -48,6 +48,20 @@ try {
       assert.ok(overflow <= 4, `${viewport.name} ${route} has ${overflow}px page-level horizontal overflow`);
     }
 
+    // The server-owned legacy cookie must survive a reload. This verifies the
+    // persistence boundary independently for every accepted viewport.
+    await page.reload({ waitUntil: "networkidle" });
+    assert.doesNotMatch(page.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} lost its authenticated session on reload`);
+
+    // Exercise logout revocation once on the desktop path. After the logout the
+    // protected Command route must redirect back to the canonical login screen.
+    if (viewport.name === "desktop-landscape") {
+      await page.getByRole("button", { name: /Log out/i }).click();
+      await page.waitForURL(/\/login(?:\?|$)/, { timeout: 20_000 });
+      await page.goto(`${baseURL}/command`, { waitUntil: "domcontentloaded" });
+      await page.waitForURL(/\/login\?returnTo=%2Fcommand/, { timeout: 20_000 });
+    }
+
     assert.deepEqual(pageErrors, [], `${viewport.name} emitted browser page errors: ${pageErrors.join(" | ")}`);
     await context.close();
   }
@@ -55,4 +69,4 @@ try {
   await browser.close();
 }
 
-console.log("[stage-d-browser] responsive protected-route acceptance passed");
+console.log("[stage-d-browser] responsive protected-route, persistence and logout acceptance passed");
