@@ -56,8 +56,9 @@ function GovernedOptimizerPage() {
         },
       });
       setResult(response as unknown as Record<string, unknown>);
+      const firstWitness = response.result?.diagnostics.find((line) => line.startsWith("INFEASIBILITY_WITNESS "));
       setMessage(
-        `Persisted ${response.optimizationRunId}. Mathematical status ${response.result?.status ?? "error"}; cash governance ${response.cashGovernance.status}; accepted=${response.accepted ? "yes" : "no"}.`,
+        `Persisted ${response.optimizationRunId}. Mathematical status ${response.result?.status ?? "error"}; cash governance ${response.cashGovernance.status}; accepted=${response.accepted ? "yes" : "no"}.${firstWitness ? ` ${firstWitness}` : ""}`,
       );
       await router.invalidate();
     } catch (error) {
