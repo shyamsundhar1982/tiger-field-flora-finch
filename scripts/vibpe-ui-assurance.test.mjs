@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const migration = readFileSync(new URL("../migrations/0056_vibpe_ui_assurance.sql", import.meta.url), "utf8");
+const workflowExpansion = readFileSync(new URL("../migrations/0073_vibpe_governed_workflow_ui_assurance.sql", import.meta.url), "utf8");
 const remediation = readFileSync(new URL("../migrations/0057_vibpe_assurance_remediation.sql", import.meta.url), "utf8");
 const shortageTrigger = readFileSync(new URL("../migrations/0058_vibpe_shortage_response_trigger.sql", import.meta.url), "utf8");
 const service = readFileSync(new URL("../src/lib/vibpe-ui-assurance.ts", import.meta.url), "utf8");
@@ -11,6 +12,7 @@ const runner = readFileSync(new URL("./vibpe-ui-assurance-runner.mjs", import.me
 const observer = readFileSync(new URL("../src/components/vibpe-runtime-observer.tsx", import.meta.url), "utf8");
 const commandRoute = readFileSync(new URL("../src/routes/command/route.tsx", import.meta.url), "utf8");
 const page = readFileSync(new URL("../src/routes/command/ibpe-operating-workspace_.assurance.tsx", import.meta.url), "utf8");
+const outputs = readFileSync(new URL("../src/routes/command/ibpe-operating-workspace_.outputs.tsx", import.meta.url), "utf8");
 const workflow = readFileSync(new URL("../src/lib/operating-workflow.ts", import.meta.url), "utf8");
 const financeAuthority = readFileSync(new URL("../src/lib/finance-governance-authority.ts", import.meta.url), "utf8");
 const route = (name) => readFileSync(new URL(`../src/routes/command/${name}.tsx`, import.meta.url), "utf8");
@@ -25,6 +27,8 @@ test("UI assurance has a declarative registry, observations, explicit unobserved
   assert.match(migration, /UI-AUTH-SESSION/);
   assert.match(migration, /UI-ACTION-LIFECYCLE/);
   assert.match(migration, /UI-VIBPE-ASSURANCE/);
+  for (const id of ["UI-VIBPE-WORKSPACE","UI-VIBPE-AUTHORITY","UI-VIBPE-OPTIMIZER","UI-VIBPE-OUTPUTS","UI-VIBPE-ASSURANCE","UI-VIBPE-RELEASE"])
+    assert.ok(workflowExpansion.includes(id), `missing governed VIBPE UI capability ${id}`);
 });
 
 test("UI observation service is protected and writes only assurance evidence", () => {
@@ -56,7 +60,12 @@ test("Cloudflare-first Playwright runner checks authority and workflow surfaces 
     "/command/people-office",
     "/command/operations",
     "/command/actions",
+    "/command/ibpe-operating-workspace",
+    "/command/ibpe-operating-workspace/authority",
+    "/command/ibpe-operating-workspace/optimizer",
+    "/command/ibpe-operating-workspace/outputs",
     "/command/ibpe-operating-workspace/assurance",
+    "/command/ibpe-operating-workspace/release",
   ]) assert.ok(runner.includes(protectedRoute), `missing protected route check: ${protectedRoute}`);
   assert.match(runner, /\/api\/vibpe\/ui-assurance/);
   assert.match(runner, /something went wrong\|application error\|internal server error/i);
@@ -74,9 +83,28 @@ test("final VIBPE Assurance page consumes canonical backend evidence and does no
   assert.doesNotMatch(page, /(?:insert into|update|delete from)\s+(?:vyndi_sales_orders|epr_production_job_cards|vyndi_shipments|vyndi_invoices|vyndi_collections)/i);
 });
 
-test("Command navigation exposes VIBPE Assurance without changing workspace ownership", () => {
-  assert.match(workflow, /\/command\/ibpe-operating-workspace\/assurance/);
-  assert.match(workflow, /label: "VIBPE Assurance"/);
+test("VIBPE outputs consolidate governed evidence without transaction authority", () => {
+  assert.match(outputs, /createFileRoute\("\/command\/ibpe-operating-workspace_?\/outputs"\)/);
+  assert.match(outputs, /getAdvancedPlanningAuthorityReadiness/);
+  assert.match(outputs, /getAdvancedOptimizerControlState/);
+  assert.match(outputs, /getVibpeOptimizerReleaseClosure/);
+  assert.match(outputs, /listVibpeAssuranceExceptions/);
+  assert.match(outputs, /Machine-readable evidence summary/);
+  assert.match(outputs, /No transaction authority is created here/);
+  assert.doesNotMatch(outputs, /(?:insert into|update|delete from)\s+(?:vyndi_sales_orders|epr_production_job_cards|epr_inventory_reservations|vyndi_purchase_orders|vyndi_shipments|vyndi_invoices|vyndi_collections)/i);
+});
+
+test("Command navigation exposes the complete sequential VIBPE workflow without changing workspace ownership", () => {
+  for (const routePath of [
+    "/command/ibpe-operating-workspace",
+    "/command/ibpe-operating-workspace/authority",
+    "/command/ibpe-operating-workspace/optimizer",
+    "/command/ibpe-operating-workspace/outputs",
+    "/command/ibpe-operating-workspace/assurance",
+    "/command/ibpe-operating-workspace/release",
+  ]) assert.ok(workflow.includes(routePath), `missing VIBPE navigation route ${routePath}`);
+  for (const label of ["01 · Operating Workspace","02 · Planning Authority","03 · Governed Optimizer","04 · Outputs & Evidence","05 · VIBPE Assurance","06 · Release Readiness"])
+    assert.ok(workflow.includes(label), `missing VIBPE navigation label ${label}`);
   assert.match(workflow, /COMMAND_CONTEXT/);
 });
 
@@ -134,7 +162,8 @@ test("authenticated runtime observer can evidence every registered UI capability
   for (const id of [
     "UI-AUTH-SESSION","UI-SALES-LOAD","UI-SALES-CONFIRM","UI-PRODUCT-LOAD","UI-ENGINEERING-LOAD","UI-BOM-LOAD",
     "UI-INVENTORY-LOAD","UI-PROCUREMENT-LOAD","UI-PRODUCTION-LOAD","UI-QUALITY-LOAD","UI-PEOPLE-OFFICE-LOAD",
-    "UI-DISPATCH-VISIBILITY","UI-ACTION-INBOX","UI-ACTION-LIFECYCLE","UI-CONTROL-TOWER","UI-VIBPE-ASSURANCE",
+    "UI-DISPATCH-VISIBILITY","UI-ACTION-INBOX","UI-ACTION-LIFECYCLE","UI-CONTROL-TOWER",
+    "UI-VIBPE-WORKSPACE","UI-VIBPE-AUTHORITY","UI-VIBPE-OPTIMIZER","UI-VIBPE-OUTPUTS","UI-VIBPE-ASSURANCE","UI-VIBPE-RELEASE",
   ]) assert.ok(observer.includes(id), `missing runtime observer capability ${id}`);
   assert.match(observer, /credentials: "include"/);
   assert.match(observer, /authenticated-route-sweep/);

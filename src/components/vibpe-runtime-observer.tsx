@@ -19,7 +19,12 @@ const capabilities: Capability[] = [
   { id: "UI-ACTION-INBOX", route: "/command/actions", label: "Business Action Inbox renders" },
   { id: "UI-ACTION-LIFECYCLE", route: "/command/actions", label: "Action lifecycle control is singular", kind: "action-lifecycle" },
   { id: "UI-CONTROL-TOWER", route: "/command/control-tower", label: "Control Tower renders" },
+  { id: "UI-VIBPE-WORKSPACE", route: "/command/ibpe-operating-workspace", label: "VIBPE Operating Workspace renders" },
+  { id: "UI-VIBPE-AUTHORITY", route: "/command/ibpe-operating-workspace/authority", label: "Advanced Planning Authority renders" },
+  { id: "UI-VIBPE-OPTIMIZER", route: "/command/ibpe-operating-workspace/optimizer", label: "Governed Optimizer renders" },
+  { id: "UI-VIBPE-OUTPUTS", route: "/command/ibpe-operating-workspace/outputs", label: "Outputs & Evidence renders" },
   { id: "UI-VIBPE-ASSURANCE", route: "/command/ibpe-operating-workspace/assurance", label: "VIBPE Assurance renders" },
+  { id: "UI-VIBPE-RELEASE", route: "/command/ibpe-operating-workspace/release", label: "Release Readiness renders" },
 ];
 
 function target() {
@@ -136,7 +141,7 @@ async function observeCurrentRoute(pathname: string) {
 }
 
 async function sweepAuthenticatedRoutes() {
-  const key = `vibpe-ui-assurance-sweep-r4:${window.location.hostname}`;
+  const key = `vibpe-ui-assurance-sweep-r5:${window.location.hostname}`;
   if (sessionStorage.getItem(key) === "complete") return true;
   let posted = 0;
   let passedCount = 0;

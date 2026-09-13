@@ -93,5 +93,5 @@ test("VIBPE evaluates committed-demand production feasibility across materials a
 
 test("Command navigation exposes the governed VIBPE Optimizer surface", () => {
   assert.match(workflow, /\/command\/ibpe-operating-workspace\/optimizer", label: "VIBPE Optimizer"/);
-  assert.match(workflow, /\/command\/ibpe-operating-workspace\/optimizer", label: "Optimizer"/);
+  assert.match(workflow, /\/command\/ibpe-operating-workspace\/optimizer", label: "03 · Governed Optimizer"/);
 });
