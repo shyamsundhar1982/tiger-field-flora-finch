@@ -5,6 +5,7 @@ import { getSql } from "@/lib/db";
 import { tryGovernanceDataAnswer } from "@/lib/vibpe-governance-queries";
 import { tryVibpeLiveSpecialistAnswer } from "@/lib/vibpe-live-specialist-queries";
 import { tryVibpeOperationalControlAudit } from "@/lib/vibpe-operational-control-audit";
+import { tryVibpeOperationalControlCompletion } from "@/lib/vibpe-operational-control-completion";
 import { tryVibpePriorityOperationalControl } from "@/lib/vibpe-operational-control-priority";
 import { answerGovernedOptimizerExecutionRequest } from "@/lib/vibpe-optimizer-copilot";
 
@@ -49,6 +50,9 @@ export const askVibpeGovernanceCopilot = createServerFn({ method: "POST" })
 
     const priorityAnswer = await tryVibpePriorityOperationalControl(sql, question);
     if (priorityAnswer) return { handled: true as const, answer: priorityAnswer };
+
+    const completionAnswer = await tryVibpeOperationalControlCompletion(sql, question);
+    if (completionAnswer) return { handled: true as const, answer: completionAnswer };
 
     const operationalAuditAnswer = await tryVibpeOperationalControlAudit(sql, question);
     if (operationalAuditAnswer) return { handled: true as const, answer: operationalAuditAnswer };
