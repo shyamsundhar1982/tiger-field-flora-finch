@@ -35,10 +35,83 @@ export type AdvancedOptimizerExecutionReceipt = {
   issueCount: number;
 };
 
+type LatestPacketRow = {
+  id: string;
+  parent_ibpe_run_id: string;
+  source_sha: string;
+};
+
+type LatestIbpeRow = {
+  id: string;
+  source_sha: string;
+};
+
 function normalizeOptionalNumber(value: unknown) {
   if (value === undefined || value === null || value === "") return undefined;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+
+function currentDeployedSourceSha() {
+  return (
+    process.env.VYNDI_SOURCE_SHA
+    || process.env.WORKERS_CI_COMMIT_SHA
+    || process.env.VERCEL_GIT_COMMIT_SHA
+    || process.env.CF_PAGES_COMMIT_SHA
+    || process.env.GITHUB_SHA
+    || ""
+  ).trim();
+}
+
+async function assertCurrentExecutionLineage(
+  sql: Awaited<ReturnType<typeof getSql>>,
+  packetId: string,
+  preparedParentIbpeRunId: string,
+) {
+  const latestPacketRows = await sql.query<LatestPacketRow>(
+    `select id,parent_ibpe_run_id,source_sha
+       from vyndi_advanced_planning_packets
+      where status='complete'
+      order by created_at desc,id desc
+      limit 1`,
+  );
+  const latestIbpeRows = await sql.query<LatestIbpeRow>(
+    `select id,source_sha
+       from vyndi_ibpe_runs
+      where status='complete'
+      order by created_at desc,id desc
+      limit 1`,
+  );
+  const latestPacket = latestPacketRows[0];
+  const latestIbpe = latestIbpeRows[0];
+  if (!latestPacket) {
+    throw new Error("Governed optimization blocked: latest complete advanced packet is unavailable.");
+  }
+  if (!latestIbpe) {
+    throw new Error("Governed optimization blocked: latest governed IBPE run is unavailable.");
+  }
+  if (packetId !== latestPacket.id) {
+    throw new Error(
+      `Governed optimization blocked: requested advanced packet is superseded by latest complete advanced packet ${latestPacket.id}. Refresh the governed optimizer before executing.`,
+    );
+  }
+  if (preparedParentIbpeRunId !== latestIbpe.id || latestPacket.parent_ibpe_run_id !== latestIbpe.id) {
+    throw new Error(
+      `Governed optimization blocked: advanced packet is not derived from latest governed IBPE run ${latestIbpe.id}. Refresh the governed advanced-planning packet.`,
+    );
+  }
+  if (latestPacket.source_sha !== latestIbpe.source_sha) {
+    throw new Error("Governed optimization blocked: latest packet source SHA differs from latest governed IBPE source SHA.");
+  }
+  const deployedSourceSha = currentDeployedSourceSha();
+  if (!deployedSourceSha || deployedSourceSha.length < 7) {
+    throw new Error("Governed optimization blocked: deployed source SHA is unavailable.");
+  }
+  if (deployedSourceSha !== latestPacket.source_sha) {
+    throw new Error(
+      `Governed optimization blocked: latest packet source ${latestPacket.source_sha} does not match deployed source ${deployedSourceSha}. Run governed IBPE and refresh the advanced packet on the current deployment.`,
+    );
+  }
 }
 
 /**
@@ -81,6 +154,9 @@ export const runAdvancedOptimizerFromPacket = createServerFn({ method: "POST" })
       throw new Error(`Governed optimization blocked by preparation gate.${reasons ? ` ${reasons}` : ""}`);
     }
 
+    const sql = await getSql();
+    await assertCurrentExecutionLineage(sql, data.packetId, prepared.parentIbpeRunId);
+
     const optimizer = await createLazyPrecompiledHighsOptimizer();
     const request = {
       requestId: data.requestId,
@@ -107,7 +183,11 @@ export const runAdvancedOptimizerFromPacket = createServerFn({ method: "POST" })
     ) ?? null;
     const fundingRequirement = governedRun.cashGovernance.fundingRequirement;
     const runId = `OPT-${crypto.randomUUID()}`;
-    const sql = await getSql();
+
+    // Re-check immediately before persistence so a packet/IBPE refresh that
+    // occurs while HiGHS is solving cannot persist a newly superseded run.
+    await assertCurrentExecutionLineage(sql, data.packetId, prepared.parentIbpeRunId);
+
     const rows = await sql.query<{ id: string }>(
       `select persist_vyndi_advanced_optimization_run_v2(
          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,
