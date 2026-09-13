@@ -59,7 +59,7 @@ function sourceModel(): AdvancedPlanningConstraintModel {
   };
 }
 
-test("bound diagnosis proves impossible protected material opening balance", () => {
+test("bound diagnosis proves impossible protected material opening balance from over-reservation", () => {
   const diagnosis = diagnoseAdvancedPlanningInfeasibility(sourceModel());
 
   assert.equal(diagnosis.method, "constraint-bound-propagation-v1");
@@ -72,6 +72,22 @@ test("bound diagnosis proves impossible protected material opening balance", () 
   assert.match(diagnosis.diagnostics.join("\n"), /exact infeasibility witnesses/i);
   assert.match(diagnosis.diagnostics.join("\n"), /protected cumulative material balance FRAME-M M1/i);
   assert.match(diagnosis.diagnostics.join("\n"), /Minimum bound relaxation: 3/i);
+});
+
+test("pre-existing safety-stock deficit alone does not manufacture a mathematical contradiction", () => {
+  const safetyDeficit = sourceModel();
+  safetyDeficit.materials = [
+    { sku: "FRAME-M", onHandQty: 0, reservedQty: 0, safetyStockQty: 5 },
+  ];
+
+  const diagnosis = diagnoseAdvancedPlanningInfeasibility(safetyDeficit);
+
+  assert.equal(diagnosis.totalBoundContradictions, 0);
+  assert.equal(
+    diagnosis.witnesses.some((row) => row.constraintFamily === "MATERIAL_CUMULATIVE"),
+    false,
+  );
+  assert.match(diagnosis.diagnostics.join("\n"), /interaction among multiple constraints/i);
 });
 
 test("bound diagnosis stays conservative when no single constraint is contradictory", () => {
