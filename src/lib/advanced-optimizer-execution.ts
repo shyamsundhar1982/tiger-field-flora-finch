@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { authMiddleware } from "./auth/middleware.ts";
 import { requireBusinessActor } from "./business-actor.ts";
 import { getSql } from "./db.ts";
 import { loadPreparedAdvancedOptimizerEnvelope } from "./advanced-optimizer-authority.ts";
@@ -129,14 +130,18 @@ async function createLazyPrecompiledHighsOptimizer() {
 }
 
 export const runAdvancedOptimizerFromPacket = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
   .validator((input: RunAdvancedOptimizerFromPacketInput) => ({
     packetId: String(input.packetId ?? "").trim().slice(0, 240),
     requestId: String(input.requestId ?? "").trim().slice(0, 240),
     maxRuntimeMs: normalizeOptionalNumber(input.maxRuntimeMs),
     mipGap: normalizeOptionalNumber(input.mipGap),
   }))
-  .handler(async ({ data }): Promise<AdvancedOptimizerExecutionReceipt> => {
-    const actor = await requireBusinessActor("edit");
+  .handler(async ({ data, context }): Promise<AdvancedOptimizerExecutionReceipt> => {
+    const actor = await requireBusinessActor("edit", {
+      userId: context.userId,
+      email: context.userEmail,
+    });
     if (!data.packetId) throw new Error("Governed optimization requires an exact advanced packet ID.");
     if (!data.requestId) throw new Error("Governed optimization requires a request ID.");
 
