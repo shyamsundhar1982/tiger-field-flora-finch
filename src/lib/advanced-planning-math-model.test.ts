@@ -108,6 +108,7 @@ test("compiler emits governed MILP algebra for demand, material, supplier and re
   assert.equal(compiled.valid, true);
   assert.ok(compiled.model);
   const model = compiled.model;
+  assert.equal(model.version, "VYNDI-ADVANCED-MATH-MODEL-0.2");
   assert.equal(model.solverClass, "milp");
 
   const demandBalance = byId(model.constraints, "DEMAND_BALANCE__D_COMMIT");
@@ -125,7 +126,7 @@ test("compiler emits governed MILP algebra for demand, material, supplier and re
 
   const materialM1 = byId(model.constraints, "MATERIAL_CUMULATIVE__FRAME_M__1");
   assert.equal(materialM1.sense, "ge");
-  // Protected opening = 8 - 1 reserved - 2 safety + 4 committed receipt = 9.
+  // Protected opening = 8 - 1 reserved - 2 physically available safety + 4 committed receipt = 9.
   assert.equal(materialM1.rhs, -9);
   // BOM requirement = 2 × (1 + 0.1) = 2.2 per finished unit.
   assert.equal(coefficient(materialM1, "PROD__BIKE_M__1"), -2.2);
@@ -152,6 +153,40 @@ test("compiler emits governed MILP algebra for demand, material, supplier and re
   assert.equal(coefficient(resourceCap, "ASSIGN__OP_LAYUP__WC_A__1"), 2); // 1 run hour / 0.5 yield.
   assert.equal(coefficient(resourceCap, "OP_ACTIVE__OP_LAYUP__WC_A__1"), 0.5);
   assert.equal(coefficient(resourceCap, "RES_OVER__WC_A__1"), -1);
+});
+
+test("compiler does not turn an opening safety-stock deficit into negative inventory", () => {
+  const model = governedModel();
+  model.materials = [
+    { sku: "FRAME-M", onHandQty: 0, reservedQty: 0, safetyStockQty: 5 },
+  ];
+  model.committedReceipts = [];
+  model.supplierLanes = [];
+
+  const compiled = compileAdvancedPlanningMathematicalModel(model);
+  assert.equal(compiled.valid, true);
+  assert.equal(compiled.model?.version, "VYNDI-ADVANCED-MATH-MODEL-0.2");
+  const materialM1 = byId(compiled.model!.constraints, "MATERIAL_CUMULATIVE__FRAME_M__1");
+  assert.equal(materialM1.rhs, 0);
+  assert.ok(compiled.issues.some((issue) => issue.code === "OPENING_SAFETY_STOCK_DEFICIT"));
+  assert.match(
+    compiled.issues.find((issue) => issue.code === "OPENING_SAFETY_STOCK_DEFICIT")?.message ?? "",
+    /opens 5 below its governed safety-stock target/i,
+  );
+});
+
+test("compiler keeps over-reservation as a hard negative opening balance", () => {
+  const model = governedModel();
+  model.materials = [
+    { sku: "FRAME-M", onHandQty: 0, reservedQty: 3, safetyStockQty: 5 },
+  ];
+  model.committedReceipts = [];
+  model.supplierLanes = [];
+
+  const compiled = compileAdvancedPlanningMathematicalModel(model);
+  assert.equal(compiled.valid, true);
+  const materialM1 = byId(compiled.model!.constraints, "MATERIAL_CUMULATIVE__FRAME_M__1");
+  assert.equal(materialM1.rhs, 3);
 });
 
 test("compiler keeps unsupported objective semantics explicit rather than inventing them", () => {
