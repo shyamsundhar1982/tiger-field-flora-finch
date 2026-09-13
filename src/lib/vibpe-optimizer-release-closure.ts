@@ -2,10 +2,22 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireBusinessActor } from "./business-actor.ts";
 import { getSql, type Sql } from "./db.ts";
 import { readOptimizerProductionReadiness, type OptimizerProductionReadiness } from "./optimizer-production-readiness.ts";
+import {
+  hasExactReleaseLineage,
+  isReleaseGovernanceReady,
+  isReleaseMathAndCashReady,
+} from "./vibpe-optimizer-release-policy.ts";
 
 type LatestPacketRow = {
   id: string;
   parent_ibpe_run_id: string;
+  source_sha: string;
+  created_at: string;
+};
+
+type LatestIbpeRow = {
+  id: string;
+  source_sha: string;
   created_at: string;
 };
 
@@ -47,21 +59,40 @@ export type VibpeOptimizerReleaseClosure = {
   gates: OptimizerReleaseGate[];
 };
 
-function governanceFlag(value: Record<string, unknown> | null, key: string) {
-  return value?.[key];
+function currentDeployedSourceSha() {
+  return (
+    process.env.VYNDI_SOURCE_SHA
+    || process.env.WORKERS_CI_COMMIT_SHA
+    || process.env.VERCEL_GIT_COMMIT_SHA
+    || process.env.CF_PAGES_COMMIT_SHA
+    || process.env.GITHUB_SHA
+    || ""
+  ).trim();
 }
 
 export async function readVibpeOptimizerReleaseClosure(sql: Sql): Promise<VibpeOptimizerReleaseClosure> {
   const readiness = await readOptimizerProductionReadiness(sql);
+  const deployedSourceSha = currentDeployedSourceSha();
 
   const packetRows = await sql.query<LatestPacketRow>(
-    `select id,parent_ibpe_run_id,created_at::text
+    `select id,parent_ibpe_run_id,source_sha,created_at::text
        from vyndi_advanced_planning_packets
       where status='complete'
       order by created_at desc
       limit 1`,
   ).catch(() => []);
   const packet = packetRows[0] ?? null;
+
+  const ibpeRows = packet
+    ? await sql.query<LatestIbpeRow>(
+        `select id,source_sha,created_at::text
+           from vyndi_ibpe_runs
+          where id=$1 and status='complete'
+          limit 1`,
+        [packet.parent_ibpe_run_id],
+      ).catch(() => [])
+    : [];
+  const ibpe = ibpeRows[0] ?? null;
 
   const runRows = packet
     ? await sql.query<LatestOptimizationRunDbRow>(
@@ -101,19 +132,18 @@ export async function readVibpeOptimizerReleaseClosure(sql: Sql): Promise<VibpeO
     : [];
   const audit = auditRows[0] ?? null;
 
-  const governanceValid = Boolean(
-    runDb
-      && governanceFlag(runDb.governance_json, "advisoryOnly") === true
-      && governanceFlag(runDb.governance_json, "mayCreateTransactions") === false
-      && governanceFlag(runDb.governance_json, "humanApprovalRequiredForBusinessAction") === true,
+  const governanceValid = isReleaseGovernanceReady(runDb?.governance_json);
+  const mathAndCashReady = Boolean(
+    run && isReleaseMathAndCashReady(run.optimization_status, run.cash_guardrail_status),
   );
-  const acceptedConsistency = Boolean(
-    run
-      && (!run.accepted
-        || ((run.optimization_status === "optimal" || run.optimization_status === "feasible")
-          && run.cash_guardrail_status === "feasible")),
-  );
-  const runCompleted = Boolean(run && !["error", "blocked"].includes(run.optimization_status));
+  const accepted = Boolean(run?.accepted && mathAndCashReady);
+  const exactLineage = hasExactReleaseLineage({
+    deployedSourceSha,
+    ibpeSourceSha: ibpe?.source_sha,
+    packetSourceSha: packet?.source_sha,
+    packetId: packet?.id,
+    runParentPacketId: run?.parent_advanced_packet_id,
+  });
   const actorAttributed = Boolean(run?.created_by?.trim() && run?.created_role?.trim());
   const auditAttributed = Boolean(audit?.actor_user_id?.trim() && audit?.actor_role?.trim());
 
@@ -128,16 +158,26 @@ export async function readVibpeOptimizerReleaseClosure(sql: Sql): Promise<VibpeO
     },
     {
       id: "PACKET",
-      label: "Exact governed advanced packet",
-      pass: Boolean(packet),
-      evidence: packet ? `${packet.id} · parent IBPE ${packet.parent_ibpe_run_id}` : "No complete advanced-planning packet exists.",
+      label: "Governed advanced packet and parent IBPE",
+      pass: Boolean(packet && ibpe),
+      evidence: packet && ibpe
+        ? `${packet.id} · parent IBPE ${ibpe.id}`
+        : "No complete advanced-planning packet with a complete parent IBPE run exists.",
+    },
+    {
+      id: "SOURCE-LINEAGE",
+      label: "Exact deployed source lineage",
+      pass: exactLineage,
+      evidence: exactLineage
+        ? `deployed=${deployedSourceSha} · IBPE=${ibpe?.source_sha} · packet=${packet?.source_sha}`
+        : `Source lineage mismatch or missing evidence: deployed=${deployedSourceSha || "missing"} · IBPE=${ibpe?.source_sha ?? "missing"} · packet=${packet?.source_sha ?? "missing"}.`,
     },
     {
       id: "RUN",
-      label: "Persisted live optimizer execution",
-      pass: runCompleted,
+      label: "Mathematically and cash-feasible optimizer execution",
+      pass: mathAndCashReady,
       evidence: run
-        ? `${run.id} · math=${run.optimization_status} · cash=${run.cash_guardrail_status ?? "not-evaluated"} · accepted=${run.accepted ? "yes" : "no"}`
+        ? `${run.id} · math=${run.optimization_status} · cash=${run.cash_guardrail_status ?? "not-evaluated"}`
         : "No complete optimization run exists for the latest advanced packet.",
     },
     {
@@ -150,11 +190,11 @@ export async function readVibpeOptimizerReleaseClosure(sql: Sql): Promise<VibpeO
     },
     {
       id: "ACCEPTANCE",
-      label: "Math + cash acceptance consistency",
-      pass: acceptedConsistency,
-      evidence: acceptedConsistency
-        ? "Any accepted run is mathematically feasible/optimal and cash-feasible."
-        : "Accepted state is inconsistent with mathematical or cash-governance status.",
+      label: "Accepted feasible governed run",
+      pass: accepted,
+      evidence: accepted
+        ? "Run is accepted with feasible/optimal mathematics and feasible cash governance."
+        : "Release remains blocked until the exact governed run is accepted and both mathematics and cash governance are feasible.",
     },
     {
       id: "ACTOR",
