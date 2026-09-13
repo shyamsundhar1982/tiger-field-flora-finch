@@ -26,5 +26,7 @@ jobs:
         run: node --test scripts/vibpe-optimizer-closure.test.mjs
       - name: Infeasibility witness diagnostics
         run: node --experimental-strip-types --test src/lib/advanced-planning-infeasibility.test.ts
+      - name: Cloudflare lazy HiGHS startup boundary
+        run: node --test scripts/cloudflare-highs-lazy-boundary.test.mjs
       - name: Cloudflare bundle reachability
         run: npm run typecheck
