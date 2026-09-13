@@ -88,6 +88,34 @@ async function sharedComponentAggregation(sql: Sql) {
   ].join("\n\n");
 }
 
+async function inventoryTransactionLineage(sql: Sql) {
+  const rows = await sql.query<Record<string, unknown>>(`
+    with skus as (
+      select distinct sku from vyndi_committed_procurement_requirements where sku is not null
+    )
+    select l.sku,l.id as ledger_id,l.movement_id,l.quantity_delta,l.created_at,
+           m.movement_type,
+           coalesce(nullif(l.reference,''),nullif(m.reference,''),'') as reference
+      from epr_inventory_ledger l
+      join skus s on s.sku=l.sku
+      left join epr_inventory_movements m on m.id=l.movement_id
+     order by l.sku,l.created_at,l.id
+  `);
+  if (!rows.length) return "Committed-SKU inventory transaction lineage: no inventory ledger transactions are recorded for current committed SKUs.";
+  const grouped = new Map<string, string[]>();
+  for (const row of rows) {
+    const sku = clean(row.sku);
+    const entries = grouped.get(sku) ?? [];
+    entries.push(`${clean(row.ledger_id)} / ${clean(row.movement_type) || "movement n/a"} ${n(row.quantity_delta) >= 0 ? "+" : ""}${n(row.quantity_delta).toFixed(1)} · ${clean(row.reference) || clean(row.movement_id)}`);
+    grouped.set(sku, entries);
+  }
+  return [
+    "Committed-SKU inventory transaction lineage:",
+    [...grouped].map(([sku, entries]) => `${sku}: ${entries.join("; ")}`).join("\n"),
+    "Evidence: immutable epr_inventory_ledger with its canonical movement/reference linkage. Use inventory arithmetic reconciliation to verify these deltas tie to current physical balance.",
+  ].join("\n\n");
+}
+
 async function draftPoLineage(sql: Sql) {
   const rows = await sql.query<Record<string, unknown>>(`
     select p.id as po_id,p.job_card_id,c.sales_order_id,p.sku,p.quantity
@@ -138,6 +166,7 @@ export async function tryVibpePriorityOperationalControl(sql: Sql, question: str
   if (/\bconfirmed\b/.test(q) && /\borders?\b/.test(q) && /\b(no|without|missing)\b[^.?!]{0,50}\b(job\s*card|production\s+job\s*card)\b/.test(q)) return missingJobCard(sql);
   if (/\bconfirmed[- ]order|confirmed\s+orders?|committed\b/.test(q) && /\bshortage|shortages|short\b/.test(q) && /\bprocure|procurement|purchase|need|now\b/.test(q)) return confirmedShortages(sql);
   if (/components? required by more than one bike|counted only once/.test(q)) return sharedComponentAggregation(sql);
+  if (/inventory transactions?/.test(q) && /(created the present stock balance|present stock balance)/.test(q)) return inventoryTransactionLineage(sql);
   if (/\bdraft\s+(?:purchase\s+orders?|pos?)\b/.test(q) && /\bhow many|which\b/.test(q) && /\b(job\s*card|confirmed\s+order|generated|originat|linked)\b/.test(q)) return draftPoLineage(sql);
   if (/\bdraft\s+(?:purchase\s+orders?|pos?)\b/.test(q) && /\b(no|without|missing|unassigned)\b[^.?!]{0,40}\bsupplier\b/.test(q)) return draftPoMissingSupplier(sql);
   if (/\bsuppliers?\b/.test(q) && /\b(lack|lacks|missing|without|no)\b/.test(q) && /\b(quality|delivery)\s+ratings?\b/.test(q)) return supplierRatingGap(sql, question);
