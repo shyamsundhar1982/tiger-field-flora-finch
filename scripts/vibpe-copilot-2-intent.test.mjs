@@ -219,3 +219,12 @@ test("Co-Pilot assistant results expose a clean printable audit view", () => {
   assert.match(copilotUi, /Print Result/);
   assert.match(copilotUi, /printWindow\.print\(\)/);
 });
+
+test("single-result print pairs the originating question with the VIBPE answer without duplicating batch prompts", () => {
+  assert.match(copilotUi, /question\?: string/);
+  assert.match(copilotUi, /question: clean/);
+  assert.match(copilotUi, /includeQuestion = Boolean\(message\.question && numberedQuestions\(message\.question\)\.length < 2\)/);
+  assert.match(copilotUi, /<h2>Question<\/h2>/);
+  assert.match(copilotUi, /<h2>VIBPE Answer<\/h2>/);
+  assert.match(copilotUi, /question\.textContent = message\.question/);
+});
