@@ -23,6 +23,8 @@ type LatestRunRow = {
   peak_additional_funding_lakh: string | number | null;
   peak_funding_period: string | number | null;
   baseline_reserve_funding_need_lakh: string | number | null;
+  funding_evidence_basis: string | null;
+  authoritative_for_funding_decision: string | boolean | null;
   objective_value: string | number | null;
   created_at: string;
 };
@@ -69,6 +71,8 @@ export const getAdvancedOptimizerControlState = createServerFn({ method: "GET" }
               cash_guardrail_json#>>'{fundingRequirement,peakAdditionalFundingLakh}' as peak_additional_funding_lakh,
               cash_guardrail_json#>>'{fundingRequirement,peakFundingPeriod}' as peak_funding_period,
               cash_guardrail_json#>>'{fundingRequirement,baselineReserveFundingNeedLakh}' as baseline_reserve_funding_need_lakh,
+              cash_guardrail_json#>>'{fundingRequirement,evidenceBasis}' as funding_evidence_basis,
+              cash_guardrail_json#>>'{fundingRequirement,authoritativeForFundingDecision}' as authoritative_for_funding_decision,
               objective_value,created_at::text
          from vyndi_advanced_optimization_runs
         where parent_advanced_packet_id=$1 and status='complete'
