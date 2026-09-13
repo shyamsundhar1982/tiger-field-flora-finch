@@ -39,6 +39,14 @@ test("Worker bundle resolves the governed optimizer to the patched HiGHS ESM ent
   assert.doesNotMatch(vite, /highs\.js"/);
 });
 
+test("HiGHS runtime instantiates the bundled Wasm module directly without filesystem fallback", async () => {
+  const runtime = await source("src/lib/advanced-planning-highs-runtime.ts");
+  assert.match(runtime, /const instantiateWasm/);
+  assert.match(runtime, /new WebAssembly\.Instance\(wasmModule, imports\)/);
+  assert.match(runtime, /receiveInstance\(instance, wasmModule\)/);
+  assert.match(runtime, /wasmModule,[\s\S]*instantiateWasm/);
+});
+
 test("HiGHS ESM loader keeps a valid module URL when Cloudflare strips import.meta.url", async () => {
   const root = await mkdtemp(join(tmpdir(), "vyndi-highs-loader-"));
   try {
