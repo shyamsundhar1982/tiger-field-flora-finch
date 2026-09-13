@@ -84,7 +84,7 @@ test("final VIBPE Assurance page consumes canonical backend evidence and does no
 });
 
 test("VIBPE outputs consolidate governed evidence without transaction authority", () => {
-  assert.match(outputs, /createFileRoute\("\/command\/ibpe-operating-workspace\/outputs"\)/);
+  assert.match(outputs, /createFileRoute\("\/command\/ibpe-operating-workspace_?\/outputs"\)/);
   assert.match(outputs, /getAdvancedPlanningAuthorityReadiness/);
   assert.match(outputs, /getAdvancedOptimizerControlState/);
   assert.match(outputs, /getVibpeOptimizerReleaseClosure/);
