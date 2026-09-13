@@ -209,3 +209,13 @@ test("Co-Pilot UI independently routes numbered multi-question reviews", () => {
   assert.match(copilotUi, /Independent multi-intent review/);
   assert.match(copilotUi, /maxLength=\{8000\}/);
 });
+
+test("Co-Pilot assistant results expose a clean printable audit view", () => {
+  assert.match(copilotUi, /function printAssistantResult/);
+  assert.match(copilotUi, /VIBPE Co-Pilot Result/);
+  assert.match(copilotUi, /@page \{ size: A4/);
+  assert.match(copilotUi, /result\.textContent = message\.text/);
+  assert.match(copilotUi, /Evidence \/ lineage:/);
+  assert.match(copilotUi, /Print Result/);
+  assert.match(copilotUi, /printWindow\.print\(\)/);
+});
