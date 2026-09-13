@@ -8,6 +8,7 @@ const architecture = await readFile(new URL("../docs/VIBPE-COPILOT-2-ARCHITECTUR
 const productionCopilot = await readFile(new URL("../src/lib/ibpe-copilot.ts", import.meta.url), "utf8");
 const copilot2 = await readFile(new URL("../src/lib/vibpe-copilot-2.ts", import.meta.url), "utf8");
 const operational = await readFile(new URL("../src/lib/vibpe-operational-queries.ts", import.meta.url), "utf8");
+const liveSpecialist = await readFile(new URL("../src/lib/vibpe-live-specialist-queries.ts", import.meta.url), "utf8");
 const governance = await readFile(new URL("../src/lib/vibpe-governance-queries.ts", import.meta.url), "utf8");
 const governanceServer = await readFile(new URL("../src/lib/vibpe-governance-server.ts", import.meta.url), "utf8");
 const copilotUi = await readFile(new URL("../src/components/ibpe-copilot.tsx", import.meta.url), "utf8");
@@ -124,6 +125,35 @@ test("supplier lookup resolves governed supplier, PO and price records", () => {
   assert.match(operational, /vyndi_procurement_prices/);
   assert.match(operational, /oda\\b/);
   assert.match(operational, /Supplier price authority rows/);
+});
+
+test("live specialist layer covers cross-functional operating questions before generic governance", () => {
+  assert.match(governanceServer, /tryVibpeLiveSpecialistAnswer/);
+  const specialistCall = governanceServer.indexOf("tryVibpeLiveSpecialistAnswer");
+  const governanceCall = governanceServer.indexOf("tryGovernanceDataAnswer(sql, data.question)");
+  assert.ok(specialistCall >= 0);
+  assert.ok(governanceCall > specialistCall);
+  assert.match(liveSpecialist, /Exact committed-SKU shortage check/);
+  assert.match(liveSpecialist, /Confirmed-order delivery risk/);
+  assert.match(liveSpecialist, /Operational reconciliation: PASS/);
+  assert.match(liveSpecialist, /Supplier-risk assessment/);
+  assert.match(liveSpecialist, /No-new-funding triage/);
+  assert.match(liveSpecialist, /Top operational risks by current business impact/);
+  assert.match(liveSpecialist, /Capacity\/material separation/);
+  assert.match(liveSpecialist, /Founder operating review/);
+  assert.match(liveSpecialist, /Promise-date limitation/);
+  assert.match(liveSpecialist, /Draft POs are not supplier commitments/);
+});
+
+test("live specialist answers use canonical live operating evidence", () => {
+  assert.match(liveSpecialist, /vyndi_committed_procurement_requirements/);
+  assert.match(liveSpecialist, /vyndi_live_job_card_requirements/);
+  assert.match(liveSpecialist, /vyndi_report_procurement_net_requirement/);
+  assert.match(liveSpecialist, /vyndi_purchase_orders/);
+  assert.match(liveSpecialist, /vyndi_suppliers/);
+  assert.match(liveSpecialist, /vyndi_operating_actions/);
+  assert.match(liveSpecialist, /vyndi_vibpe_assurance_exceptions_all/);
+  assert.match(liveSpecialist, /vyndi_ibpe_runs/);
 });
 
 test("traceability exception questions inspect missing job-card origin links instead of literal search", () => {
