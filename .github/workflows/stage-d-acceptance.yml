@@ -1,0 +1,92 @@
+name: Stage D Acceptance Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  business-chain-and-resilience:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Full canonical business and resilience acceptance
+        run: >-
+          node --experimental-strip-types --test
+          scripts/migration-execution.test.mjs
+          scripts/canonical-business-truth.test.mjs
+          scripts/issued-material-fulfillment.test.mjs
+          scripts/production-batch-release.test.mjs
+          scripts/traceability-search.test.mjs
+          scripts/pre-r3-authority-remediation.test.mjs
+          scripts/security-boundary-regression.test.mjs
+          scripts/epr-individual-authority.test.mjs
+          scripts/session-security-policy.test.mjs
+          scripts/session-concurrency.test.mjs
+          scripts/stage-d-load-resilience.test.mjs
+
+  responsive-browser-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      COMMAND_PASSWORD: stage-d-ci-disposable-password
+      VITE_AUTH_ENABLED: "false"
+      STAGE_D_BASE_URL: http://localhost:8080
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Start isolated VYNDI acceptance server
+        run: |
+          npm run dev > /tmp/vyndi-stage-d.log 2>&1 &
+          echo $! > /tmp/vyndi-stage-d.pid
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://localhost:8080/ >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/vyndi-stage-d.log
+          exit 1
+
+      - name: Protected-route responsive browser acceptance
+        run: node scripts/stage-d-browser-acceptance.mjs
+
+      - name: Print server log on failure
+        if: failure()
+        run: cat /tmp/vyndi-stage-d.log || true
+
+      - name: Stop acceptance server
+        if: always()
+        run: |
+          if [ -f /tmp/vyndi-stage-d.pid ]; then
+            kill $(cat /tmp/vyndi-stage-d.pid) || true
+          fi
