@@ -17,6 +17,7 @@ import {
 import { requestSafePostgresPoolConfig } from "../postgres-pool";
 import { resolvePostgresTransport } from "../postgres-runtime";
 import { AUTH_TRUSTED_ORIGINS, resolveAuthBaseURL, resolveAuthSecret } from "./runtime-config";
+import { VYNDI_SESSION_POLICY } from "./session-policy";
 
 void ensureDbReady();
 
@@ -119,13 +120,23 @@ export const auth = betterAuth({
     },
   },
 
-  session: { cookieCache: { enabled: true, maxAge: 300 } },
+  session: VYNDI_SESSION_POLICY,
 
   // VINDY administrators create accounts for other people. Creating a user must
   // NEVER sign the administrator into the newly-created account. Better Auth's
   // email/password sign-up auto-signs users in by default; disabling that here
   // prevents the admin session cookie from being replaced during user creation.
-  ...(emailAndPasswordEnabled ? { emailAndPassword: { enabled: true, autoSignIn: false } } : {}),
+  // Password reset also revokes outstanding sessions so a changed credential
+  // cannot leave older authenticated devices active.
+  ...(emailAndPasswordEnabled
+    ? {
+        emailAndPassword: {
+          enabled: true,
+          autoSignIn: false,
+          revokeSessionsOnPasswordReset: true,
+        },
+      }
+    : {}),
 
   advanced: {
     useSecureCookies: false,

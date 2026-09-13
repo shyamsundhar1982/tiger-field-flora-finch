@@ -41,6 +41,15 @@ jobs:
       - name: Actuals evidence regression gate
         run: node --experimental-strip-types --test scripts/actuals-evidence-regression.test.mjs
 
+      - name: Migration environment isolation gate
+        run: node --test scripts/migration-environment.test.mjs
+
+      - name: Session security policy gate
+        run: node --experimental-strip-types --test scripts/session-security-policy.test.mjs
+
+      - name: Security boundary regression gate
+        run: node --experimental-strip-types --test scripts/security-boundary-regression.test.mjs
+
       - name: Generate route tree and typecheck
         run: npm run typecheck
 
