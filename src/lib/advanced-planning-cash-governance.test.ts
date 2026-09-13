@@ -24,6 +24,7 @@ const model: AdvancedPlanningConstraintModel = {
     orderMultiple: 1,
     landedUnitCostLakh: 2,
     reliability: 0.95,
+    sourceRef: "COMMERCIAL-QUOTE-1",
     capacity: [{ period: 1, maxQty: 10 }, { period: 2, maxQty: 10 }, { period: 3, maxQty: 10 }],
   }],
   objectiveWeights: {
@@ -99,11 +100,14 @@ test("cash-infeasible optimal solver output is explicitly funding-dependent and 
   assert.equal(governed.cashGovernance.fundingRequirement?.peakAdditionalFundingLakh, 1);
   assert.equal(governed.cashGovernance.fundingRequirement?.peakFundingPeriod, 1);
   assert.equal(governed.cashGovernance.fundingRequirement?.baselineReserveFundingNeedLakh, 0);
+  assert.equal(governed.cashGovernance.fundingRequirement?.evidenceBasis, "commercially-governed");
+  assert.equal(governed.cashGovernance.fundingRequirement?.authoritativeForFundingDecision, true);
   assert.equal(governed.cashGovernance.fundingRequirement?.executionBlockedUntilFundingEvidenced, true);
   assert.equal(governed.cashGovernance.fundingRequirement?.planningScenarioConditionallyFeasible, true);
   assert.equal(governed.accepted, false);
   assert.ok(governed.issues.some((issue) => issue.code === "CASH_GOVERNANCE_INFEASIBLE"));
   assert.ok(governed.issues.some((issue) => issue.code === "CAPITAL_DEPENDENT_PLAN"));
+  assert.equal(governed.issues.some((issue) => issue.code === "PROVISIONAL_FUNDING_EVIDENCE"), false);
 });
 
 test("pre-existing reserve deficit is reported as funding need, not mathematical-plan failure", () => {
@@ -136,6 +140,25 @@ test("first funding need and peak funding requirement retain their own periods",
   assert.equal(governed.cashGovernance.fundingRequirement?.peakAdditionalFundingLakh, 4.6);
   assert.equal(governed.cashGovernance.fundingRequirement?.peakFundingPeriod, 2);
   assert.equal(governed.cashGovernance.fundingRequirement?.baselineReserveFundingNeedLakh, 4.6);
+});
+
+test("test and benchmark supplier economics cannot become authoritative funding evidence", () => {
+  const provisionalModel: AdvancedPlanningConstraintModel = {
+    ...model,
+    supplierLanes: model.supplierLanes.map((lane) => ({
+      ...lane,
+      id: "LANE-TEST-20260913-SKU1",
+      sourceRef: "TEST-ONLY-VIBPE-SUPPLIER-LANE-VALIDATION | TEST-MARKET-BENCHMARK | method:TEST ASSUMPTION ONLY",
+    })),
+  };
+  const governed = applyCashGovernanceToOptimizationRun(run(3), provisionalModel, guardrails);
+  assert.equal(governed.cashGovernance.fundingRequirement?.evidenceBasis, "provisional-test-or-benchmark");
+  assert.equal(governed.cashGovernance.fundingRequirement?.authoritativeForFundingDecision, false);
+  assert.ok(governed.issues.some((issue) => issue.code === "PROVISIONAL_FUNDING_EVIDENCE"));
+  assert.match(
+    governed.issues.find((issue) => issue.code === "CAPITAL_DEPENDENT_PLAN")?.message ?? "",
+    /not an authoritative fundraising requirement/i,
+  );
 });
 
 test("incomplete liquidity horizon is governance-indeterminate and cannot be accepted", () => {
