@@ -11,7 +11,7 @@ async function source(path) {
 
 test("governed optimizer execution is edit-authorized, readiness-gated, cash-governed and persisted through v2", async () => {
   const execution = await source("src/lib/advanced-optimizer-execution.ts");
-  assert.match(execution, /requireBusinessActor\("edit"\)/);
+  assert.match(execution, /requireBusinessActor\("edit",\s*\{/);
   assert.match(execution, /readyForGovernedOptimization/);
   assert.match(execution, /createPrecompiledHighsOptimizer/);
   assert.match(execution, /runGovernedAdvancedOptimizer/);
