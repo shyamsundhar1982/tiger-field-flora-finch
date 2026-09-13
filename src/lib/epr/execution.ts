@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getCommandRole } from "@/lib/command-access";
+import { requireBusinessActor } from "@/lib/business-actor";
 import { getSql } from "@/lib/db";
 
 const ventureSchema = z.enum(["carbon", "aluminium"]);
@@ -14,9 +15,12 @@ const modelNameForId: Record<z.infer<typeof modelSchema>, z.infer<typeof modelNa
 };
 
 async function requireCommand(write = false) {
+  if (write) {
+    const actor = await requireBusinessActor("admin");
+    return actor.userId;
+  }
   const role = await getCommandRole();
   if (!role) throw new Error("Command access is required for EPR access.");
-  if (write && role !== "admin") throw new Error("Admin Command access is required for EPR mutations.");
   return role;
 }
 
@@ -118,7 +122,7 @@ export const updateEprGate = createServerFn({ method: "POST" })
     const traveller = await getTraveller(sql, data.travellerId);
     if (traveller.venture !== data.venture) throw new Error("Venture scope mismatch.");
     await assertGateOrder(sql, data.travellerId, data.gateId, data.status);
-    await sql.query(`insert into epr_gate_events (id, traveller_id, gate_id, status, reason, actor) values ($1,$2,$3,$4,$5,$6)`, [id("GATE"), data.travellerId, data.gateId, data.status, data.reason]);
+    await sql.query(`insert into epr_gate_events (id, traveller_id, gate_id, status, reason, actor) values ($1,$2,$3,$4,$5,$6)`, [id("GATE"), data.travellerId, data.gateId, data.status, data.reason, actor]);
     const travellerStatus = data.status === "rejected" ? "rejected" : data.status === "hold" || data.status === "blocked" ? "hold" : data.gateId === "EPR-04" && data.status === "passed" ? "released" : data.gateId === "EPR-05" && data.status === "in_progress" ? "in_build" : traveller.status;
     await sql.query(`update epr_travellers set status=$1, updated_at=now() where id=$2`, [travellerStatus, data.travellerId]);
     await audit(sql, data.venture, "traveller", data.travellerId, "gate_status_changed", actor, data);
