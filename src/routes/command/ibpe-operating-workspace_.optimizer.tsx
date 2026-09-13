@@ -25,7 +25,19 @@ function truthyDatabaseBoolean(value: string | boolean | null | undefined) {
 }
 
 function GovernedOptimizerPage() {
-  const state = Route.useLoaderData();
+  const loadedState = Route.useLoaderData();
+  const state = loadedState ?? {
+    packet: null,
+    readyForGovernedOptimization: false,
+    issues: [
+      {
+        severity: "error",
+        code: "OPTIMIZER_STATE_UNAVAILABLE",
+        message: "Optimizer route state is temporarily unavailable. Reload the page before starting another governed run.",
+      },
+    ],
+    recentRun: null,
+  };
   const router = useRouter();
   const [packetBusy, setPacketBusy] = useState(false);
   const [packetMessage, setPacketMessage] = useState(
@@ -37,6 +49,14 @@ function GovernedOptimizerPage() {
   const [message, setMessage] = useState("No optimizer run started in this session.");
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
 
+  async function reloadOptimizerState() {
+    if (typeof window !== "undefined") {
+      window.location.reload();
+      return;
+    }
+    await router.invalidate();
+  }
+
   async function preparePacket() {
     if (packetBusy || busy) return;
     setPacketBusy(true);
@@ -46,11 +66,7 @@ function GovernedOptimizerPage() {
       setPacketMessage(
         `Governed packet ${response.id} persisted from IBPE run ${response.parentIbpeRunId}. Reloading the optimizer against this exact packet…`,
       );
-      if (typeof window !== "undefined") {
-        window.location.reload();
-        return;
-      }
-      await router.invalidate();
+      await reloadOptimizerState();
     } catch (error) {
       setPacketMessage(error instanceof Error ? error.message : "Governed advanced-planning packet preparation failed.");
     } finally {
@@ -73,9 +89,9 @@ function GovernedOptimizerPage() {
       if (!response) {
         setResult(null);
         setMessage(
-          "The optimizer request completed without a browser execution receipt. Refreshing persisted run evidence; no business action was taken.",
+          "The optimizer request completed without a browser execution receipt. Reloading persisted run evidence; no business action was taken.",
         );
-        await router.invalidate();
+        await reloadOptimizerState();
         return;
       }
 
@@ -94,7 +110,7 @@ function GovernedOptimizerPage() {
       setMessage(
         `Persisted ${response.optimizationRunId}. Mathematical status ${response.mathematicalStatus}; cash governance ${response.cashGovernanceStatus}; planning ${response.cashPlanningDisposition}; accepted=${response.accepted ? "yes" : "no"}.${fundingDependency}${response.firstInfeasibilityWitness ? ` ${response.firstInfeasibilityWitness}` : ""}`,
       );
-      await router.invalidate();
+      await reloadOptimizerState();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Governed optimizer execution failed.");
     } finally {
