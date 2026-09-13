@@ -3,6 +3,7 @@ import { optionalAuthMiddleware } from "@/lib/auth/middleware";
 import { requireBusinessActor } from "@/lib/business-actor";
 import { getSql } from "@/lib/db";
 import { tryGovernanceDataAnswer } from "@/lib/vibpe-governance-queries";
+import { tryVibpeLiveSpecialistAnswer } from "@/lib/vibpe-live-specialist-queries";
 import { answerGovernedOptimizerExecutionRequest } from "@/lib/vibpe-optimizer-copilot";
 
 export const askVibpeGovernanceCopilot = createServerFn({ method: "POST" })
@@ -17,6 +18,8 @@ export const askVibpeGovernanceCopilot = createServerFn({ method: "POST" })
     const sql = await getSql();
     const optimizerAnswer = await answerGovernedOptimizerExecutionRequest(sql, data.question);
     if (optimizerAnswer) return { handled: true as const, answer: optimizerAnswer };
+    const specialistAnswer = await tryVibpeLiveSpecialistAnswer(sql, data.question);
+    if (specialistAnswer) return { handled: true as const, answer: specialistAnswer };
     const answer = await tryGovernanceDataAnswer(sql, data.question);
     if (!answer) return { handled: false as const };
     return { handled: true as const, answer };
