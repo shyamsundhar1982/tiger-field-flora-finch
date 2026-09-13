@@ -1,9 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
-import highsWasm from "../generated/highs.wasm";
 import { requireBusinessActor } from "./business-actor.ts";
 import { getSql } from "./db.ts";
 import { loadPreparedAdvancedOptimizerEnvelope } from "./advanced-optimizer-authority.ts";
-import { createPrecompiledHighsOptimizer } from "./advanced-planning-highs-runtime.ts";
 import { runGovernedAdvancedOptimizer } from "./advanced-planning-optimizer.ts";
 import { applyCashGovernanceToOptimizationRun } from "./advanced-planning-cash-governance.ts";
 import { diagnoseAdvancedPlanningInfeasibility } from "./advanced-planning-infeasibility.ts";
@@ -34,6 +32,20 @@ function normalizeOptionalNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : Number.NaN;
 }
 
+/**
+ * Keep the expensive HiGHS JavaScript runtime and compiled WebAssembly module
+ * outside the Worker's initial module graph. Ordinary VYNDI requests must not
+ * pay solver startup/compilation cost; the solver is loaded only after a human
+ * explicitly starts governed optimisation.
+ */
+async function createLazyPrecompiledHighsOptimizer() {
+  const [{ default: highsWasm }, { createPrecompiledHighsOptimizer }] = await Promise.all([
+    import("../generated/highs.wasm"),
+    import("./advanced-planning-highs-runtime.ts"),
+  ]);
+  return createPrecompiledHighsOptimizer(highsWasm);
+}
+
 export const runAdvancedOptimizerFromPacket = createServerFn({ method: "POST" })
   .validator((input: RunAdvancedOptimizerFromPacketInput) => ({
     packetId: String(input.packetId ?? "").trim().slice(0, 240),
@@ -55,7 +67,7 @@ export const runAdvancedOptimizerFromPacket = createServerFn({ method: "POST" })
       throw new Error(`Governed optimization blocked by preparation gate.${reasons ? ` ${reasons}` : ""}`);
     }
 
-    const optimizer = await createPrecompiledHighsOptimizer(highsWasm);
+    const optimizer = await createLazyPrecompiledHighsOptimizer();
     const request = {
       requestId: data.requestId,
       ...(data.maxRuntimeMs === undefined ? {} : { maxRuntimeMs: data.maxRuntimeMs }),
