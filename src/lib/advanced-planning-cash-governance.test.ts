@@ -84,20 +84,46 @@ test("cash-feasible optimal solver output remains governance-accepted", () => {
   const governed = applyCashGovernanceToOptimizationRun(run(2), model, guardrails);
   assert.equal(governed.result?.status, "optimal");
   assert.equal(governed.cashGovernance.status, "feasible");
+  assert.equal(governed.cashGovernance.planningDisposition, "execution-ready");
+  assert.equal(governed.cashGovernance.fundingRequirement, undefined);
   assert.equal(governed.accepted, true);
 });
 
-test("cash-infeasible optimal solver output preserves math status but is not accepted", () => {
+test("cash-infeasible optimal solver output is explicitly funding-dependent and remains blocked", () => {
   const governed = applyCashGovernanceToOptimizationRun(run(3), model, guardrails);
   assert.equal(governed.result?.status, "optimal");
   assert.equal(governed.cashGovernance.status, "infeasible");
+  assert.equal(governed.cashGovernance.planningDisposition, "funding-required");
+  assert.equal(governed.cashGovernance.fundingRequirement?.minimumAdditionalFundingLakh, 1);
+  assert.equal(governed.cashGovernance.fundingRequirement?.requiredByPeriod, 1);
+  assert.equal(governed.cashGovernance.fundingRequirement?.baselineReserveFundingNeedLakh, 0);
+  assert.equal(governed.cashGovernance.fundingRequirement?.executionBlockedUntilFundingEvidenced, true);
+  assert.equal(governed.cashGovernance.fundingRequirement?.planningScenarioConditionallyFeasible, true);
   assert.equal(governed.accepted, false);
   assert.ok(governed.issues.some((issue) => issue.code === "CASH_GOVERNANCE_INFEASIBLE"));
+  assert.ok(governed.issues.some((issue) => issue.code === "CAPITAL_DEPENDENT_PLAN"));
+});
+
+test("pre-existing reserve deficit is reported as funding need, not mathematical-plan failure", () => {
+  const startupGuardrails: AdvancedCashGuardrail[] = [
+    { period: 1, baselineFreeLiquidityLakh: 0.5, cumulativeIncrementalProcurementHeadroomLakh: 0.5, sourceRef: "IBPE:CASH" },
+    { period: 2, baselineFreeLiquidityLakh: -4.6, cumulativeIncrementalProcurementHeadroomLakh: -4.6, sourceRef: "IBPE:CASH" },
+    { period: 3, baselineFreeLiquidityLakh: -3.2, cumulativeIncrementalProcurementHeadroomLakh: -3.2, sourceRef: "IBPE:CASH" },
+  ];
+  const governed = applyCashGovernanceToOptimizationRun(run(0), model, startupGuardrails);
+  assert.equal(governed.result?.status, "optimal");
+  assert.equal(governed.cashGovernance.status, "infeasible");
+  assert.equal(governed.cashGovernance.planningDisposition, "funding-required");
+  assert.equal(governed.cashGovernance.fundingRequirement?.minimumAdditionalFundingLakh, 4.6);
+  assert.equal(governed.cashGovernance.fundingRequirement?.requiredByPeriod, 2);
+  assert.equal(governed.cashGovernance.fundingRequirement?.baselineReserveFundingNeedLakh, 4.6);
+  assert.equal(governed.accepted, false);
 });
 
 test("incomplete liquidity horizon is governance-indeterminate and cannot be accepted", () => {
   const governed = applyCashGovernanceToOptimizationRun(run(1), model, guardrails.slice(0, 2));
   assert.equal(governed.accepted, false);
+  assert.equal(governed.cashGovernance.planningDisposition, "cash-evidence-incomplete");
   assert.ok(governed.issues.some((issue) => issue.code === "CASH_GOVERNANCE_INCOMPLETE_HORIZON"));
 });
 
@@ -107,5 +133,6 @@ test("non-feasible solver outputs do not masquerade as cash-evaluated proposals"
   source.accepted = false;
   const governed = applyCashGovernanceToOptimizationRun(source, model, guardrails);
   assert.equal(governed.cashGovernance.status, "not-evaluated");
+  assert.equal(governed.cashGovernance.planningDisposition, "not-evaluated");
   assert.equal(governed.accepted, false);
 });
