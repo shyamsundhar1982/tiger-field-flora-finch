@@ -25,11 +25,18 @@ test("optimizer browser boundary returns a compact receipt and never dereference
   assert.match(execution, /AdvancedOptimizerExecutionReceipt/);
   assert.match(execution, /mathematicalStatus: optimizationStatus/);
   assert.match(execution, /cashGovernanceStatus: governedRun\.cashGovernance\.status/);
+  assert.match(execution, /cashPlanningDisposition: governedRun\.cashGovernance\.planningDisposition/);
+  assert.match(execution, /minimumAdditionalFundingLakh/);
+  assert.match(execution, /fundingRequiredByPeriod/);
+  assert.match(execution, /baselineReserveFundingNeedLakh/);
   assert.match(execution, /firstInfeasibilityWitness/);
   assert.doesNotMatch(execution, /\.\.\.governedRun[\s\S]*return/);
   assert.match(route, /if \(!response\)/);
   assert.match(route, /response\.mathematicalStatus/);
   assert.match(route, /response\.cashGovernanceStatus/);
+  assert.match(route, /response\.cashPlanningDisposition/);
+  assert.match(route, /response\.minimumAdditionalFundingLakh/);
+  assert.match(route, /execution remains blocked until funding is evidenced/i);
   assert.match(route, /response\.firstInfeasibilityWitness/);
   assert.doesNotMatch(route, /response\.result/);
 });
