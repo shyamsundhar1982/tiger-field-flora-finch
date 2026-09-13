@@ -9,7 +9,7 @@ import {
   type ProcurementCashGuardrailResult,
 } from "./advanced-planning-cash-guardrails.ts";
 
-export const ADVANCED_CASH_GOVERNANCE_VERSION = "VYNDI-ADVANCED-CASH-GOVERNANCE-0.2" as const;
+export const ADVANCED_CASH_GOVERNANCE_VERSION = "VYNDI-ADVANCED-CASH-GOVERNANCE-0.3" as const;
 
 export type CashPlanningDisposition =
   | "execution-ready"
@@ -18,8 +18,10 @@ export type CashPlanningDisposition =
   | "not-evaluated";
 
 export type CashFundingRequirement = {
-  minimumAdditionalFundingLakh: number;
-  requiredByPeriod: number;
+  firstFundingNeedLakh: number;
+  firstFundingNeedPeriod: number;
+  peakAdditionalFundingLakh: number;
+  peakFundingPeriod: number;
   baselineReserveFundingNeedLakh: number;
   reason: "reserve-preserving-liquidity-gap";
   executionBlockedUntilFundingEvidenced: true;
@@ -52,23 +54,29 @@ function round(value: number) {
 function deriveFundingRequirement(
   result: ProcurementCashGuardrailResult,
 ): CashFundingRequirement | undefined {
-  const deficitPeriods = result.periods.filter(
-    (period) => period.headroomAfterProposedProcurementLakh < -1e-9,
-  );
+  const deficitPeriods = result.periods
+    .filter((period) => period.headroomAfterProposedProcurementLakh < -1e-9)
+    .sort((left, right) => left.period - right.period);
   if (!deficitPeriods.length) return undefined;
 
-  const minimumAdditionalFundingLakh = round(Math.max(
-    ...deficitPeriods.map((period) => Math.abs(period.headroomAfterProposedProcurementLakh)),
-  ));
-  const requiredByPeriod = Math.min(...deficitPeriods.map((period) => period.period));
+  const firstDeficit = deficitPeriods[0];
+  const peakDeficit = deficitPeriods.reduce((peak, period) => {
+    const peakNeed = Math.abs(peak.headroomAfterProposedProcurementLakh);
+    const periodNeed = Math.abs(period.headroomAfterProposedProcurementLakh);
+    if (periodNeed > peakNeed + 1e-9) return period;
+    if (Math.abs(periodNeed - peakNeed) <= 1e-9 && period.period < peak.period) return period;
+    return peak;
+  });
   const baselineReserveFundingNeedLakh = round(Math.max(
     0,
     ...result.periods.map((period) => Math.max(0, -period.cumulativeHeadroomLakh)),
   ));
 
   return {
-    minimumAdditionalFundingLakh,
-    requiredByPeriod,
+    firstFundingNeedLakh: round(Math.abs(firstDeficit.headroomAfterProposedProcurementLakh)),
+    firstFundingNeedPeriod: firstDeficit.period,
+    peakAdditionalFundingLakh: round(Math.abs(peakDeficit.headroomAfterProposedProcurementLakh)),
+    peakFundingPeriod: peakDeficit.period,
     baselineReserveFundingNeedLakh,
     reason: "reserve-preserving-liquidity-gap",
     executionBlockedUntilFundingEvidenced: true,
@@ -165,7 +173,7 @@ export function applyCashGovernanceToOptimizationRun(
       issues.push(cashIssue(
         "warning",
         "CAPITAL_DEPENDENT_PLAN",
-        `The mathematically feasible plan is funding-dependent: at least ₹${fundingRequirement.minimumAdditionalFundingLakh}L additional funding is required by period ${fundingRequirement.requiredByPeriod} to restore reserve-preserving liquidity. This is a conditional planning result, not authority to raise, spend or commit funds.`,
+        `The mathematically feasible plan is funding-dependent: the first reserve-preserving funding need is ₹${fundingRequirement.firstFundingNeedLakh}L by period ${fundingRequirement.firstFundingNeedPeriod}, while the peak additional funding requirement is ₹${fundingRequirement.peakAdditionalFundingLakh}L by period ${fundingRequirement.peakFundingPeriod}. This is a conditional planning result, not authority to raise, spend or commit funds.`,
       ));
     }
   } else if (result.status === "indeterminate") {

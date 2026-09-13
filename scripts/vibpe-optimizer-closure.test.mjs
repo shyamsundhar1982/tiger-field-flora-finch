@@ -26,8 +26,10 @@ test("optimizer browser boundary returns a compact receipt and never dereference
   assert.match(execution, /mathematicalStatus: optimizationStatus/);
   assert.match(execution, /cashGovernanceStatus: governedRun\.cashGovernance\.status/);
   assert.match(execution, /cashPlanningDisposition: governedRun\.cashGovernance\.planningDisposition/);
-  assert.match(execution, /minimumAdditionalFundingLakh/);
-  assert.match(execution, /fundingRequiredByPeriod/);
+  assert.match(execution, /firstFundingNeedLakh/);
+  assert.match(execution, /firstFundingNeedPeriod/);
+  assert.match(execution, /peakAdditionalFundingLakh/);
+  assert.match(execution, /peakFundingPeriod/);
   assert.match(execution, /baselineReserveFundingNeedLakh/);
   assert.match(execution, /firstInfeasibilityWitness/);
   assert.doesNotMatch(execution, /\.\.\.governedRun[\s\S]*return/);
@@ -35,7 +37,8 @@ test("optimizer browser boundary returns a compact receipt and never dereference
   assert.match(route, /response\.mathematicalStatus/);
   assert.match(route, /response\.cashGovernanceStatus/);
   assert.match(route, /response\.cashPlanningDisposition/);
-  assert.match(route, /response\.minimumAdditionalFundingLakh/);
+  assert.match(route, /response\.firstFundingNeedLakh/);
+  assert.match(route, /response\.peakAdditionalFundingLakh/);
   assert.match(route, /execution remains blocked until funding is evidenced/i);
   assert.match(route, /response\.firstInfeasibilityWitness/);
   assert.doesNotMatch(route, /response\.result/);
@@ -92,7 +95,6 @@ test("HiGHS ESM loader keeps a valid module URL when Cloudflare strips import.me
     assert.match(patched, /file:\/\/\/highs\.mjs/);
     assert.match(patched, /typeof import\.meta\.url === "string"/);
 
-    // A second wrapper invocation must not recursively rewrite the dependency.
     assert.equal(patchPinnedHighsEsmLoaderForCloudflare(root), true);
     assert.equal(await readFile(loaderPath, "utf8"), patched);
   } finally {

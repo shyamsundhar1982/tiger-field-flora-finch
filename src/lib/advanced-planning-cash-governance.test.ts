@@ -94,8 +94,10 @@ test("cash-infeasible optimal solver output is explicitly funding-dependent and 
   assert.equal(governed.result?.status, "optimal");
   assert.equal(governed.cashGovernance.status, "infeasible");
   assert.equal(governed.cashGovernance.planningDisposition, "funding-required");
-  assert.equal(governed.cashGovernance.fundingRequirement?.minimumAdditionalFundingLakh, 1);
-  assert.equal(governed.cashGovernance.fundingRequirement?.requiredByPeriod, 1);
+  assert.equal(governed.cashGovernance.fundingRequirement?.firstFundingNeedLakh, 1);
+  assert.equal(governed.cashGovernance.fundingRequirement?.firstFundingNeedPeriod, 1);
+  assert.equal(governed.cashGovernance.fundingRequirement?.peakAdditionalFundingLakh, 1);
+  assert.equal(governed.cashGovernance.fundingRequirement?.peakFundingPeriod, 1);
   assert.equal(governed.cashGovernance.fundingRequirement?.baselineReserveFundingNeedLakh, 0);
   assert.equal(governed.cashGovernance.fundingRequirement?.executionBlockedUntilFundingEvidenced, true);
   assert.equal(governed.cashGovernance.fundingRequirement?.planningScenarioConditionallyFeasible, true);
@@ -114,10 +116,26 @@ test("pre-existing reserve deficit is reported as funding need, not mathematical
   assert.equal(governed.result?.status, "optimal");
   assert.equal(governed.cashGovernance.status, "infeasible");
   assert.equal(governed.cashGovernance.planningDisposition, "funding-required");
-  assert.equal(governed.cashGovernance.fundingRequirement?.minimumAdditionalFundingLakh, 4.6);
-  assert.equal(governed.cashGovernance.fundingRequirement?.requiredByPeriod, 2);
+  assert.equal(governed.cashGovernance.fundingRequirement?.firstFundingNeedLakh, 4.6);
+  assert.equal(governed.cashGovernance.fundingRequirement?.firstFundingNeedPeriod, 2);
+  assert.equal(governed.cashGovernance.fundingRequirement?.peakAdditionalFundingLakh, 4.6);
+  assert.equal(governed.cashGovernance.fundingRequirement?.peakFundingPeriod, 2);
   assert.equal(governed.cashGovernance.fundingRequirement?.baselineReserveFundingNeedLakh, 4.6);
   assert.equal(governed.accepted, false);
+});
+
+test("first funding need and peak funding requirement retain their own periods", () => {
+  const stagedGuardrails: AdvancedCashGuardrail[] = [
+    { period: 1, baselineFreeLiquidityLakh: -1, cumulativeIncrementalProcurementHeadroomLakh: -1, sourceRef: "IBPE:CASH" },
+    { period: 2, baselineFreeLiquidityLakh: -4.6, cumulativeIncrementalProcurementHeadroomLakh: -4.6, sourceRef: "IBPE:CASH" },
+    { period: 3, baselineFreeLiquidityLakh: -3.2, cumulativeIncrementalProcurementHeadroomLakh: -3.2, sourceRef: "IBPE:CASH" },
+  ];
+  const governed = applyCashGovernanceToOptimizationRun(run(0), model, stagedGuardrails);
+  assert.equal(governed.cashGovernance.fundingRequirement?.firstFundingNeedLakh, 1);
+  assert.equal(governed.cashGovernance.fundingRequirement?.firstFundingNeedPeriod, 1);
+  assert.equal(governed.cashGovernance.fundingRequirement?.peakAdditionalFundingLakh, 4.6);
+  assert.equal(governed.cashGovernance.fundingRequirement?.peakFundingPeriod, 2);
+  assert.equal(governed.cashGovernance.fundingRequirement?.baselineReserveFundingNeedLakh, 4.6);
 });
 
 test("incomplete liquidity horizon is governance-indeterminate and cannot be accepted", () => {
