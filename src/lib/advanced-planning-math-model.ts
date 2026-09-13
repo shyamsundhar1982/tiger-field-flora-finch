@@ -4,7 +4,7 @@ import {
   type PlanningObjectiveWeights,
 } from "./advanced-planning-constraints.ts";
 
-export const ADVANCED_MATH_MODEL_VERSION = "VYNDI-ADVANCED-MATH-MODEL-0.1" as const;
+export const ADVANCED_MATH_MODEL_VERSION = "VYNDI-ADVANCED-MATH-MODEL-0.2" as const;
 
 export type MathVariableType = "continuous" | "integer" | "binary";
 export type MathConstraintSense = "eq" | "le" | "ge";
@@ -242,7 +242,19 @@ export function compileAdvancedPlanningMathematicalModel(
       issues.push({ severity: "error", code: "MATERIAL_POSITION_REQUIRED", message: `Required SKU ${sku} has no governed material position.` });
       continue;
     }
-    const opening = material.onHandQty - (material.reservedQty ?? 0) - (material.safetyStockQty ?? 0);
+    const reserved = material.reservedQty ?? 0;
+    const safetyTarget = material.safetyStockQty ?? 0;
+    const unreservedOpening = material.onHandQty - reserved;
+    const protectedSafetyStock = Math.min(safetyTarget, Math.max(0, unreservedOpening));
+    const openingSafetyDeficit = safetyTarget - protectedSafetyStock;
+    const opening = unreservedOpening - protectedSafetyStock;
+    if (openingSafetyDeficit > 1e-12) {
+      issues.push({
+        severity: "warning",
+        code: "OPENING_SAFETY_STOCK_DEFICIT",
+        message: `SKU ${sku} opens ${openingSafetyDeficit} below its governed safety-stock target. The optimizer protects only physically available unreserved opening stock; the pre-existing deficit remains planning evidence rather than impossible negative inventory.`,
+      });
+    }
     for (let period = 1; period <= H; period += 1) {
       const terms: MathTerm[] = [];
       for (const req of requirements) {
@@ -252,8 +264,9 @@ export function compileAdvancedPlanningMathematicalModel(
         for (const proc of procurementVarsBySkuReceipt.get(`${sku}::${receiptPeriod}`) ?? []) addTerm(terms, proc.variableId, proc.qtyPerLot);
       }
       const committed = (receiptsBySku.get(sku) ?? []).filter((row) => row.period <= period).reduce((sum, row) => sum + row.quantity, 0);
+      const materialRhs = -(opening + committed);
       addConstraint({
-        id: c("MATERIAL_CUMULATIVE", sku, period), sense: "ge", rhs: -(opening + committed), terms,
+        id: c("MATERIAL_CUMULATIVE", sku, period), sense: "ge", rhs: Math.abs(materialRhs) <= 1e-12 ? 0 : materialRhs, terms,
         semantic: `protected cumulative material balance ${sku} M${period}`,
       });
     }
@@ -333,7 +346,7 @@ export function compileAdvancedPlanningMathematicalModel(
       semantics: [
         "Demand is fulfilled at or after its requested period; unmet quantity is explicit and penalised by truth class and priority.",
         "Production is bounded by total modeled demand and cumulative finished-goods fulfilment cannot exceed cumulative production.",
-        "Protected material balance preserves reservations and safety stock; BOM scrap uses quantityPerUnit × (1 + scrapPct).",
+        "Protected material balance preserves all reservations and protects safety stock only from physically available unreserved opening stock; a pre-existing safety-stock deficit remains a planning exception rather than impossible negative inventory. BOM scrap uses quantityPerUnit × (1 + scrapPct).",
         "Supplier orders use integer order-multiple lots, MOQ activation binaries, governed lead time and finite receipt-period capacity with explicit overload slack.",
         "Operation quantities are assigned only to eligible resources; run load is divided by yield and setup is charged once per active operation-resource-period.",
         "Resource capacity equals governed available hours × efficiency, with explicit overload slack rather than silent infeasibility masking.",
