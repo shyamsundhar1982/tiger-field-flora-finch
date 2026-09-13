@@ -147,7 +147,6 @@ test("test and benchmark supplier economics cannot become authoritative funding 
     ...model,
     supplierLanes: model.supplierLanes.map((lane) => ({
       ...lane,
-      id: "LANE-TEST-20260913-SKU1",
       sourceRef: "TEST-ONLY-VIBPE-SUPPLIER-LANE-VALIDATION | TEST-MARKET-BENCHMARK | method:TEST ASSUMPTION ONLY",
     })),
   };
