@@ -15,6 +15,19 @@ export type RunAdvancedOptimizerFromPacketInput = {
   mipGap?: number;
 };
 
+export type AdvancedOptimizerExecutionReceipt = {
+  optimizationRunId: string;
+  parentIbpeRunId: string;
+  packetId: string;
+  preparationVersion: string;
+  readyForGovernedOptimization: boolean;
+  mathematicalStatus: string;
+  cashGovernanceStatus: string;
+  accepted: boolean;
+  firstInfeasibilityWitness: string | null;
+  issueCount: number;
+};
+
 function normalizeOptionalNumber(value: unknown) {
   if (value === undefined || value === null || value === "") return undefined;
   const parsed = Number(value);
@@ -28,7 +41,7 @@ export const runAdvancedOptimizerFromPacket = createServerFn({ method: "POST" })
     maxRuntimeMs: normalizeOptionalNumber(input.maxRuntimeMs),
     mipGap: normalizeOptionalNumber(input.mipGap),
   }))
-  .handler(async ({ data }) => {
+  .handler(async ({ data }): Promise<AdvancedOptimizerExecutionReceipt> => {
     const actor = await requireBusinessActor("edit");
     if (!data.packetId) throw new Error("Governed optimization requires an exact advanced packet ID.");
     if (!data.requestId) throw new Error("Governed optimization requires a request ID.");
@@ -63,6 +76,9 @@ export const runAdvancedOptimizerFromPacket = createServerFn({ method: "POST" })
     );
 
     const optimizationStatus = governedRun.result?.status ?? "error";
+    const firstInfeasibilityWitness = governedRun.result?.diagnostics.find((line) =>
+      line.startsWith("INFEASIBILITY_WITNESS "),
+    ) ?? null;
     const runId = `OPT-${crypto.randomUUID()}`;
     const sql = await getSql();
     const rows = await sql.query<{ id: string }>(
@@ -107,6 +123,10 @@ export const runAdvancedOptimizerFromPacket = createServerFn({ method: "POST" })
       packetId: prepared.packetId,
       preparationVersion: prepared.version,
       readyForGovernedOptimization: prepared.readyForGovernedOptimization,
-      ...governedRun,
+      mathematicalStatus: optimizationStatus,
+      cashGovernanceStatus: governedRun.cashGovernance.status,
+      accepted: governedRun.accepted,
+      firstInfeasibilityWitness,
+      issueCount: governedRun.issues.length,
     };
   });
