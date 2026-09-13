@@ -28,7 +28,12 @@ const checks = [
   ["UI-DISPATCH-VISIBILITY", "/command/operations", "Operations dispatch visibility renders"],
   ["UI-ACTION-INBOX", "/command/actions", "Business Action Inbox renders"],
   ["UI-CONTROL-TOWER", "/command/control-tower", "Control Tower renders"],
+  ["UI-VIBPE-WORKSPACE", "/command/ibpe-operating-workspace", "VIBPE Operating Workspace renders"],
+  ["UI-VIBPE-AUTHORITY", "/command/ibpe-operating-workspace/authority", "Advanced Planning Authority renders"],
+  ["UI-VIBPE-OPTIMIZER", "/command/ibpe-operating-workspace/optimizer", "Governed Optimizer renders"],
+  ["UI-VIBPE-OUTPUTS", "/command/ibpe-operating-workspace/outputs", "Outputs & Evidence renders"],
   ["UI-VIBPE-ASSURANCE", "/command/ibpe-operating-workspace/assurance", "VIBPE Assurance renders"],
+  ["UI-VIBPE-RELEASE", "/command/ibpe-operating-workspace/release", "Release Readiness renders"],
 ];
 
 const browser = await chromium.launch({ headless: true });
