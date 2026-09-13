@@ -6,6 +6,7 @@ import { loadPreparedAdvancedOptimizerEnvelope } from "./advanced-optimizer-auth
 import { createPrecompiledHighsOptimizer } from "./advanced-planning-highs-runtime.ts";
 import { runGovernedAdvancedOptimizer } from "./advanced-planning-optimizer.ts";
 import { applyCashGovernanceToOptimizationRun } from "./advanced-planning-cash-governance.ts";
+import { diagnoseAdvancedPlanningInfeasibility } from "./advanced-planning-infeasibility.ts";
 
 export type RunAdvancedOptimizerFromPacketInput = {
   packetId: string;
@@ -48,6 +49,13 @@ export const runAdvancedOptimizerFromPacket = createServerFn({ method: "POST" })
       ...(data.mipGap === undefined ? {} : { mipGap: data.mipGap }),
     };
     const mathematicalRun = await runGovernedAdvancedOptimizer(prepared.model, optimizer, request);
+    if (mathematicalRun.result?.status === "infeasible") {
+      const diagnosis = diagnoseAdvancedPlanningInfeasibility(prepared.model);
+      mathematicalRun.result.diagnostics = [
+        ...mathematicalRun.result.diagnostics,
+        ...diagnosis.diagnostics,
+      ];
+    }
     const governedRun = applyCashGovernanceToOptimizationRun(
       mathematicalRun,
       prepared.model,
