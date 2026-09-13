@@ -169,3 +169,13 @@ test("Co-Pilot UI routes governance and aggregate exception questions before tra
   assert.ok(ibpeCall > traceabilityCall);
   assert.match(copilotUi, /Governed VIBPE control state · live read-only sources/);
 });
+
+test("Co-Pilot UI independently routes numbered multi-question reviews", () => {
+  assert.match(copilotUi, /function numberedQuestions/);
+  assert.match(copilotUi, /questions\.length >= 2/);
+  assert.match(copilotUi, /questions\.slice\(0, 12\)/);
+  assert.match(copilotUi, /for \(const item of batch\)/);
+  assert.match(copilotUi, /await resolveOne\(item\.question\)/);
+  assert.match(copilotUi, /Independent multi-intent review/);
+  assert.match(copilotUi, /maxLength=\{8000\}/);
+});
