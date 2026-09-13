@@ -52,6 +52,23 @@ function numberedQuestions(text: string) {
   return questions.length >= 2 ? questions.slice(0, 12) : [];
 }
 
+function batchSynthesisInstruction(text: string) {
+  const lines = text.split(/\r?\n/);
+  let lastNumberedIndex = -1;
+  for (let index = 0; index < lines.length; index += 1) {
+    if (/^\s*\d{1,2}[.)]\s+/.test(lines[index])) lastNumberedIndex = index;
+  }
+  if (lastNumberedIndex < 0 || lastNumberedIndex >= lines.length - 1) return "";
+  const trailing = lines
+    .slice(lastNumberedIndex + 1)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join(" ");
+  if (!trailing) return "";
+  const asksSynthesis = /finish with|overall assessment|overall operating status|primary blocker|secondary blocker|founder decision|highest-priority executable action|contradiction/i.test(trailing);
+  return asksSynthesis ? trailing.slice(0, 1600) : "";
+}
+
 export function IbpeCopilot() {
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
@@ -138,13 +155,24 @@ export function IbpeCopilot() {
             sections.push(`${item.number}. ${item.question}\nUnable to resolve this question: ${error instanceof Error ? error.message : "request failed"}.`);
           }
         }
+
+        const synthesisInstruction = batchSynthesisInstruction(clean);
+        if (synthesisInstruction) {
+          try {
+            const synthesis = await resolveOne(`Founder operating review synthesis. ${synthesisInstruction}`);
+            sections.push(`Overall assessment\n${synthesis.text}`);
+          } catch (error) {
+            sections.push(`Overall assessment\nUnable to resolve the requested synthesis: ${error instanceof Error ? error.message : "request failed"}.`);
+          }
+        }
+
         setMessages((current) => [
           ...current,
           {
             id: crypto.randomUUID(),
             role: "assistant",
             text: sections.join("\n\n"),
-            meta: `Independent multi-intent review · ${batch.length} questions routed separately`,
+            meta: `Independent multi-intent review · ${batch.length} questions routed separately${synthesisInstruction ? " · overall synthesis included" : ""}`,
           },
         ]);
         return;
