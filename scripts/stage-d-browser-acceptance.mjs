@@ -24,10 +24,20 @@ try {
     const pageErrors = [];
     page.on("pageerror", (error) => pageErrors.push(String(error?.message || error)));
 
-    await page.goto(`${baseURL}/command-login`, { waitUntil: "domcontentloaded" });
-    await page.getByLabel(/Email or legacy username/i).fill("admin");
-    await page.getByLabel(/^Password$/i).fill(password);
-    await page.getByRole("button", { name: /Use legacy Command access/i }).click();
+    // Wait for Vite/React hydration before editing controlled form fields. If
+    // values are written at DOMContentLoaded, hydration can legitimately replace
+    // the DOM value while React state is still empty, leaving Submit disabled.
+    await page.goto(`${baseURL}/command-login`, { waitUntil: "networkidle" });
+    const username = page.getByLabel(/Email or legacy username/i);
+    const passwordField = page.getByLabel(/^Password$/i);
+    const submit = page.getByRole("button", { name: /Use legacy Command access/i });
+    await username.fill("admin");
+    await passwordField.fill(password);
+    await page.waitForFunction(() => {
+      const button = document.querySelector('button[type="submit"]');
+      return button instanceof HTMLButtonElement && !button.disabled;
+    });
+    await submit.click();
     await page.waitForURL(/\/command(?:\/|$)/, { timeout: 20_000 });
 
     for (const route of routes) {
