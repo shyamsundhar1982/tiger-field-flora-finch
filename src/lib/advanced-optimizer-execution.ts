@@ -21,6 +21,10 @@ export type AdvancedOptimizerExecutionReceipt = {
   readyForGovernedOptimization: boolean;
   mathematicalStatus: string;
   cashGovernanceStatus: string;
+  cashPlanningDisposition: string;
+  minimumAdditionalFundingLakh: number | null;
+  fundingRequiredByPeriod: number | null;
+  baselineReserveFundingNeedLakh: number | null;
   accepted: boolean;
   firstInfeasibilityWitness: string | null;
   issueCount: number;
@@ -91,6 +95,7 @@ export const runAdvancedOptimizerFromPacket = createServerFn({ method: "POST" })
     const firstInfeasibilityWitness = governedRun.result?.diagnostics.find((line) =>
       line.startsWith("INFEASIBILITY_WITNESS "),
     ) ?? null;
+    const fundingRequirement = governedRun.cashGovernance.fundingRequirement;
     const runId = `OPT-${crypto.randomUUID()}`;
     const sql = await getSql();
     const rows = await sql.query<{ id: string }>(
@@ -137,6 +142,10 @@ export const runAdvancedOptimizerFromPacket = createServerFn({ method: "POST" })
       readyForGovernedOptimization: prepared.readyForGovernedOptimization,
       mathematicalStatus: optimizationStatus,
       cashGovernanceStatus: governedRun.cashGovernance.status,
+      cashPlanningDisposition: governedRun.cashGovernance.planningDisposition,
+      minimumAdditionalFundingLakh: fundingRequirement?.minimumAdditionalFundingLakh ?? null,
+      fundingRequiredByPeriod: fundingRequirement?.requiredByPeriod ?? null,
+      baselineReserveFundingNeedLakh: fundingRequirement?.baselineReserveFundingNeedLakh ?? null,
       accepted: governedRun.accepted,
       firstInfeasibilityWitness,
       issueCount: governedRun.issues.length,
