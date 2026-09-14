@@ -97,19 +97,22 @@ try {
       }
     }
 
-    // Verify the authenticated browser session survives a full protected-route
-    // reload. Use a fresh page in the same authenticated context so the check
-    // validates session persistence without depending on a stale page handle
-    // left behind by SPA/auth navigation.
+    // Verify the authenticated browser session survives a real document reload.
+    // Wait for the reload RESPONSE to commit, then verify the newly committed
+    // document becomes substantive. TanStack Start can continue streaming work
+    // after commit, so DOMContentLoaded is not a reliable synchronization point
+    // for this persistence assertion in the workerd development runtime.
     const persistenceProbe = await context.newPage();
     observePage(persistenceProbe);
     try {
       await persistenceProbe.goto(`${baseURL}/command`, { waitUntil: "domcontentloaded", timeout: 30_000 });
       await waitForSubstantiveBody(persistenceProbe);
       assert.doesNotMatch(persistenceProbe.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} lost its authenticated session before reload`);
-      await persistenceProbe.reload({ waitUntil: "domcontentloaded", timeout: 30_000 });
+      await persistenceProbe.reload({ waitUntil: "commit", timeout: 30_000 });
       await waitForSubstantiveBody(persistenceProbe);
       assert.doesNotMatch(persistenceProbe.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} lost its authenticated session on reload`);
+      const reloadedText = await persistenceProbe.locator("body").innerText();
+      assert.doesNotMatch(reloadedText, /Something went wrong|Cannot read properties of undefined|Internal Server Error/i, `${viewport.name} reload rendered a fatal error`);
     } finally {
       await persistenceProbe.close().catch(() => {});
     }
