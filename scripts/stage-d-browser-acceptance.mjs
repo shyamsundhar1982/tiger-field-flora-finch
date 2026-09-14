@@ -93,13 +93,16 @@ try {
     await waitForSubstantiveBody(page);
     assert.doesNotMatch(page.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} lost its authenticated session on reload`);
 
-    // Exercise server-side revocation once. After logout, the protected route
-    // must no longer be reachable in the same browser context.
+    // Exercise server-side revocation once. After logout, probe the revoked
+    // session from a fresh page in the SAME context. This preserves the cleared
+    // cookie state while avoiding a race with the logout page's own navigation.
     if (viewport.name === "desktop-landscape") {
       await page.getByRole("button", { name: /Log out/i }).click();
       await page.waitForURL(/\/login(?:\?|$)/, { timeout: 30_000 });
-      await page.goto(`${baseURL}/command`, { waitUntil: "domcontentloaded" });
-      await page.waitForURL(/\/login\?returnTo=%2Fcommand/, { timeout: 30_000 });
+      const revokedProbe = await context.newPage();
+      await revokedProbe.goto(`${baseURL}/command`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+      await revokedProbe.waitForURL(/\/login\?returnTo=%2Fcommand/, { timeout: 30_000 });
+      await revokedProbe.close();
     }
 
     assert.deepEqual(pageErrors, [], `${viewport.name} emitted browser page errors: ${pageErrors.join(" | ")}`);
