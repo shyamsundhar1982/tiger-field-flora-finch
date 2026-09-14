@@ -101,7 +101,7 @@ jobs:
         run: npm run db:migrate
 
       - name: Build production-like acceptance bundle
-        run: node scripts/with-app-env.mjs vite build
+        run: npm run build
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
