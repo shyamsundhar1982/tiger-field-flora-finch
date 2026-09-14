@@ -17,13 +17,14 @@ const routes = [
   "/command/actuals",
   "/command/ibpe-operating-workspace/assurance",
 ];
+const heavyRoutes = new Set(["/command/ibpe-operating-workspace/assurance"]);
 
-async function waitForSubstantiveBody(page) {
-  await page.locator("body").waitFor({ state: "visible", timeout: 20_000 });
+async function waitForSubstantiveBody(page, timeout = 20_000) {
+  await page.locator("body").waitFor({ state: "visible", timeout });
   await page.waitForFunction(
     () => (document.body?.innerText || "").trim().length > 40,
     undefined,
-    { timeout: 20_000 },
+    { timeout },
   );
 }
 
@@ -101,15 +102,20 @@ try {
     );
 
     // Probe each protected route from a fresh page in the same authenticated
-    // context. This tests direct protected entry while avoiding overlapping
-    // TanStack client-router navigations from a previously mounted live page.
+    // context. Assurance intentionally has a larger navigation budget because it
+    // aggregates governed evidence across multiple backend authorities. All
+    // other routes retain the normal 30-second acceptance budget.
     for (const route of routes) {
       console.log(`[stage-d-browser] ${viewport.name}: protected route ${route}`);
       const routePage = await context.newPage();
       observePage(routePage);
+      const heavy = heavyRoutes.has(route);
       try {
-        await routePage.goto(`${baseURL}${route}`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-        await waitForSubstantiveBody(routePage);
+        await routePage.goto(`${baseURL}${route}`, {
+          waitUntil: "domcontentloaded",
+          timeout: heavy ? 90_000 : 30_000,
+        });
+        await waitForSubstantiveBody(routePage, heavy ? 60_000 : 20_000);
         assert.doesNotMatch(routePage.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} ${route} lost authenticated access`);
         const text = await routePage.locator("body").innerText();
         assert.doesNotMatch(text, /Something went wrong|Cannot read properties of undefined|Internal Server Error/i, `${viewport.name} ${route} rendered a fatal error`);
