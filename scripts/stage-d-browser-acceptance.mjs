@@ -98,22 +98,46 @@ try {
     }
 
     // Verify the authenticated browser session survives a full protected-route
-    // reload; this is distinct from client-side SPA navigation.
-    await page.reload({ waitUntil: "domcontentloaded", timeout: 30_000 });
-    await waitForSubstantiveBody(page);
-    assert.doesNotMatch(page.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} lost its authenticated session on reload`);
+    // reload. Use a fresh page in the same authenticated context so the check
+    // validates session persistence without depending on a stale page handle
+    // left behind by SPA/auth navigation.
+    const persistenceProbe = await context.newPage();
+    observePage(persistenceProbe);
+    try {
+      await persistenceProbe.goto(`${baseURL}/command`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+      await waitForSubstantiveBody(persistenceProbe);
+      assert.doesNotMatch(persistenceProbe.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} lost its authenticated session before reload`);
+      await persistenceProbe.reload({ waitUntil: "domcontentloaded", timeout: 30_000 });
+      await waitForSubstantiveBody(persistenceProbe);
+      assert.doesNotMatch(persistenceProbe.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} lost its authenticated session on reload`);
+    } finally {
+      await persistenceProbe.close().catch(() => {});
+    }
 
-    // Exercise server-side revocation once. After logout, probe the revoked
-    // session from a fresh page in the SAME context. This preserves the cleared
-    // cookie state while avoiding a race with the logout page's own navigation.
+    // Exercise server-side revocation once. Use a fresh authenticated page for
+    // logout, then probe the revoked session from another page in the SAME
+    // context. This preserves shared cookie state and avoids stale-page races.
     if (viewport.name === "desktop-landscape") {
-      await page.getByRole("button", { name: /Log out/i }).click();
-      await page.waitForURL(/\/login(?:\?|$)/, { timeout: 30_000 });
+      const logoutPage = await context.newPage();
+      observePage(logoutPage);
+      try {
+        await logoutPage.goto(`${baseURL}/command`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+        await waitForSubstantiveBody(logoutPage);
+        assert.doesNotMatch(logoutPage.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} was not authenticated before logout`);
+        await logoutPage.getByRole("button", { name: /Log out/i }).click();
+        await logoutPage.waitForURL(/\/login(?:\?|$)/, { timeout: 30_000 });
+      } finally {
+        await logoutPage.close().catch(() => {});
+      }
+
       const revokedProbe = await context.newPage();
       observePage(revokedProbe);
-      await revokedProbe.goto(`${baseURL}/command`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-      await revokedProbe.waitForURL(/\/login\?returnTo=%2Fcommand/, { timeout: 30_000 });
-      await revokedProbe.close();
+      try {
+        await revokedProbe.goto(`${baseURL}/command`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+        await revokedProbe.waitForURL(/\/login\?returnTo=%2Fcommand/, { timeout: 30_000 });
+      } finally {
+        await revokedProbe.close().catch(() => {});
+      }
     }
 
     assert.deepEqual(pageErrors, [], `${viewport.name} emitted browser page errors: ${pageErrors.join(" | ")}`);
