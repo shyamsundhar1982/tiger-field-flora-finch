@@ -7,22 +7,23 @@
  * The two environments authenticate differently, so they need different
  * answers to "the server did not reply":
  *
- * - **Live preview** — a partitioned iframe with no readable session cookie;
- *   the session rides the bearer token in `sessionStorage`. Dropping that token
- *   IS being signed out, so the server call is best effort and a wedged request
- *   must never strand the button. This is where the hang actually happens.
+ * - **Live preview / loopback acceptance** — bearer transport may be used, but
+ *   loopback can also carry a real Better Auth cookie. Therefore every logout
+ *   must attempt the server-side sign-out before clearing local bearer state.
+ *   The request is best effort and bounded so a wedged preview request cannot
+ *   strand the button.
  * - **Deployed** — the session rides an HttpOnly `__Host-` cookie that JS
  *   cannot delete. ONLY a completed sign-out response clears it, and
- *   `server.ts` enables `session.cookieCache` (maxAge 300), so `/get-session`
- *   would keep answering from the cached cookie for minutes afterwards.
- *   Redirecting on a timeout would show the visitor "signed out" while their
- *   session is still live — so here we fail loudly instead of pretending.
+ *   `server.ts` enables `session.cookieCache`, so `/get-session` may otherwise
+ *   keep answering from cached state. Redirecting on a timeout would show the
+ *   visitor "signed out" while their session is still live — so here we fail
+ *   loudly instead of pretending.
  */
 
 /**
- * Live preview: aggressive, because the local clear is what signs the user out.
- * The same-origin POST normally answers in tens of ms; lower would start
- * abandoning slow-but-working sign-outs for no gain.
+ * Live preview: aggressive, because local bearer clear is still the final
+ * fallback. The same-origin POST normally answers in tens of ms; lower would
+ * start abandoning slow-but-working sign-outs for no gain.
  */
 export const PREVIEW_SIGN_OUT_TIMEOUT_MS = 1500;
 
@@ -73,8 +74,8 @@ export function settleWithin(start, timeoutMs) {
 
 /**
  * @typedef {object} SignOutSteps
- * @property {boolean} livePreview Whether the app is the sandbox preview iframe.
- * @property {boolean} hasBearer Whether a preview bearer token is stored.
+ * @property {boolean} livePreview Whether the app is a preview/loopback transport host.
+ * @property {boolean} hasBearer Whether a preview bearer token is stored. Retained for caller compatibility and diagnostics.
  * @property {() => unknown} requestSignOut Ask the server to end the session; must reject on a failed response.
  * @property {() => void} clearToken Drop the stored bearer token.
  * @property {() => void} redirect Leave the page.
@@ -84,27 +85,23 @@ export function settleWithin(start, timeoutMs) {
 /**
  * End the session, then clear the local token and redirect.
  *
- * In the live preview those last two always run. When deployed they run only if
- * the server confirmed, because nothing else can clear the cookie — a failed or
- * timed-out sign-out throws rather than reporting a sign-out that did not
- * happen.
+ * Preview/loopback always attempts server revocation because those hosts may
+ * authenticate with either bearer or cookie transport. The request remains
+ * best effort there: after the bounded wait, local bearer state is cleared and
+ * navigation proceeds. When deployed, redirect occurs only after the server
+ * confirms the HttpOnly cookie session was ended.
  * @param {SignOutSteps} steps
  * @returns {Promise<void>}
  */
 export async function runSignOut({
   livePreview,
-  hasBearer,
   requestSignOut,
   clearToken,
   redirect,
   timeoutMs,
 }) {
   if (livePreview) {
-    // No bearer means a partitioned iframe with nothing to invalidate; with one,
-    // still invalidate it server-side, just don't block on the answer.
-    if (hasBearer) {
-      await settleWithin(requestSignOut, timeoutMs ?? signOutTimeoutMs(livePreview));
-    }
+    await settleWithin(requestSignOut, timeoutMs ?? signOutTimeoutMs(livePreview));
     clearToken();
     redirect();
     return;
@@ -124,8 +121,8 @@ export async function runSignOut({
 
 /**
  * @typedef {object} PreSignInSteps
- * @property {boolean} livePreview Whether the app is the sandbox preview iframe.
- * @property {boolean} hasBearer Whether a preview bearer token is stored.
+ * @property {boolean} livePreview Whether the app is a preview/loopback transport host.
+ * @property {boolean} hasBearer Whether a preview bearer token is stored. Retained for caller compatibility and diagnostics.
  * @property {() => unknown} requestSignOut Ask the server to end any prior session.
  * @property {() => void} clearToken Drop the stored bearer token.
  * @property {number} [timeoutMs]
@@ -135,26 +132,19 @@ export async function runSignOut({
  * Drop any prior session before a new sign-in starts, so switching providers
  * actually switches identity.
  *
- * Deliberately BEST EFFORT — unlike `runSignOut` this never throws. It also
- * runs when there is no prior session at all, so treating a failure as fatal
- * would block first-time sign-in on a transport hiccup, for a visitor with no
- * session to protect. The subsequent OAuth flow issues a fresh session either
- * way. Only the wait is bounded, and by the same per-environment rule as
- * `runSignOut`: a deployed session dies server-side, so it gets the full
- * window rather than the preview's aggressive one.
+ * Deliberately BEST EFFORT — unlike `runSignOut` this never throws. Preview and
+ * loopback hosts also always attempt the server request because they can carry a
+ * cookie-backed session even when no bearer is present. Only the wait is
+ * bounded, and by the same per-environment rule as `runSignOut`.
  * @param {PreSignInSteps} steps
  * @returns {Promise<void>}
  */
 export async function runPreSignInSignOut({
   livePreview,
-  hasBearer,
   requestSignOut,
   clearToken,
   timeoutMs,
 }) {
-  // In the preview a missing bearer means there is nothing to clear.
-  if (hasBearer || !livePreview) {
-    await settleWithin(requestSignOut, timeoutMs ?? signOutTimeoutMs(livePreview));
-  }
+  await settleWithin(requestSignOut, timeoutMs ?? signOutTimeoutMs(livePreview));
   clearToken();
 }
