@@ -29,15 +29,16 @@ test("deployed PostgreSQL connections cannot be reused across Worker requests", 
   assert.match(authSource, /new Pool\(requestSafePostgresPoolConfig\([^)]+\)\)/);
 });
 
-test("loopback Hyperdrive development bounds concurrency without retaining request-owned sockets", async () => {
+test("loopback Hyperdrive development allows bounded parallel loaders without retaining request-owned sockets", async () => {
   assert.equal(isLoopbackPostgresConnectionString("postgresql://postgres:postgres@localhost:5432/vyndi"), true);
   assert.equal(isLoopbackPostgresConnectionString("postgresql://postgres:postgres@127.0.0.1:5432/vyndi"), true);
   assert.equal(isLoopbackPostgresConnectionString("postgresql://postgres:postgres@[::1]:5432/vyndi"), true);
   assert.equal(isLoopbackPostgresConnectionString("postgresql://hyperdrive.internal/vyndi"), false);
 
   const localConfig = requestSafePostgresPoolConfig("postgresql://postgres:postgres@localhost:5432/vyndi");
-  assert.equal(localConfig.max, 1);
+  assert.equal(localConfig.max, 5);
   assert.equal(localConfig.maxUses, 1);
+  assert.equal(localConfig.connectionTimeoutMillis, 10_000);
   assert.equal(localConfig.idleTimeoutMillis, 30_000);
 
   const databaseSource = await readFile(new URL("./db.server.ts", import.meta.url), "utf8");
