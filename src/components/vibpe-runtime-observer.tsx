@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useLocation, useRouter } from "@tanstack/react-router";
+import { useLocation } from "@tanstack/react-router";
 
 type Capability = { id: string; route: string; label: string; kind?: "route" | "sales-confirm" | "action-lifecycle" };
 
@@ -85,7 +85,7 @@ function inspectDocument(capability: Capability, doc: Document) {
   return { passed: !errorLike, result: `${capability.label}: rendered`, evidence: { errorLike } };
 }
 
-async function probeAuthenticatedSession(mode: "live-session-probe" | "authenticated-route-sweep") {
+async function probeAuthenticatedSession() {
   const capability = capabilities.find((item) => item.id === "UI-AUTH-SESSION");
   if (!capability) return { posted: false, passed: false };
   try {
@@ -104,7 +104,7 @@ async function probeAuthenticatedSession(mode: "live-session-probe" | "authentic
         ? `Authenticated business session verified by protected assurance API (HTTP ${response.status}).`
         : `Authenticated business session probe failed (HTTP ${response.status}).`,
       {
-        mode,
+        mode: "live-session-probe",
         probe: "/api/vibpe/ui-assurance",
         httpStatus: response.status,
         apiOk: payload?.ok === true,
@@ -118,7 +118,7 @@ async function probeAuthenticatedSession(mode: "live-session-probe" | "authentic
       capability,
       false,
       `Authenticated business session probe failed: ${error instanceof Error ? error.message : String(error)}`,
-      { mode, probe: "/api/vibpe/ui-assurance", error: String(error) },
+      { mode: "live-session-probe", probe: "/api/vibpe/ui-assurance", error: String(error) },
     ).catch(() => false);
     return { posted, passed: false };
   }
@@ -129,7 +129,7 @@ async function observeCurrentRoute(pathname: string) {
   if (!matches.length) return;
   for (const capability of matches) {
     if (capability.id === "UI-AUTH-SESSION") {
-      await probeAuthenticatedSession("live-session-probe");
+      await probeAuthenticatedSession();
       continue;
     }
     const inspected = inspectDocument(capability, document);
@@ -140,82 +140,17 @@ async function observeCurrentRoute(pathname: string) {
   }
 }
 
-async function sweepAuthenticatedRoutes() {
-  const key = `vibpe-ui-assurance-sweep-r5:${window.location.hostname}`;
-  if (sessionStorage.getItem(key) === "complete") return true;
-  let posted = 0;
-  let passedCount = 0;
-  for (const capability of capabilities) {
-    if (capability.id === "UI-AUTH-SESSION") {
-      const auth = await probeAuthenticatedSession("authenticated-route-sweep");
-      if (auth.posted) posted += 1;
-      if (auth.passed) passedCount += 1;
-      continue;
-    }
-    try {
-      const response = await fetch(capability.route, {
-        method: "GET",
-        credentials: "include",
-        redirect: "follow",
-        cache: "no-store",
-      });
-      const html = await response.text();
-      const finalUrl = response.url;
-      const loginLike =
-        /\/login(?:[/?#]|$)/i.test(finalUrl) || /sign in|log in/i.test(html.slice(0, 3000));
-      const doc = new DOMParser().parseFromString(html, "text/html");
-      const inspected = inspectDocument(capability, doc);
-      const passed = response.ok && !loginLike && inspected.passed;
-      const ok = await record(
-        capability,
-        passed,
-        passed
-          ? `${inspected.result}; authenticated HTTP ${response.status}`
-          : `${capability.label}: HTTP ${response.status}, loginLike=${loginLike}, error=${!inspected.passed}`,
-        {
-          ...inspected.evidence,
-          mode: "authenticated-route-sweep",
-          httpStatus: response.status,
-          finalUrl,
-          loginLike,
-        },
-      );
-      if (ok) posted += 1;
-      if (passed) passedCount += 1;
-    } catch (error) {
-      await record(
-        capability,
-        false,
-        `${capability.label}: ${error instanceof Error ? error.message : String(error)}`,
-        { mode: "authenticated-route-sweep", error: String(error) },
-      ).catch(() => false);
-    }
-  }
-  const complete = posted === capabilities.length && passedCount === capabilities.length;
-  if (complete) sessionStorage.setItem(key, "complete");
-  else sessionStorage.removeItem(key);
-  return complete;
-}
-
 /**
- * Runtime assurance observer. It records evidence only; it does not own or mutate
- * any Product, Engineering, Operations, Quality, Finance or Governance transaction.
+ * Lightweight runtime assurance observer. It records evidence for the route the
+ * operator is actually using; it does not crawl the whole application from a
+ * live business session. Full cross-route assurance belongs to the explicit
+ * Playwright audit runner, avoiding self-generated request storms in workerd.
  */
 export function VibpeRuntimeObserver() {
   const location = useLocation();
-  const router = useRouter();
   useEffect(() => {
     const timer = window.setTimeout(() => void observeCurrentRoute(location.pathname), 350);
-    let sweepTimer = 0;
-    if (location.pathname === "/command/ibpe-operating-workspace/assurance") {
-      sweepTimer = window.setTimeout(() => {
-        void sweepAuthenticatedRoutes().then(() => router.invalidate());
-      }, 650);
-    }
-    return () => {
-      window.clearTimeout(timer);
-      if (sweepTimer) window.clearTimeout(sweepTimer);
-    };
-  }, [location.pathname, router]);
+    return () => window.clearTimeout(timer);
+  }, [location.pathname]);
   return null;
 }
