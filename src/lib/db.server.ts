@@ -1,13 +1,14 @@
 import { getRequest } from "@tanstack/react-start/server";
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
-import { requestSafePostgresPoolConfig } from "./postgres-pool";
+import {
+  isLoopbackPostgresConnectionString,
+  requestSafePostgresPoolConfig,
+} from "./postgres-pool";
 import {
   resolvePostgresTransport,
   type PostgresTransport,
 } from "./postgres-runtime";
 import type { Sql, SqlRow } from "./db.ts";
-
-const LOCAL_HYPERDRIVE_OVERRIDE = "CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE";
 
 const globalRef = globalThis as typeof globalThis & {
   __pgliteInstance__?: Promise<import("@electric-sql/pglite").PGlite>;
@@ -22,11 +23,10 @@ const globalRef = globalThis as typeof globalThis & {
  * pool per request while allowing nested server functions in that request to
  * share it.
  *
- * Wrangler's explicit local Hyperdrive override is different: it is a direct
- * localhost PostgreSQL connection used by development/CI, not the deployed
- * Hyperdrive proxy. In that environment, creating one pool per browser/server
- * request can multiply into hundreds of direct database connections. We reuse a
- * single bounded local pool only when that explicit override is present.
+ * Wrangler's local Hyperdrive override resolves to a loopback PostgreSQL URL,
+ * not the deployed multiplexing Hyperdrive proxy. Loopback transports therefore
+ * reuse one bounded pool per workerd isolate to avoid multiplying direct local
+ * database connections across browser/server requests.
  */
 const requestSqlCache = new WeakMap<Request, Promise<Sql>>();
 
@@ -47,16 +47,16 @@ function toSql(run: Run): Sql {
   return sql;
 }
 
-function hasLocalHyperdriveOverride(): boolean {
-  return Boolean(process.env[LOCAL_HYPERDRIVE_OVERRIDE]?.trim());
+function isLocalPostgresTransport(transport: PostgresTransport): boolean {
+  return isLoopbackPostgresConnectionString(transport.connectionString);
 }
 
 /**
  * Build a SQL facade around a bounded driver pool. Deployed Workers create this
  * per request and retire each checked-out connection after its query;
  * Hyperdrive remains the shared cross-request pool. Local Wrangler/CI reuses one
- * bounded pool for the entire process so parallel route requests cannot exhaust
- * the direct PostgreSQL server.
+ * one-connection pool per isolate so parallel route requests cannot exhaust the
+ * direct PostgreSQL server.
  */
 async function createPostgresSql(transport: PostgresTransport): Promise<Sql> {
   const { Pool, types } = await import("pg");
@@ -65,7 +65,7 @@ async function createPostgresSql(transport: PostgresTransport): Promise<Sql> {
   types.setTypeParser(OID_INTERVAL, identity);
 
   const config = requestSafePostgresPoolConfig(transport.connectionString);
-  const pool = hasLocalHyperdriveOverride()
+  const pool = isLocalPostgresTransport(transport)
     ? (globalRef.__vyndiLocalPostgresPool__ ??= new Pool(config))
     : new Pool(config);
 
@@ -125,10 +125,9 @@ export async function getSqlServer(): Promise<Sql> {
   const transport = await resolvePostgresTransport();
   if (!transport) return createPgliteSql();
 
-  // With the explicit Wrangler local-Hyperdrive connection string, every SQL
-  // facade points at the same process-local bounded Pool created above. There is
-  // no need to retain per-request facades in that environment.
-  if (hasLocalHyperdriveOverride()) return createPostgresSql(transport);
+  // Local Hyperdrive overrides surface as a loopback HYPERDRIVE connection
+  // string inside workerd. Reuse the per-isolate bounded pool in that runtime.
+  if (isLocalPostgresTransport(transport)) return createPostgresSql(transport);
 
   // In deployed Workers, getRequest() is stable for nested server functions in
   // the same incoming request and prevents cross-request I/O reuse.
