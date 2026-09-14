@@ -47,8 +47,11 @@ async function waitForSubstantiveBody(page, timeout = 20_000) {
   );
 }
 
-async function assertFullViewRegisters(page, viewportName, route) {
+async function assertFullViewRegisters(page, viewportName, route, timeout = 20_000) {
   const registers = page.locator("[data-full-view-table]");
+  if (REQUIRED_FULL_VIEW_ROUTES.has(route)) {
+    await registers.first().waitFor({ state: "visible", timeout });
+  }
   const count = await registers.count();
   if (REQUIRED_FULL_VIEW_ROUTES.has(route)) {
     assert.ok(count > 0, `${viewportName} ${route} rendered no full-view register`);
@@ -255,7 +258,7 @@ try {
           console.error(`[stage-d-browser] overflow diagnostics for ${viewport.name} ${route}`, overflowDiagnostics);
         }
         assert.ok(overflow <= 4, `${viewport.name} ${route} has ${overflow}px page-level horizontal overflow`);
-        await assertFullViewRegisters(routePage, viewport.name, route);
+        await assertFullViewRegisters(routePage, viewport.name, route, bodyTimeout);
 
         const routeErrors = pageErrors.slice(routeErrorStart);
         if (routeErrors.some((message) => message.includes("React error #418"))) {
