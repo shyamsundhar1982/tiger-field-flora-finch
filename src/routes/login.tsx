@@ -501,7 +501,14 @@ function LoginPage() {
       setWarping(true);
       await (sceneControlsRef.current?.startWarp() ?? Promise.resolve());
       setBootMessage(null);
-      await navigate({ to: destination as never });
+      // Cross the authentication boundary with a fresh document request so the
+      // protected loader deterministically receives the just-issued HttpOnly
+      // session cookie. Keep TanStack navigation only as an exceptional fallback.
+      try {
+        window.location.assign(destination);
+      } catch {
+        await navigate({ to: destination as never });
+      }
     } catch (cause) {
       setGranted(false);
       setWarping(false);
