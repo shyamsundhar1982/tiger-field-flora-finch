@@ -37,7 +37,7 @@ function assertModelScope(modelId: string) {
   const variant = MODELS.find((model) => model.id === modelId);
   if (variant) return { kind: "variant" as const, variant };
   if ((planningTierIds as readonly string[]).includes(modelId)) return { kind: "planning" as const, variant: null };
-  throw new Error("Unknown VINDY model/variant mapping scope.");
+  throw new Error("Unknown VYNDI model/variant mapping scope.");
 }
 
 export const listControlledBomMappings = createServerFn({ method: "GET" }).handler(async () => {
@@ -80,10 +80,10 @@ export const createControlledBomMapping = createServerFn({ method: "POST" })
       throw new Error("Configuration category and controlled option must either both be set or both be blank for a base BOM line.");
     }
     if (scope.kind === "planning" && optionId) {
-      throw new Error("Planning-standard tier mappings cannot contain customer option selections; use an exact VINDY variant mapping.");
+      throw new Error("Planning-standard tier mappings cannot contain customer option selections; use an exact VYNDI variant mapping.");
     }
     if (optionId) {
-      if (scope.kind !== "variant") throw new Error("Configured BOM mappings require an exact VINDY variant.");
+      if (scope.kind !== "variant") throw new Error("Configured BOM mappings require an exact VYNDI variant.");
       const option = SEED_INVENTORY.find((item) => item.id === optionId);
       if (!option || option.category !== category) throw new Error("Controlled configuration option does not match the selected category.");
       if (!isEligible(option, scope.variant.tier)) throw new Error(`${option.brand} ${option.model} is not eligible for ${scope.variant.name}.`);

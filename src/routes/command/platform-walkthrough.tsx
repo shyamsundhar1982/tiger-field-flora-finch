@@ -24,14 +24,14 @@ const DOMAINS = [
 function PlatformWalkthrough() {
   return <div className="space-y-7">
     <header>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">VINDY · Showcase Mode</p>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">VYNDI · Showcase Mode</p>
       <h1 className="mt-1 font-display text-4xl text-accent">Platform Walkthrough</h1>
-      <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">A guided, read-only demonstration of the seven-workspace VINDY operating system. The walkthrough stays inside presentation-safe views while explaining where authorised teams execute the underlying work.</p>
+      <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">A guided, read-only demonstration of the seven-workspace VYNDI operating system. The walkthrough stays inside presentation-safe views while explaining where authorised teams execute the underlying work.</p>
       <div className="mt-4 flex flex-wrap gap-2"><span className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs">Showcase</span><span className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs">End-to-end</span><span className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs">Evidence-led</span></div>
     </header>
 
     <section className="rounded-xl border border-border bg-surface p-6 sm:p-8">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-green">The VINDY flow</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-green">The VYNDI flow</p>
       <h2 className="mt-3 max-w-4xl font-display text-3xl leading-tight text-accent">See the company as a connected operating system, not a directory of disconnected pages.</h2>
       <p className="mt-4 max-w-3xl text-sm leading-6 text-muted">Every demonstration should answer three questions: what is happening, what needs to happen next, and what evidence proves the decision is ready.</p>
     </section>

@@ -306,7 +306,7 @@ export const getProcurementPlanningMethod = createServerFn({ method: "GET" }).ha
     planningLeadMonths: 2,
     horizonMonths: 36,
     principles: [
-      "Planned demand uses one approved planning-standard BOM per VINDY family; committed demand uses the exact released variant BOM.",
+      "Planned demand uses one approved planning-standard BOM per VYNDI family; committed demand uses the exact released variant BOM.",
       "Planned and committed demand remain visible separately; the larger signal governs so confirmed orders never double-count forecast demand.",
       "Physical stock is the single EPR FIFO ledger; reservations reduce ATP without moving quantity.",
       "Open purchase orders and projected inventory are carried month-to-month; MSL remains protected as safety stock.",

@@ -5,7 +5,7 @@ import { auth } from "@/lib/auth/server";
  * Better Auth catch-all endpoint.
  *
  * This route is required for all Better Auth operations, including
- * email/password sign-in for VINDY-managed users.
+ * email/password sign-in for VYNDI-managed users.
  */
 export const Route = createFileRoute("/api/auth/$")({
   server: {

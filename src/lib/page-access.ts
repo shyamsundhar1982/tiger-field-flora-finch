@@ -37,7 +37,7 @@ const PEOPLE_OFFICE_PAGE: PageMeta = {
 };
 
 /**
- * Phase E source of truth for VINDY role access.
+ * Phase E source of truth for VYNDI role access.
  *
  * Admin is unrestricted. Functional roles are scoped by mode, domain and
  * ownership. Viewer remains read/presentation-only for compatibility with
