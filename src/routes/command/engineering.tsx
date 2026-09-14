@@ -40,6 +40,7 @@ function changeView(row: Row): Row {
 }
 
 export const Route = createFileRoute("/command/engineering")({
+  ssr: "data-only",
   loader: async () => {
     const data = await listEngineeringAuthority();
     return {
