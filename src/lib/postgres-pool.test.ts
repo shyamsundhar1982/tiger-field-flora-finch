@@ -27,7 +27,8 @@ test("deployed PostgreSQL connections cannot be reused across Worker requests", 
   assert.match(databaseSource, /requestSqlCache\.set\(request, pending\)/);
   assert.match(databaseSource, /new Pool\(requestSafePostgresPoolConfig\(transport\.connectionString\)\)/);
   assert.doesNotMatch(databaseSource, /__vyndiLocalPostgresPool__/);
-  assert.match(authSource, /new Pool\(requestSafePostgresPoolConfig\([^)]+\)\)/);
+  assert.match(authSource, /requestSafePostgresDialect\(postgresTransport\.connectionString\)/);
+  assert.doesNotMatch(authSource, /new Pool\(/);
 });
 
 test("loopback Worker development opens and closes a fresh client per query", async () => {
@@ -84,7 +85,7 @@ test("Better Auth uses the same Hyperdrive-aware deployed Postgres transport", a
   assert.match(authSource, /const postgresTransport = await resolvePostgresTransport\(\)/);
   assert.match(
     authSource,
-    /new Pool\(requestSafePostgresPoolConfig\(postgresTransport\.connectionString\)\)/,
+    /requestSafePostgresDialect\(postgresTransport\.connectionString\)/,
   );
   assert.doesNotMatch(
     authSource,

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { auth } from "@/lib/auth/server";
+import { handleAuthRequest } from "@/lib/auth/server";
 
 /**
  * Better Auth catch-all endpoint.
@@ -14,8 +14,8 @@ export const Route = createFileRoute("/api/auth/$")({
       // Returning that response directly avoids a second TanStack cookie
       // handoff, which crashes Cloudflare Workers only after valid credentials
       // create a session.
-      GET: ({ request }) => auth.handler(request),
-      POST: ({ request }) => auth.handler(request),
+      GET: ({ request }) => handleAuthRequest(request),
+      POST: ({ request }) => handleAuthRequest(request),
     },
   },
 });

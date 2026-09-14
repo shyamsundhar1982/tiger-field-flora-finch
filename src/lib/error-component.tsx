@@ -1,7 +1,26 @@
 import type { ErrorComponentProps } from "@tanstack/react-router";
 import { TriangleAlert } from "lucide-react";
+import { useEffect } from "react";
 
 export function AppErrorComponent({ error }: ErrorComponentProps) {
+  const unauthenticated =
+    error.message === "Unauthorized" ||
+    ("status" in error && error.status === 401);
+
+  useEffect(() => {
+    if (!unauthenticated) return;
+    const returnTo = `${window.location.pathname}${window.location.search}`;
+    window.location.replace(`/login?returnTo=${encodeURIComponent(returnTo)}`);
+  }, [unauthenticated]);
+
+  if (unauthenticated) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-6 text-sm text-zinc-600 dark:bg-zinc-950 dark:text-zinc-300">
+        Redirecting to sign in…
+      </main>
+    );
+  }
+
   return (
     <main
       className={

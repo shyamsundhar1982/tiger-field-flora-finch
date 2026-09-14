@@ -4,6 +4,9 @@ import { chromium } from "playwright";
 const baseURL = process.env.STAGE_D_BASE_URL || "http://127.0.0.1:8080";
 const email = process.env.STAGE_D_USER_EMAIL;
 const password = process.env.STAGE_D_USER_PASSWORD;
+const sessionCacheBoundaryWaitMs = Number(
+  process.env.STAGE_D_SESSION_CACHE_BOUNDARY_WAIT_MS || 65_000,
+);
 if (!email) throw new Error("STAGE_D_USER_EMAIL is required for Stage D browser acceptance.");
 if (!password) throw new Error("STAGE_D_USER_PASSWORD is required for Stage D browser acceptance.");
 
@@ -44,6 +47,17 @@ const REQUIRED_FULL_VIEW_ROUTES = new Set([
   "/command/engineering",
   "/command/manufacturing",
 ]);
+const SESSION_RELIABILITY_ROUTES = [
+  "/command",
+  "/command/inventory",
+  "/command/procurement-planning",
+  "/command/production",
+  "/command/qa-verification",
+  "/command/operations",
+  "/command/financial-cockpit",
+  "/command/ibpe-operating-workspace",
+  "/command/ibpe-operating-workspace/optimizer",
+];
 
 async function waitForSubstantiveBody(page, timeout = 20_000) {
   await page.locator("body").waitFor({ state: "visible", timeout });
@@ -409,6 +423,46 @@ try {
     }
 
     if (viewport.name === "desktop-landscape") {
+      for (let round = 1; round <= 2; round += 1) {
+        console.log(
+          `[stage-d-browser] ${viewport.name}: waiting ${sessionCacheBoundaryWaitMs}ms before session reliability round ${round}`,
+        );
+        await page.waitForTimeout(sessionCacheBoundaryWaitMs);
+
+        for (const route of SESSION_RELIABILITY_ROUTES) {
+          const sessionPage = await context.newPage();
+          observePage(sessionPage);
+          try {
+            const response = await sessionPage.goto(`${baseURL}${route}`, {
+              waitUntil: "domcontentloaded",
+              timeout: ROUTE_GOTO_TIMEOUT_MS[route] ?? 90_000,
+            });
+            await waitForSubstantiveBody(
+              sessionPage,
+              ROUTE_BODY_TIMEOUT_MS[route] ?? 60_000,
+            );
+            assert.doesNotMatch(
+              sessionPage.url(),
+              /\/login(?:\?|$)|\/command-login/,
+              `session reliability round ${round} lost authenticated access at ${route}`,
+            );
+            if (response && !response.ok()) {
+              throw new Error(
+                `session reliability round ${round} returned HTTP ${response.status()} at ${route}`,
+              );
+            }
+            const text = await sessionPage.locator("body").innerText();
+            assert.doesNotMatch(
+              text,
+              /Something went wrong|Failed to get session|Internal Server Error/i,
+              `session reliability round ${round} rendered an auth failure at ${route}`,
+            );
+          } finally {
+            await sessionPage.close().catch(() => {});
+          }
+        }
+      }
+
       console.log(`[stage-d-browser] ${viewport.name}: logout and revocation`);
       const logoutPage = await context.newPage();
       observePage(logoutPage);

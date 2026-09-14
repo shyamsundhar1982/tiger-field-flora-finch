@@ -39,7 +39,9 @@ jobs:
           scripts/epr-individual-authority.test.mjs
           scripts/session-security-policy.test.mjs
           scripts/session-concurrency.test.mjs
+          scripts/session-reliability.test.mjs
           scripts/stage-d-load-resilience.test.mjs
+          src/lib/auth/postgres-dialect.test.ts
 
   responsive-browser-acceptance:
     runs-on: ubuntu-latest
@@ -65,6 +67,7 @@ jobs:
       STAGE_D_BASE_URL: http://127.0.0.1:8081
       STAGE_D_USER_EMAIL: stage-d-acceptance@vyndi.test
       STAGE_D_USER_PASSWORD: stage-d-ci-individual-password-2026
+      STAGE_D_SESSION_CACHE_BOUNDARY_WAIT_MS: "65000"
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vyndi_ci
       CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE: postgresql://postgres:postgres@localhost:5432/vyndi_ci
       VYNDI_ALLOW_DB_MIGRATIONS: "1"
