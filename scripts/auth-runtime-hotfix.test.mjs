@@ -81,8 +81,8 @@ test("production hosts use request-local auth URLs and exact trusted origins", (
   assert.match(authRuntimeConfig, /createHash\("sha256"\)/);
 });
 
-test("command logout clears legacy compatibility and canonical individual session", () => {
-  assert.match(shell, /await lockCommand\(\)\.catch/);
+test("command logout uses canonical individual session only", () => {
+  assert.doesNotMatch(shell, /lockCommand/);
   assert.match(shell, /await signOut\("\/login"\)/);
   assert.doesNotMatch(shell, /navigate\(\{ to: "\/command-login" \}\)/);
 });
