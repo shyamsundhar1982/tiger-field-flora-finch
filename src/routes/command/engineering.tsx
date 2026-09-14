@@ -185,10 +185,7 @@ function Engineering() {
         )}
       </Panel>
 
-      <p className="text-xs text-muted">
-        Canonical authority: <code>vyndi_engineering_baselines</code> +{" "}
-        <code>vyndi_engineering_change_requests</code>.
-      </p>
+      <p className="text-xs text-muted">Canonical authority: <code>vyndi_engineering_baselines</code> + <code>vyndi_engineering_change_requests</code>.</p>
     </div>
   );
 }
