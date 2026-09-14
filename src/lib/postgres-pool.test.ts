@@ -25,11 +25,12 @@ test("deployed PostgreSQL connections cannot be reused across Worker requests", 
   assert.match(databaseSource, /const request = getRequest\(\)/);
   assert.match(databaseSource, /requestSqlCache\.get\(request\)/);
   assert.match(databaseSource, /requestSqlCache\.set\(request, pending\)/);
-  assert.match(databaseSource, /new Pool\(config\)/);
+  assert.match(databaseSource, /new Pool\(requestSafePostgresPoolConfig\(transport\.connectionString\)\)/);
+  assert.doesNotMatch(databaseSource, /__vyndiLocalPostgresPool__/);
   assert.match(authSource, /new Pool\(requestSafePostgresPoolConfig\([^)]+\)\)/);
 });
 
-test("loopback Hyperdrive development allows bounded parallel loaders without retaining request-owned sockets", async () => {
+test("loopback Worker development keeps database pools request-scoped", async () => {
   assert.equal(isLoopbackPostgresConnectionString("postgresql://postgres:postgres@localhost:5432/vyndi"), true);
   assert.equal(isLoopbackPostgresConnectionString("postgresql://postgres:postgres@127.0.0.1:5432/vyndi"), true);
   assert.equal(isLoopbackPostgresConnectionString("postgresql://postgres:postgres@[::1]:5432/vyndi"), true);
@@ -42,10 +43,10 @@ test("loopback Hyperdrive development allows bounded parallel loaders without re
   assert.equal(localConfig.idleTimeoutMillis, 30_000);
 
   const databaseSource = await readFile(new URL("./db.server.ts", import.meta.url), "utf8");
-  assert.match(databaseSource, /isLoopbackPostgresConnectionString\(transport\.connectionString\)/);
-  assert.match(databaseSource, /__vyndiLocalPostgresPool__/);
-  assert.match(databaseSource, /globalRef\.__vyndiLocalPostgresPool__ \?\?= new Pool\(config\)/);
-  assert.match(databaseSource, /if \(isLocalPostgresTransport\(transport\)\) return createPostgresSql\(transport\)/);
+  assert.match(databaseSource, /const request = getRequest\(\)/);
+  assert.match(databaseSource, /requestSqlCache\.get\(request\)/);
+  assert.match(databaseSource, /new Pool\(requestSafePostgresPoolConfig\(transport\.connectionString\)\)/);
+  assert.doesNotMatch(databaseSource, /__vyndiLocalPostgresPool__/);
 });
 
 test("Hyperdrive takes precedence over direct DATABASE_URL", () => {

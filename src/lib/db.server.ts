@@ -1,9 +1,6 @@
 import { getRequest } from "@tanstack/react-start/server";
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
-import {
-  isLoopbackPostgresConnectionString,
-  requestSafePostgresPoolConfig,
-} from "./postgres-pool";
+import { requestSafePostgresPoolConfig } from "./postgres-pool";
 import {
   resolvePostgresTransport,
   type PostgresTransport,
@@ -13,20 +10,17 @@ import type { Sql, SqlRow } from "./db.ts";
 const globalRef = globalThis as typeof globalThis & {
   __pgliteInstance__?: Promise<import("@electric-sql/pglite").PGlite>;
   __pgliteMigrateChain__?: Promise<void>;
-  __vyndiLocalPostgresPool__?: import("pg").Pool;
 };
 
 /**
  * A deployed Worker may serve many requests from the same module isolate, but
  * request-bound network I/O objects must stay inside the request that created
- * them. Keying by the ambient Request gives deployed Workers one bounded SQL
- * pool per request while allowing nested server functions in that request to
- * share it.
+ * them. Keying by the ambient Request gives Workers one bounded SQL pool per
+ * request while allowing nested server functions in that request to share it.
  *
- * Wrangler's local Hyperdrive override resolves to a loopback PostgreSQL URL,
- * not the deployed multiplexing Hyperdrive proxy. Loopback transports therefore
- * reuse one bounded pool per workerd isolate to avoid multiplying direct local
- * database connections across browser/server requests.
+ * The same rule is required by local workerd. A loopback PostgreSQL URL is
+ * still reached through request-owned Cloudflare sockets, so a pool must never
+ * be cached on globalThis and reused by a later request context.
  */
 const requestSqlCache = new WeakMap<Request, Promise<Sql>>();
 
@@ -47,16 +41,10 @@ function toSql(run: Run): Sql {
   return sql;
 }
 
-function isLocalPostgresTransport(transport: PostgresTransport): boolean {
-  return isLoopbackPostgresConnectionString(transport.connectionString);
-}
-
 /**
- * Build a SQL facade around a bounded driver pool. Deployed Workers create this
- * per request and retire each checked-out connection after its query;
- * Hyperdrive remains the shared cross-request pool. Local Wrangler/CI reuses one
- * one-connection pool per isolate so parallel route requests cannot exhaust the
- * direct PostgreSQL server.
+ * Build a SQL facade around a bounded request-local driver pool. Every checked-
+ * out connection is retired after one query by requestSafePostgresPoolConfig;
+ * Hyperdrive remains the shared cross-request pool in deployed Cloudflare.
  */
 async function createPostgresSql(transport: PostgresTransport): Promise<Sql> {
   const { Pool, types } = await import("pg");
@@ -64,10 +52,7 @@ async function createPostgresSql(transport: PostgresTransport): Promise<Sql> {
   types.setTypeParser(OID_DATE, identity);
   types.setTypeParser(OID_INTERVAL, identity);
 
-  const config = requestSafePostgresPoolConfig(transport.connectionString);
-  const pool = isLocalPostgresTransport(transport)
-    ? (globalRef.__vyndiLocalPostgresPool__ ??= new Pool(config))
-    : new Pool(config);
+  const pool = new Pool(requestSafePostgresPoolConfig(transport.connectionString));
 
   return toSql(async <T>(text: string, params: unknown[]) => {
     const res = await pool.query(text, params);
@@ -125,12 +110,9 @@ export async function getSqlServer(): Promise<Sql> {
   const transport = await resolvePostgresTransport();
   if (!transport) return createPgliteSql();
 
-  // Local Hyperdrive overrides surface as a loopback HYPERDRIVE connection
-  // string inside workerd. Reuse the per-isolate bounded pool in that runtime.
-  if (isLocalPostgresTransport(transport)) return createPostgresSql(transport);
-
-  // In deployed Workers, getRequest() is stable for nested server functions in
-  // the same incoming request and prevents cross-request I/O reuse.
+  // In Workers, getRequest() is stable for nested server functions in the same
+  // incoming request and prevents cross-request I/O reuse. This applies to both
+  // deployed Hyperdrive and local/direct PostgreSQL transports under workerd.
   const request = getRequest();
   if (!request) return createPostgresSql(transport);
 
