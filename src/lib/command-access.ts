@@ -4,6 +4,11 @@ import type { CommandRole } from "@/lib/page-access";
 import { optionalAuthMiddleware } from "@/lib/auth/middleware";
 import { getAssignedCommandRole } from "@/lib/command-user-role.server";
 
+const SESSION_NAME = "__Host-vyndi-command";
+const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
+
+type CommandSession = { role?: CommandRole };
+
 type CommandAuthContext = {
   userId?: string;
   userEmail?: string | null;
@@ -40,8 +45,18 @@ function getCommandEnv(): CommandEnv {
 }
 
 async function getLegacySession() {
-  const { getLegacyCommandSession } = await import("@/lib/command-session.server");
-  return getLegacyCommandSession();
+  const password = getCommandEnv().COMMAND_PASSWORD;
+  if (!password) throw new Error("COMMAND_PASSWORD is not configured on the Worker.");
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(password));
+  const sessionPassword = Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+  const { useSession: getServerSession } = await import("@tanstack/react-start/server");
+  return getServerSession<CommandSession>({
+    name: SESSION_NAME,
+    password: sessionPassword,
+    cookie: { secure: true, httpOnly: true, sameSite: "lax", maxAge: SESSION_MAX_AGE, path: "/" },
+  });
 }
 
 async function getLegacyRole(): Promise<CommandRole | null> {
