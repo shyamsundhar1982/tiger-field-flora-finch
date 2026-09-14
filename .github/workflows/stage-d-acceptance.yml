@@ -111,7 +111,7 @@ jobs:
           npm run preview > /tmp/vyndi-stage-d.log 2>&1 &
           echo $! > /tmp/vyndi-stage-d.pid
           for attempt in $(seq 1 90); do
-            if curl -fsS http://127.0.0.1:8081/health >/dev/null; then
+            if curl -sS --max-time 2 http://127.0.0.1:8081/ >/dev/null; then
               exit 0
             fi
             sleep 2
