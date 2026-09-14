@@ -79,6 +79,61 @@ async function assertFullViewRegisters(page, viewportName, route) {
   }
 }
 
+async function captureTextNodes(page) {
+  return page.evaluate(() => {
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    let node = walker.nextNode();
+    while (node) {
+      const text = String(node.textContent || "").replace(/\s+/g, " ").trim();
+      if (text) nodes.push(text);
+      node = walker.nextNode();
+    }
+    return nodes;
+  });
+}
+
+async function diagnoseHydrationMismatch(browser, context, viewport, route, hydratedPage) {
+  const hydratedNodes = await captureTextNodes(hydratedPage).catch(() => []);
+  const storageState = await context.storageState();
+  const serverContext = await browser.newContext({
+    viewport: { width: viewport.width, height: viewport.height },
+    reducedMotion: "reduce",
+    javaScriptEnabled: false,
+    storageState,
+  });
+  try {
+    const serverPage = await serverContext.newPage();
+    const response = await serverPage.goto(`${baseURL}${route}`, {
+      waitUntil: "domcontentloaded",
+      timeout: ROUTE_GOTO_TIMEOUT_MS[route] ?? 30_000,
+    });
+    await serverPage.locator("body").waitFor({ state: "visible", timeout: 20_000 });
+    const serverNodes = await captureTextNodes(serverPage);
+    const max = Math.max(serverNodes.length, hydratedNodes.length);
+    const differences = [];
+    for (let index = 0; index < max && differences.length < 12; index += 1) {
+      if (serverNodes[index] === hydratedNodes[index]) continue;
+      differences.push({
+        index,
+        server: serverNodes[index] ?? "<missing>",
+        hydrated: hydratedNodes[index] ?? "<missing>",
+      });
+    }
+    console.error(`[stage-d-browser] hydration text diagnostic for ${viewport.name} ${route}`, {
+      serverUrl: serverPage.url(),
+      serverHttp: response?.status() ?? null,
+      serverTextNodes: serverNodes.length,
+      hydratedTextNodes: hydratedNodes.length,
+      differences,
+    });
+  } catch (error) {
+    console.error(`[stage-d-browser] hydration diagnostic failed for ${viewport.name} ${route}`, String(error));
+  } finally {
+    await serverContext.close().catch(() => {});
+  }
+}
+
 async function waitForMutationQuiescence(page, pendingRequests, { timeoutMs = 20_000, quietMs = 1_000 } = {}) {
   const deadline = Date.now() + timeoutMs;
   let quietSince = null;
@@ -153,6 +208,7 @@ try {
     for (const route of routes) {
       console.log(`[stage-d-browser] ${viewport.name}: protected route ${route}`);
       const routePage = await context.newPage();
+      const routeErrorStart = pageErrors.length;
       observePage(routePage);
       const gotoTimeout = ROUTE_GOTO_TIMEOUT_MS[route] ?? 30_000;
       const bodyTimeout = ROUTE_BODY_TIMEOUT_MS[route] ?? 20_000;
@@ -201,6 +257,10 @@ try {
         assert.ok(overflow <= 4, `${viewport.name} ${route} has ${overflow}px page-level horizontal overflow`);
         await assertFullViewRegisters(routePage, viewport.name, route);
 
+        const routeErrors = pageErrors.slice(routeErrorStart);
+        if (routeErrors.some((message) => message.includes("React error #418"))) {
+          await diagnoseHydrationMismatch(browser, context, viewport, route, routePage);
+        }
         if (pageErrors.length) {
           console.error(`[stage-d-browser] pageerrors after ${viewport.name} ${route}`, pageErrors);
         }
