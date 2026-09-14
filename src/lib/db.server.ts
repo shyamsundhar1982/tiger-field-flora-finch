@@ -1,6 +1,9 @@
 import { getRequest } from "@tanstack/react-start/server";
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
-import { requestSafePostgresPoolConfig } from "./postgres-pool";
+import {
+  isLoopbackPostgresConnectionString,
+  requestSafePostgresPoolConfig,
+} from "./postgres-pool";
 import {
   resolvePostgresTransport,
   type PostgresTransport,
@@ -15,12 +18,13 @@ const globalRef = globalThis as typeof globalThis & {
 /**
  * A deployed Worker may serve many requests from the same module isolate, but
  * request-bound network I/O objects must stay inside the request that created
- * them. Keying by the ambient Request gives Workers one bounded SQL pool per
- * request while allowing nested server functions in that request to share it.
+ * them. Keying by the ambient Request gives Workers one SQL facade per request
+ * while allowing nested server functions in that request to share it.
  *
- * The same rule is required by local workerd. A loopback PostgreSQL URL is
- * still reached through request-owned Cloudflare sockets, so a pool must never
- * be cached on globalThis and reused by a later request context.
+ * Local workerd is stricter than Node about socket ownership. A loopback
+ * PostgreSQL URL therefore uses a fresh pg.Client for every query and closes it
+ * before that query resolves. No loopback socket or pg.Pool survives beyond the
+ * request/query context that created it.
  */
 const requestSqlCache = new WeakMap<Request, Promise<Sql>>();
 
@@ -42,18 +46,34 @@ function toSql(run: Run): Sql {
 }
 
 /**
- * Build a SQL facade around a bounded request-local driver pool. Every checked-
- * out connection is retired after one query by requestSafePostgresPoolConfig;
- * Hyperdrive remains the shared cross-request pool in deployed Cloudflare.
+ * Build the request-local SQL facade.
+ *
+ * - local/loopback PostgreSQL: one pg.Client per query, fully connected and
+ *   closed inside that query's request context;
+ * - deployed/non-loopback PostgreSQL: a small request-local pg.Pool, with each
+ *   checked-out connection retired after one query. Hyperdrive remains the
+ *   shared cross-request pool in deployed Cloudflare environments.
  */
 async function createPostgresSql(transport: PostgresTransport): Promise<Sql> {
-  const { Pool, types } = await import("pg");
+  const { Client, Pool, types } = await import("pg");
   types.setTypeParser(OID_INT8, Number);
   types.setTypeParser(OID_DATE, identity);
   types.setTypeParser(OID_INTERVAL, identity);
 
-  const pool = new Pool(requestSafePostgresPoolConfig(transport.connectionString));
+  if (isLoopbackPostgresConnectionString(transport.connectionString)) {
+    return toSql(async <T>(text: string, params: unknown[]) => {
+      const client = new Client({ connectionString: transport.connectionString });
+      await client.connect();
+      try {
+        const res = await client.query(text, params);
+        return res.rows as T[];
+      } finally {
+        await client.end();
+      }
+    });
+  }
 
+  const pool = new Pool(requestSafePostgresPoolConfig(transport.connectionString));
   return toSql(async <T>(text: string, params: unknown[]) => {
     const res = await pool.query(text, params);
     return res.rows as T[];
@@ -110,9 +130,6 @@ export async function getSqlServer(): Promise<Sql> {
   const transport = await resolvePostgresTransport();
   if (!transport) return createPgliteSql();
 
-  // In Workers, getRequest() is stable for nested server functions in the same
-  // incoming request and prevents cross-request I/O reuse. This applies to both
-  // deployed Hyperdrive and local/direct PostgreSQL transports under workerd.
   const request = getRequest();
   if (!request) return createPostgresSql(transport);
 
