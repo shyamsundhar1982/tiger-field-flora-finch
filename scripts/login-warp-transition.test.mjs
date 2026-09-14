@@ -14,6 +14,12 @@ test("successful password login keeps the visual transition short", async () => 
   assert.doesNotMatch(route, /setTimeout\(resolve, 120\)/);
 });
 
+test("successful password login crosses the auth boundary with a fresh document request", async () => {
+  const route = await source("src/routes/login.tsx");
+  assert.match(route, /window\.location\.assign\(destination\)/);
+  assert.match(route, /await navigate\(\{ to: destination as never \}\)/);
+});
+
 test("warp strands accelerate and revolve during command entry", async () => {
   const route = await source("src/routes/login.tsx");
   assert.match(route, /const LOGIN_WARP_STRAND_BOOST = 34;/);
