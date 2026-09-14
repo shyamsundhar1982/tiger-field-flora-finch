@@ -136,6 +136,18 @@ jobs:
       - name: Protected-route responsive browser acceptance
         run: node scripts/stage-d-browser-acceptance.mjs
 
+      - name: Responsive geometry and nested-table acceptance
+        run: node scripts/stage-d-responsive-geometry.mjs
+
+      - name: Upload responsive acceptance diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage-d-responsive-diagnostics
+          path: /tmp/vyndi-stage-d-artifacts
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Print server log on failure
         if: failure()
         run: cat /tmp/vyndi-stage-d.log || true
