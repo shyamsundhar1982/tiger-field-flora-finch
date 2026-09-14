@@ -30,6 +30,7 @@ async function waitForSubstantiveBody(page) {
 const browser = await chromium.launch({ headless: true });
 try {
   for (const viewport of viewports) {
+    console.log(`[stage-d-browser] ${viewport.name}: individual login`);
     const context = await browser.newContext({
       viewport: { width: viewport.width, height: viewport.height },
       reducedMotion: "reduce",
@@ -74,6 +75,7 @@ try {
     // context. This tests direct protected entry while avoiding overlapping
     // TanStack client-router navigations from a previously mounted live page.
     for (const route of routes) {
+      console.log(`[stage-d-browser] ${viewport.name}: protected route ${route}`);
       const routePage = await context.newPage();
       observePage(routePage);
       try {
@@ -104,7 +106,12 @@ try {
     // for this persistence assertion in the workerd development runtime.
     const persistenceProbe = await context.newPage();
     observePage(persistenceProbe);
+    const pendingRequests = new Set();
+    persistenceProbe.on("request", (request) => pendingRequests.add(request));
+    persistenceProbe.on("requestfinished", (request) => pendingRequests.delete(request));
+    persistenceProbe.on("requestfailed", (request) => pendingRequests.delete(request));
     try {
+      console.log(`[stage-d-browser] ${viewport.name}: session persistence`);
       await persistenceProbe.goto(`${baseURL}/command`, { waitUntil: "domcontentloaded", timeout: 30_000 });
       await waitForSubstantiveBody(persistenceProbe);
       assert.doesNotMatch(persistenceProbe.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} lost its authenticated session before reload`);
@@ -113,6 +120,17 @@ try {
       assert.doesNotMatch(persistenceProbe.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} lost its authenticated session on reload`);
       const reloadedText = await persistenceProbe.locator("body").innerText();
       assert.doesNotMatch(reloadedText, /Something went wrong|Cannot read properties of undefined|Internal Server Error/i, `${viewport.name} reload rendered a fatal error`);
+    } catch (error) {
+      console.error("[stage-d-browser] persistence failure", {
+        viewport: viewport.name,
+        pending: [...pendingRequests].map((request) => ({
+          method: request.method(),
+          type: request.resourceType(),
+          path: new URL(request.url()).pathname,
+        })),
+        pageErrors,
+      });
+      throw error;
     } finally {
       await persistenceProbe.close().catch(() => {});
     }
@@ -121,6 +139,7 @@ try {
     // logout, then probe the revoked session from another page in the SAME
     // context. This preserves shared cookie state and avoids stale-page races.
     if (viewport.name === "desktop-landscape") {
+      console.log(`[stage-d-browser] ${viewport.name}: logout and revocation`);
       const logoutPage = await context.newPage();
       observePage(logoutPage);
       try {
