@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { requestSafePostgresPoolConfig } from "./postgres-pool.ts";
+import {
+  isLoopbackPostgresConnectionString,
+  requestSafePostgresPoolConfig,
+} from "./postgres-pool.ts";
 import { selectPostgresTransport } from "./postgres-runtime.ts";
 
 test("deployed PostgreSQL connections cannot be reused across Worker requests", async () => {
@@ -26,22 +29,22 @@ test("deployed PostgreSQL connections cannot be reused across Worker requests", 
   assert.match(authSource, /new Pool\(requestSafePostgresPoolConfig\([^)]+\)\)/);
 });
 
-test("explicit local Hyperdrive override shares one bounded PostgreSQL pool", async () => {
-  const databaseSource = await readFile(new URL("./db.server.ts", import.meta.url), "utf8");
+test("loopback Hyperdrive development uses one persistent connection per isolate", async () => {
+  assert.equal(isLoopbackPostgresConnectionString("postgresql://postgres:postgres@localhost:5432/vyndi"), true);
+  assert.equal(isLoopbackPostgresConnectionString("postgresql://postgres:postgres@127.0.0.1:5432/vyndi"), true);
+  assert.equal(isLoopbackPostgresConnectionString("postgresql://postgres:postgres@[::1]:5432/vyndi"), true);
+  assert.equal(isLoopbackPostgresConnectionString("postgresql://hyperdrive.internal/vyndi"), false);
 
-  assert.match(
-    databaseSource,
-    /CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE/,
-  );
+  const localConfig = requestSafePostgresPoolConfig("postgresql://postgres:postgres@localhost:5432/vyndi");
+  assert.equal(localConfig.max, 1);
+  assert.equal(localConfig.maxUses, undefined);
+  assert.equal(localConfig.idleTimeoutMillis, 30_000);
+
+  const databaseSource = await readFile(new URL("./db.server.ts", import.meta.url), "utf8");
+  assert.match(databaseSource, /isLoopbackPostgresConnectionString\(transport\.connectionString\)/);
   assert.match(databaseSource, /__vyndiLocalPostgresPool__/);
-  assert.match(
-    databaseSource,
-    /globalRef\.__vyndiLocalPostgresPool__ \?\?= new Pool\(config\)/,
-  );
-  assert.match(
-    databaseSource,
-    /if \(hasLocalHyperdriveOverride\(\)\) return createPostgresSql\(transport\)/,
-  );
+  assert.match(databaseSource, /globalRef\.__vyndiLocalPostgresPool__ \?\?= new Pool\(config\)/);
+  assert.match(databaseSource, /if \(isLocalPostgresTransport\(transport\)\) return createPostgresSql\(transport\)/);
 });
 
 test("Hyperdrive takes precedence over direct DATABASE_URL", () => {
