@@ -30,22 +30,17 @@ test("deployed PostgreSQL connections cannot be reused across Worker requests", 
   assert.match(authSource, /new Pool\(requestSafePostgresPoolConfig\([^)]+\)\)/);
 });
 
-test("loopback Worker development keeps database pools request-scoped", async () => {
+test("loopback Worker development opens and closes a fresh client per query", async () => {
   assert.equal(isLoopbackPostgresConnectionString("postgresql://postgres:postgres@localhost:5432/vyndi"), true);
   assert.equal(isLoopbackPostgresConnectionString("postgresql://postgres:postgres@127.0.0.1:5432/vyndi"), true);
   assert.equal(isLoopbackPostgresConnectionString("postgresql://postgres:postgres@[::1]:5432/vyndi"), true);
   assert.equal(isLoopbackPostgresConnectionString("postgresql://hyperdrive.internal/vyndi"), false);
 
-  const localConfig = requestSafePostgresPoolConfig("postgresql://postgres:postgres@localhost:5432/vyndi");
-  assert.equal(localConfig.max, 5);
-  assert.equal(localConfig.maxUses, 1);
-  assert.equal(localConfig.connectionTimeoutMillis, 10_000);
-  assert.equal(localConfig.idleTimeoutMillis, 30_000);
-
   const databaseSource = await readFile(new URL("./db.server.ts", import.meta.url), "utf8");
-  assert.match(databaseSource, /const request = getRequest\(\)/);
-  assert.match(databaseSource, /requestSqlCache\.get\(request\)/);
-  assert.match(databaseSource, /new Pool\(requestSafePostgresPoolConfig\(transport\.connectionString\)\)/);
+  assert.match(databaseSource, /isLoopbackPostgresConnectionString\(transport\.connectionString\)/);
+  assert.match(databaseSource, /new Client\(\{ connectionString: transport\.connectionString \}\)/);
+  assert.match(databaseSource, /await client\.connect\(\)/);
+  assert.match(databaseSource, /await client\.end\(\)/);
   assert.doesNotMatch(databaseSource, /__vyndiLocalPostgresPool__/);
 });
 
