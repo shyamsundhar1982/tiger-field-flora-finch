@@ -14,10 +14,11 @@ test("successful password login keeps the visual transition short", async () => 
   assert.doesNotMatch(route, /setTimeout\(resolve, 120\)/);
 });
 
-test("successful password login crosses the auth boundary with a fresh document request", async () => {
+test("successful password login uses bearer-aware SPA handoff on preview and loopback hosts", async () => {
   const route = await source("src/routes/login.tsx");
-  assert.match(route, /window\.location\.assign\(destination\)/);
+  assert.match(route, /isBearerTransportHost\(window\.location\.hostname\)/);
   assert.match(route, /await navigate\(\{ to: destination as never \}\)/);
+  assert.match(route, /window\.location\.assign\(destination\)/);
 });
 
 test("warp strands accelerate and revolve during command entry", async () => {
