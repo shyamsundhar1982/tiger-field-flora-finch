@@ -10,6 +10,10 @@ const engineeringSource = fs.readFileSync(
   new URL("../src/routes/command/engineering.tsx", import.meta.url),
   "utf8",
 );
+const operationsSource = fs.readFileSync(
+  new URL("../src/routes/command/operations.tsx", import.meta.url),
+  "utf8",
+);
 
 test("Master Inventory stock health uses a full-view responsive register", () => {
   assert.ok(inventorySource.includes('data-full-view-table="master-inventory-stock-health"'));
@@ -56,4 +60,35 @@ test("Engineering full-view registers preserve governed authority and lifecycle 
   assert.ok(engineeringSource.includes("listEngineeringAuthority"));
   assert.ok(engineeringSource.includes("vyndi_engineering_baselines"));
   assert.ok(engineeringSource.includes("vyndi_engineering_change_requests"));
+});
+
+test("Operations nested registers are integrated full-view layouts without inner horizontal scroll", () => {
+  assert.ok(operationsSource.includes('data-full-view-table="operations-dispatch-register"'));
+  assert.ok(operationsSource.includes('data-full-view-table="operations-order-to-cash-lineage"'));
+  assert.ok(!operationsSource.includes("overflow-x-auto"));
+  assert.ok(operationsSource.includes("lg:grid"));
+  assert.ok(operationsSource.includes("lg:hidden"));
+  assert.ok(operationsSource.includes("<details"));
+});
+
+test("Operations full-view registers preserve canonical lineage and downstream evidence", () => {
+  for (const label of [
+    "Shipment",
+    "Order / job",
+    "Units",
+    "Quality",
+    "Finance downstream",
+    "Order",
+    "Job Card",
+    "Material",
+    "Procurement",
+    "Traveller",
+    "Dispatch / invoice / collection",
+  ]) {
+    assert.ok(operationsSource.includes(label), `missing operations field: ${label}`);
+  }
+  assert.ok(operationsSource.includes("listDispatchRegister"));
+  assert.ok(operationsSource.includes("getOperatingLineage"));
+  assert.ok(operationsSource.includes("vyndi_dispatch_register"));
+  assert.ok(operationsSource.includes("This surface does not write Finance records"));
 });
