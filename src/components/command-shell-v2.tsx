@@ -14,7 +14,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { signOut } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
-import { getCommandRole, lockCommand } from "@/lib/command-access";
+import { getCommandRole } from "@/lib/command-access";
 import {
   ADMIN_CONTEXT,
   ADMIN_HOME,
@@ -264,7 +264,6 @@ export function CommandShell() {
     setLoggingOut(true);
     setLogoutError("");
     try {
-      await lockCommand().catch(() => undefined);
       setRole(null);
 
       if (individualUser && !individualUser.isDevFallback) {
