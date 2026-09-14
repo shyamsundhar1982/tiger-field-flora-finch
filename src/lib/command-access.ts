@@ -4,7 +4,8 @@ import type { CommandRole } from "@/lib/page-access";
 import { optionalAuthMiddleware } from "@/lib/auth/middleware";
 import { getAssignedCommandRole } from "@/lib/command-user-role.server";
 
-const SESSION_NAME = "__Host-vyndi-command";
+const PRODUCTION_SESSION_NAME = "__Host-vyndi-command";
+const LOOPBACK_SESSION_NAME = "vyndi-command-local";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
 
 type CommandSession = { role?: CommandRole };
@@ -44,6 +45,21 @@ function getCommandEnv(): CommandEnv {
   return process.env as CommandEnv;
 }
 
+function isLoopbackHttp(request: Request | undefined) {
+  if (!request) return false;
+  try {
+    const url = new URL(request.url);
+    const loopbackHost =
+      url.hostname === "localhost" ||
+      url.hostname === "127.0.0.1" ||
+      url.hostname === "::1" ||
+      url.hostname === "[::1]";
+    return loopbackHost && url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
 async function getLegacySession() {
   const password = getCommandEnv().COMMAND_PASSWORD;
   if (!password) throw new Error("COMMAND_PASSWORD is not configured on the Worker.");
@@ -51,11 +67,18 @@ async function getLegacySession() {
   const sessionPassword = Array.from(new Uint8Array(digest))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
-  const { useSession: getServerSession } = await import("@tanstack/react-start/server");
+  const { useSession: getServerSession, getRequest } = await import("@tanstack/react-start/server");
+  const loopbackHttp = isLoopbackHttp(getRequest());
   return getServerSession<CommandSession>({
-    name: SESSION_NAME,
+    name: loopbackHttp ? LOOPBACK_SESSION_NAME : PRODUCTION_SESSION_NAME,
     password: sessionPassword,
-    cookie: { secure: true, httpOnly: true, sameSite: "lax", maxAge: SESSION_MAX_AGE, path: "/" },
+    cookie: {
+      secure: !loopbackHttp,
+      httpOnly: true,
+      sameSite: "lax",
+      maxAge: SESSION_MAX_AGE,
+      path: "/",
+    },
   });
 }
 
