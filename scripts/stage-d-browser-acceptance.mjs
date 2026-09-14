@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { chromium } from "playwright";
 
 const baseURL = process.env.STAGE_D_BASE_URL || "http://127.0.0.1:8080";
-const password = process.env.COMMAND_PASSWORD;
-if (!password) throw new Error("COMMAND_PASSWORD is required for Stage D browser acceptance.");
+const email = process.env.STAGE_D_USER_EMAIL;
+const password = process.env.STAGE_D_USER_PASSWORD;
+if (!email) throw new Error("STAGE_D_USER_EMAIL is required for Stage D browser acceptance.");
+if (!password) throw new Error("STAGE_D_USER_PASSWORD is required for Stage D browser acceptance.");
 
 const viewports = [
   { name: "desktop-landscape", width: 1440, height: 900 },
@@ -16,80 +18,48 @@ const routes = [
   "/command/ibpe-operating-workspace/assurance",
 ];
 
-function redactSetCookie(raw) {
-  const pieces = raw.split(";").map((part) => part.trim()).filter(Boolean);
-  const pair = pieces.shift() || "";
-  const equals = pair.indexOf("=");
-  const name = equals >= 0 ? pair.slice(0, equals).trim() : pair.trim();
-  return [name || "<unnamed-cookie>", ...pieces].join("; ");
-}
-
 const browser = await chromium.launch({ headless: true });
 try {
   for (const viewport of viewports) {
-    const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height } });
+    const context = await browser.newContext({
+      viewport: { width: viewport.width, height: viewport.height },
+      reducedMotion: "reduce",
+    });
     const page = await context.newPage();
     const pageErrors = [];
-    const setCookieTrace = [];
-    let captureLoginCookies = false;
     page.on("pageerror", (error) => pageErrors.push(String(error?.message || error)));
-    page.on("response", async (response) => {
-      if (!captureLoginCookies) return;
-      try {
-        const headers = await response.headersArray();
-        const cookies = headers
-          .filter((header) => header.name.toLowerCase() === "set-cookie")
-          .map((header) => redactSetCookie(header.value));
-        if (cookies.length) {
-          setCookieTrace.push({ url: response.url(), status: response.status(), cookies });
-        }
-      } catch {
-        // Diagnostics must never make the acceptance test itself fail.
-      }
-    });
 
-    // Wait for Vite/React hydration before editing controlled form fields. If
-    // values are written at DOMContentLoaded, hydration can legitimately replace
-    // the DOM value while React state is still empty, leaving Submit disabled.
-    await page.goto(`${baseURL}/command-login`, { waitUntil: "networkidle" });
-    const username = page.getByLabel(/Email or legacy username/i);
-    const passwordField = page.getByLabel(/^Password$/i);
-    const submit = page.getByRole("button", { name: /Use legacy Command access/i });
-    await username.fill("admin");
-    await passwordField.fill(password);
-    await page.waitForFunction(() => {
-      const button = document.querySelector('button[type="submit"]');
-      return button instanceof HTMLButtonElement && !button.disabled;
-    });
-    captureLoginCookies = true;
+    // Use VYNDI's real individual Better Auth path. The account is disposable
+    // and exists only in this job's ephemeral PostgreSQL service.
+    await page.goto(`${baseURL}/login?returnTo=%2Fcommand`, { waitUntil: "networkidle" });
+    await page.getByLabel(/Authorised Email/i).fill(email);
+    await page.getByLabel(/^Password$/i).fill(password);
+    const submit = page.getByRole("button", { name: /Authorize · Enter Command/i });
     await submit.click();
 
-    // Give the server function + client redirect a bounded interval, then expose
-    // actionable diagnostics if the protected route was not reached. Only cookie
-    // names/attributes are logged; no cookie values or credentials are emitted.
     try {
-      await page.waitForURL(/\/command(?:\/|$)/, { timeout: 20_000 });
+      await page.waitForURL(/\/command(?:\/|$)/, { timeout: 30_000 });
     } catch (error) {
       const alert = page.getByRole("alert");
       const alertText = (await alert.count()) ? (await alert.first().innerText()).trim() : "<no login error rendered>";
-      const cookies = (await context.cookies()).map(({ name, domain, path, secure, httpOnly, sameSite }) => ({
-        name,
-        domain,
-        path,
-        secure,
-        httpOnly,
-        sameSite,
-      }));
+      const cookieNames = (await context.cookies()).map(({ name }) => name);
+      const bearerPresent = await page.evaluate(() => Boolean(window.sessionStorage.getItem("grok-auth.bearer-token"))).catch(() => false);
       throw new Error(
-        `${viewport.name} legacy login did not persist; url=${page.url()}; alert=${alertText}; cookies=${JSON.stringify(cookies)}; setCookieTrace=${JSON.stringify(setCookieTrace)}`,
+        `${viewport.name} individual login did not reach Command; url=${page.url()}; alert=${alertText}; cookieNames=${JSON.stringify(cookieNames)}; bearerPresent=${bearerPresent}`,
         { cause: error },
       );
-    } finally {
-      captureLoginCookies = false;
     }
+
+    const authenticatedCookieNames = (await context.cookies()).map(({ name }) => name);
+    const bearerPresent = await page.evaluate(() => Boolean(window.sessionStorage.getItem("grok-auth.bearer-token"))).catch(() => false);
+    assert.ok(
+      authenticatedCookieNames.some((name) => name.includes("grok-auth") || name.includes("better-auth")) || bearerPresent,
+      `${viewport.name} reached Command without observable Better Auth session transport`,
+    );
 
     for (const route of routes) {
       await page.goto(`${baseURL}${route}`, { waitUntil: "networkidle", timeout: 30_000 });
+      assert.doesNotMatch(page.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} ${route} lost authenticated access`);
       const body = page.locator("body");
       await body.waitFor({ state: "visible" });
       const text = await body.innerText();
@@ -106,18 +76,18 @@ try {
       assert.ok(overflow <= 4, `${viewport.name} ${route} has ${overflow}px page-level horizontal overflow`);
     }
 
-    // The server-owned legacy cookie must survive a reload. This verifies the
-    // persistence boundary independently for every accepted viewport.
+    // Verify the authenticated browser session survives a full protected-route
+    // reload; this is distinct from client-side SPA navigation.
     await page.reload({ waitUntil: "networkidle" });
     assert.doesNotMatch(page.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} lost its authenticated session on reload`);
 
-    // Exercise logout revocation once on the desktop path. After the logout the
-    // protected Command route must redirect back to the canonical login screen.
+    // Exercise server-side revocation once. After logout, the protected route
+    // must no longer be reachable in the same browser context.
     if (viewport.name === "desktop-landscape") {
       await page.getByRole("button", { name: /Log out/i }).click();
-      await page.waitForURL(/\/login(?:\?|$)/, { timeout: 20_000 });
+      await page.waitForURL(/\/login(?:\?|$)/, { timeout: 30_000 });
       await page.goto(`${baseURL}/command`, { waitUntil: "domcontentloaded" });
-      await page.waitForURL(/\/login\?returnTo=%2Fcommand/, { timeout: 20_000 });
+      await page.waitForURL(/\/login\?returnTo=%2Fcommand/, { timeout: 30_000 });
     }
 
     assert.deepEqual(pageErrors, [], `${viewport.name} emitted browser page errors: ${pageErrors.join(" | ")}`);
@@ -127,4 +97,4 @@ try {
   await browser.close();
 }
 
-console.log("[stage-d-browser] responsive protected-route, persistence and logout acceptance passed");
+console.log("[stage-d-browser] individual auth, responsive protected routes, persistence and logout acceptance passed");
