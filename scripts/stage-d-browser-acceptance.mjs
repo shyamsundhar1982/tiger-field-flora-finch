@@ -16,13 +16,37 @@ const routes = [
   "/command/ibpe-operating-workspace/assurance",
 ];
 
+function redactSetCookie(raw) {
+  const pieces = raw.split(";").map((part) => part.trim()).filter(Boolean);
+  const pair = pieces.shift() || "";
+  const equals = pair.indexOf("=");
+  const name = equals >= 0 ? pair.slice(0, equals).trim() : pair.trim();
+  return [name || "<unnamed-cookie>", ...pieces].join("; ");
+}
+
 const browser = await chromium.launch({ headless: true });
 try {
   for (const viewport of viewports) {
     const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height } });
     const page = await context.newPage();
     const pageErrors = [];
+    const setCookieTrace = [];
+    let captureLoginCookies = false;
     page.on("pageerror", (error) => pageErrors.push(String(error?.message || error)));
+    page.on("response", async (response) => {
+      if (!captureLoginCookies) return;
+      try {
+        const headers = await response.headersArray();
+        const cookies = headers
+          .filter((header) => header.name.toLowerCase() === "set-cookie")
+          .map((header) => redactSetCookie(header.value));
+        if (cookies.length) {
+          setCookieTrace.push({ url: response.url(), status: response.status(), cookies });
+        }
+      } catch {
+        // Diagnostics must never make the acceptance test itself fail.
+      }
+    });
 
     // Wait for Vite/React hydration before editing controlled form fields. If
     // values are written at DOMContentLoaded, hydration can legitimately replace
@@ -37,6 +61,7 @@ try {
       const button = document.querySelector('button[type="submit"]');
       return button instanceof HTMLButtonElement && !button.disabled;
     });
+    captureLoginCookies = true;
     await submit.click();
 
     // Give the server function + client redirect a bounded interval, then expose
@@ -56,9 +81,11 @@ try {
         sameSite,
       }));
       throw new Error(
-        `${viewport.name} legacy login did not persist; url=${page.url()}; alert=${alertText}; cookies=${JSON.stringify(cookies)}`,
+        `${viewport.name} legacy login did not persist; url=${page.url()}; alert=${alertText}; cookies=${JSON.stringify(cookies)}; setCookieTrace=${JSON.stringify(setCookieTrace)}`,
         { cause: error },
       );
+    } finally {
+      captureLoginCookies = false;
     }
 
     for (const route of routes) {
