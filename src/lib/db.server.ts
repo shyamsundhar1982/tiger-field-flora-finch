@@ -1,3 +1,4 @@
+import { getRequest } from "@tanstack/react-start/server";
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
 import { requestSafePostgresPoolConfig } from "./postgres-pool";
 import {
@@ -10,6 +11,16 @@ const globalRef = globalThis as typeof globalThis & {
   __pgliteInstance__?: Promise<import("@electric-sql/pglite").PGlite>;
   __pgliteMigrateChain__?: Promise<void>;
 };
+
+/**
+ * A Worker may serve many requests from the same module isolate, but network I/O
+ * objects must stay inside the request that created them. Keying by the ambient
+ * Request gives every incoming request one bounded SQL pool while allowing every
+ * getSqlServer() call made during that request to share it. WeakMap entries are
+ * unreachable once the Request is collected, so no later request can acquire the
+ * previous request's pool.
+ */
+const requestSqlCache = new WeakMap<Request, Promise<Sql>>();
 
 const OID_INT8 = 20;
 const OID_DATE = 1082;
@@ -29,11 +40,10 @@ function toSql(run: Run): Sql {
 }
 
 /**
- * Build a pool for the CURRENT getSqlServer() scope only. Nothing owning TCP
- * state is cached in module/global promises, so a later Worker request cannot
- * reuse request-bound I/O. The pool bounds parallel SQL issued by one request;
- * maxUses=1 retires every checked-out connection after its query. Hyperdrive
- * remains the cross-request/shared pool in deployed Cloudflare environments.
+ * Build a pool for one incoming request only. The pool caps concurrent SQL for
+ * that request; maxUses=1 retires every checked-out connection after its query.
+ * Hyperdrive remains the shared cross-request pool in deployed Cloudflare
+ * environments.
  */
 async function createPostgresSql(transport: PostgresTransport): Promise<Sql> {
   const { Pool, types } = await import("pg");
@@ -90,15 +100,28 @@ async function createPgliteSql(): Promise<Sql> {
 
   return toSql(async <T>(text: string, params: unknown[]) => {
     const result = await pg.query<T>(text, params);
-    return result.rows;
+    return result.rows as T[];
   });
 }
 
 export async function getSqlServer(): Promise<Sql> {
-  // Resolve the transport in the current request. Hyperdrive connection strings
-  // and request-bound I/O must not be captured in module/global promises.
   const transport = await resolvePostgresTransport();
-  return transport ? createPostgresSql(transport) : createPgliteSql();
+  if (!transport) return createPgliteSql();
+
+  // getRequest() is the ambient TanStack request object and is stable for all
+  // nested server functions participating in the same incoming request.
+  const request = getRequest();
+  if (!request) return createPostgresSql(transport);
+
+  const cached = requestSqlCache.get(request);
+  if (cached) return cached;
+
+  const pending = createPostgresSql(transport).catch((error) => {
+    requestSqlCache.delete(request);
+    throw error;
+  });
+  requestSqlCache.set(request, pending);
+  return pending;
 }
 
 export async function getPgliteServer(): Promise<import("@electric-sql/pglite").PGlite> {
