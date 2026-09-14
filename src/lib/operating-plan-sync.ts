@@ -42,10 +42,10 @@ export function useOperatingPlanSync() {
         actions: { ...current.actions, ...actionStatus },
       });
 
-      if (!source) {
-        await saveOperatingPlanDraft({ data: planSnapshot(useVeloxis.getState()) });
-      }
-
+      // A read-only Command mount must not manufacture a business-plan revision.
+      // If no central source exists, keep the browser defaults as an editing
+      // cache. The first substantive store change is persisted by the debounced
+      // subscription below, preserving explicit business intent and auditability.
       lastPlan = JSON.stringify(planSnapshot(useVeloxis.getState()));
       lastActions = { ...useVeloxis.getState().actions };
 
