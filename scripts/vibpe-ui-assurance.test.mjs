@@ -158,7 +158,7 @@ test("finance, legal and risk have persisted canonical source authority", () => 
   assert.match(financeAuthority, /Math\.abs\(balanceError\) > 0\.01/);
 });
 
-test("authenticated runtime observer can evidence every registered UI capability", () => {
+test("runtime observer records only the active route while explicit Playwright audit owns full route coverage", () => {
   for (const id of [
     "UI-AUTH-SESSION","UI-SALES-LOAD","UI-SALES-CONFIRM","UI-PRODUCT-LOAD","UI-ENGINEERING-LOAD","UI-BOM-LOAD",
     "UI-INVENTORY-LOAD","UI-PROCUREMENT-LOAD","UI-PRODUCTION-LOAD","UI-QUALITY-LOAD","UI-PEOPLE-OFFICE-LOAD",
@@ -166,15 +166,15 @@ test("authenticated runtime observer can evidence every registered UI capability
     "UI-VIBPE-WORKSPACE","UI-VIBPE-AUTHORITY","UI-VIBPE-OPTIMIZER","UI-VIBPE-OUTPUTS","UI-VIBPE-ASSURANCE","UI-VIBPE-RELEASE",
   ]) assert.ok(observer.includes(id), `missing runtime observer capability ${id}`);
   assert.match(observer, /credentials: "include"/);
-  assert.match(observer, /authenticated-route-sweep/);
-  assert.match(observer, /DOMParser/);
   assert.match(observer, /\/api\/vibpe\/ui-assurance/);
   assert.match(observer, /probeAuthenticatedSession/);
   assert.match(observer, /payload\?\.ok === true/);
   assert.match(observer, /actorPresent/);
-  assert.match(observer, /passedCount === capabilities\.length/);
-  assert.match(observer, /sessionStorage\.removeItem/);
+  assert.match(observer, /location\.pathname/);
   assert.match(observer, /cloudflare-production/);
   assert.match(observer, /vercel-production/);
+  assert.doesNotMatch(observer, /sweepAuthenticatedRoutes/);
+  assert.doesNotMatch(observer, /authenticated-route-sweep/);
+  assert.doesNotMatch(observer, /router\.invalidate/);
   assert.match(commandRoute, /VibpeRuntimeObserver/);
 });
