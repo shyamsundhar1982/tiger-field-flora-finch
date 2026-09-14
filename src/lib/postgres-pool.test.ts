@@ -22,8 +22,26 @@ test("deployed PostgreSQL connections cannot be reused across Worker requests", 
   assert.match(databaseSource, /const request = getRequest\(\)/);
   assert.match(databaseSource, /requestSqlCache\.get\(request\)/);
   assert.match(databaseSource, /requestSqlCache\.set\(request, pending\)/);
-  assert.match(databaseSource, /new Pool\(requestSafePostgresPoolConfig\([^)]+\)\)/);
+  assert.match(databaseSource, /new Pool\(config\)/);
   assert.match(authSource, /new Pool\(requestSafePostgresPoolConfig\([^)]+\)\)/);
+});
+
+test("explicit local Hyperdrive override shares one bounded PostgreSQL pool", async () => {
+  const databaseSource = await readFile(new URL("./db.server.ts", import.meta.url), "utf8");
+
+  assert.match(
+    databaseSource,
+    /CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE/,
+  );
+  assert.match(databaseSource, /__vyndiLocalPostgresPool__/);
+  assert.match(
+    databaseSource,
+    /globalRef\.__vyndiLocalPostgresPool__ \?\?= new Pool\(config\)/,
+  );
+  assert.match(
+    databaseSource,
+    /if \(hasLocalHyperdriveOverride\(\)\) return createPostgresSql\(transport\)/,
+  );
 });
 
 test("Hyperdrive takes precedence over direct DATABASE_URL", () => {
