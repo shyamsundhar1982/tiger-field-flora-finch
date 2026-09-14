@@ -34,9 +34,13 @@ try {
       viewport: { width: viewport.width, height: viewport.height },
       reducedMotion: "reduce",
     });
-    const page = await context.newPage();
     const pageErrors = [];
-    page.on("pageerror", (error) => pageErrors.push(String(error?.message || error)));
+    const observePage = (observedPage) => {
+      observedPage.on("pageerror", (error) => pageErrors.push(String(error?.message || error)));
+    };
+
+    const page = await context.newPage();
+    observePage(page);
 
     // Use VYNDI's real individual Better Auth path. The account is disposable
     // and exists only in this job's ephemeral PostgreSQL service.
@@ -66,25 +70,31 @@ try {
       `${viewport.name} reached Command without observable Better Auth session transport`,
     );
 
+    // Probe each protected route from a fresh page in the same authenticated
+    // context. This tests direct protected entry while avoiding overlapping
+    // TanStack client-router navigations from a previously mounted live page.
     for (const route of routes) {
-      // Command workspaces intentionally perform background observation and
-      // projection work. Requiring network-idle would reject a healthy live
-      // dashboard, so readiness is based on the document + rendered evidence.
-      await page.goto(`${baseURL}${route}`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-      await waitForSubstantiveBody(page);
-      assert.doesNotMatch(page.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} ${route} lost authenticated access`);
-      const text = await page.locator("body").innerText();
-      assert.doesNotMatch(text, /Something went wrong|Cannot read properties of undefined|Internal Server Error/i, `${viewport.name} ${route} rendered a fatal error`);
-      assert.ok(text.trim().length > 40, `${viewport.name} ${route} rendered insufficient content`);
+      const routePage = await context.newPage();
+      observePage(routePage);
+      try {
+        await routePage.goto(`${baseURL}${route}`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+        await waitForSubstantiveBody(routePage);
+        assert.doesNotMatch(routePage.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} ${route} lost authenticated access`);
+        const text = await routePage.locator("body").innerText();
+        assert.doesNotMatch(text, /Something went wrong|Cannot read properties of undefined|Internal Server Error/i, `${viewport.name} ${route} rendered a fatal error`);
+        assert.ok(text.trim().length > 40, `${viewport.name} ${route} rendered insufficient content`);
 
-      const geometry = await page.evaluate(() => ({
-        scrollWidth: document.documentElement.scrollWidth,
-        clientWidth: document.documentElement.clientWidth,
-        bodyScrollWidth: document.body.scrollWidth,
-        innerWidth: window.innerWidth,
-      }));
-      const overflow = Math.max(geometry.scrollWidth, geometry.bodyScrollWidth) - geometry.innerWidth;
-      assert.ok(overflow <= 4, `${viewport.name} ${route} has ${overflow}px page-level horizontal overflow`);
+        const geometry = await routePage.evaluate(() => ({
+          scrollWidth: document.documentElement.scrollWidth,
+          clientWidth: document.documentElement.clientWidth,
+          bodyScrollWidth: document.body.scrollWidth,
+          innerWidth: window.innerWidth,
+        }));
+        const overflow = Math.max(geometry.scrollWidth, geometry.bodyScrollWidth) - geometry.innerWidth;
+        assert.ok(overflow <= 4, `${viewport.name} ${route} has ${overflow}px page-level horizontal overflow`);
+      } finally {
+        await routePage.close();
+      }
     }
 
     // Verify the authenticated browser session survives a full protected-route
@@ -100,6 +110,7 @@ try {
       await page.getByRole("button", { name: /Log out/i }).click();
       await page.waitForURL(/\/login(?:\?|$)/, { timeout: 30_000 });
       const revokedProbe = await context.newPage();
+      observePage(revokedProbe);
       await revokedProbe.goto(`${baseURL}/command`, { waitUntil: "domcontentloaded", timeout: 30_000 });
       await revokedProbe.waitForURL(/\/login\?returnTo=%2Fcommand/, { timeout: 30_000 });
       await revokedProbe.close();
