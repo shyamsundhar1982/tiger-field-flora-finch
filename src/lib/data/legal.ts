@@ -2,7 +2,7 @@ export const IP_FILINGS = [
   { asset: "Frame geometry", type: "Provisional patent (IN)", when: "M3", cost: 0.8, note: "File at CAD lock, amend in FEA. Before any OEM disclosure." },
   { asset: "Layup / process claims", type: "Provisional patent (IN)", when: "M3–M4", cost: 0.6, note: "Claim-draft carefully — process patents are narrower." },
   { asset: "Frame + fork industrial design", type: "Design (IN)", when: "M3", cost: 0.25, note: "Fast. Do this even if patent is pending." },
-  { asset: "VéLOXIS word + device", type: "TM Class 12, 35, 41", when: "M1–M2", cost: 0.35, note: "File before any public pitch deck circulation." },
+  { asset: "VYNDI word + device", type: "TM Class 12, 35, 41", when: "M1–M2", cost: 0.35, note: "File before any public pitch deck circulation." },
   { asset: "Vāyú Shastr word", type: "TM Class 12, 35", when: "M1–M2", cost: 0.2, note: "House mark. Separate from product brand." },
   { asset: "Core / Pro / Apex", type: "TM Class 12", when: "M6", cost: 0.25, note: "After model names are frozen." },
   { asset: "PCT", type: "International", when: "After ₹1 Cr revenue", cost: 4.5, note: "Delay until commercial proof. India-first is enough now." },

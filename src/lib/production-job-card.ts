@@ -75,7 +75,7 @@ async function activeReleasedMappings(
   order: OrderRow,
 ): Promise<{ bomRevision: string; rows: MappingRow[]; authority: "variant" | "family-standard" }> {
   if (!order.model_tier || !order.variant_id) {
-    throw new Error("A confirmed order must reference an exact released VINDY variant.");
+    throw new Error("A confirmed order must reference an exact released VYNDI variant.");
   }
   const venture = ventureForTier(order.model_tier);
   const exactRows = await releasedRows(sql, venture, order.variant_id);

@@ -142,7 +142,7 @@ export const auth = betterAuth({
     }),
   },
 
-  // VINDY administrators create accounts for other people. Creating a user must
+  // VYNDI administrators create accounts for other people. Creating a user must
   // NEVER sign the administrator into the newly-created account. Better Auth's
   // email/password sign-up auto-signs users in by default; disabling that here
   // prevents the admin session cookie from being replaced during user creation.

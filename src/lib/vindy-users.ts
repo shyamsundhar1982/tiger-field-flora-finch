@@ -65,7 +65,7 @@ async function ensureCredentialPassword(sql: Awaited<ReturnType<typeof getSql>>,
   `;
 
   // Better Auth resolves email/password identities through the credential
-  // account. Older VINDY provisioning attempts could leave more than one
+  // account. Older VYNDI provisioning attempts could leave more than one
   // credential row behind; that makes the password lookup nondeterministic.
   // Keep exactly one canonical credential row per user.
   const credential = credentials[0];
@@ -123,7 +123,7 @@ async function verifyWithBetterAuth(sql: Awaited<ReturnType<typeof getSql>>, use
   // deliberately stronger than verifying the hash directly: Better Auth first
   // resolves the user by email, selects the credential account, verifies the
   // password, and then creates a session. A successful result proves that the
-  // persisted VINDY identity is compatible with the real authentication path.
+  // persisted VYNDI identity is compatible with the real authentication path.
   let result: { token?: string; user?: { id?: string } };
   try {
     result = (await auth.api.signInEmail({
@@ -131,7 +131,7 @@ async function verifyWithBetterAuth(sql: Awaited<ReturnType<typeof getSql>>, use
     })) as { token?: string; user?: { id?: string } };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown Better Auth error";
-    throw new Error(`Better Auth rejected the VINDY credential: ${message}`);
+    throw new Error(`Better Auth rejected the VYNDI credential: ${message}`);
   }
 
   if (result.user?.id !== userId || !result.token) {

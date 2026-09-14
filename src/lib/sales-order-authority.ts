@@ -28,7 +28,7 @@ const orderSchema = z.object({
 }).superRefine((order, context) => {
   if (order.status === "confirmed" || order.status === "delivered") {
     if (!order.modelTier) context.addIssue({ code: "custom", path: ["modelTier"], message: "Committed demand requires a model tier." });
-    if (!order.variantId) context.addIssue({ code: "custom", path: ["variantId"], message: "Committed demand requires an exact VINDY variant." });
+    if (!order.variantId) context.addIssue({ code: "custom", path: ["variantId"], message: "Committed demand requires an exact VYNDI variant." });
     if (!order.configuration) context.addIssue({ code: "custom", path: ["configuration"], message: "Committed demand requires the controlled configuration." });
   }
 });
@@ -86,10 +86,10 @@ export const saveSalesOrder = createServerFn({ method: "POST" })
 
     if (data.variantId) {
       const variant = MODELS.find((entry) => entry.id === data.variantId);
-      if (!variant) throw new Error("Unknown VINDY model/variant.");
+      if (!variant) throw new Error("Unknown VYNDI model/variant.");
       if (data.modelTier !== variant.tier) throw new Error("Sales order model tier does not match the selected variant.");
       const expectedProduct = variant.tier === "core" ? "aluminium" : variant.tier === "apex" ? "premiumCarbon" : "carbon";
-      if (data.product !== expectedProduct) throw new Error("Sales order product line does not match the selected VINDY variant.");
+      if (data.product !== expectedProduct) throw new Error("Sales order product line does not match the selected VYNDI variant.");
       if (data.configuration) validateConfiguration(data.variantId, data.configuration);
     }
 

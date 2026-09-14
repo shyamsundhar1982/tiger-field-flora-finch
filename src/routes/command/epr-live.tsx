@@ -40,7 +40,7 @@ function LiveEpr() {
     venture: "carbon",
     modelId: "core",
     modelName: "Longitude",
-    sku: "VINDY-LONGITUDE-PILOT",
+    sku: "VYNDI-LONGITUDE-PILOT",
     bomRevision: "BOM-001",
     engineeringRevision: "VEDM-301-5.3.8",
     serialNumber: "",
@@ -156,7 +156,7 @@ function LiveEpr() {
       <header className="rounded-2xl border border-border bg-bg-elevated/70 p-5">
         <div className="flex flex-wrap items-center justify-between gap-5">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Vāyú Shastr · VINDY · Production control</p>
+            <p className="text-[11px] uppercase tracking-[0.2em] text-subtle">Vāyú Shastr · VYNDI · Production control</p>
             <h1 className="mt-1 font-display text-4xl text-accent">Live EPR Transaction Core</h1>
             <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">Traveller → material → process → inspection → NCR/CAPA → inventory → evidence → gate → audit.</p>
           </div>
@@ -180,7 +180,7 @@ function LiveEpr() {
 
       <Panel title="Create controlled pilot traveller" kicker="EPR-04 · serial genealogy root">
         <div className="grid gap-3 md:grid-cols-4">
-          <select value={form.venture} onChange={(event) => setForm({ ...form, venture: event.target.value })} className={control}><option value="carbon">VINDY · Carbon</option><option value="aluminium">Aluminium Bicycle</option></select>
+          <select value={form.venture} onChange={(event) => setForm({ ...form, venture: event.target.value })} className={control}><option value="carbon">VYNDI · Carbon</option><option value="aluminium">Aluminium Bicycle</option></select>
           <select value={form.modelId} onChange={(event) => { const modelId = event.target.value as keyof typeof models; setForm({ ...form, modelId, modelName: models[modelId] }); }} className={control}><option value="core">Longitude</option><option value="pro">Latitude</option><option value="apex">Altitude</option></select>
           <input value={form.sku} onChange={(event) => setForm({ ...form, sku: event.target.value })} placeholder="SKU" className={control} />
           <input value={form.serialNumber} onChange={(event) => setForm({ ...form, serialNumber: event.target.value })} placeholder="Serial number *" className={control} />

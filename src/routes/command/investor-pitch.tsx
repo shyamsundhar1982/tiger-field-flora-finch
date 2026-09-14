@@ -35,9 +35,9 @@ function InvestorPitch() {
   return (
     <div className="space-y-7">
       <header className="border-b border-border pb-6">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">VINDY · Investor showcase</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-green">VYNDI · Investor showcase</p>
         <h1 className="mt-1 font-display text-4xl text-accent">Investment Case</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">A concise, evidence-led presentation of VINDY for investors, board members and partners. Operational controls remain role-restricted; every link on this page opens a presentation-safe evidence surface.</p>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">A concise, evidence-led presentation of VYNDI for investors, board members and partners. Operational controls remain role-restricted; every link on this page opens a presentation-safe evidence surface.</p>
         <div className="mt-4 flex flex-wrap gap-2"><span className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-muted">Showcase</span><span className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-muted">Evidence-led</span><span className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-muted">36-month horizon</span></div>
       </header>
 
@@ -55,7 +55,7 @@ function InvestorPitch() {
       <section className="rounded-xl border border-border bg-surface/35 p-6 sm:p-8">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-green">Investment thesis</p>
         <h2 className="mt-3 max-w-4xl font-display text-3xl leading-tight text-accent">An India-focused, IP-led performance bicycle platform built around controlled engineering, rider fit, configurable specification and disciplined staged capital.</h2>
-        <p className="mt-4 max-w-3xl text-sm leading-6 text-muted">Vāyú Shastr is building VINDY as an asset-light product company: retain product definition, brand, customer relationship and relevant IP while using qualified manufacturing partners. The proposition is engineered performance, fit and configuration with an evidence-gated path from prototype to scale.</p>
+        <p className="mt-4 max-w-3xl text-sm leading-6 text-muted">Vāyú Shastr is building VYNDI as an asset-light product company: retain product definition, brand, customer relationship and relevant IP while using qualified manufacturing partners. The proposition is engineered performance, fit and configuration with an evidence-gated path from prototype to scale.</p>
       </section>
 
       <Panel title="Unit economics" kicker="Management assumptions · validate before formal fundraising use">

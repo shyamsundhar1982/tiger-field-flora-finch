@@ -1,7 +1,7 @@
 export type StakeholderStatus = "ready" | "in-progress" | "blocked";
 
 export const STAKEHOLDER_PORTAL_STATUS = {
-  headline: "A controlled external view of the VINDY opportunity.",
+  headline: "A controlled external view of the VYNDI opportunity.",
   currentTrancheLakh: 15,
   totalLadderLakh: 225,
   disclosureRule: "External claims must be traceable to approved Finance, Engineering, Manufacturing, Legal, EPR or Governance evidence.",

@@ -10,7 +10,7 @@ export const OEM_CRITERIA = [
 ] as const;
 
 export const CONTRACT_CLAUSES = [
-  { id: "1", title: "Tooling ownership", body: "Moulds, jigs, masters are VéLOXIS property. Serial tagged. Location disclosed. Retrieval within 30 days of notice, freight on OEM if breach." },
+  { id: "1", title: "Tooling ownership", body: "Moulds, jigs, masters are VYNDI property. Serial tagged. Location disclosed. Retrieval within 30 days of notice, freight on OEM if breach." },
   { id: "2", title: "IP non-use", body: "No use of geometry, layup, or photos for any other customer. Employee NDAs. Photographic evidence control." },
   { id: "3", title: "Staged file release", body: "NDA → RFQ (envelope + stack) → CAD after provisional filing. Never reverse." },
   { id: "4", title: "Payment", body: "50% on PO (deposit — budgeted M8 ₹2 L shifted from inventory), 50% before bill of lading." },
