@@ -85,53 +85,17 @@ function inspectDocument(capability: Capability, doc: Document) {
   return { passed: !errorLike, result: `${capability.label}: rendered`, evidence: { errorLike } };
 }
 
-async function probeAuthenticatedSession() {
-  const capability = capabilities.find((item) => item.id === "UI-AUTH-SESSION");
-  if (!capability) return { posted: false, passed: false };
-  try {
-    const response = await fetch("/api/vibpe/ui-assurance", {
-      method: "GET",
-      credentials: "include",
-      redirect: "follow",
-      cache: "no-store",
-    });
-    const payload = (await response.json().catch(() => null)) as { ok?: boolean; actor?: { userId?: string; role?: string } } | null;
-    const passed = response.ok && payload?.ok === true && Boolean(payload.actor?.userId);
-    const posted = await record(
-      capability,
-      passed,
-      passed
-        ? `Authenticated business session verified by protected assurance API (HTTP ${response.status}).`
-        : `Authenticated business session probe failed (HTTP ${response.status}).`,
-      {
-        mode: "live-session-probe",
-        probe: "/api/vibpe/ui-assurance",
-        httpStatus: response.status,
-        apiOk: payload?.ok === true,
-        actorPresent: Boolean(payload?.actor?.userId),
-        actorRole: payload?.actor?.role ?? null,
-      },
-    );
-    return { posted, passed };
-  } catch (error) {
-    const posted = await record(
-      capability,
-      false,
-      `Authenticated business session probe failed: ${error instanceof Error ? error.message : String(error)}`,
-      { mode: "live-session-probe", probe: "/api/vibpe/ui-assurance", error: String(error) },
-    ).catch(() => false);
-    return { posted, passed: false };
-  }
-}
-
 async function observeCurrentRoute(pathname: string) {
   const matches = capabilities.filter((capability) => capability.route === pathname);
   if (!matches.length) return;
   for (const capability of matches) {
-    if (capability.id === "UI-AUTH-SESSION") {
-      await probeAuthenticatedSession();
-      continue;
-    }
+    // Persistence is a temporal property: a single live API probe cannot prove
+    // that a session survives navigation or reload. The explicit Playwright
+    // assurance runner owns UI-AUTH-SESSION and records it only after a real
+    // document reload. Avoid manufacturing a false-positive persistence record
+    // (and an unnecessary POST) on every Command mount.
+    if (capability.id === "UI-AUTH-SESSION") continue;
+
     const inspected = inspectDocument(capability, document);
     await record(capability, inspected.passed, `${inspected.result} at ${pathname}`, {
       ...inspected.evidence,
@@ -143,8 +107,9 @@ async function observeCurrentRoute(pathname: string) {
 /**
  * Lightweight runtime assurance observer. It records evidence for the route the
  * operator is actually using; it does not crawl the whole application from a
- * live business session. Full cross-route assurance belongs to the explicit
- * Playwright audit runner, avoiding self-generated request storms in workerd.
+ * live business session. Full cross-route and temporal session assurance belong
+ * to the explicit Playwright audit runner, avoiding self-generated request
+ * storms and misleading one-shot persistence evidence in workerd.
  */
 export function VibpeRuntimeObserver() {
   const location = useLocation();
