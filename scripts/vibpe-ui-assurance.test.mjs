@@ -78,9 +78,10 @@ test("Cloudflare-first Playwright runner checks authority, workflow surfaces and
 
 test("final VIBPE Assurance page consumes canonical backend evidence and does not become a business writer", () => {
   assert.match(page, /createFileRoute\("\/command\/ibpe-operating-workspace_?\/assurance"\)/);
-  assert.match(page, /getVibpeAssuranceCoverage/);
+  assert.match(page, /getVibpeAssurancePageData/);
   assert.match(page, /listVibpeAssuranceExceptions/);
-  assert.match(page, /getVibpeUiAssurance/);
+  assert.match(page, /getVibpeUiCapabilityRegistry/);
+  assert.doesNotMatch(page, /getVibpeAssuranceCoverage/);
   assert.match(page, /captureVibpeAssuranceSnapshot/);
   assert.match(page, /unproved route remains a gap/i);
   assert.match(page, /does not become a duplicate writer/i);

@@ -12,8 +12,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { SiteHeader } from "@/components/site-header";
-import { signOut } from "@/lib/auth/client";
-import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { authEnabled, signOut } from "@/lib/auth/client";
 import { getCommandRole } from "@/lib/command-access";
 import {
   ADMIN_CONTEXT,
@@ -248,7 +247,6 @@ function MobileNavigation({
 
 export function CommandShell() {
   const navigate = useNavigate();
-  const { user: individualUser } = useCurrentUserState();
   const [role, setRole] = useState<CommandRole | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState("");
@@ -266,7 +264,7 @@ export function CommandShell() {
     try {
       setRole(null);
 
-      if (individualUser && !individualUser.isDevFallback) {
+      if (authEnabled) {
         await signOut("/login");
         return;
       }
