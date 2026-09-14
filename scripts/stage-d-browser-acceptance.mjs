@@ -14,19 +14,29 @@ const viewports = [
 ];
 const routes = [
   "/command",
+  "/command/inventory",
+  "/command/engineering",
+  "/command/operations",
   "/command/actuals",
   "/command/ibpe-operating-workspace/assurance",
 ];
 const ROUTE_GOTO_TIMEOUT_MS = {
   "/command": 30_000,
+  "/command/inventory": 30_000,
+  "/command/engineering": 30_000,
+  "/command/operations": 30_000,
   "/command/actuals": 30_000,
   "/command/ibpe-operating-workspace/assurance": 90_000,
 };
 const ROUTE_BODY_TIMEOUT_MS = {
   "/command": 20_000,
+  "/command/inventory": 20_000,
+  "/command/engineering": 20_000,
+  "/command/operations": 20_000,
   "/command/actuals": 20_000,
   "/command/ibpe-operating-workspace/assurance": 60_000,
 };
+const REQUIRED_FULL_VIEW_ROUTES = new Set(["/command/inventory", "/command/engineering"]);
 
 async function waitForSubstantiveBody(page, timeout = 20_000) {
   await page.locator("body").waitFor({ state: "visible", timeout });
@@ -35,6 +45,38 @@ async function waitForSubstantiveBody(page, timeout = 20_000) {
     undefined,
     { timeout },
   );
+}
+
+async function assertFullViewRegisters(page, viewportName, route) {
+  const registers = page.locator("[data-full-view-table]");
+  const count = await registers.count();
+  if (REQUIRED_FULL_VIEW_ROUTES.has(route)) {
+    assert.ok(count > 0, `${viewportName} ${route} rendered no full-view register`);
+  }
+
+  for (let index = 0; index < count; index += 1) {
+    const register = registers.nth(index);
+    const geometry = await register.evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      return {
+        id: element.getAttribute("data-full-view-table") || `register-${index}`,
+        scrollWidth: element.scrollWidth,
+        clientWidth: element.clientWidth,
+        overflowX: style.overflowX,
+      };
+    });
+    if (geometry.clientWidth === 0) continue;
+    const overflow = geometry.scrollWidth - geometry.clientWidth;
+    assert.ok(
+      overflow <= 4,
+      `${viewportName} ${route} full-view register ${geometry.id} has ${overflow}px internal horizontal overflow`,
+    );
+    assert.doesNotMatch(
+      geometry.overflowX,
+      /auto|scroll/i,
+      `${viewportName} ${route} full-view register ${geometry.id} exposes a horizontal scrolling surface`,
+    );
+  }
 }
 
 async function waitForMutationQuiescence(page, pendingRequests, { timeoutMs = 20_000, quietMs = 1_000 } = {}) {
@@ -163,6 +205,8 @@ try {
           console.error(`[stage-d-browser] overflow diagnostics for ${viewport.name} ${route}`, overflowDiagnostics);
         }
         assert.ok(overflow <= 4, `${viewport.name} ${route} has ${overflow}px page-level horizontal overflow`);
+        await assertFullViewRegisters(routePage, viewport.name, route);
+
         // Fail fast on pageerrors so a desktop Assurance exception cannot hide
         // behind later persistence/logout work and a late end-of-viewport assert.
         if (pageErrors.length) {
@@ -331,4 +375,4 @@ try {
   await browser.close();
 }
 
-console.log("[stage-d-browser] individual auth, responsive protected routes, persistence and logout acceptance passed");
+console.log("[stage-d-browser] individual auth, full-view responsive routes, persistence and logout acceptance passed");
