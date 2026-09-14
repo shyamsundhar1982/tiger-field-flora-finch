@@ -17,6 +17,7 @@ const routes = [
   "/command/inventory",
   "/command/engineering",
   "/command/operations",
+  "/command/manufacturing",
   "/command/actuals",
   "/command/ibpe-operating-workspace/assurance",
 ];
@@ -25,6 +26,7 @@ const ROUTE_GOTO_TIMEOUT_MS = {
   "/command/inventory": 30_000,
   "/command/engineering": 30_000,
   "/command/operations": 30_000,
+  "/command/manufacturing": 30_000,
   "/command/actuals": 30_000,
   "/command/ibpe-operating-workspace/assurance": 90_000,
 };
@@ -33,10 +35,15 @@ const ROUTE_BODY_TIMEOUT_MS = {
   "/command/inventory": 20_000,
   "/command/engineering": 20_000,
   "/command/operations": 20_000,
+  "/command/manufacturing": 20_000,
   "/command/actuals": 20_000,
   "/command/ibpe-operating-workspace/assurance": 60_000,
 };
-const REQUIRED_FULL_VIEW_ROUTES = new Set(["/command/inventory", "/command/engineering"]);
+const REQUIRED_FULL_VIEW_ROUTES = new Set([
+  "/command/inventory",
+  "/command/engineering",
+  "/command/manufacturing",
+]);
 
 async function waitForSubstantiveBody(page, timeout = 20_000) {
   await page.locator("body").waitFor({ state: "visible", timeout });
@@ -131,13 +138,20 @@ async function diagnoseHydrationMismatch(browser, context, viewport, route, hydr
       differences,
     });
   } catch (error) {
-    console.error(`[stage-d-browser] hydration diagnostic failed for ${viewport.name} ${route}`, String(error));
+    console.error(
+      `[stage-d-browser] hydration diagnostic failed for ${viewport.name} ${route}`,
+      String(error),
+    );
   } finally {
     await serverContext.close().catch(() => {});
   }
 }
 
-async function waitForMutationQuiescence(page, pendingRequests, { timeoutMs = 20_000, quietMs = 1_000 } = {}) {
+async function waitForMutationQuiescence(
+  page,
+  pendingRequests,
+  { timeoutMs = 20_000, quietMs = 1_000 } = {},
+) {
   const deadline = Date.now() + timeoutMs;
   let quietSince = null;
 
@@ -163,7 +177,9 @@ async function waitForMutationQuiescence(page, pendingRequests, { timeoutMs = 20
       type: request.resourceType(),
       path: new URL(request.url()).pathname,
     }));
-  throw new Error(`Background mutations did not settle before document replacement: ${JSON.stringify(pendingMutations)}`);
+  throw new Error(
+    `Background mutations did not settle before document replacement: ${JSON.stringify(pendingMutations)}`,
+  );
 }
 
 const browser = await chromium.launch({ headless: true });
@@ -192,9 +208,13 @@ try {
       await page.waitForURL(/\/command(?:\/|$)/, { timeout: 30_000 });
     } catch (error) {
       const alert = page.getByRole("alert");
-      const alertText = (await alert.count()) ? (await alert.first().innerText()).trim() : "<no login error rendered>";
+      const alertText = (await alert.count())
+        ? (await alert.first().innerText()).trim()
+        : "<no login error rendered>";
       const cookieNames = (await context.cookies()).map(({ name }) => name);
-      const bearerPresent = await page.evaluate(() => Boolean(window.sessionStorage.getItem("grok-auth.bearer-token"))).catch(() => false);
+      const bearerPresent = await page
+        .evaluate(() => Boolean(window.sessionStorage.getItem("grok-auth.bearer-token")))
+        .catch(() => false);
       throw new Error(
         `${viewport.name} individual login did not reach Command; url=${page.url()}; alert=${alertText}; cookieNames=${JSON.stringify(cookieNames)}; bearerPresent=${bearerPresent}`,
         { cause: error },
@@ -202,9 +222,13 @@ try {
     }
 
     const authenticatedCookieNames = (await context.cookies()).map(({ name }) => name);
-    const bearerPresent = await page.evaluate(() => Boolean(window.sessionStorage.getItem("grok-auth.bearer-token"))).catch(() => false);
+    const bearerPresent = await page
+      .evaluate(() => Boolean(window.sessionStorage.getItem("grok-auth.bearer-token")))
+      .catch(() => false);
     assert.ok(
-      authenticatedCookieNames.some((name) => name.includes("grok-auth") || name.includes("better-auth")) || bearerPresent,
+      authenticatedCookieNames.some(
+        (name) => name.includes("grok-auth") || name.includes("better-auth"),
+      ) || bearerPresent,
       `${viewport.name} reached Command without observable Better Auth session transport`,
     );
 
@@ -225,9 +249,17 @@ try {
           `[stage-d-browser] ${viewport.name}: ${route} DOMContentLoaded in ${Date.now() - navigationStartedAt}ms`,
         );
         await waitForSubstantiveBody(routePage, bodyTimeout);
-        assert.doesNotMatch(routePage.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} ${route} lost authenticated access`);
+        assert.doesNotMatch(
+          routePage.url(),
+          /\/login(?:\?|$)|\/command-login/,
+          `${viewport.name} ${route} lost authenticated access`,
+        );
         const text = await routePage.locator("body").innerText();
-        assert.doesNotMatch(text, /Something went wrong|Cannot read properties of undefined|Internal Server Error/i, `${viewport.name} ${route} rendered a fatal error`);
+        assert.doesNotMatch(
+          text,
+          /Something went wrong|Cannot read properties of undefined|Internal Server Error/i,
+          `${viewport.name} ${route} rendered a fatal error`,
+        );
         assert.ok(text.trim().length > 40, `${viewport.name} ${route} rendered insufficient content`);
 
         const geometry = await routePage.evaluate(() => ({
@@ -255,9 +287,15 @@ try {
               .filter((item) => item.right > viewportWidth + 4 || item.left < -4)
               .slice(0, 20);
           });
-          console.error(`[stage-d-browser] overflow diagnostics for ${viewport.name} ${route}`, overflowDiagnostics);
+          console.error(
+            `[stage-d-browser] overflow diagnostics for ${viewport.name} ${route}`,
+            overflowDiagnostics,
+          );
         }
-        assert.ok(overflow <= 4, `${viewport.name} ${route} has ${overflow}px page-level horizontal overflow`);
+        assert.ok(
+          overflow <= 4,
+          `${viewport.name} ${route} has ${overflow}px page-level horizontal overflow`,
+        );
         await assertFullViewRegisters(routePage, viewport.name, route, bodyTimeout);
 
         const routeErrors = pageErrors.slice(routeErrorStart);
@@ -302,7 +340,11 @@ try {
         `[stage-d-browser] ${viewport.name}: post-heavy /command DOMContentLoaded in ${Date.now() - firstPersistenceStartedAt}ms`,
       );
       await waitForSubstantiveBody(persistenceProbe, 40_000);
-      assert.doesNotMatch(persistenceProbe.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} lost its authenticated session before document replacement`);
+      assert.doesNotMatch(
+        persistenceProbe.url(),
+        /\/login(?:\?|$)|\/command-login/,
+        `${viewport.name} lost its authenticated session before document replacement`,
+      );
       await waitForMutationQuiescence(persistenceProbe, pendingRequests);
 
       const persistenceUrl = `${baseURL}/command?stage_d_session_probe=${Date.now()}`;
@@ -334,7 +376,10 @@ try {
           /Something went wrong|Cannot read properties of undefined|Internal Server Error/i,
           `${viewport.name} second document rendered a fatal error`,
         );
-        assert.ok(reloadedText.trim().length > 40, `${viewport.name} second document rendered insufficient content`);
+        assert.ok(
+          reloadedText.trim().length > 40,
+          `${viewport.name} second document rendered insufficient content`,
+        );
       } finally {
         await secondProbe.close().catch(() => {});
       }
@@ -368,18 +413,30 @@ try {
       const logoutPage = await context.newPage();
       observePage(logoutPage);
       try {
-        await logoutPage.goto(`${baseURL}/command`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+        await logoutPage.goto(`${baseURL}/command`, {
+          waitUntil: "domcontentloaded",
+          timeout: 30_000,
+        });
         await waitForSubstantiveBody(logoutPage);
-        assert.doesNotMatch(logoutPage.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} was not authenticated before logout`);
+        assert.doesNotMatch(
+          logoutPage.url(),
+          /\/login(?:\?|$)|\/command-login/,
+          `${viewport.name} was not authenticated before logout`,
+        );
         const logoutButton = logoutPage.getByRole("button", { name: /Log out/i });
         const logoutCount = await logoutButton.count();
-        assert.ok(logoutCount > 0, `${viewport.name} Log out control not found before revocation (count=${logoutCount})`);
+        assert.ok(
+          logoutCount > 0,
+          `${viewport.name} Log out control not found before revocation (count=${logoutCount})`,
+        );
         await logoutButton.click();
         try {
           await logoutPage.waitForURL(/\/login(?:\?|$)/, { timeout: 30_000 });
         } catch (error) {
           const alert = logoutPage.getByRole("alert");
-          const alertText = (await alert.count()) ? (await alert.first().innerText()).trim() : "<no alert>";
+          const alertText = (await alert.count())
+            ? (await alert.first().innerText()).trim()
+            : "<no alert>";
           throw new Error(
             `${viewport.name} logout did not reach /login; url=${logoutPage.url()}; alert=${alertText}`,
             { cause: error },
@@ -392,7 +449,10 @@ try {
       const revokedProbe = await context.newPage();
       observePage(revokedProbe);
       try {
-        await revokedProbe.goto(`${baseURL}/command`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+        await revokedProbe.goto(`${baseURL}/command`, {
+          waitUntil: "domcontentloaded",
+          timeout: 30_000,
+        });
         try {
           await revokedProbe.waitForURL(/\/login\?returnTo=%2Fcommand/, { timeout: 30_000 });
         } catch (error) {
@@ -409,11 +469,17 @@ try {
     if (pageErrors.length) {
       console.error(`[stage-d-browser] residual pageerrors at end of ${viewport.name}`, pageErrors);
     }
-    assert.deepEqual(pageErrors, [], `${viewport.name} emitted browser page errors: ${pageErrors.join(" | ")}`);
+    assert.deepEqual(
+      pageErrors,
+      [],
+      `${viewport.name} emitted browser page errors: ${pageErrors.join(" | ")}`,
+    );
     await context.close();
   }
 } finally {
   await browser.close();
 }
 
-console.log("[stage-d-browser] individual auth, full-view responsive routes, persistence and logout acceptance passed");
+console.log(
+  "[stage-d-browser] individual auth, full-view responsive routes, persistence and logout acceptance passed",
+);
