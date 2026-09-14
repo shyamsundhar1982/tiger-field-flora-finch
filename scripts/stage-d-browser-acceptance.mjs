@@ -163,9 +163,20 @@ try {
           console.error(`[stage-d-browser] overflow diagnostics for ${viewport.name} ${route}`, overflowDiagnostics);
         }
         assert.ok(overflow <= 4, `${viewport.name} ${route} has ${overflow}px page-level horizontal overflow`);
+        // Fail fast on pageerrors so a desktop Assurance exception cannot hide
+        // behind later persistence/logout work and a late end-of-viewport assert.
+        if (pageErrors.length) {
+          console.error(`[stage-d-browser] pageerrors after ${viewport.name} ${route}`, pageErrors);
+        }
+        assert.deepEqual(
+          pageErrors,
+          [],
+          `${viewport.name} ${route} emitted browser page errors: ${pageErrors.join(" | ")}`,
+        );
       } catch (error) {
         console.error(
           `[stage-d-browser] ${viewport.name}: ${route} failed after ${Date.now() - navigationStartedAt}ms`,
+          { pageErrors },
         );
         throw error;
       } finally {
@@ -255,6 +266,9 @@ try {
       }
     }
 
+    if (pageErrors.length) {
+      console.error(`[stage-d-browser] residual pageerrors at end of ${viewport.name}`, pageErrors);
+    }
     assert.deepEqual(pageErrors, [], `${viewport.name} emitted browser page errors: ${pageErrors.join(" | ")}`);
     await context.close();
   }
