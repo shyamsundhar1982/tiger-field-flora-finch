@@ -18,6 +18,10 @@ test("deployed PostgreSQL connections cannot be reused across Worker requests", 
     readFile(new URL("./auth/server.ts", import.meta.url), "utf8"),
   ]);
 
+  assert.match(databaseSource, /new WeakMap<Request, Promise<Sql>>\(\)/);
+  assert.match(databaseSource, /const request = getRequest\(\)/);
+  assert.match(databaseSource, /requestSqlCache\.get\(request\)/);
+  assert.match(databaseSource, /requestSqlCache\.set\(request, pending\)/);
   assert.match(databaseSource, /new Pool\(requestSafePostgresPoolConfig\([^)]+\)\)/);
   assert.match(authSource, /new Pool\(requestSafePostgresPoolConfig\([^)]+\)\)/);
 });
