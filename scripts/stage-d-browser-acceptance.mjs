@@ -142,6 +142,26 @@ try {
           innerWidth: window.innerWidth,
         }));
         const overflow = Math.max(geometry.scrollWidth, geometry.bodyScrollWidth) - geometry.innerWidth;
+        if (overflow > 4) {
+          const overflowDiagnostics = await routePage.evaluate(() => {
+            const viewportWidth = window.innerWidth;
+            return [...document.querySelectorAll("*")]
+              .map((el) => {
+                const rect = el.getBoundingClientRect();
+                return {
+                  tag: el.tagName,
+                  className: typeof el.className === "string" ? el.className.slice(0, 180) : "",
+                  text: (el.textContent || "").trim().slice(0, 120),
+                  left: Math.round(rect.left),
+                  right: Math.round(rect.right),
+                  width: Math.round(rect.width),
+                };
+              })
+              .filter((item) => item.right > viewportWidth + 4 || item.left < -4)
+              .slice(0, 20);
+          });
+          console.error(`[stage-d-browser] overflow diagnostics for ${viewport.name} ${route}`, overflowDiagnostics);
+        }
         assert.ok(overflow <= 4, `${viewport.name} ${route} has ${overflow}px page-level horizontal overflow`);
       } catch (error) {
         console.error(

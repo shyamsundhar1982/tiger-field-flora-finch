@@ -65,9 +65,9 @@ export function Panel({
   }
 
   return (
-    <section ref={sectionRef} className={cn("rounded-xl border border-border bg-surface/35 p-5 sm:p-6", className)}>
-      <div className="flex items-start justify-between gap-4">
-        <div>
+    <section ref={sectionRef} className={cn("min-w-0 rounded-xl border border-border bg-surface/35 p-5 sm:p-6", className)}>
+      <div className="flex min-w-0 items-start justify-between gap-4">
+        <div className="min-w-0">
           {kicker ? <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-green">{kicker}</p> : null}
           <h2 className={cn("font-display text-xl font-semibold text-accent", kicker && "mt-1")}>{title}</h2>
         </div>
@@ -82,7 +82,7 @@ export function Panel({
           </button>
         ) : null}
       </div>
-      <div className="mt-4">{children}</div>
+      <div className="mt-4 min-w-0">{children}</div>
     </section>
   );
 }
