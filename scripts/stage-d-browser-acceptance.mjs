@@ -59,7 +59,7 @@ async function assertFullViewRegisters(page, viewportName, route) {
     const geometry = await register.evaluate((element) => {
       const style = window.getComputedStyle(element);
       return {
-        id: element.getAttribute("data-full-view-table") || `register-${index}`,
+        id: element.getAttribute("data-full-view-table") || "full-view-register",
         scrollWidth: element.scrollWidth,
         clientWidth: element.clientWidth,
         overflowX: style.overflowX,
@@ -124,8 +124,6 @@ try {
     const page = await context.newPage();
     observePage(page);
 
-    // Use VYNDI's real individual Better Auth path. The account is disposable
-    // and exists only in this job's ephemeral PostgreSQL service.
     await page.goto(`${baseURL}/login?returnTo=%2Fcommand`, { waitUntil: "networkidle" });
     await page.getByLabel(/Authorised Email/i).fill(email);
     await page.getByLabel(/^Password$/i).fill(password);
@@ -152,10 +150,6 @@ try {
       `${viewport.name} reached Command without observable Better Auth session transport`,
     );
 
-    // Probe each protected route from a fresh page in the same authenticated
-    // context. Assurance intentionally has a larger navigation/body budget because
-    // it aggregates governed evidence across multiple backend authorities. The
-    // exception is explicit and timed so a green gate cannot conceal a slow route.
     for (const route of routes) {
       console.log(`[stage-d-browser] ${viewport.name}: protected route ${route}`);
       const routePage = await context.newPage();
@@ -207,8 +201,6 @@ try {
         assert.ok(overflow <= 4, `${viewport.name} ${route} has ${overflow}px page-level horizontal overflow`);
         await assertFullViewRegisters(routePage, viewport.name, route);
 
-        // Fail fast on pageerrors so a desktop Assurance exception cannot hide
-        // behind later persistence/logout work and a late end-of-viewport assert.
         if (pageErrors.length) {
           console.error(`[stage-d-browser] pageerrors after ${viewport.name} ${route}`, pageErrors);
         }
@@ -228,14 +220,8 @@ try {
       }
     }
 
-    // Brief settle after the heavy Assurance probe so the single Worker process
-    // can finish any leftover SSR / DB work before the next full document.
     await page.waitForTimeout(2_000);
 
-    // Verify the authenticated browser session survives a second top-level
-    // document request in the SAME browser context. Cache-bust forces SSR +
-    // Better Auth + role authorization again. First hop recovers after Assurance;
-    // second hop uses a fresh page so it does not inherit a stuck navigation.
     const persistenceProbe = await context.newPage();
     observePage(persistenceProbe);
     const pendingRequests = new Set();
@@ -256,10 +242,6 @@ try {
       assert.doesNotMatch(persistenceProbe.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} lost its authenticated session before document replacement`);
       await waitForMutationQuiescence(persistenceProbe, pendingRequests);
 
-      // Second hop: cache-busted full document reload on a FRESH page in the same
-      // authenticated context. Reusing the post-Assurance page leaves an in-flight
-      // document navigation (/command) that never settles under Vite/workerd, so
-      // waitForSubstantiveBody hangs waiting for navigation to finish.
       const persistenceUrl = `${baseURL}/command?stage_d_session_probe=${Date.now()}`;
       const secondProbe = await context.newPage();
       observePage(secondProbe);
@@ -278,7 +260,6 @@ try {
           /\/login(?:\?|$)|\/command-login/,
           `${viewport.name} lost its authenticated session on second document navigation`,
         );
-        // Prefer document outcome: a null Response is acceptable if Command still rendered.
         if (secondResponse && !secondResponse.ok()) {
           throw new Error(
             `${viewport.name} persistence document returned HTTP ${secondResponse.status()} at ${secondProbe.url()}`,
@@ -319,9 +300,6 @@ try {
       await persistenceProbe.close().catch(() => {});
     }
 
-    // Exercise server-side revocation once. Use a fresh authenticated page for
-    // logout, then probe the revoked session from another page in the SAME
-    // context. This preserves shared cookie state and avoids stale-page races.
     if (viewport.name === "desktop-landscape") {
       console.log(`[stage-d-browser] ${viewport.name}: logout and revocation`);
       const logoutPage = await context.newPage();
