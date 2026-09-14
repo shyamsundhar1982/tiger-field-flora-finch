@@ -60,8 +60,12 @@ jobs:
           --health-retries 10
     env:
       COMMAND_PASSWORD: stage-d-ci-disposable-password
-      VITE_AUTH_ENABLED: "false"
+      VITE_AUTH_ENABLED: "true"
+      BETTER_AUTH_URL: http://localhost:8080
+      BETTER_AUTH_SECRET: stage-d-ci-better-auth-secret-2026-not-production
       STAGE_D_BASE_URL: http://localhost:8080
+      STAGE_D_USER_EMAIL: stage-d-acceptance@vyndi.test
+      STAGE_D_USER_PASSWORD: stage-d-ci-individual-password-2026
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vyndi_ci
       CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE: postgresql://postgres:postgres@localhost:5432/vyndi_ci
       VYNDI_ALLOW_DB_MIGRATIONS: "1"
@@ -96,6 +100,9 @@ jobs:
           done
           cat /tmp/vyndi-stage-d.log
           exit 1
+
+      - name: Seed disposable individual acceptance identity
+        run: node scripts/stage-d-seed-user.mjs
 
       - name: Protected-route responsive browser acceptance
         run: node scripts/stage-d-browser-acceptance.mjs
