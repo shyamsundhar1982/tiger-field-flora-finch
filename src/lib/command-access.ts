@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 import type { CommandRole } from "@/lib/page-access";
 import { optionalAuthMiddleware } from "@/lib/auth/middleware";
 import { getAssignedCommandRole } from "@/lib/command-user-role.server";
@@ -19,9 +20,9 @@ async function resolveCommandAuthorization(
 
 /**
  * Command is governed exclusively by an individually verified Better Auth
- * identity. There is no shared-password/legacy session fallback: an anonymous
- * request has no Command access, while an authenticated identity resolves its
- * persisted VYNDI role (defaulting to viewer until explicitly assigned).
+ * identity. Anonymous requests have no Command access; an authenticated
+ * identity resolves its persisted VYNDI role, defaulting to viewer until an
+ * administrator explicitly assigns another role.
  */
 export const getCommandAuthorization = createServerFn({ method: "GET" })
   .middleware([optionalAuthMiddleware])
@@ -41,3 +42,19 @@ export const getCommandIdentity = createServerFn({ method: "GET" })
 export const getCommandAccess = createServerFn({ method: "GET" })
   .middleware([optionalAuthMiddleware])
   .handler(async ({ context }) => (await resolveCommandAuthorization(context)).access);
+
+/**
+ * Compatibility endpoint retained only so an old /command-login bundle cannot
+ * fail at import time. Shared Command credentials are retired: this endpoint
+ * never creates a session and never grants a role.
+ */
+export const unlockCommand = createServerFn({ method: "POST" })
+  .validator(z.object({ username: z.string().min(1).max(100), password: z.string().min(1).max(200) }))
+  .handler(async () => ({
+    ok: false as const,
+    role: null,
+    error: "Legacy Command access is retired. Use the individual VYNDI sign in.",
+  }));
+
+/** No legacy session exists anymore; retained as a harmless compatibility no-op. */
+export const lockCommand = createServerFn({ method: "POST" }).handler(async () => ({ ok: true as const }));
