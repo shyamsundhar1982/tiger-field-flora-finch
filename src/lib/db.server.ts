@@ -7,7 +7,6 @@ import {
 import type { Sql, SqlRow } from "./db.ts";
 
 const globalRef = globalThis as typeof globalThis & {
-  __pgSqlPromise__?: Promise<Sql>;
   __pgliteInstance__?: Promise<import("@electric-sql/pglite").PGlite>;
   __pgliteMigrateChain__?: Promise<void>;
 };
@@ -29,33 +28,27 @@ function toSql(run: Run): Sql {
   return sql;
 }
 
-let postgresTransportPromise: Promise<PostgresTransport | null> | null = null;
+/**
+ * Cloudflare Workers cannot retain a pg Pool (or a promise that owns one)
+ * across request contexts. Hyperdrive already provides the shared connection
+ * pool, so each query gets a short-lived driver pool that is closed before the
+ * request continues. This is also safe for the portable DATABASE_URL fallback.
+ */
+async function createPostgresSql(transport: PostgresTransport): Promise<Sql> {
+  const { Pool, types } = await import("pg");
+  types.setTypeParser(OID_INT8, Number);
+  types.setTypeParser(OID_DATE, identity);
+  types.setTypeParser(OID_INTERVAL, identity);
 
-function getPostgresTransport(): Promise<PostgresTransport | null> {
-  postgresTransportPromise ??= resolvePostgresTransport().catch((err) => {
-    postgresTransportPromise = null;
-    throw err;
-  });
-  return postgresTransportPromise;
-}
-
-function createPostgresSql(transport: PostgresTransport): Promise<Sql> {
-  const connectionString = transport.connectionString;
-  globalRef.__pgSqlPromise__ ??= (async () => {
-    const { Pool, types } = await import("pg");
-    types.setTypeParser(OID_INT8, Number);
-    types.setTypeParser(OID_DATE, identity);
-    types.setTypeParser(OID_INTERVAL, identity);
-    const pool = new Pool(requestSafePostgresPoolConfig(connectionString));
-    return toSql(async <T>(text: string, params: unknown[]) => {
+  return toSql(async <T>(text: string, params: unknown[]) => {
+    const pool = new Pool(requestSafePostgresPoolConfig(transport.connectionString));
+    try {
       const res = await pool.query(text, params);
       return res.rows as T[];
-    });
-  })().catch((err) => {
-    globalRef.__pgSqlPromise__ = undefined;
-    throw err;
+    } finally {
+      await pool.end().catch(() => undefined);
+    }
   });
-  return globalRef.__pgSqlPromise__;
 }
 
 async function createPgliteSql(): Promise<Sql> {
@@ -104,21 +97,15 @@ async function createPgliteSql(): Promise<Sql> {
   });
 }
 
-let sqlPromise: Promise<Sql> | null = null;
-
 export async function getSqlServer(): Promise<Sql> {
-  sqlPromise ??= (async () => {
-    const transport = await getPostgresTransport();
-    return transport ? createPostgresSql(transport) : createPgliteSql();
-  })().catch((err) => {
-    sqlPromise = null;
-    throw err;
-  });
-  return sqlPromise;
+  // Resolve the transport in the current request. Hyperdrive connection strings
+  // and request-bound I/O must not be captured in module/global promises.
+  const transport = await resolvePostgresTransport();
+  return transport ? createPostgresSql(transport) : createPgliteSql();
 }
 
 export async function getPgliteServer(): Promise<import("@electric-sql/pglite").PGlite> {
-  const transport = await getPostgresTransport();
+  const transport = await resolvePostgresTransport();
   if (transport) {
     throw new Error("getPglite() is only available when neither Hyperdrive nor DATABASE_URL is configured");
   }
@@ -129,7 +116,7 @@ export async function getPgliteServer(): Promise<import("@electric-sql/pglite").
 }
 
 export async function ensureDbReadyServer(): Promise<void> {
-  const transport = await getPostgresTransport();
+  const transport = await resolvePostgresTransport();
   if (transport) return;
   await getSqlServer();
 }
