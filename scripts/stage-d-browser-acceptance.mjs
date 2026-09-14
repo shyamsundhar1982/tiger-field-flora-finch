@@ -224,14 +224,24 @@ try {
       assert.doesNotMatch(persistenceProbe.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} lost its authenticated session on second document navigation`);
       const reloadedText = await persistenceProbe.locator("body").innerText();
       assert.doesNotMatch(reloadedText, /Something went wrong|Cannot read properties of undefined|Internal Server Error/i, `${viewport.name} second document rendered a fatal error`);
+      if (pageErrors.length) {
+        console.error(`[stage-d-browser] pageerrors after ${viewport.name} persistence`, pageErrors);
+      }
+      assert.deepEqual(
+        pageErrors,
+        [],
+        `${viewport.name} persistence emitted browser page errors: ${pageErrors.join(" | ")}`,
+      );
     } catch (error) {
+      const pending = [...pendingRequests].map((request) => ({
+        method: request.method(),
+        type: request.resourceType(),
+        path: new URL(request.url()).pathname,
+      }));
       console.error("[stage-d-browser] persistence failure", {
         viewport: viewport.name,
-        pending: [...pendingRequests].map((request) => ({
-          method: request.method(),
-          type: request.resourceType(),
-          path: new URL(request.url()).pathname,
-        })),
+        url: persistenceProbe.url(),
+        pending,
         pageErrors,
       });
       throw error;
@@ -250,8 +260,20 @@ try {
         await logoutPage.goto(`${baseURL}/command`, { waitUntil: "domcontentloaded", timeout: 30_000 });
         await waitForSubstantiveBody(logoutPage);
         assert.doesNotMatch(logoutPage.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} was not authenticated before logout`);
-        await logoutPage.getByRole("button", { name: /Log out/i }).click();
-        await logoutPage.waitForURL(/\/login(?:\?|$)/, { timeout: 30_000 });
+        const logoutButton = logoutPage.getByRole("button", { name: /Log out/i });
+        const logoutCount = await logoutButton.count();
+        assert.ok(logoutCount > 0, `${viewport.name} Log out control not found before revocation (count=${logoutCount})`);
+        await logoutButton.click();
+        try {
+          await logoutPage.waitForURL(/\/login(?:\?|$)/, { timeout: 30_000 });
+        } catch (error) {
+          const alert = logoutPage.getByRole("alert");
+          const alertText = (await alert.count()) ? (await alert.first().innerText()).trim() : "<no alert>";
+          throw new Error(
+            `${viewport.name} logout did not reach /login; url=${logoutPage.url()}; alert=${alertText}`,
+            { cause: error },
+          );
+        }
       } finally {
         await logoutPage.close().catch(() => {});
       }
@@ -260,7 +282,14 @@ try {
       observePage(revokedProbe);
       try {
         await revokedProbe.goto(`${baseURL}/command`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-        await revokedProbe.waitForURL(/\/login\?returnTo=%2Fcommand/, { timeout: 30_000 });
+        try {
+          await revokedProbe.waitForURL(/\/login\?returnTo=%2Fcommand/, { timeout: 30_000 });
+        } catch (error) {
+          throw new Error(
+            `${viewport.name} revoked session still reached protected Command; url=${revokedProbe.url()}`,
+            { cause: error },
+          );
+        }
       } finally {
         await revokedProbe.close().catch(() => {});
       }
