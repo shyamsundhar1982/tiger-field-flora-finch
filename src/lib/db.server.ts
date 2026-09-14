@@ -29,10 +29,11 @@ function toSql(run: Run): Sql {
 }
 
 /**
- * Cloudflare Workers cannot retain a pg Pool (or a promise that owns one)
- * across request contexts. Hyperdrive already provides the shared connection
- * pool, so each query gets a short-lived driver pool that is closed before the
- * request continues. This is also safe for the portable DATABASE_URL fallback.
+ * Build a pool for the CURRENT getSqlServer() scope only. Nothing owning TCP
+ * state is cached in module/global promises, so a later Worker request cannot
+ * reuse request-bound I/O. The pool bounds parallel SQL issued by one request;
+ * maxUses=1 retires every checked-out connection after its query. Hyperdrive
+ * remains the cross-request/shared pool in deployed Cloudflare environments.
  */
 async function createPostgresSql(transport: PostgresTransport): Promise<Sql> {
   const { Pool, types } = await import("pg");
@@ -40,14 +41,10 @@ async function createPostgresSql(transport: PostgresTransport): Promise<Sql> {
   types.setTypeParser(OID_DATE, identity);
   types.setTypeParser(OID_INTERVAL, identity);
 
+  const pool = new Pool(requestSafePostgresPoolConfig(transport.connectionString));
   return toSql(async <T>(text: string, params: unknown[]) => {
-    const pool = new Pool(requestSafePostgresPoolConfig(transport.connectionString));
-    try {
-      const res = await pool.query(text, params);
-      return res.rows as T[];
-    } finally {
-      await pool.end().catch(() => undefined);
-    }
+    const res = await pool.query(text, params);
+    return res.rows as T[];
   });
 }
 
