@@ -173,7 +173,10 @@ try {
       await loginPage.getByLabel(/Authorised Email/i).fill(email);
       await loginPage.getByLabel(/^Password$/i).fill(password);
       await loginPage.getByRole("button", { name: /Authorize · Enter Command/i }).click();
-      await loginPage.waitForURL(/\/command(?:\/|$)/, { timeout: 30_000 });
+      await loginPage.waitForURL(/\/command(?:\/|$)/, {
+        waitUntil: "domcontentloaded",
+        timeout: 30_000,
+      });
       await waitForSubstantiveBody(loginPage, 20_000);
       assert.doesNotMatch(
         loginPage.url(),
