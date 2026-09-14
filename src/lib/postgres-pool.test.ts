@@ -9,6 +9,7 @@ test("deployed PostgreSQL connections cannot be reused across Worker requests", 
   const config = requestSafePostgresPoolConfig("postgresql://example.invalid/db");
 
   assert.equal(config.connectionString, "postgresql://example.invalid/db");
+  assert.equal(config.max, 5);
   assert.equal(config.maxUses, 1);
   assert.equal(config.connectionTimeoutMillis, 10_000);
 
