@@ -78,7 +78,7 @@ function BrandMigration() {
     migrateRoot();
 
     let scheduled: number | null = null;
-    const pendingRoots = new Set<ParentNode>();
+    const pendingRoots = new Set<Text | Element>();
 
     const flush = () => {
       scheduled = null;
@@ -105,7 +105,7 @@ function BrandMigration() {
           if (added.nodeType === Node.TEXT_NODE) {
             pendingRoots.add(added as Text);
           } else if (added.nodeType === Node.ELEMENT_NODE) {
-            pendingRoots.add(added as ParentNode);
+            pendingRoots.add(added as Element);
           }
         }
       }
