@@ -7,18 +7,26 @@ import {
 } from "./postgres-runtime";
 import type { Sql, SqlRow } from "./db.ts";
 
+const LOCAL_HYPERDRIVE_OVERRIDE = "CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE";
+
 const globalRef = globalThis as typeof globalThis & {
   __pgliteInstance__?: Promise<import("@electric-sql/pglite").PGlite>;
   __pgliteMigrateChain__?: Promise<void>;
+  __vyndiLocalPostgresPool__?: import("pg").Pool;
 };
 
 /**
- * A Worker may serve many requests from the same module isolate, but network I/O
- * objects must stay inside the request that created them. Keying by the ambient
- * Request gives every incoming request one bounded SQL pool while allowing every
- * getSqlServer() call made during that request to share it. WeakMap entries are
- * unreachable once the Request is collected, so no later request can acquire the
- * previous request's pool.
+ * A deployed Worker may serve many requests from the same module isolate, but
+ * request-bound network I/O objects must stay inside the request that created
+ * them. Keying by the ambient Request gives deployed Workers one bounded SQL
+ * pool per request while allowing nested server functions in that request to
+ * share it.
+ *
+ * Wrangler's explicit local Hyperdrive override is different: it is a direct
+ * localhost PostgreSQL connection used by development/CI, not the deployed
+ * Hyperdrive proxy. In that environment, creating one pool per browser/server
+ * request can multiply into hundreds of direct database connections. We reuse a
+ * single bounded local pool only when that explicit override is present.
  */
 const requestSqlCache = new WeakMap<Request, Promise<Sql>>();
 
@@ -39,11 +47,16 @@ function toSql(run: Run): Sql {
   return sql;
 }
 
+function hasLocalHyperdriveOverride(): boolean {
+  return Boolean(process.env[LOCAL_HYPERDRIVE_OVERRIDE]?.trim());
+}
+
 /**
- * Build a pool for one incoming request only. The pool caps concurrent SQL for
- * that request; maxUses=1 retires every checked-out connection after its query.
- * Hyperdrive remains the shared cross-request pool in deployed Cloudflare
- * environments.
+ * Build a SQL facade around a bounded driver pool. Deployed Workers create this
+ * per request and retire each checked-out connection after its query;
+ * Hyperdrive remains the shared cross-request pool. Local Wrangler/CI reuses one
+ * bounded pool for the entire process so parallel route requests cannot exhaust
+ * the direct PostgreSQL server.
  */
 async function createPostgresSql(transport: PostgresTransport): Promise<Sql> {
   const { Pool, types } = await import("pg");
@@ -51,7 +64,11 @@ async function createPostgresSql(transport: PostgresTransport): Promise<Sql> {
   types.setTypeParser(OID_DATE, identity);
   types.setTypeParser(OID_INTERVAL, identity);
 
-  const pool = new Pool(requestSafePostgresPoolConfig(transport.connectionString));
+  const config = requestSafePostgresPoolConfig(transport.connectionString);
+  const pool = hasLocalHyperdriveOverride()
+    ? (globalRef.__vyndiLocalPostgresPool__ ??= new Pool(config))
+    : new Pool(config);
+
   return toSql(async <T>(text: string, params: unknown[]) => {
     const res = await pool.query(text, params);
     return res.rows as T[];
@@ -108,8 +125,13 @@ export async function getSqlServer(): Promise<Sql> {
   const transport = await resolvePostgresTransport();
   if (!transport) return createPgliteSql();
 
-  // getRequest() is the ambient TanStack request object and is stable for all
-  // nested server functions participating in the same incoming request.
+  // With the explicit Wrangler local-Hyperdrive connection string, every SQL
+  // facade points at the same process-local bounded Pool created above. There is
+  // no need to retain per-request facades in that environment.
+  if (hasLocalHyperdriveOverride()) return createPostgresSql(transport);
+
+  // In deployed Workers, getRequest() is stable for nested server functions in
+  // the same incoming request and prevents cross-request I/O reuse.
   const request = getRequest();
   if (!request) return createPostgresSql(transport);
 
