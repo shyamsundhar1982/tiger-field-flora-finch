@@ -59,16 +59,30 @@ async function checkRoute(capabilityId, routePath, label) {
   const evidence = {};
   try {
     const response = await page.goto(`${baseUrl}${routePath}`, { waitUntil: "domcontentloaded", timeout: 30000 });
+    let finalResponse = response;
+
+    // Session persistence is temporal evidence. Prove it by forcing a second
+    // document request in the same authenticated browser context rather than
+    // treating a one-shot authenticated GET as persistence proof.
+    if (capabilityId === "UI-AUTH-SESSION") {
+      await page.waitForTimeout(400);
+      finalResponse = await page.reload({ waitUntil: "domcontentloaded", timeout: 30000 });
+      evidence.reloadVerified = true;
+      evidence.initialHttpStatus = response?.status() ?? null;
+    }
+
     await page.waitForTimeout(400);
     const finalUrl = page.url();
     const bodyText = (await page.locator("body").innerText().catch(() => "")).slice(0, 3000);
     const loginLike = /\/login(?:[/?#]|$)/i.test(finalUrl) || /sign in|log in/i.test(bodyText.slice(0, 700));
     const errorLike = /something went wrong|application error|internal server error/i.test(bodyText);
-    passed = Boolean(response?.ok()) && !loginLike && !errorLike;
+    passed = Boolean(finalResponse?.ok()) && !loginLike && !errorLike;
     observedResult = passed
-      ? `${label}: rendered at ${new URL(finalUrl).pathname}`
-      : `${label}: status=${response?.status() ?? "none"}, final=${finalUrl}, loginLike=${loginLike}, errorLike=${errorLike}`;
-    Object.assign(evidence, { httpStatus: response?.status() ?? null, finalUrl, loginLike, errorLike });
+      ? capabilityId === "UI-AUTH-SESSION"
+        ? `${label}: authenticated session survived a real document reload at ${new URL(finalUrl).pathname}`
+        : `${label}: rendered at ${new URL(finalUrl).pathname}`
+      : `${label}: status=${finalResponse?.status() ?? "none"}, final=${finalUrl}, loginLike=${loginLike}, errorLike=${errorLike}`;
+    Object.assign(evidence, { httpStatus: finalResponse?.status() ?? null, finalUrl, loginLike, errorLike });
   } catch (error) {
     observedResult = `${label}: ${error instanceof Error ? error.message : String(error)}`;
     evidence.error = observedResult;
