@@ -32,6 +32,20 @@ export const getVibpeUiAssurance = createServerFn({ method: "GET" })
     return { capabilities, coverage, exceptions };
   });
 
+/** Load the detailed capability register only when a user expands it. */
+export const getVibpeUiCapabilityRegistry = createServerFn({ method: "GET" })
+  .middleware([optionalAuthMiddleware])
+  .handler(async ({ context }) => {
+    await requireBusinessActor(
+      "view",
+      context.userId ? { userId: context.userId, email: context.userEmail } : undefined,
+    );
+    const sql = await getSql();
+    return sql.query(
+      "select * from vyndi_vibpe_ui_capability_registry where active=true order by domain,route_path,capability_id",
+    );
+  });
+
 export const recordVibpeUiObservation = createServerFn({ method: "POST" })
   .middleware([optionalAuthMiddleware])
   .validator((input: VibpeUiObservationInput) => input)
