@@ -3,19 +3,18 @@ import { createAuthMiddleware } from "better-auth/api";
 import { bearer, genericOAuth } from "better-auth/plugins";
 import { getCookie } from "@tanstack/react-start/server";
 import { randomBytes } from "node:crypto";
-import { Pool } from "pg";
 import { ensureDbReady, getPglite } from "../db";
 import { emailAndPasswordEnabled } from "./email-password";
 import { GATE_PROVIDER_ID, gateIdentitySessions } from "./gate-session.server";
 import { GROK_PROVIDERS } from "./providers";
 import { pgliteDialect } from "./pglite-dialect";
+import { requestSafePostgresDialect } from "./postgres-dialect";
 import {
   GROK_ISSUER_DEFAULT,
   PREVIEW_ALLOWED_HOSTS,
   PREVIEW_CLIENT_ID,
   PREVIEW_CLIENT_SECRET,
 } from "./preview";
-import { requestSafePostgresPoolConfig } from "../postgres-pool";
 import { resolvePostgresTransport } from "../postgres-runtime";
 import { AUTH_TRUSTED_ORIGINS, resolveAuthBaseURL, resolveAuthSecret } from "./runtime-config";
 import { excessActiveSessionTokens } from "./session-concurrency";
@@ -87,10 +86,65 @@ const grokUserInfoUrl = `${issuerBase}/api/auth/oauth2/userinfo`;
 
 const postgresTransport = await resolvePostgresTransport();
 const database = postgresTransport
-  ? new Pool(requestSafePostgresPoolConfig(postgresTransport.connectionString))
+  ? {
+      dialect: requestSafePostgresDialect(postgresTransport.connectionString),
+      type: "postgres" as const,
+    }
   : { dialect: pgliteDialect(() => getPglite()), type: "postgres" as const };
 
 export const SESSION_TOKEN_COOKIE = "__Host-grok-auth.session_token";
+
+function authFailureCategory(error: unknown): string | undefined {
+  if (!error) return undefined;
+  const cause = error instanceof Error ? error.cause : undefined;
+  const searchable = [error, cause]
+    .flatMap((value) => {
+      if (!value || typeof value !== "object") return [];
+      return [
+        "name" in value ? String(value.name) : "",
+        "message" in value ? String(value.message) : "",
+        "code" in value ? String(value.code) : "",
+      ];
+    })
+    .join(" ")
+    .toLowerCase();
+  if (/postgres|hyperdrive|connection|socket|econn|timeout|query/.test(searchable)) {
+    return "postgres-transport";
+  }
+  if (/cookie|signature|decrypt|jwe|token/.test(searchable)) {
+    return "cookie-verification";
+  }
+  if (/adapter|session|relation|table|column/.test(searchable)) {
+    return "better-auth-adapter";
+  }
+  return "better-auth";
+}
+
+function authFailureDetails(request: Request, error?: unknown) {
+  const cause = error instanceof Error ? error.cause : undefined;
+  const errorCode =
+    typeof cause === "object" && cause && "code" in cause
+      ? String(cause.code)
+      : typeof error === "object" && error && "code" in error
+        ? String(error.code)
+        : undefined;
+  return {
+    path: new URL(request.url).pathname,
+    sessionCookiePresent: (request.headers.get("cookie") ?? "").includes(
+      `${SESSION_TOKEN_COOKIE}=`,
+    ),
+    bearerPresent: Boolean(request.headers.get("authorization")),
+    databaseTransport: postgresTransport?.source ?? "pglite",
+    secretSource: env("BETTER_AUTH_SECRET")
+      ? "BETTER_AUTH_SECRET"
+      : databaseUrl
+        ? "stable-database-derived-fallback"
+        : "preview-process",
+    errorName: error instanceof Error ? error.name : error ? typeof error : undefined,
+    errorCode,
+    failureCategory: authFailureCategory(error),
+  };
+}
 
 const grokOAuthPlugin = authConfigured
   ? genericOAuth({
@@ -175,6 +229,28 @@ export const auth = betterAuth({
     bearer(),
   ],
 });
+
+/** Run the public Better Auth endpoint with credential-safe failure context. */
+export async function handleAuthRequest(request: Request): Promise<Response> {
+  try {
+    const response = await auth.handler(request);
+    if (response.status >= 500) {
+      console.error("[auth] Better Auth endpoint failed", {
+        ...authFailureDetails(request),
+        responseStatus: response.status,
+      });
+    }
+    return response;
+  } catch (error) {
+    console.error("[auth] Better Auth endpoint threw", authFailureDetails(request, error));
+    throw error;
+  }
+}
+
+/** Record a server-side session lookup failure without logging cookie/token values. */
+export function logSessionLookupFailure(request: Request, error: unknown): void {
+  console.error("[auth] Better Auth getSession failed", authFailureDetails(request, error));
+}
 
 export function readSessionToken(): string | null {
   return getCookie(SESSION_TOKEN_COOKIE) ?? null;
