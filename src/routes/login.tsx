@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { LockKeyhole, Mail, ShieldCheck } from "lucide-react";
 import { FormEvent, MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from "react";
+import { isBearerTransportHost } from "@/lib/auth/bearer-transport";
 import "../login-rev1.css";
 
 type LoginSearch = {
@@ -476,7 +477,7 @@ function LoginPage() {
         { email: normalizedEmail, password },
         {
           onSuccess(ctx) {
-            if (!window.location.hostname.endsWith(".grok-sandbox.com")) return;
+            if (!isBearerTransportHost(window.location.hostname)) return;
             const token = ctx.response.headers.get("set-auth-token");
             if (token) window.sessionStorage.setItem(BEARER_KEY, token);
           },
@@ -491,8 +492,8 @@ function LoginPage() {
 
       void authClient.getSession().catch(() => {
         // Session hydration is non-blocking after credentials are accepted.
-        // Production already has the first-party HttpOnly cookie and embedded
-        // preview already has the bearer captured above.
+        // Cookie-first deployments use the HttpOnly session cookie; preview and
+        // loopback acceptance hosts use the verified bearer captured above.
       });
 
       const destination = safeReturnTo(search.returnTo);
@@ -501,13 +502,18 @@ function LoginPage() {
       setWarping(true);
       await (sceneControlsRef.current?.startWarp() ?? Promise.resolve());
       setBootMessage(null);
-      // Cross the authentication boundary with a fresh document request so the
-      // protected loader deterministically receives the just-issued HttpOnly
-      // session cookie. Keep TanStack navigation only as an exceptional fallback.
-      try {
-        window.location.assign(destination);
-      } catch {
+
+      // Preview/loopback needs an SPA handoff so server functions can receive
+      // the bearer transport from sessionStorage. Real deployments remain
+      // cookie-first and cross the auth boundary with a fresh document request.
+      if (isBearerTransportHost(window.location.hostname)) {
         await navigate({ to: destination as never });
+      } else {
+        try {
+          window.location.assign(destination);
+        } catch {
+          await navigate({ to: destination as never });
+        }
       }
     } catch (cause) {
       setGranted(false);
