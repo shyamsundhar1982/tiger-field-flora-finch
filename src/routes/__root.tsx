@@ -2,7 +2,6 @@ import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-r
 import { Analytics } from "@vercel/analytics/react";
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
-import { useEffect } from "react";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "VYNDI";
@@ -29,105 +28,6 @@ export const Route = createRootRoute({
   component: Root,
 });
 
-function correctBrandCopy(value: string) {
-  return value
-    .replace(/VéLOXIS/gi, "VYNDI")
-    .replace(/\bVINDY\b/g, "VYNDI")
-    .replace(/\bVindy\b/g, "VYNDI");
-}
-
-function migrateTextNodes(root: Node) {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  let node: Node | null;
-  while ((node = walker.nextNode())) {
-    const text = node as Text;
-    const current = text.nodeValue ?? "";
-    const corrected = correctBrandCopy(current);
-    if (corrected !== current) text.nodeValue = corrected;
-  }
-}
-
-function migrateElementAttributes(root: ParentNode) {
-  root.querySelectorAll<HTMLElement>("[aria-label],[title]").forEach((element) => {
-    for (const attribute of ["aria-label", "title"] as const) {
-      const current = element.getAttribute(attribute);
-      if (!current) continue;
-      const corrected = correctBrandCopy(current);
-      if (corrected !== current) element.setAttribute(attribute, corrected);
-    }
-  });
-  root.querySelectorAll<HTMLImageElement>("img[alt]").forEach((image) => {
-    const corrected = correctBrandCopy(image.alt);
-    if (corrected !== image.alt) image.alt = corrected;
-  });
-}
-
-function BrandMigration() {
-  useEffect(() => {
-    // One full pass on mount, then only walk *added* subtrees.
-    // Never re-scan the entire document on every characterData mutation —
-    // that cost stacks on heavy Command routes (Assurance ~38s in Stage D)
-    // and can starve the next document navigation.
-    const migrateRoot = () => {
-      if (!document.body) return;
-      migrateTextNodes(document.body);
-      migrateElementAttributes(document.body);
-      document.title = "VYNDI · Vāyú Shastr Pvt Ltd";
-    };
-
-    migrateRoot();
-
-    let scheduled: number | null = null;
-    const pendingRoots = new Set<Text | Element>();
-
-    const flush = () => {
-      scheduled = null;
-      for (const root of pendingRoots) {
-        if (root instanceof Text) {
-          const current = root.nodeValue ?? "";
-          const corrected = correctBrandCopy(current);
-          if (corrected !== current) root.nodeValue = corrected;
-          continue;
-        }
-        migrateTextNodes(root);
-        migrateElementAttributes(root);
-      }
-      pendingRoots.clear();
-    };
-
-    const observer = new MutationObserver((records) => {
-      for (const record of records) {
-        if (record.type === "characterData" && record.target.nodeType === Node.TEXT_NODE) {
-          pendingRoots.add(record.target as Text);
-          continue;
-        }
-        for (const added of record.addedNodes) {
-          if (added.nodeType === Node.TEXT_NODE) {
-            pendingRoots.add(added as Text);
-          } else if (added.nodeType === Node.ELEMENT_NODE) {
-            pendingRoots.add(added as Element);
-          }
-        }
-      }
-      if (pendingRoots.size === 0) return;
-      if (scheduled != null) return;
-      scheduled = window.setTimeout(flush, 50);
-    });
-
-    observer.observe(document.body, {
-      subtree: true,
-      childList: true,
-      characterData: true,
-    });
-
-    return () => {
-      observer.disconnect();
-      if (scheduled != null) window.clearTimeout(scheduled);
-    };
-  }, []);
-  return null;
-}
-
 function LegalFooter() {
   return (
     <footer className="vyndi-legal-footer" aria-label="Vāyú Shastr copyright notice">
@@ -147,7 +47,6 @@ function Root() {
       <body className="bg-bg text-fg">
         <PreviewHostBridge />
         <AuthProvider>
-          <BrandMigration />
           <Outlet />
           <LegalFooter />
         </AuthProvider>
