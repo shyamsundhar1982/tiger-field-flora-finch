@@ -53,7 +53,7 @@ async function waitForMutationQuiescence(page, pendingRequests, { timeoutMs = 20
       type: request.resourceType(),
       path: new URL(request.url()).pathname,
     }));
-  throw new Error(`Background mutations did not settle before reload: ${JSON.stringify(pendingMutations)}`);
+  throw new Error(`Background mutations did not settle before document replacement: ${JSON.stringify(pendingMutations)}`);
 }
 
 const browser = await chromium.launch({ headless: true });
@@ -128,11 +128,12 @@ try {
       }
     }
 
-    // Verify the authenticated browser session survives a real document reload.
-    // Command mount intentionally starts governed background writes (runtime UI
-    // assurance and draft-plan sync). Let those mutations settle before forcing
-    // the document reload so the assertion measures session persistence instead
-    // of racing the local single-process workerd acceptance server.
+    // Verify the authenticated browser session survives a second top-level
+    // document request in the SAME page and browser context. The cache-busting
+    // query forces SSR + Better Auth + role authorization to execute again while
+    // avoiding the local Vite/workerd same-URL reload cache path, which can hang
+    // despite all application requests being quiescent. This remains a full
+    // document replacement, not a TanStack client-router transition.
     const persistenceProbe = await context.newPage();
     observePage(persistenceProbe);
     const pendingRequests = new Set();
@@ -143,13 +144,16 @@ try {
       console.log(`[stage-d-browser] ${viewport.name}: session persistence`);
       await persistenceProbe.goto(`${baseURL}/command`, { waitUntil: "domcontentloaded", timeout: 30_000 });
       await waitForSubstantiveBody(persistenceProbe);
-      assert.doesNotMatch(persistenceProbe.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} lost its authenticated session before reload`);
+      assert.doesNotMatch(persistenceProbe.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} lost its authenticated session before document replacement`);
       await waitForMutationQuiescence(persistenceProbe, pendingRequests);
-      await persistenceProbe.reload({ waitUntil: "commit", timeout: 30_000 });
+
+      const persistenceUrl = `${baseURL}/command?stage_d_session_probe=${Date.now()}`;
+      const response = await persistenceProbe.goto(persistenceUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
+      assert.ok(response?.ok(), `${viewport.name} persistence document returned HTTP ${response?.status() ?? "none"}`);
       await waitForSubstantiveBody(persistenceProbe);
-      assert.doesNotMatch(persistenceProbe.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} lost its authenticated session on reload`);
+      assert.doesNotMatch(persistenceProbe.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} lost its authenticated session on second document navigation`);
       const reloadedText = await persistenceProbe.locator("body").innerText();
-      assert.doesNotMatch(reloadedText, /Something went wrong|Cannot read properties of undefined|Internal Server Error/i, `${viewport.name} reload rendered a fatal error`);
+      assert.doesNotMatch(reloadedText, /Something went wrong|Cannot read properties of undefined|Internal Server Error/i, `${viewport.name} second document rendered a fatal error`);
     } catch (error) {
       console.error("[stage-d-browser] persistence failure", {
         viewport: viewport.name,
