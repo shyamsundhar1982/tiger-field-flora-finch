@@ -2,7 +2,6 @@ import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-r
 import { Analytics } from "@vercel/analytics/react";
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
-import { useEffect } from "react";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "VYNDI";
@@ -29,49 +28,6 @@ export const Route = createRootRoute({
   component: Root,
 });
 
-function correctBrandCopy(value: string) {
-  return value
-    .replace(/VéLOXIS/gi, "VYNDI")
-    .replace(/\bVINDY\b/g, "VYNDI")
-    .replace(/\bVindy\b/g, "VYNDI");
-}
-
-function BrandMigration() {
-  useEffect(() => {
-    const migrate = () => {
-      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-      const nodes: Text[] = [];
-      let node: Node | null;
-      while ((node = walker.nextNode())) nodes.push(node as Text);
-      for (const text of nodes) {
-        const current = text.nodeValue ?? "";
-        const corrected = correctBrandCopy(current);
-        if (corrected !== current) text.nodeValue = corrected;
-      }
-
-      document.querySelectorAll<HTMLElement>("[aria-label],[title]").forEach((element) => {
-        for (const attribute of ["aria-label", "title"] as const) {
-          const current = element.getAttribute(attribute);
-          if (!current) continue;
-          const corrected = correctBrandCopy(current);
-          if (corrected !== current) element.setAttribute(attribute, corrected);
-        }
-      });
-      document.querySelectorAll<HTMLImageElement>("img[alt]").forEach((image) => {
-        const corrected = correctBrandCopy(image.alt);
-        if (corrected !== image.alt) image.alt = corrected;
-      });
-
-      document.title = "VYNDI · Vāyú Shastr Pvt Ltd";
-    };
-    migrate();
-    const observer = new MutationObserver(migrate);
-    observer.observe(document.body, { subtree: true, childList: true, characterData: true });
-    return () => observer.disconnect();
-  }, []);
-  return null;
-}
-
 function LegalFooter() {
   return (
     <footer className="vyndi-legal-footer" aria-label="Vāyú Shastr copyright notice">
@@ -91,7 +47,6 @@ function Root() {
       <body className="bg-bg text-fg">
         <PreviewHostBridge />
         <AuthProvider>
-          <BrandMigration />
           <Outlet />
           <LegalFooter />
         </AuthProvider>
