@@ -14,6 +14,10 @@ const operationsSource = fs.readFileSync(
   new URL("../src/routes/command/operations.tsx", import.meta.url),
   "utf8",
 );
+const manufacturingSource = fs.readFileSync(
+  new URL("../src/routes/command/manufacturing.tsx", import.meta.url),
+  "utf8",
+);
 
 test("Master Inventory stock health uses a full-view responsive register", () => {
   assert.ok(inventorySource.includes('data-full-view-table="master-inventory-stock-health"'));
@@ -91,4 +95,22 @@ test("Operations full-view registers preserve canonical lineage and downstream e
   assert.ok(operationsSource.includes("getOperatingLineage"));
   assert.ok(operationsSource.includes("vyndi_dispatch_register"));
   assert.ok(operationsSource.includes("This surface does not write Finance records"));
+});
+
+test("Manufacturing control register uses a full-view responsive layout", () => {
+  assert.ok(manufacturingSource.includes('data-full-view-table="manufacturing-control-register"'));
+  assert.ok(!manufacturingSource.includes("overflow-x-auto"));
+  assert.ok(!manufacturingSource.includes("min-w-[68rem]"));
+  assert.ok(manufacturingSource.includes("lg:grid"));
+  assert.ok(manufacturingSource.includes("lg:hidden"));
+});
+
+test("Manufacturing full-view register preserves every governed control field", () => {
+  for (const label of ["ID", "Control", "Requirement", "Domain", "Status", "Stage", "Evidence", "Owner"]) {
+    assert.ok(manufacturingSource.includes(label), `missing manufacturing field: ${label}`);
+  }
+  assert.ok(manufacturingSource.includes("MANUFACTURING_CONTROLS"));
+  assert.ok(manufacturingSource.includes("MANUFACTURING_STATUS_LABELS"));
+  assert.ok(manufacturingSource.includes("c.requirement"));
+  assert.ok(manufacturingSource.includes("c.note"));
 });
