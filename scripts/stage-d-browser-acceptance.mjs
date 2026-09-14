@@ -27,6 +27,35 @@ async function waitForSubstantiveBody(page) {
   );
 }
 
+async function waitForMutationQuiescence(page, pendingRequests, { timeoutMs = 20_000, quietMs = 1_000 } = {}) {
+  const deadline = Date.now() + timeoutMs;
+  let quietSince = null;
+
+  while (Date.now() < deadline) {
+    const pendingMutations = [...pendingRequests].filter((request) =>
+      ["POST", "PUT", "PATCH", "DELETE"].includes(request.method()),
+    );
+
+    if (pendingMutations.length === 0) {
+      quietSince ??= Date.now();
+      if (Date.now() - quietSince >= quietMs) return;
+    } else {
+      quietSince = null;
+    }
+
+    await page.waitForTimeout(100);
+  }
+
+  const pendingMutations = [...pendingRequests]
+    .filter((request) => ["POST", "PUT", "PATCH", "DELETE"].includes(request.method()))
+    .map((request) => ({
+      method: request.method(),
+      type: request.resourceType(),
+      path: new URL(request.url()).pathname,
+    }));
+  throw new Error(`Background mutations did not settle before reload: ${JSON.stringify(pendingMutations)}`);
+}
+
 const browser = await chromium.launch({ headless: true });
 try {
   for (const viewport of viewports) {
@@ -100,10 +129,10 @@ try {
     }
 
     // Verify the authenticated browser session survives a real document reload.
-    // Wait for the reload RESPONSE to commit, then verify the newly committed
-    // document becomes substantive. TanStack Start can continue streaming work
-    // after commit, so DOMContentLoaded is not a reliable synchronization point
-    // for this persistence assertion in the workerd development runtime.
+    // Command mount intentionally starts governed background writes (runtime UI
+    // assurance and draft-plan sync). Let those mutations settle before forcing
+    // the document reload so the assertion measures session persistence instead
+    // of racing the local single-process workerd acceptance server.
     const persistenceProbe = await context.newPage();
     observePage(persistenceProbe);
     const pendingRequests = new Set();
@@ -115,6 +144,7 @@ try {
       await persistenceProbe.goto(`${baseURL}/command`, { waitUntil: "domcontentloaded", timeout: 30_000 });
       await waitForSubstantiveBody(persistenceProbe);
       assert.doesNotMatch(persistenceProbe.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} lost its authenticated session before reload`);
+      await waitForMutationQuiescence(persistenceProbe, pendingRequests);
       await persistenceProbe.reload({ waitUntil: "commit", timeout: 30_000 });
       await waitForSubstantiveBody(persistenceProbe);
       assert.doesNotMatch(persistenceProbe.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} lost its authenticated session on reload`);
