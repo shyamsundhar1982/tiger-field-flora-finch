@@ -9,8 +9,44 @@ const text = (row: Row, ...keys: string[]) => {
   return "";
 };
 
+function baselineView(row: Row): Row {
+  return {
+    id: text(row, "id"),
+    family_code: text(row, "family_code"),
+    family_name: text(row, "family_name", "familyName"),
+    variant_id: text(row, "variant_id"),
+    variant_name: text(row, "variant_name", "variantName"),
+    revision_code: text(row, "revision_code", "revisionCode"),
+    geometry_ref: text(row, "geometry_ref", "geometryRef"),
+    material_spec: text(row, "material_spec", "materialSpec"),
+    tooling_ref: text(row, "tooling_ref", "toolingRef"),
+    drawing_ref: text(row, "drawing_ref", "drawingRef"),
+    bom_revision: text(row, "bom_revision", "bomRevision"),
+    status: text(row, "status"),
+  };
+}
+
+function changeView(row: Row): Row {
+  return {
+    id: text(row, "id"),
+    family_code: text(row, "family_code"),
+    family_name: text(row, "family_name", "familyName"),
+    variant_id: text(row, "variant_id"),
+    variant_name: text(row, "variant_name", "variantName"),
+    target_revision_code: text(row, "target_revision_code", "targetRevisionCode"),
+    reason: text(row, "reason"),
+    status: text(row, "status"),
+  };
+}
+
 export const Route = createFileRoute("/command/engineering")({
-  loader: () => listEngineeringAuthority(),
+  loader: async () => {
+    const data = await listEngineeringAuthority();
+    return {
+      baselines: (Array.isArray(data.baselines) ? data.baselines : []).map((row) => baselineView(row as Row)),
+      changes: (Array.isArray(data.changes) ? data.changes : []).map((row) => changeView(row as Row)),
+    };
+  },
   component: Engineering,
 });
 
