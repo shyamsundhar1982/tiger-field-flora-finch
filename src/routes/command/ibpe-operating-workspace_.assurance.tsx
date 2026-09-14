@@ -3,10 +3,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Kpi, Panel } from "@/components/kpi";
 import {
   captureVibpeAssuranceSnapshot,
-  getVibpeAssuranceCoverage,
+  getVibpeAssurancePageData,
   listVibpeAssuranceExceptions,
+  type VibpeAssuranceException,
 } from "@/lib/vibpe-assurance";
-import { getVibpeUiAssurance } from "@/lib/vibpe-ui-assurance";
+import { getVibpeUiCapabilityRegistry } from "@/lib/vibpe-ui-assurance";
 
 type Row = Record<string, unknown>;
 
@@ -33,37 +34,40 @@ const toneFor = (value: string) => {
 };
 
 export const Route = createFileRoute("/command/ibpe-operating-workspace/assurance")({
-  loader: async () => {
-    const [backend, exceptions, ui] = await Promise.all([
-      getVibpeAssuranceCoverage(),
-      listVibpeAssuranceExceptions(),
-      getVibpeUiAssurance(),
-    ]);
-    return { backend, exceptions, ui };
-  },
+  loader: () => getVibpeAssurancePageData(),
   component: VibpeAssurancePage,
 });
 
 function VibpeAssurancePage() {
   const data = Route.useLoaderData();
   const [snapshotState, setSnapshotState] = useState("No assurance snapshot captured in this session.");
+  const [fullExceptions, setFullExceptions] = useState<VibpeAssuranceException[] | null>(null);
+  const [exceptionLoadState, setExceptionLoadState] = useState("");
+  const [uiCapabilities, setUiCapabilities] = useState<Row[] | null>(null);
+  const [uiCapabilityState, setUiCapabilityState] = useState("");
 
-  const surfaces = (data.backend.surfaces ?? []) as Row[];
-  const gates = (data.backend.gates ?? []) as Row[];
-  const workflows = (data.backend.workflow ?? []) as Row[];
-  const uiCoverage = (data.ui.coverage ?? []) as Row[];
-  const uiCapabilities = (data.ui.capabilities ?? []) as Row[];
+  const surfaces = (data.surfaces ?? []) as Row[];
+  const gates = (data.gates ?? []) as Row[];
+  const workflows = (data.workflow ?? []) as Row[];
+  const uiCoverage = (data.uiCoverage ?? []) as Row[];
+  const exceptions = fullExceptions ?? data.exceptions;
 
   const summary = useMemo(() => {
     const full = surfaces.filter((row) => str(row, "coverage_status", "coverageStatus") === "full").length;
     const partial = surfaces.filter((row) => str(row, "coverage_status", "coverageStatus") === "partial").length;
     const gap = surfaces.filter((row) => str(row, "coverage_status", "coverageStatus") === "gap").length;
-    const critical = data.exceptions.filter((item) => item.severity === "critical").length;
-    const warnings = data.exceptions.filter((item) => item.severity === "warning").length;
     const uiFailing = uiCoverage.reduce((sum, row) => sum + num(row, "failing_capabilities", "failingCapabilities"), 0);
     const uiUnobserved = uiCoverage.reduce((sum, row) => sum + num(row, "unobserved_capabilities", "unobservedCapabilities"), 0);
-    return { full, partial, gap, critical, warnings, uiFailing, uiUnobserved };
-  }, [data.exceptions, surfaces, uiCoverage]);
+    return {
+      full,
+      partial,
+      gap,
+      critical: data.exceptionSummary.critical,
+      warnings: data.exceptionSummary.warnings,
+      uiFailing,
+      uiUnobserved,
+    };
+  }, [data.exceptionSummary.critical, data.exceptionSummary.warnings, surfaces, uiCoverage]);
 
   async function captureSnapshot() {
     setSnapshotState("Capturing immutable assurance evidence…");
@@ -74,6 +78,30 @@ function VibpeAssurancePage() {
       );
     } catch (error) {
       setSnapshotState(error instanceof Error ? error.message : "Assurance snapshot capture failed.");
+    }
+  }
+
+  async function loadAllExceptions() {
+    if (fullExceptions !== null) return;
+    setExceptionLoadState("Loading complete exception register…");
+    try {
+      const rows = await listVibpeAssuranceExceptions();
+      setFullExceptions(rows);
+      setExceptionLoadState(`Loaded ${rows.length.toLocaleString("en-IN")} exception row(s).`);
+    } catch (error) {
+      setExceptionLoadState(error instanceof Error ? error.message : "Exception register load failed.");
+    }
+  }
+
+  async function loadUiCapabilities() {
+    if (uiCapabilities !== null) return;
+    setUiCapabilityState("Loading registered UI capabilities…");
+    try {
+      const rows = (await getVibpeUiCapabilityRegistry()) as Row[];
+      setUiCapabilities(rows);
+      setUiCapabilityState(`Loaded ${rows.length.toLocaleString("en-IN")} registered UI capabilities.`);
+    } catch (error) {
+      setUiCapabilityState(error instanceof Error ? error.message : "UI capability register load failed.");
     }
   }
 
@@ -121,8 +149,23 @@ function VibpeAssurancePage() {
         </div>
       </Panel>
 
-      <Panel title="Live Exceptions" kicker="Unified VIBPE assurance stream">
-        {data.exceptions.length === 0 ? (
+      <Panel title="Live Exceptions" kicker="Summary-first · full register on demand">
+        {data.exceptionSummary.total > data.exceptions.length && fullExceptions === null ? (
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface/20 p-3 text-xs text-muted">
+            <span>
+              Showing the highest-priority {data.exceptions.length.toLocaleString("en-IN")} of {data.exceptionSummary.total.toLocaleString("en-IN")} live exceptions for faster first render.
+            </span>
+            <button
+              type="button"
+              onClick={loadAllExceptions}
+              className="rounded-md border border-border px-3 py-1.5 text-xs text-fg hover:border-accent"
+            >
+              Load complete register
+            </button>
+          </div>
+        ) : null}
+        {exceptionLoadState ? <p className="mb-3 text-xs text-subtle">{exceptionLoadState}</p> : null}
+        {exceptions.length === 0 ? (
           <p className="rounded-md border border-ok/30 bg-ok/5 p-3 text-sm text-ok">No live assurance exceptions are currently projected.</p>
         ) : (
           <div className="overflow-x-auto">
@@ -138,7 +181,7 @@ function VibpeAssurancePage() {
                 </tr>
               </thead>
               <tbody>
-                {data.exceptions.map((item) => (
+                {exceptions.map((item) => (
                   <tr key={item.exceptionKey} className="border-b border-border/60 align-top">
                     <td className={`px-2 py-2 font-semibold ${toneFor(item.severity)}`}>{item.severity.toUpperCase()}</td>
                     <td className="px-2 py-2 text-muted">{item.domain}</td>
@@ -210,10 +253,25 @@ function VibpeAssurancePage() {
             );
           })}
         </div>
-        <details className="mt-4 rounded-lg border border-border">
-          <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-fg">Registered UI capabilities ({uiCapabilities.length})</summary>
-          <div className="border-t border-border p-3">
-            <div className="grid gap-2 lg:grid-cols-2">
+        <div className="mt-4 rounded-lg border border-border p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-fg">Registered UI capabilities ({data.uiCapabilityCount.toLocaleString("en-IN")})</p>
+              <p className="mt-1 text-xs text-subtle">Detailed capability rows are excluded from the critical first-render payload.</p>
+            </div>
+            {uiCapabilities === null ? (
+              <button
+                type="button"
+                onClick={loadUiCapabilities}
+                className="rounded-md border border-border px-3 py-1.5 text-xs text-fg hover:border-accent"
+              >
+                Load capability register
+              </button>
+            ) : null}
+          </div>
+          {uiCapabilityState ? <p className="mt-3 text-xs text-subtle">{uiCapabilityState}</p> : null}
+          {uiCapabilities !== null ? (
+            <div className="mt-4 grid gap-2 border-t border-border pt-4 lg:grid-cols-2">
               {uiCapabilities.map((row, index) => (
                 <div key={`${str(row, "capability_id", "capabilityId")}-${index}`} className="min-w-0 rounded-md border border-border/70 p-3 text-xs">
                   <p className="break-words [overflow-wrap:anywhere] font-semibold text-fg">{str(row, "capability_name", "capabilityName")}</p>
@@ -222,8 +280,8 @@ function VibpeAssurancePage() {
                 </div>
               ))}
             </div>
-          </div>
-        </details>
+          ) : null}
+        </div>
       </Panel>
 
       <Panel title="Governed Gate & Workflow Coverage" kicker="Evidence model, not an alternate transaction engine">
