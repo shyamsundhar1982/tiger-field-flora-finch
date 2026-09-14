@@ -1,11 +1,15 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { Analytics } from "@vercel/analytics/react";
 import { AuthProvider } from "@/lib/auth/provider";
-import { PreviewHostBridge } from "@/components/preview-host-bridge";
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "VYNDI";
+
+const LazyPreviewHostBridge = lazy(async () => {
+  const module = await import("@/components/preview-host-bridge");
+  return { default: module.PreviewHostBridge };
+});
 
 export const Route = createRootRoute({
   head: () => ({
@@ -64,23 +68,11 @@ function migrateElementAttributes(root: ParentNode) {
 
 function BrandMigration() {
   useEffect(() => {
-    // One full pass on mount, then only walk *added* subtrees.
-    // Never re-scan the entire document on every characterData mutation —
-    // that cost stacks on heavy Command routes (Assurance ~38s in Stage D)
-    // and can starve the next document navigation.
-    const migrateRoot = () => {
-      if (!document.body) return;
-      migrateTextNodes(document.body);
-      migrateElementAttributes(document.body);
-      document.title = "VYNDI · Vāyú Shastr Pvt Ltd";
-    };
-
-    migrateRoot();
-
+    let disposed = false;
+    let observer: MutationObserver | null = null;
     let scheduled: number | null = null;
-    const pendingRoots = new Set<Text | Element>();
 
-    const flush = () => {
+    const flushRoots = (pendingRoots: Set<Text | Element>) => {
       scheduled = null;
       for (const root of pendingRoots) {
         if (root instanceof Text) {
@@ -95,37 +87,67 @@ function BrandMigration() {
       pendingRoots.clear();
     };
 
-    const observer = new MutationObserver((records) => {
-      for (const record of records) {
-        if (record.type === "characterData" && record.target.nodeType === Node.TEXT_NODE) {
-          pendingRoots.add(record.target as Text);
-          continue;
-        }
-        for (const added of record.addedNodes) {
-          if (added.nodeType === Node.TEXT_NODE) {
-            pendingRoots.add(added as Text);
-          } else if (added.nodeType === Node.ELEMENT_NODE) {
-            pendingRoots.add(added as Element);
+    const startMigration = () => {
+      if (disposed || !document.body) return;
+
+      // Compatibility cleanup is intentionally kept off the critical render path.
+      // Once installed, only added/changed subtrees are inspected.
+      migrateTextNodes(document.body);
+      migrateElementAttributes(document.body);
+      document.title = "VYNDI · Vāyú Shastr Pvt Ltd";
+
+      const pendingRoots = new Set<Text | Element>();
+      observer = new MutationObserver((records) => {
+        for (const record of records) {
+          if (record.type === "characterData" && record.target.nodeType === Node.TEXT_NODE) {
+            pendingRoots.add(record.target as Text);
+            continue;
+          }
+          for (const added of record.addedNodes) {
+            if (added.nodeType === Node.TEXT_NODE) {
+              pendingRoots.add(added as Text);
+            } else if (added.nodeType === Node.ELEMENT_NODE) {
+              pendingRoots.add(added as Element);
+            }
           }
         }
-      }
-      if (pendingRoots.size === 0) return;
-      if (scheduled != null) return;
-      scheduled = window.setTimeout(flush, 50);
-    });
+        if (pendingRoots.size === 0 || scheduled != null) return;
+        scheduled = window.setTimeout(() => flushRoots(pendingRoots), 50);
+      });
 
-    observer.observe(document.body, {
-      subtree: true,
-      childList: true,
-      characterData: true,
-    });
+      observer.observe(document.body, {
+        subtree: true,
+        childList: true,
+        characterData: true,
+      });
+    };
+
+    // Do not make compatibility branding compete with hydration or route data.
+    const startTimer = window.setTimeout(startMigration, 750);
 
     return () => {
-      observer.disconnect();
+      disposed = true;
+      window.clearTimeout(startTimer);
+      observer?.disconnect();
       if (scheduled != null) window.clearTimeout(scheduled);
     };
   }, []);
   return null;
+}
+
+function PreviewBridgeBoundary() {
+  const [embedded, setEmbedded] = useState(false);
+
+  useEffect(() => {
+    setEmbedded(window.parent !== window);
+  }, []);
+
+  if (!embedded) return null;
+  return (
+    <Suspense fallback={null}>
+      <LazyPreviewHostBridge />
+    </Suspense>
+  );
 }
 
 function LegalFooter() {
@@ -145,7 +167,7 @@ function Root() {
     <html lang="en" className="antialiased" suppressHydrationWarning>
       <head><HeadContent /></head>
       <body className="bg-bg text-fg">
-        <PreviewHostBridge />
+        <PreviewBridgeBoundary />
         <AuthProvider>
           <BrandMigration />
           <Outlet />
