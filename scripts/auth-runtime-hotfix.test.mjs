@@ -16,6 +16,7 @@ const ibpeBrand = read("src/lib/ibpe-brand.ts");
 const ibpeProjection = read("src/components/ibpe-workspace-projection.tsx");
 const authServer = read("src/lib/auth/server.ts");
 const authRuntimeConfig = read("src/lib/auth/runtime-config.ts");
+const signOutPlan = read("scripts/sign-out-plan.mjs");
 
 test("canonical login preserves the requested protected workspace", () => {
   assert.match(login, /returnTo\?: string/);
@@ -85,6 +86,16 @@ test("command logout uses canonical individual session only", () => {
   assert.doesNotMatch(shell, /lockCommand/);
   assert.match(shell, /await signOut\("\/login"\)/);
   assert.doesNotMatch(shell, /navigate\(\{ to: "\/command-login" \}\)/);
+});
+
+test("preview and loopback logout always attempt server-side session revocation", () => {
+  const previewBranch = signOutPlan.slice(
+    signOutPlan.indexOf("if (livePreview)"),
+    signOutPlan.indexOf("const outcome =", signOutPlan.indexOf("if (livePreview)")),
+  );
+  assert.match(previewBranch, /await settleWithin\(requestSignOut/);
+  assert.doesNotMatch(previewBranch, /if \(hasBearer\)/);
+  assert.match(signOutPlan, /runPreSignInSignOut[\s\S]*await settleWithin\(requestSignOut/);
 });
 
 test("Commercial engine cannot crash when a serialized order payload is not iterable", () => {

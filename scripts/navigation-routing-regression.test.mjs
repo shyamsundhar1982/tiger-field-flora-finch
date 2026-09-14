@@ -183,7 +183,9 @@ test("G3: Supply & Operations follows the execution sequence and does not front-
   assert.match(operations, /Today's operating exceptions/);
   assert.match(operations, /Order-to-cash lineage/);
   assert.match(operations, /Operating controls/);
-  assert.match(operations, /table-auto/);
+  assert.match(operations, /data-full-view-table="operations-dispatch-register"/);
+  assert.match(operations, /data-full-view-table="operations-order-to-cash-lineage"/);
+  assert.doesNotMatch(operations, /overflow-x-auto/);
   assert.doesNotMatch(operations, /min-w-\[(?:9|1[0-9])\d{2}px\]/);
 });
 

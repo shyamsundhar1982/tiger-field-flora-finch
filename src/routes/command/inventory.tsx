@@ -582,78 +582,152 @@ function MasterInventory() {
             </select>
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] text-sm">
-            <thead className="text-[10px] uppercase tracking-[0.14em] text-subtle">
-              <tr>
-                <th className="px-5 py-3 text-left">Item</th>
-                <th className="px-3 py-3 text-left">Ledger</th>
-                <th className="px-3 py-3 text-right">Available</th>
-                <th className="px-3 py-3 text-right">MSL</th>
-                <th className="px-3 py-3 text-left">Health</th>
-                <th className="px-3 py-3 text-right">Plan / mo</th>
-                <th className="px-3 py-3 text-left">36-mo forecast</th>
-                <th className="px-5 py-3 text-right">Audit</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredItems.map((item) => (
-                <tr key={item.id} className="border-t border-border/70 hover:bg-surface/50">
-                  <td className="px-5 py-3">
-                    <p className="font-semibold text-fg">{item.name}</p>
-                    <p className="mt-0.5 font-mono text-[10px] text-subtle">
+
+        <div
+          className="p-3 sm:p-4"
+          data-full-view-table="master-inventory-stock-health"
+          aria-label="Full-view stock health register"
+        >
+          <div className="hidden grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,.8fr)_minmax(0,.65fr)_minmax(0,1fr)_minmax(0,.75fr)_minmax(0,1.05fr)_minmax(0,.55fr)] gap-2 rounded-lg border border-border bg-surface/55 px-3 py-2 text-[9px] font-bold uppercase tracking-[0.12em] text-subtle lg:grid">
+            <span>Item</span>
+            <span>Ledger</span>
+            <span className="text-right">Available</span>
+            <span className="text-right">MSL</span>
+            <span>Health</span>
+            <span className="text-right">Plan / mo</span>
+            <span>36-mo forecast</span>
+            <span className="text-right">Audit</span>
+          </div>
+
+          <div className="mt-2 space-y-2">
+            {filteredItems.map((item) => (
+              <article
+                key={item.id}
+                className="rounded-lg border border-border/80 bg-bg/45 p-3 transition-colors hover:bg-surface/45"
+              >
+                <div className="hidden grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,.8fr)_minmax(0,.65fr)_minmax(0,1fr)_minmax(0,.75fr)_minmax(0,1.05fr)_minmax(0,.55fr)] items-center gap-2 lg:grid">
+                  <div className="min-w-0">
+                    <p className="break-words text-xs font-semibold leading-5 text-fg">{item.name}</p>
+                    <p className="mt-0.5 break-all font-mono text-[9px] leading-4 text-subtle">
                       {item.sku} · {item.category}
                     </p>
-                  </td>
-                  <td className="px-3 py-3 text-xs text-muted">{ledgerLabel(item.ledger_id)}</td>
-                  <td className="px-3 py-3 text-right font-semibold tabular-nums">
+                  </div>
+                  <p className="min-w-0 break-words text-[11px] leading-4 text-muted">
+                    {ledgerLabel(item.ledger_id)}
+                  </p>
+                  <p className="text-right text-xs font-semibold tabular-nums">
                     {item.availableQuantity.toLocaleString("en-IN")}{" "}
-                    <span className="text-[10px] font-normal text-subtle">{item.unit}</span>
-                  </td>
-                  <td className="px-3 py-3 text-right tabular-nums">
+                    <span className="text-[9px] font-normal text-subtle">{item.unit}</span>
+                  </p>
+                  <p className="text-right text-xs tabular-nums">
                     {item.minimumStockLevel.toLocaleString("en-IN")}
-                  </td>
-                  <td className="px-3 py-3">
+                  </p>
+                  <div className="min-w-0">
                     <span
                       className={cn(
-                        "inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold",
+                        "inline-flex max-w-full rounded-full border px-2 py-1 text-[9px] font-semibold leading-4",
                         healthClass(item.health),
                       )}
                     >
                       {item.health}
                     </span>
-                  </td>
-                  <td className="px-3 py-3 text-right tabular-nums">
+                  </div>
+                  <p className="text-right text-xs tabular-nums">
                     {item.plannedMonthlyUse ? item.plannedMonthlyUse.toLocaleString("en-IN") : "—"}
-                  </td>
-                  <td
+                  </p>
+                  <p
                     className={cn(
-                      "px-3 py-3 text-xs font-semibold",
+                      "min-w-0 break-words text-[11px] font-semibold leading-4",
                       forecastClass(item.forecast.status),
                     )}
                   >
                     {forecastLabel(item)}
-                  </td>
-                  <td className="px-5 py-3 text-right">
+                  </p>
+                  <div className="text-right">
                     <Link
                       to="/command/inventory-ledgers/$ledger"
                       params={{ ledger: item.ledger_id }}
                       search={{ sku: item.sku } as never}
-                      className="text-xs font-semibold text-accent"
+                      className="text-[11px] font-semibold text-accent"
                     >
                       Open →
                     </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {filteredItems.length === 0 ? (
-            <div className="p-10 text-center">
-              <TriangleAlert className="mx-auto size-5 text-subtle" />
-              <p className="mt-2 text-sm text-muted">No inventory items match these filters.</p>
-            </div>
-          ) : null}
+                  </div>
+                </div>
+
+                <div className="space-y-3 lg:hidden">
+                  <div className="flex min-w-0 items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="break-words text-sm font-semibold leading-5 text-fg">{item.name}</p>
+                      <p className="mt-1 break-all font-mono text-[10px] leading-4 text-subtle">
+                        {item.sku} · {item.category}
+                      </p>
+                    </div>
+                    <span
+                      className={cn(
+                        "shrink-0 rounded-full border px-2 py-1 text-[9px] font-semibold",
+                        healthClass(item.health),
+                      )}
+                    >
+                      {item.health}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs sm:grid-cols-4">
+                    <div className="min-w-0">
+                      <p className="text-[9px] font-semibold uppercase tracking-wider text-subtle">Ledger</p>
+                      <p className="mt-1 break-words text-muted">{ledgerLabel(item.ledger_id)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-semibold uppercase tracking-wider text-subtle">Available</p>
+                      <p className="mt-1 font-semibold tabular-nums">
+                        {item.availableQuantity.toLocaleString("en-IN")} {item.unit}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-semibold uppercase tracking-wider text-subtle">MSL</p>
+                      <p className="mt-1 tabular-nums">{item.minimumStockLevel.toLocaleString("en-IN")}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-semibold uppercase tracking-wider text-subtle">Plan / mo</p>
+                      <p className="mt-1 tabular-nums">
+                        {item.plannedMonthlyUse ? item.plannedMonthlyUse.toLocaleString("en-IN") : "—"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-end justify-between gap-4 border-t border-border/70 pt-3">
+                    <div className="min-w-0">
+                      <p className="text-[9px] font-semibold uppercase tracking-wider text-subtle">36-mo forecast</p>
+                      <p
+                        className={cn(
+                          "mt-1 break-words text-xs font-semibold",
+                          forecastClass(item.forecast.status),
+                        )}
+                      >
+                        {forecastLabel(item)}
+                      </p>
+                    </div>
+                    <Link
+                      to="/command/inventory-ledgers/$ledger"
+                      params={{ ledger: item.ledger_id }}
+                      search={{ sku: item.sku } as never}
+                      className="shrink-0 text-xs font-semibold text-accent"
+                    >
+                      Open audit →
+                    </Link>
+                  </div>
+                </div>
+              </article>
+            ))}
+
+            {filteredItems.length === 0 ? (
+              <div className="p-10 text-center">
+                <TriangleAlert className="mx-auto size-5 text-subtle" />
+                <p className="mt-2 text-sm text-muted">No inventory items match these filters.</p>
+              </div>
+            ) : null}
+          </div>
         </div>
       </section>
 
