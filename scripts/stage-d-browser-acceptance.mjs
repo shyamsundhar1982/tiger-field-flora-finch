@@ -17,7 +17,16 @@ const routes = [
   "/command/actuals",
   "/command/ibpe-operating-workspace/assurance",
 ];
-const heavyRoutes = new Set(["/command/ibpe-operating-workspace/assurance"]);
+const ROUTE_GOTO_TIMEOUT_MS = {
+  "/command": 30_000,
+  "/command/actuals": 30_000,
+  "/command/ibpe-operating-workspace/assurance": 90_000,
+};
+const ROUTE_BODY_TIMEOUT_MS = {
+  "/command": 20_000,
+  "/command/actuals": 20_000,
+  "/command/ibpe-operating-workspace/assurance": 60_000,
+};
 
 async function waitForSubstantiveBody(page, timeout = 20_000) {
   await page.locator("body").waitFor({ state: "visible", timeout });
@@ -102,20 +111,25 @@ try {
     );
 
     // Probe each protected route from a fresh page in the same authenticated
-    // context. Assurance intentionally has a larger navigation budget because it
-    // aggregates governed evidence across multiple backend authorities. All
-    // other routes retain the normal 30-second acceptance budget.
+    // context. Assurance intentionally has a larger navigation/body budget because
+    // it aggregates governed evidence across multiple backend authorities. The
+    // exception is explicit and timed so a green gate cannot conceal a slow route.
     for (const route of routes) {
       console.log(`[stage-d-browser] ${viewport.name}: protected route ${route}`);
       const routePage = await context.newPage();
       observePage(routePage);
-      const heavy = heavyRoutes.has(route);
+      const gotoTimeout = ROUTE_GOTO_TIMEOUT_MS[route] ?? 30_000;
+      const bodyTimeout = ROUTE_BODY_TIMEOUT_MS[route] ?? 20_000;
+      const navigationStartedAt = Date.now();
       try {
         await routePage.goto(`${baseURL}${route}`, {
           waitUntil: "domcontentloaded",
-          timeout: heavy ? 90_000 : 30_000,
+          timeout: gotoTimeout,
         });
-        await waitForSubstantiveBody(routePage, heavy ? 60_000 : 20_000);
+        console.log(
+          `[stage-d-browser] ${viewport.name}: ${route} DOMContentLoaded in ${Date.now() - navigationStartedAt}ms`,
+        );
+        await waitForSubstantiveBody(routePage, bodyTimeout);
         assert.doesNotMatch(routePage.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} ${route} lost authenticated access`);
         const text = await routePage.locator("body").innerText();
         assert.doesNotMatch(text, /Something went wrong|Cannot read properties of undefined|Internal Server Error/i, `${viewport.name} ${route} rendered a fatal error`);
@@ -129,6 +143,11 @@ try {
         }));
         const overflow = Math.max(geometry.scrollWidth, geometry.bodyScrollWidth) - geometry.innerWidth;
         assert.ok(overflow <= 4, `${viewport.name} ${route} has ${overflow}px page-level horizontal overflow`);
+      } catch (error) {
+        console.error(
+          `[stage-d-browser] ${viewport.name}: ${route} failed after ${Date.now() - navigationStartedAt}ms`,
+        );
+        throw error;
       } finally {
         await routePage.close();
       }
