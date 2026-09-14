@@ -103,6 +103,17 @@ jobs:
       - name: Verify production bundle builds
         run: npm run build
 
+      - name: Configure isolated browser runtime
+        run: |
+          node -e 'const fs=require("node:fs"); const path="wrangler.jsonc"; const config=JSON.parse(fs.readFileSync(path,"utf8")); delete config.hyperdrive; fs.writeFileSync(path, JSON.stringify(config,null,2)+"\n");'
+          printf '%s\n' \
+            "VITE_AUTH_ENABLED=${VITE_AUTH_ENABLED}" \
+            "BETTER_AUTH_URL=${BETTER_AUTH_URL}" \
+            "BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}" \
+            "DATABASE_URL=${DATABASE_URL}" \
+            "VYNDI_ALLOW_DB_MIGRATIONS=${VYNDI_ALLOW_DB_MIGRATIONS}" \
+            > .dev.vars
+
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
