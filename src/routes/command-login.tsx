@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { LockKeyhole } from "lucide-react";
 import { type FormEvent, useState } from "react";
-import { authClient } from "@/lib/auth/client";
+import { authClient, authEnabled } from "@/lib/auth/client";
 import { lockCommand, unlockCommand } from "@/lib/command-access";
 
 export const Route = createFileRoute("/command-login")({ component: CommandLogin });
@@ -10,7 +10,10 @@ const BEARER_KEY = "grok-auth.bearer-token";
 
 async function clearBetterAuthSession() {
   try {
-    await authClient.signOut();
+    // In legacy-only/auth-disabled mode there is no canonical Better Auth
+    // session to revoke. Avoid a remote sign-out request that can stall the
+    // compatibility login path; clearing the local bearer below is sufficient.
+    if (authEnabled) await authClient.signOut();
   } catch {
     // The local bearer is cleared below even if the remote sign-out cannot settle.
   } finally {
