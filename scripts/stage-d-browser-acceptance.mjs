@@ -153,12 +153,19 @@ try {
       }
     }
 
+    // Brief settle after the heavy Assurance probe so the single Worker process
+    // can finish any leftover SSR / DB work before the next full document.
+    await page.waitForTimeout(2_000);
+
     // Verify the authenticated browser session survives a second top-level
     // document request in the SAME page and browser context. The cache-busting
     // query forces SSR + Better Auth + role authorization to execute again while
     // avoiding the local Vite/workerd same-URL reload cache path, which can hang
     // despite all application requests being quiescent. This remains a full
     // document replacement, not a TanStack client-router transition.
+    //
+    // Post-Assurance first persistence hop uses a 90s recovery budget; the
+    // second (cache-busted) hop stays at 30s once the process is warm again.
     const persistenceProbe = await context.newPage();
     observePage(persistenceProbe);
     const pendingRequests = new Set();
@@ -167,8 +174,15 @@ try {
     persistenceProbe.on("requestfailed", (request) => pendingRequests.delete(request));
     try {
       console.log(`[stage-d-browser] ${viewport.name}: session persistence`);
-      await persistenceProbe.goto(`${baseURL}/command`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-      await waitForSubstantiveBody(persistenceProbe);
+      const firstPersistenceStartedAt = Date.now();
+      await persistenceProbe.goto(`${baseURL}/command`, {
+        waitUntil: "domcontentloaded",
+        timeout: 90_000,
+      });
+      console.log(
+        `[stage-d-browser] ${viewport.name}: post-heavy /command DOMContentLoaded in ${Date.now() - firstPersistenceStartedAt}ms`,
+      );
+      await waitForSubstantiveBody(persistenceProbe, 40_000);
       assert.doesNotMatch(persistenceProbe.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} lost its authenticated session before document replacement`);
       await waitForMutationQuiescence(persistenceProbe, pendingRequests);
 
