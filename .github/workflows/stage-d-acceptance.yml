@@ -59,7 +59,6 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      COMMAND_PASSWORD: stage-d-ci-disposable-password
       VITE_AUTH_ENABLED: "true"
       BETTER_AUTH_URL: http://localhost:8080
       BETTER_AUTH_SECRET: stage-d-ci-better-auth-secret-2026-not-production
@@ -101,14 +100,17 @@ jobs:
       - name: Migrate isolated browser database
         run: npm run db:migrate
 
+      - name: Build production-like acceptance bundle
+        run: node scripts/with-app-env.mjs vite build
+
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Start isolated VYNDI acceptance server
+      - name: Start isolated production-like VYNDI server
         run: |
-          npm run dev > /tmp/vyndi-stage-d.log 2>&1 &
+          npm run preview -- --host 0.0.0.0 --port 8080 > /tmp/vyndi-stage-d.log 2>&1 &
           echo $! > /tmp/vyndi-stage-d.pid
-          for attempt in $(seq 1 60); do
+          for attempt in $(seq 1 90); do
             if curl -fsS http://localhost:8080/ >/dev/null; then
               exit 0
             fi
