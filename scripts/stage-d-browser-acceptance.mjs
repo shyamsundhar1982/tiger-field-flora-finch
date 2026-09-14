@@ -189,15 +189,9 @@ try {
     await page.waitForTimeout(2_000);
 
     // Verify the authenticated browser session survives a second top-level
-    // document request in the SAME page and browser context. The cache-busting
-    // query forces SSR + Better Auth + role authorization to execute again while
-    // avoiding the local Vite/workerd same-URL reload cache path, which can hang
-    // despite all application requests being quiescent. This remains a full
-    // document replacement, not a TanStack client-router transition.
-    //
-    // Post-Assurance first persistence hop uses a 90s recovery budget; the
-    // second (cache-busted) hop is judged by document outcome, not only the
-    // Playwright Response handle (which can be null under Vite /@react-refresh).
+    // document request in the SAME browser context. Cache-bust forces SSR +
+    // Better Auth + role authorization again. First hop recovers after Assurance;
+    // second hop uses a fresh page so it does not inherit a stuck navigation.
     const persistenceProbe = await context.newPage();
     observePage(persistenceProbe);
     const pendingRequests = new Set();
@@ -218,59 +212,44 @@ try {
       assert.doesNotMatch(persistenceProbe.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} lost its authenticated session before document replacement`);
       await waitForMutationQuiescence(persistenceProbe, pendingRequests);
 
-      // Second hop is a cache-busted full document reload. After the heavy Assurance
-      // route, Vite/workerd can still be serving /@react-refresh and the goto
-      // response object may be null even when the document lands correctly. Prefer
-      // document outcome (URL + body) over the Playwright Response handle, and retry
-      // once if the navigation handle is missing or non-OK.
+      // Second hop: cache-busted full document reload on a FRESH page in the same
+      // authenticated context. Reusing the post-Assurance page leaves an in-flight
+      // document navigation (/command) that never settles under Vite/workerd, so
+      // waitForSubstantiveBody hangs waiting for navigation to finish.
       const persistenceUrl = `${baseURL}/command?stage_d_session_probe=${Date.now()}`;
-      await page.waitForTimeout(1_000);
-      let secondResponse = null;
-      let secondError = null;
-      for (let attempt = 1; attempt <= 2; attempt++) {
-        try {
-          secondResponse = await persistenceProbe.goto(persistenceUrl, {
-            waitUntil: "domcontentloaded",
-            timeout: 45_000,
-          });
-          if (secondResponse?.ok()) break;
-          // Null or non-OK response: still accept if the document is the authenticated Command shell.
-          await waitForSubstantiveBody(persistenceProbe, 20_000);
-          if (!/\/login(?:\?|$)|\/command-login/.test(persistenceProbe.url())) break;
-          secondError = new Error(
-            `${viewport.name} persistence hop ${attempt} returned HTTP ${secondResponse?.status() ?? "none"} at ${persistenceProbe.url()}`,
-          );
-        } catch (error) {
-          secondError = error;
-          if (attempt === 2) throw error;
-          console.error(`[stage-d-browser] ${viewport.name}: persistence hop retry after`, String(error?.message || error));
-          await page.waitForTimeout(2_000);
-        }
-      }
-      if (secondResponse && !secondResponse.ok()) {
-        // Document may still be valid; only hard-fail if we are not on Command with body.
-        const landed = !/\/login(?:\?|$)|\/command-login/.test(persistenceProbe.url());
-        if (!landed) {
-          throw secondError ?? new Error(`${viewport.name} persistence document returned HTTP ${secondResponse.status()}`);
-        }
-        console.error(
-          `[stage-d-browser] ${viewport.name}: persistence hop HTTP ${secondResponse.status()} but document landed on ${persistenceProbe.url()}`,
+      const secondProbe = await context.newPage();
+      observePage(secondProbe);
+      try {
+        const secondStartedAt = Date.now();
+        const secondResponse = await secondProbe.goto(persistenceUrl, {
+          waitUntil: "domcontentloaded",
+          timeout: 60_000,
+        });
+        console.log(
+          `[stage-d-browser] ${viewport.name}: cache-busted /command DOMContentLoaded in ${Date.now() - secondStartedAt}ms (HTTP ${secondResponse?.status() ?? "none"})`,
         );
-      } else if (!secondResponse) {
-        await waitForSubstantiveBody(persistenceProbe, 20_000);
+        await waitForSubstantiveBody(secondProbe, 30_000);
         assert.doesNotMatch(
-          persistenceProbe.url(),
+          secondProbe.url(),
           /\/login(?:\?|$)|\/command-login/,
-          `${viewport.name} persistence document returned HTTP none and did not land on Command (url=${persistenceProbe.url()})`,
+          `${viewport.name} lost its authenticated session on second document navigation`,
         );
-        console.error(
-          `[stage-d-browser] ${viewport.name}: persistence hop response handle was null; document outcome accepted at ${persistenceProbe.url()}`,
+        // Prefer document outcome: a null Response is acceptable if Command still rendered.
+        if (secondResponse && !secondResponse.ok()) {
+          throw new Error(
+            `${viewport.name} persistence document returned HTTP ${secondResponse.status()} at ${secondProbe.url()}`,
+          );
+        }
+        const reloadedText = await secondProbe.locator("body").innerText();
+        assert.doesNotMatch(
+          reloadedText,
+          /Something went wrong|Cannot read properties of undefined|Internal Server Error/i,
+          `${viewport.name} second document rendered a fatal error`,
         );
+        assert.ok(reloadedText.trim().length > 40, `${viewport.name} second document rendered insufficient content`);
+      } finally {
+        await secondProbe.close().catch(() => {});
       }
-      await waitForSubstantiveBody(persistenceProbe);
-      assert.doesNotMatch(persistenceProbe.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} lost its authenticated session on second document navigation`);
-      const reloadedText = await persistenceProbe.locator("body").innerText();
-      assert.doesNotMatch(reloadedText, /Something went wrong|Cannot read properties of undefined|Internal Server Error/i, `${viewport.name} second document rendered a fatal error`);
       if (pageErrors.length) {
         console.error(`[stage-d-browser] pageerrors after ${viewport.name} persistence`, pageErrors);
       }
