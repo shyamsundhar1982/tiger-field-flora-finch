@@ -50,13 +50,13 @@ function harness(overrides = {}) {
   };
 }
 
-/** Live preview: the bearer is the session, so the local clear always wins. */
+/** Preview/loopback: server revocation is attempted, bearer clear remains the fallback. */
 const preview = (overrides = {}) => harness({ livePreview: true, ...overrides });
 
 /** Deployed: only the server can clear the `__Host-` cookie. */
 const deployed = (overrides = {}) => harness({ livePreview: false, ...overrides });
 
-// ── Live preview ─────────────────────────────────────────────────────────────
+// ── Live preview / loopback ──────────────────────────────────────────────────
 
 test("preview: a successful sign-out clears the token, then redirects", async () => {
   const h = preview();
@@ -95,10 +95,10 @@ test("preview: a sign-out that never settles clears and redirects once the wait 
   assert.deepEqual(h.order, ["clear", "redirect"]);
 });
 
-test("preview: no bearer means nothing to invalidate, so no request is made", async () => {
+test("preview: no bearer still attempts server revocation for a possible cookie session", async () => {
   const h = preview({ hasBearer: false });
   await h.run();
-  assert.equal(h.requests, 0);
+  assert.equal(h.requests, 1);
   assert.deepEqual(h.order, ["clear", "redirect"]);
 });
 
@@ -109,8 +109,8 @@ test("preview: a stored bearer is still invalidated server-side", async () => {
 });
 
 // ── Deployed ─────────────────────────────────────────────────────────────────
-// JS cannot delete the HttpOnly `__Host-` cookie and `cookieCache` keeps
-// serving the cached session, so an unconfirmed sign-out must NOT look like one.
+// JS cannot delete the HttpOnly `__Host-` cookie and `cookieCache` can keep
+// serving cached state, so an unconfirmed sign-out must NOT look like one.
 
 test("deployed: a confirmed sign-out clears the token, then redirects", async () => {
   const h = deployed();
@@ -158,8 +158,8 @@ test("settleWithin waits its full window, then gives up rather than hanging", as
 });
 
 // ── Pre-sign-in session clear (`signIn`) ─────────────────────────────────────
-// Same per-environment bound as sign-out, but best effort: it also runs when
-// there is no prior session, so a failure must never block sign-in.
+// Same per-environment bound as sign-out, but best effort: a failure must never
+// block sign-in. Preview/loopback also checks for a possible cookie session.
 
 /** A pre-sign-in clear whose request never settles. */
 function preSignIn(livePreview, overrides = {}) {
@@ -210,22 +210,21 @@ test("pre-sign-in: a deployed session gets the deployed window, not the preview 
 });
 
 test("pre-sign-in: a failed clear never blocks sign-in", async () => {
-  // Best effort by design: this also runs with no prior session to clear.
   await preSignIn(false, { requestSignOut: rejects, timeoutMs: TEST_TIMEOUT_MS }).done;
   await preSignIn(true, { requestSignOut: rejects, timeoutMs: TEST_TIMEOUT_MS }).done;
 });
 
-test("pre-sign-in: the preview skips the request when there is no bearer", async () => {
+test("pre-sign-in: the preview still requests server clear when there is no bearer", async () => {
   let requests = 0;
   const h = preSignIn(true, {
     hasBearer: false,
     requestSignOut: () => {
       requests += 1;
-      return hangs();
+      return Promise.resolve();
     },
   });
   await h.done;
-  assert.equal(requests, 0);
+  assert.equal(requests, 1);
   assert.equal(h.cleared, 1);
 });
 
