@@ -38,7 +38,28 @@ try {
       return button instanceof HTMLButtonElement && !button.disabled;
     });
     await submit.click();
-    await page.waitForURL(/\/command(?:\/|$)/, { timeout: 20_000 });
+
+    // Give the server function + client redirect a bounded interval, then expose
+    // actionable diagnostics if the protected route was not reached. Only cookie
+    // names/attributes are logged; no cookie values or credentials are emitted.
+    try {
+      await page.waitForURL(/\/command(?:\/|$)/, { timeout: 20_000 });
+    } catch (error) {
+      const alert = page.getByRole("alert");
+      const alertText = (await alert.count()) ? (await alert.first().innerText()).trim() : "<no login error rendered>";
+      const cookies = (await context.cookies()).map(({ name, domain, path, secure, httpOnly, sameSite }) => ({
+        name,
+        domain,
+        path,
+        secure,
+        httpOnly,
+        sameSite,
+      }));
+      throw new Error(
+        `${viewport.name} legacy login did not persist; url=${page.url()}; alert=${alertText}; cookies=${JSON.stringify(cookies)}`,
+        { cause: error },
+      );
+    }
 
     for (const route of routes) {
       await page.goto(`${baseURL}${route}`, { waitUntil: "networkidle", timeout: 30_000 });
