@@ -18,6 +18,15 @@ const routes = [
   "/command/ibpe-operating-workspace/assurance",
 ];
 
+async function waitForSubstantiveBody(page) {
+  await page.locator("body").waitFor({ state: "visible", timeout: 20_000 });
+  await page.waitForFunction(
+    () => (document.body?.innerText || "").trim().length > 40,
+    undefined,
+    { timeout: 20_000 },
+  );
+}
+
 const browser = await chromium.launch({ headless: true });
 try {
   for (const viewport of viewports) {
@@ -58,11 +67,13 @@ try {
     );
 
     for (const route of routes) {
-      await page.goto(`${baseURL}${route}`, { waitUntil: "networkidle", timeout: 30_000 });
+      // Command workspaces intentionally perform background observation and
+      // projection work. Requiring network-idle would reject a healthy live
+      // dashboard, so readiness is based on the document + rendered evidence.
+      await page.goto(`${baseURL}${route}`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+      await waitForSubstantiveBody(page);
       assert.doesNotMatch(page.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} ${route} lost authenticated access`);
-      const body = page.locator("body");
-      await body.waitFor({ state: "visible" });
-      const text = await body.innerText();
+      const text = await page.locator("body").innerText();
       assert.doesNotMatch(text, /Something went wrong|Cannot read properties of undefined|Internal Server Error/i, `${viewport.name} ${route} rendered a fatal error`);
       assert.ok(text.trim().length > 40, `${viewport.name} ${route} rendered insufficient content`);
 
@@ -78,7 +89,8 @@ try {
 
     // Verify the authenticated browser session survives a full protected-route
     // reload; this is distinct from client-side SPA navigation.
-    await page.reload({ waitUntil: "networkidle" });
+    await page.reload({ waitUntil: "domcontentloaded", timeout: 30_000 });
+    await waitForSubstantiveBody(page);
     assert.doesNotMatch(page.url(), /\/login(?:\?|$)|\/command-login/, `${viewport.name} lost its authenticated session on reload`);
 
     // Exercise server-side revocation once. After logout, the protected route
