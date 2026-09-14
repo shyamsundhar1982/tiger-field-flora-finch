@@ -177,7 +177,7 @@ function VibpeAssurancePage() {
                     <td className="px-2 py-2 text-fg">{str(row, "surface_name", "surfaceName")}</td>
                     <td className="px-2 py-2 text-muted">{str(row, "surface_type", "surfaceType")}</td>
                     <td className="px-2 py-2 text-muted">{str(row, "owner_workspace", "ownerWorkspace") || "—"}</td>
-                    <td className="max-w-xl px-2 py-2 text-subtle">{str(row, "notes") || str(row, "evidence_source", "evidenceSource") || "—"}</td>
+                    <td className="max-w-xl break-words [overflow-wrap:anywhere] px-2 py-2 text-subtle">{str(row, "notes") || str(row, "evidence_source", "evidenceSource") || "—"}</td>
                   </tr>
                 );
               })}
@@ -195,7 +195,7 @@ function VibpeAssurancePage() {
             const failing = num(row, "failing_capabilities", "failingCapabilities");
             const unobserved = num(row, "unobserved_capabilities", "unobservedCapabilities");
             return (
-              <article key={`${str(row, "domain")}-${index}`} className="rounded-xl border border-border bg-surface/30 p-4">
+              <article key={`${str(row, "domain")}-${index}`} className="min-w-0 rounded-xl border border-border bg-surface/30 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-medium text-fg">{str(row, "domain") || "unknown"}</p>
@@ -215,10 +215,10 @@ function VibpeAssurancePage() {
           <div className="border-t border-border p-3">
             <div className="grid gap-2 lg:grid-cols-2">
               {uiCapabilities.map((row, index) => (
-                <div key={`${str(row, "capability_id", "capabilityId")}-${index}`} className="rounded-md border border-border/70 p-3 text-xs">
-                  <p className="font-semibold text-fg">{str(row, "capability_name", "capabilityName")}</p>
-                  <p className="mt-1 text-muted">{str(row, "route_path", "routePath")}</p>
-                  <p className="mt-1 text-subtle">Expected: {str(row, "expected_result", "expectedResult")}</p>
+                <div key={`${str(row, "capability_id", "capabilityId")}-${index}`} className="min-w-0 rounded-md border border-border/70 p-3 text-xs">
+                  <p className="break-words [overflow-wrap:anywhere] font-semibold text-fg">{str(row, "capability_name", "capabilityName")}</p>
+                  <p className="mt-1 break-words [overflow-wrap:anywhere] text-muted">{str(row, "route_path", "routePath")}</p>
+                  <p className="mt-1 break-words [overflow-wrap:anywhere] text-subtle">Expected: {str(row, "expected_result", "expectedResult")}</p>
                 </div>
               ))}
             </div>
@@ -232,9 +232,9 @@ function VibpeAssurancePage() {
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-subtle">Active gates ({gates.length})</p>
             <div className="mt-2 space-y-2">
               {gates.map((row, index) => (
-                <div key={`${str(row, "gate_id", "gateId")}-${index}`} className="rounded-md border border-border p-3 text-xs">
-                  <p className="font-semibold text-fg">{str(row, "gate_id", "gateId")} · {str(row, "gate_name", "gateName")}</p>
-                  <p className="mt-1 text-muted">{str(row, "domain")} · {str(row, "decision_criteria", "decisionCriteria")}</p>
+                <div key={`${str(row, "gate_id", "gateId")}-${index}`} className="min-w-0 rounded-md border border-border p-3 text-xs">
+                  <p className="break-words [overflow-wrap:anywhere] font-semibold text-fg">{str(row, "gate_id", "gateId")} · {str(row, "gate_name", "gateName")}</p>
+                  <p className="mt-1 break-words [overflow-wrap:anywhere] text-muted">{str(row, "domain")} · {str(row, "decision_criteria", "decisionCriteria")}</p>
                 </div>
               ))}
             </div>
@@ -243,9 +243,9 @@ function VibpeAssurancePage() {
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-subtle">Workflow stages ({workflows.length})</p>
             <div className="mt-2 space-y-2">
               {workflows.map((row, index) => (
-                <div key={`${str(row, "workflow_id", "workflowId")}-${str(row, "stage_id", "stageId")}-${index}`} className="rounded-md border border-border p-3 text-xs">
-                  <p className="font-semibold text-fg">{str(row, "workflow_id", "workflowId")} · {str(row, "stage_name", "stageName")}</p>
-                  <p className="mt-1 text-muted">Entity {str(row, "entity_type", "entityType")} · Gate {str(row, "gate_id", "gateId") || "—"}</p>
+                <div key={`${str(row, "workflow_id", "workflowId")}-${str(row, "stage_id", "stageId")}-${index}`} className="min-w-0 rounded-md border border-border p-3 text-xs">
+                  <p className="break-words [overflow-wrap:anywhere] font-semibold text-fg">{str(row, "workflow_id", "workflowId")} · {str(row, "stage_name", "stageName")}</p>
+                  <p className="mt-1 break-words [overflow-wrap:anywhere] text-muted">Entity {str(row, "entity_type", "entityType")} · Gate {str(row, "gate_id", "gateId") || "—"}</p>
                 </div>
               ))}
             </div>

@@ -1,5 +1,9 @@
+import { getRequest } from "@tanstack/react-start/server";
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
-import { requestSafePostgresPoolConfig } from "./postgres-pool";
+import {
+  isLoopbackPostgresConnectionString,
+  requestSafePostgresPoolConfig,
+} from "./postgres-pool";
 import {
   resolvePostgresTransport,
   type PostgresTransport,
@@ -7,10 +11,22 @@ import {
 import type { Sql, SqlRow } from "./db.ts";
 
 const globalRef = globalThis as typeof globalThis & {
-  __pgSqlPromise__?: Promise<Sql>;
   __pgliteInstance__?: Promise<import("@electric-sql/pglite").PGlite>;
   __pgliteMigrateChain__?: Promise<void>;
 };
+
+/**
+ * A deployed Worker may serve many requests from the same module isolate, but
+ * request-bound network I/O objects must stay inside the request that created
+ * them. Keying by the ambient Request gives Workers one SQL facade per request
+ * while allowing nested server functions in that request to share it.
+ *
+ * Local workerd is stricter than Node about socket ownership. A loopback
+ * PostgreSQL URL therefore uses a fresh pg.Client for every query and closes it
+ * before that query resolves. No loopback socket or pg.Pool survives beyond the
+ * request/query context that created it.
+ */
+const requestSqlCache = new WeakMap<Request, Promise<Sql>>();
 
 const OID_INT8 = 20;
 const OID_DATE = 1082;
@@ -29,33 +45,39 @@ function toSql(run: Run): Sql {
   return sql;
 }
 
-let postgresTransportPromise: Promise<PostgresTransport | null> | null = null;
+/**
+ * Build the request-local SQL facade.
+ *
+ * - local/loopback PostgreSQL: one pg.Client per query, fully connected and
+ *   closed inside that query's request context;
+ * - deployed/non-loopback PostgreSQL: a small request-local pg.Pool, with each
+ *   checked-out connection retired after one query. Hyperdrive remains the
+ *   shared cross-request pool in deployed Cloudflare environments.
+ */
+async function createPostgresSql(transport: PostgresTransport): Promise<Sql> {
+  const { Client, Pool, types } = await import("pg");
+  types.setTypeParser(OID_INT8, Number);
+  types.setTypeParser(OID_DATE, identity);
+  types.setTypeParser(OID_INTERVAL, identity);
 
-function getPostgresTransport(): Promise<PostgresTransport | null> {
-  postgresTransportPromise ??= resolvePostgresTransport().catch((err) => {
-    postgresTransportPromise = null;
-    throw err;
-  });
-  return postgresTransportPromise;
-}
-
-function createPostgresSql(transport: PostgresTransport): Promise<Sql> {
-  const connectionString = transport.connectionString;
-  globalRef.__pgSqlPromise__ ??= (async () => {
-    const { Pool, types } = await import("pg");
-    types.setTypeParser(OID_INT8, Number);
-    types.setTypeParser(OID_DATE, identity);
-    types.setTypeParser(OID_INTERVAL, identity);
-    const pool = new Pool(requestSafePostgresPoolConfig(connectionString));
+  if (isLoopbackPostgresConnectionString(transport.connectionString)) {
     return toSql(async <T>(text: string, params: unknown[]) => {
-      const res = await pool.query(text, params);
-      return res.rows as T[];
+      const client = new Client({ connectionString: transport.connectionString });
+      await client.connect();
+      try {
+        const res = await client.query(text, params);
+        return res.rows as T[];
+      } finally {
+        await client.end();
+      }
     });
-  })().catch((err) => {
-    globalRef.__pgSqlPromise__ = undefined;
-    throw err;
+  }
+
+  const pool = new Pool(requestSafePostgresPoolConfig(transport.connectionString));
+  return toSql(async <T>(text: string, params: unknown[]) => {
+    const res = await pool.query(text, params);
+    return res.rows as T[];
   });
-  return globalRef.__pgSqlPromise__;
 }
 
 async function createPgliteSql(): Promise<Sql> {
@@ -100,25 +122,30 @@ async function createPgliteSql(): Promise<Sql> {
 
   return toSql(async <T>(text: string, params: unknown[]) => {
     const result = await pg.query<T>(text, params);
-    return result.rows;
+    return result.rows as T[];
   });
 }
 
-let sqlPromise: Promise<Sql> | null = null;
-
 export async function getSqlServer(): Promise<Sql> {
-  sqlPromise ??= (async () => {
-    const transport = await getPostgresTransport();
-    return transport ? createPostgresSql(transport) : createPgliteSql();
-  })().catch((err) => {
-    sqlPromise = null;
-    throw err;
+  const transport = await resolvePostgresTransport();
+  if (!transport) return createPgliteSql();
+
+  const request = getRequest();
+  if (!request) return createPostgresSql(transport);
+
+  const cached = requestSqlCache.get(request);
+  if (cached) return cached;
+
+  const pending = createPostgresSql(transport).catch((error) => {
+    requestSqlCache.delete(request);
+    throw error;
   });
-  return sqlPromise;
+  requestSqlCache.set(request, pending);
+  return pending;
 }
 
 export async function getPgliteServer(): Promise<import("@electric-sql/pglite").PGlite> {
-  const transport = await getPostgresTransport();
+  const transport = await resolvePostgresTransport();
   if (transport) {
     throw new Error("getPglite() is only available when neither Hyperdrive nor DATABASE_URL is configured");
   }
@@ -129,7 +156,7 @@ export async function getPgliteServer(): Promise<import("@electric-sql/pglite").
 }
 
 export async function ensureDbReadyServer(): Promise<void> {
-  const transport = await getPostgresTransport();
+  const transport = await resolvePostgresTransport();
   if (transport) return;
   await getSqlServer();
 }

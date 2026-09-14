@@ -2,13 +2,17 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { requestSafePostgresPoolConfig } from "./postgres-pool.ts";
+import {
+  isLoopbackPostgresConnectionString,
+  requestSafePostgresPoolConfig,
+} from "./postgres-pool.ts";
 import { selectPostgresTransport } from "./postgres-runtime.ts";
 
 test("deployed PostgreSQL connections cannot be reused across Worker requests", async () => {
   const config = requestSafePostgresPoolConfig("postgresql://example.invalid/db");
 
   assert.equal(config.connectionString, "postgresql://example.invalid/db");
+  assert.equal(config.max, 5);
   assert.equal(config.maxUses, 1);
   assert.equal(config.connectionTimeoutMillis, 10_000);
 
@@ -17,8 +21,27 @@ test("deployed PostgreSQL connections cannot be reused across Worker requests", 
     readFile(new URL("./auth/server.ts", import.meta.url), "utf8"),
   ]);
 
-  assert.match(databaseSource, /new Pool\(requestSafePostgresPoolConfig\([^)]+\)\)/);
+  assert.match(databaseSource, /new WeakMap<Request, Promise<Sql>>\(\)/);
+  assert.match(databaseSource, /const request = getRequest\(\)/);
+  assert.match(databaseSource, /requestSqlCache\.get\(request\)/);
+  assert.match(databaseSource, /requestSqlCache\.set\(request, pending\)/);
+  assert.match(databaseSource, /new Pool\(requestSafePostgresPoolConfig\(transport\.connectionString\)\)/);
+  assert.doesNotMatch(databaseSource, /__vyndiLocalPostgresPool__/);
   assert.match(authSource, /new Pool\(requestSafePostgresPoolConfig\([^)]+\)\)/);
+});
+
+test("loopback Worker development opens and closes a fresh client per query", async () => {
+  assert.equal(isLoopbackPostgresConnectionString("postgresql://postgres:postgres@localhost:5432/vyndi"), true);
+  assert.equal(isLoopbackPostgresConnectionString("postgresql://postgres:postgres@127.0.0.1:5432/vyndi"), true);
+  assert.equal(isLoopbackPostgresConnectionString("postgresql://postgres:postgres@[::1]:5432/vyndi"), true);
+  assert.equal(isLoopbackPostgresConnectionString("postgresql://hyperdrive.internal/vyndi"), false);
+
+  const databaseSource = await readFile(new URL("./db.server.ts", import.meta.url), "utf8");
+  assert.match(databaseSource, /isLoopbackPostgresConnectionString\(transport\.connectionString\)/);
+  assert.match(databaseSource, /new Client\(\{ connectionString: transport\.connectionString \}\)/);
+  assert.match(databaseSource, /await client\.connect\(\)/);
+  assert.match(databaseSource, /await client\.end\(\)/);
+  assert.doesNotMatch(databaseSource, /__vyndiLocalPostgresPool__/);
 });
 
 test("Hyperdrive takes precedence over direct DATABASE_URL", () => {

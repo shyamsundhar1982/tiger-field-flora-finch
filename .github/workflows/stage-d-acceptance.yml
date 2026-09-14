@@ -1,0 +1,148 @@
+name: Stage D Acceptance Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  business-chain-and-resilience:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Full canonical business and resilience acceptance
+        run: >-
+          node --experimental-strip-types --test
+          scripts/migration-execution.test.mjs
+          scripts/canonical-business-truth.test.mjs
+          scripts/issued-material-fulfillment.test.mjs
+          scripts/production-batch-release.test.mjs
+          scripts/traceability-search.test.mjs
+          scripts/pre-r3-authority-remediation.test.mjs
+          scripts/security-boundary-regression.test.mjs
+          scripts/epr-individual-authority.test.mjs
+          scripts/session-security-policy.test.mjs
+          scripts/session-concurrency.test.mjs
+          scripts/stage-d-load-resilience.test.mjs
+
+  responsive-browser-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: vyndi_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d vyndi_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      VITE_AUTH_ENABLED: "true"
+      BETTER_AUTH_URL: http://localhost:8080
+      BETTER_AUTH_SECRET: stage-d-ci-better-auth-secret-2026-not-production
+      STAGE_D_BASE_URL: http://localhost:8080
+      STAGE_D_USER_EMAIL: stage-d-acceptance@vyndi.test
+      STAGE_D_USER_PASSWORD: stage-d-ci-individual-password-2026
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vyndi_ci
+      CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE: postgresql://postgres:postgres@localhost:5432/vyndi_ci
+      VYNDI_ALLOW_DB_MIGRATIONS: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Configure local Hyperdrive acceptance capacity
+        run: |
+          container_id="$(docker ps --filter ancestor=postgres:16-alpine --format '{{.ID}}' | head -n 1)"
+          test -n "$container_id"
+          docker exec "$container_id" psql -U postgres -d vyndi_ci -v ON_ERROR_STOP=1 -c "ALTER SYSTEM SET max_connections = '500';"
+          docker restart "$container_id" >/dev/null
+          for attempt in $(seq 1 30); do
+            if docker exec "$container_id" pg_isready -U postgres -d vyndi_ci >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          configured="$(docker exec "$container_id" psql -U postgres -d vyndi_ci -Atc 'show max_connections')"
+          test "$configured" = "500"
+          echo "Stage D local PostgreSQL max_connections=$configured"
+
+      - name: Migrate isolated browser database
+        run: npm run db:migrate
+
+      - name: Verify production bundle builds
+        run: npm run build
+
+      - name: Configure isolated browser runtime
+        run: |
+          node -e 'const fs=require("node:fs"); const path="wrangler.jsonc"; const config=JSON.parse(fs.readFileSync(path,"utf8")); delete config.hyperdrive; fs.writeFileSync(path, JSON.stringify(config,null,2)+"\n");'
+          printf '%s\n' \
+            "VITE_AUTH_ENABLED=${VITE_AUTH_ENABLED}" \
+            "BETTER_AUTH_URL=${BETTER_AUTH_URL}" \
+            "BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}" \
+            "DATABASE_URL=${DATABASE_URL}" \
+            "VYNDI_ALLOW_DB_MIGRATIONS=${VYNDI_ALLOW_DB_MIGRATIONS}" \
+            > .dev.vars
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Start isolated VYNDI Worker dev server
+        run: |
+          npm run dev > /tmp/vyndi-stage-d.log 2>&1 &
+          echo $! > /tmp/vyndi-stage-d.pid
+          for attempt in $(seq 1 90); do
+            if curl -sS --max-time 2 http://localhost:8080/ >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/vyndi-stage-d.log
+          exit 1
+
+      - name: Seed disposable individual acceptance identity
+        run: node scripts/stage-d-seed-user.mjs
+
+      - name: Protected-route responsive browser acceptance
+        run: node scripts/stage-d-browser-acceptance.mjs
+
+      - name: Print server log on failure
+        if: failure()
+        run: cat /tmp/vyndi-stage-d.log || true
+
+      - name: Stop acceptance server
+        if: always()
+        run: |
+          if [ -f /tmp/vyndi-stage-d.pid ]; then
+            kill $(cat /tmp/vyndi-stage-d.pid) || true
+          fi

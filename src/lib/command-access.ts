@@ -4,87 +4,25 @@ import type { CommandRole } from "@/lib/page-access";
 import { optionalAuthMiddleware } from "@/lib/auth/middleware";
 import { getAssignedCommandRole } from "@/lib/command-user-role.server";
 
-const SESSION_NAME = "__Host-vyndi-command";
-const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
-
-type CommandSession = { role?: CommandRole };
-
 type CommandAuthContext = {
   userId?: string;
   userEmail?: string | null;
 };
 
-type CommandEnv = {
-  COMMAND_PASSWORD?: string;
-  COMMAND_MANAGEMENT_PASSWORD?: string;
-  COMMAND_BOARD_PASSWORD?: string;
-  COMMAND_FINANCE_PASSWORD?: string;
-  COMMAND_OPERATIONS_PASSWORD?: string;
-  COMMAND_ENGINEERING_PASSWORD?: string;
-  COMMAND_QA_PASSWORD?: string;
-  COMMAND_COMPLIANCE_PASSWORD?: string;
-  user?: string;
-};
-
-const roleCredentials: Array<{
-  username: string;
-  role: Exclude<CommandRole, "admin" | "viewer">;
-  envKey: keyof CommandEnv;
-}> = [
-  { username: "management", role: "management", envKey: "COMMAND_MANAGEMENT_PASSWORD" },
-  { username: "board", role: "board", envKey: "COMMAND_BOARD_PASSWORD" },
-  { username: "finance", role: "finance", envKey: "COMMAND_FINANCE_PASSWORD" },
-  { username: "operations", role: "operations", envKey: "COMMAND_OPERATIONS_PASSWORD" },
-  { username: "engineering", role: "engineering", envKey: "COMMAND_ENGINEERING_PASSWORD" },
-  { username: "qa", role: "qa", envKey: "COMMAND_QA_PASSWORD" },
-  { username: "compliance", role: "compliance", envKey: "COMMAND_COMPLIANCE_PASSWORD" },
-];
-
-function getCommandEnv(): CommandEnv {
-  return process.env as CommandEnv;
-}
-
-async function getLegacySession() {
-  const password = getCommandEnv().COMMAND_PASSWORD;
-  if (!password) throw new Error("COMMAND_PASSWORD is not configured on the Worker.");
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(password));
-  const sessionPassword = Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-  const { useSession: getServerSession } = await import("@tanstack/react-start/server");
-  return getServerSession<CommandSession>({
-    name: SESSION_NAME,
-    password: sessionPassword,
-    cookie: { secure: true, httpOnly: true, sameSite: "lax", maxAge: SESSION_MAX_AGE, path: "/" },
-  });
-}
-
-async function getLegacyRole(): Promise<CommandRole | null> {
-  try {
-    const session = await getLegacySession();
-    return session.data.role ?? null;
-  } catch (error) {
-    console.warn("Legacy command session lookup failed; continuing with Better Auth.", error);
-    return null;
-  }
-}
-
 async function resolveCommandAuthorization(
   context: CommandAuthContext,
 ): Promise<{ access: boolean; role: CommandRole | null }> {
-  if (context.userId) {
-    const role = (await getAssignedCommandRole(context.userId, context.userEmail)) ?? "viewer";
-    return { access: true, role };
-  }
-  const role = await getLegacyRole();
-  return { access: Boolean(role), role };
+  if (!context.userId) return { access: false, role: null };
+
+  const role = (await getAssignedCommandRole(context.userId, context.userEmail)) ?? "viewer";
+  return { access: true, role };
 }
 
 /**
- * Individual Better Auth identity and its assigned VYNDI role are one authority
- * boundary. A stale shared-password cookie must never elevate or otherwise
- * change an authenticated individual's role. Legacy role lookup is permitted
- * only when no individual identity exists.
+ * Command is governed exclusively by an individually verified Better Auth
+ * identity. Anonymous requests have no Command access; an authenticated
+ * identity resolves its persisted VYNDI role, defaulting to viewer until an
+ * administrator explicitly assigns another role.
  */
 export const getCommandAuthorization = createServerFn({ method: "GET" })
   .middleware([optionalAuthMiddleware])
@@ -105,26 +43,18 @@ export const getCommandAccess = createServerFn({ method: "GET" })
   .middleware([optionalAuthMiddleware])
   .handler(async ({ context }) => (await resolveCommandAuthorization(context)).access);
 
+/**
+ * Compatibility endpoint retained only so an old /command-login bundle cannot
+ * fail at import time. Shared Command credentials are retired: this endpoint
+ * never creates a session and never grants a role.
+ */
 export const unlockCommand = createServerFn({ method: "POST" })
   .validator(z.object({ username: z.string().min(1).max(100), password: z.string().min(1).max(200) }))
-  .handler(async ({ data }) => {
-    const env = getCommandEnv();
-    if (!env.COMMAND_PASSWORD) return { ok: false, role: null, error: "Command access is not configured." };
-    let role: CommandRole | null = null;
-    if (data.username === "admin" && data.password === env.COMMAND_PASSWORD) role = "admin";
-    else if (data.username === "user" && env.user && data.password === env.user) role = "viewer";
-    else {
-      const credential = roleCredentials.find((item) => item.username === data.username);
-      if (credential && env[credential.envKey] && data.password === env[credential.envKey]) role = credential.role;
-    }
-    if (!role) return { ok: false, role: null, error: "Incorrect username or password." };
-    const session = await getLegacySession();
-    await session.update({ role });
-    return { ok: true, role, error: null };
-  });
+  .handler(async () => ({
+    ok: false as const,
+    role: null,
+    error: "Legacy Command access is retired. Use the individual VYNDI sign in.",
+  }));
 
-export const lockCommand = createServerFn({ method: "POST" }).handler(async () => {
-  const session = await getLegacySession();
-  await session.clear();
-  return { ok: true };
-});
+/** No legacy session exists anymore; retained as a harmless compatibility no-op. */
+export const lockCommand = createServerFn({ method: "POST" }).handler(async () => ({ ok: true as const }));
