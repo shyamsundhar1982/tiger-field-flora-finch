@@ -60,9 +60,9 @@ jobs:
           --health-retries 10
     env:
       VITE_AUTH_ENABLED: "true"
-      BETTER_AUTH_URL: http://127.0.0.1:8081
+      BETTER_AUTH_URL: http://localhost:8080
       BETTER_AUTH_SECRET: stage-d-ci-better-auth-secret-2026-not-production
-      STAGE_D_BASE_URL: http://127.0.0.1:8081
+      STAGE_D_BASE_URL: http://localhost:8080
       STAGE_D_USER_EMAIL: stage-d-acceptance@vyndi.test
       STAGE_D_USER_PASSWORD: stage-d-ci-individual-password-2026
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vyndi_ci
@@ -100,18 +100,18 @@ jobs:
       - name: Migrate isolated browser database
         run: npm run db:migrate
 
-      - name: Build production-like acceptance bundle
+      - name: Verify production bundle builds
         run: npm run build
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Start isolated production-like VYNDI server
+      - name: Start isolated VYNDI Worker dev server
         run: |
-          npm run preview > /tmp/vyndi-stage-d.log 2>&1 &
+          npm run dev > /tmp/vyndi-stage-d.log 2>&1 &
           echo $! > /tmp/vyndi-stage-d.pid
           for attempt in $(seq 1 90); do
-            if curl -sS --max-time 2 http://127.0.0.1:8081/ >/dev/null; then
+            if curl -sS --max-time 2 http://localhost:8080/ >/dev/null; then
               exit 0
             fi
             sleep 2
