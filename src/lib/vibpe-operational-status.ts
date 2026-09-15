@@ -60,6 +60,16 @@ const ROUTE_BY_INTENT: Record<OperationalStatusIntent, string> = {
   invoice_pending: "/command/receivables",
 };
 
+const INTENT_LABEL: Record<OperationalStatusIntent, string> = {
+  customer_orders: "Pending customer orders",
+  purchase_orders: "Pending purchase orders",
+  supplier_purchase_orders: "Supplier pending purchase orders",
+  job_cards: "Job Cards",
+  grn_pending: "Pending receipt / GRN",
+  dispatch_pending: "Pending dispatch",
+  invoice_pending: "Pending invoice",
+};
+
 function clean(value: unknown) {
   return String(value ?? "").trim();
 }
@@ -72,29 +82,49 @@ function hasExplicitTraceReference(question: string) {
   return /\b(?:so|jbc|po|grn|mr|batch|vyndi|autopo|vibpe-autopo)[-_][a-z0-9][a-z0-9-]*\b/i.test(question);
 }
 
-export function interpretOperationalStatusQuery(question: string): OperationalInterpretation {
-  if (hasExplicitTraceReference(question)) return { recognized: false };
+function addIntent(intents: OperationalStatusIntent[], intent: OperationalStatusIntent) {
+  if (!intents.includes(intent)) intents.push(intent);
+}
+
+export function interpretOperationalStatusQueries(question: string): OperationalStatusIntent[] {
+  if (hasExplicitTraceReference(question)) return [];
 
   const q = normalize(question);
-  const asksOpen = /\b(pending|open|outstanding|waiting)\b/.test(q);
-  const asksList = /\b(show|list|tell|what|which|raised|created|current|status)\b/.test(q);
-  const purchaseOrder = /\bpo\b|\bpurchase order(?:s)?\b/.test(q);
-  const order = /\border(?:s)?\b/.test(q);
+  const intents: OperationalStatusIntent[] = [];
   const supplierish = /\bsupplier\b|\bsupplies\b|\bsupply\b|\boda\b|\bfrom\b/.test(q);
-  const jobCard = /\bjbc\b|\bjob card(?:s)?\b|\bjobcard(?:s)?\b/.test(q);
-  const grn = /\bgrn\b|\bgoods receipt(?:s)?\b|\breceiving\b/.test(q);
-  const dispatch = /\bdispatch\b|\bshipment\b|\bshipping\b/.test(q);
-  const invoice = /\binvoice(?:s)?\b|\breceivable(?:s)?\b|\bbilling\b/.test(q);
 
-  if (purchaseOrder && asksOpen && supplierish) return { recognized: true, intent: "supplier_purchase_orders" };
-  if (purchaseOrder && asksOpen) return { recognized: true, intent: "purchase_orders" };
-  if (order && asksOpen && !purchaseOrder) return { recognized: true, intent: "customer_orders" };
-  if (jobCard && (asksOpen || asksList)) return { recognized: true, intent: "job_cards" };
-  if (grn && asksOpen) return { recognized: true, intent: "grn_pending" };
-  if (dispatch && asksOpen) return { recognized: true, intent: "dispatch_pending" };
-  if (invoice && asksOpen) return { recognized: true, intent: "invoice_pending" };
+  const customerOrders =
+    /\b(?:pending|open|outstanding|waiting)\s+(?:(?:customer|sales|commercial)\s+)?orders?\b/.test(q) ||
+    /\b(?:(?:customer|sales|commercial)\s+)?orders?\s+(?:pending|open|outstanding|waiting)\b/.test(q);
+  const purchaseOrders =
+    /\b(?:pending|open|outstanding|waiting)\s+(?:purchase\s+orders?|pos?)\b/.test(q) ||
+    /\b(?:purchase\s+orders?|pos?)\s+(?:pending|open|outstanding|waiting)\b/.test(q);
+  const jobCards =
+    /\b(?:jbc|job\s*cards?)\b[^?.]{0,80}\b(?:raised|created|open|pending|current|status)\b/.test(q) ||
+    /\b(?:raised|created|open|pending|current|status)\b[^?.]{0,80}\b(?:jbc|job\s*cards?)\b/.test(q);
+  const receipts =
+    /\b(?:pending|open|outstanding|waiting)\s+(?:grns?|goods\s+receipts?|receipts?|receiving)\b/.test(q) ||
+    /\b(?:grns?|goods\s+receipts?|receipts?|receiving)\s+(?:pending|open|outstanding|waiting)\b/.test(q);
+  const dispatches =
+    /\b(?:pending|open|outstanding|waiting)\s+(?:dispatch(?:es)?|shipments?|shipping)\b/.test(q) ||
+    /\b(?:dispatch(?:es)?|shipments?|shipping)\s+(?:pending|open|outstanding|waiting)\b/.test(q);
+  const invoices =
+    /\b(?:pending|open|outstanding|waiting)\s+(?:invoices?|receivables?|billing)\b/.test(q) ||
+    /\b(?:invoices?|receivables?|billing)\s+(?:pending|open|outstanding|waiting)\b/.test(q);
 
-  return { recognized: false };
+  if (customerOrders) addIntent(intents, "customer_orders");
+  if (jobCards) addIntent(intents, "job_cards");
+  if (purchaseOrders) addIntent(intents, supplierish ? "supplier_purchase_orders" : "purchase_orders");
+  if (receipts) addIntent(intents, "grn_pending");
+  if (dispatches) addIntent(intents, "dispatch_pending");
+  if (invoices) addIntent(intents, "invoice_pending");
+
+  return intents;
+}
+
+export function interpretOperationalStatusQuery(question: string): OperationalInterpretation {
+  const [intent] = interpretOperationalStatusQueries(question);
+  return intent ? { recognized: true, intent } : { recognized: false };
 }
 
 function supplierMatchScore(question: string, supplierName: string) {
@@ -282,18 +312,26 @@ export const askVibpeOperationalStatus = createServerFn({ method: "POST" })
   .middleware([optionalAuthMiddleware])
   .validator((input: { question: string }) => ({ question: clean(input.question).slice(0, 500) }))
   .handler(async ({ data, context }) => {
-    const interpretation = interpretOperationalStatusQuery(data.question);
-    if (!interpretation.recognized || !interpretation.intent) return { handled: false as const };
+    const intents = interpretOperationalStatusQueries(data.question);
+    if (!intents.length) return { handled: false as const };
 
     const actor = await requireBusinessActor("view", context.userId ? { userId: context.userId, email: context.userEmail } : undefined);
-    if (!canView(actor.role, interpretation.intent)) {
-      return {
-        handled: true as const,
-        answer: "I identified this as an operational-status query, but your current role is not authorised to view the controlling workspace for that record type.",
-      };
+    const sql = await getSql();
+    const answers: string[] = [];
+
+    for (const intent of intents) {
+      if (!canView(actor.role, intent)) {
+        answers.push(`${INTENT_LABEL[intent]}\nNot authorised to view the controlling workspace for this record type.`);
+        continue;
+      }
+      const answer = await answerIntent(sql, intent, data.question);
+      answers.push(intents.length > 1 ? `${INTENT_LABEL[intent]}\n${answer}` : answer);
     }
 
-    const sql = await getSql();
-    const answer = await answerIntent(sql, interpretation.intent, data.question);
-    return { handled: true as const, answer, intent: interpretation.intent };
+    return {
+      handled: true as const,
+      answer: answers.join("\n\n---\n\n"),
+      intent: intents[0],
+      intents,
+    };
   });
