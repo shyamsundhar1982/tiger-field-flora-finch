@@ -6,7 +6,7 @@ export const VIBPE_QA_CASES = [
     expected: "Use canonical cash authority as actual truth, compare it with the latest governed IBPE snapshot, state freshness, and never substitute plan liquidity for ledger cash.",
     criteria: {
       mustInclude: ["Cash ledger reconciliation", "canonical cash"],
-      anyOf: [["reconciles", "does not reconcile", "cannot be confirmed"]],
+      anyOf: [["planning closing cash", "stale", "current-compatible", "unconfirmed"]],
       provenanceTerms: ["vyndi_cash_authority", "cash authority"],
       truthClassTerms: ["actual", "planning", "ledger"],
       freshnessTerms: ["updated", "snapshot", "latest governed IBPE"],
@@ -158,7 +158,7 @@ export const VIBPE_QA_CASES = [
   {
     id: "liquidity-02",
     pack: "liquidity",
-    question: "Is the liquidity number a planning forecast or actual cash ledger truth?",
+    question: "Is the minimum free liquidity after recommendations a planning forecast or an actual ledger value?",
     expected: "Explicitly identify the Co-Pilot liquidity metric as governed planning output and not actual ledger cash.",
     criteria: {
       mustInclude: ["Funding assessment"],
