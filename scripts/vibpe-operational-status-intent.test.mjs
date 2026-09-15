@@ -55,6 +55,6 @@ test("explicit document references remain traceability territory", () => {
 
 test("open PO states include both legacy and reconciled partial-receipt spellings", () => {
   for (const status of ["draft", "pending_approval", "approved", "issued", "part_received", "partially_received"]) {
-    assert.ok(operational.includes(`\"${status}\"`), `missing open PO state ${status}`);
+    assert.ok(operational.includes(`"${status}"`), `missing open PO state ${status}`);
   }
 });
