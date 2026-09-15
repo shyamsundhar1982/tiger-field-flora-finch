@@ -131,6 +131,10 @@ export const WORKSPACE_NAVIGATION: Record<CanonicalWorkspaceId, readonly Workspa
         { to: "/command/ibpe-operating-workspace/release", label: "06 · Release Readiness" },
       ],
     },
+    {
+      label: "Help & Reference",
+      items: [{ to: "/command/user-manual", label: "User Manual" }],
+    },
   ],
   "plan-sales": [
     {
