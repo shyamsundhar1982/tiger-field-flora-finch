@@ -1,14 +1,41 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, useLocation } from "@tanstack/react-router";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { CommandShell } from "@/components/command-shell";
-import { ControlledDocumentToolbar } from "@/components/controlled-document-toolbar";
-import { IbpeCopilot } from "@/components/ibpe-copilot";
-import { IbpeWorkspaceProjection } from "@/components/ibpe-workspace-projection";
 import { ProtectedNavigationBridge } from "@/components/protected-navigation-bridge";
-import { TraceabilityDocumentCentreV2 } from "@/components/traceability-document-centre-v2";
 import { getCommandRole } from "@/lib/command-access";
 import { canAccessRoute } from "@/lib/page-access";
 import { getRouteMeta } from "@/lib/page-metadata";
 import { useOperatingPlanSync } from "@/lib/operating-plan-sync";
+
+const LazyIbpeWorkspaceProjection = lazy(async () => {
+  const module = await import("@/components/ibpe-workspace-projection");
+  return { default: module.IbpeWorkspaceProjection };
+});
+
+const LazyControlledDocumentToolbar = lazy(async () => {
+  const module = await import("@/components/controlled-document-toolbar");
+  return { default: module.ControlledDocumentToolbar };
+});
+
+const LazyTraceabilityDocumentCentre = lazy(async () => {
+  const module = await import("@/components/traceability-document-centre-v2");
+  return { default: module.TraceabilityDocumentCentreV2 };
+});
+
+const LazyIbpeCopilot = lazy(async () => {
+  const module = await import("@/components/ibpe-copilot");
+  return { default: module.IbpeCopilot };
+});
+
+const CONTROLLED_DOCUMENT_ROUTES = new Set([
+  "/command/sales",
+  "/command/production",
+  "/command/purchase-execution",
+  "/command/receiving",
+  "/command/quality",
+  "/command/operations",
+  "/command/receivables",
+]);
 
 function normalizeCommandPath(pathname: string) {
   if (pathname === "/") return pathname;
@@ -43,8 +70,40 @@ export const Route = createFileRoute("/command")({
   component: CommandRoot,
 });
 
+function DeferredCommandTools() {
+  const { pathname } = useLocation();
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    // Keep non-critical floating tools off the first paint. They become
+    // available immediately after the protected page has had time to settle.
+    const timer = window.setTimeout(() => setReady(true), 180);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  if (!ready) return null;
+  const routePath = normalizeCommandPath(pathname);
+
+  return (
+    <Suspense fallback={null}>
+      {CONTROLLED_DOCUMENT_ROUTES.has(routePath) ? <LazyControlledDocumentToolbar /> : null}
+      <LazyTraceabilityDocumentCentre />
+      <LazyIbpeCopilot />
+    </Suspense>
+  );
+}
+
 function CommandRoot() {
   const { commandRole } = Route.useRouteContext();
   useOperatingPlanSync();
-  return <><ProtectedNavigationBridge /><IbpeWorkspaceProjection /><CommandShell initialRole={commandRole} /><ControlledDocumentToolbar /><TraceabilityDocumentCentreV2 /><IbpeCopilot /></>;
+  return (
+    <>
+      <ProtectedNavigationBridge />
+      <Suspense fallback={null}>
+        <LazyIbpeWorkspaceProjection />
+      </Suspense>
+      <CommandShell initialRole={commandRole} />
+      <DeferredCommandTools />
+    </>
+  );
 }
