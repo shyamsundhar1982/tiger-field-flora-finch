@@ -1,3 +1,4 @@
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
@@ -26,18 +27,56 @@ function RangePage() {
     <div className="vyndi-public-page min-h-dvh bg-bg">
       <SiteHeader ghost />
 
-      <section className="vyndi-range-hero">
-        <div className="vyndi-range-hero__stage">
-          <img src="/bikes/hero.jpg" alt="VYNDI endurance range in cinematic studio light" className="media vyndi-range-hero__media" />
-          <div className="vyndi-range-hero__shade" />
-          <div className="vyndi-range-hero__grid" />
-          <div className="vyndi-range-hero__orb vyndi-range-hero__orb--lime" />
-          <div className="vyndi-range-hero__orb vyndi-range-hero__orb--cyan" />
-          <div className="vyndi-range-hero__bike" aria-hidden="true">
-            <img src={TIERS[1]?.image ?? TIERS[0].image} alt="" />
+      <section className="vyndi-range-hero vyndi-cinematic-hero">
+        <div
+          className="vyndi-range-hero__stage vyndi-cinematic-stage"
+          onPointerMove={handleScenePointerMove}
+          onPointerLeave={resetScenePointer}
+        >
+          <div className="vyndi-cinematic-scene vyndi-range-cinematic-scene" aria-hidden="true">
+            <div className="vyndi-cinematic-scroll vyndi-cinematic-scroll--back">
+              <div className="vyndi-cinematic-pointer vyndi-cinematic-pointer--back">
+                <img src="/bikes/hero.jpg" alt="" className="media vyndi-range-hero__media vyndi-cinematic-backdrop" />
+              </div>
+            </div>
+
+            <div className="vyndi-cinematic-grid vyndi-range-hero__grid" />
+            <div className="vyndi-cinematic-depth-field" />
+            <div className="vyndi-cinematic-orb vyndi-cinematic-orb--lime" />
+            <div className="vyndi-cinematic-orb vyndi-cinematic-orb--cyan" />
+            <div className="vyndi-cinematic-light-beam" />
+
+            <div className="vyndi-range-fleet">
+              <div className="vyndi-range-fleet__plane vyndi-range-fleet__plane--rear">
+                <div className="vyndi-cinematic-pointer vyndi-range-fleet__pointer vyndi-range-fleet__pointer--rear">
+                  <img src={TIERS[0]?.image ?? "/bikes/core.jpg"} alt="" />
+                </div>
+              </div>
+              <div className="vyndi-range-fleet__plane vyndi-range-fleet__plane--mid">
+                <div className="vyndi-cinematic-pointer vyndi-range-fleet__pointer vyndi-range-fleet__pointer--mid">
+                  <img src={TIERS[1]?.image ?? "/bikes/pro.jpg"} alt="" />
+                </div>
+              </div>
+              <div className="vyndi-range-fleet__plane vyndi-range-fleet__plane--front">
+                <div className="vyndi-cinematic-pointer vyndi-range-fleet__pointer vyndi-range-fleet__pointer--front">
+                  <img src={TIERS[2]?.image ?? "/bikes/apex.jpg"} alt="" />
+                </div>
+              </div>
+            </div>
+
+            <div className="vyndi-cinematic-floor" />
+            <div className="vyndi-cinematic-scroll vyndi-cinematic-scroll--foreground">
+              <div className="vyndi-cinematic-pointer vyndi-cinematic-pointer--foreground">
+                <div className="vyndi-cinematic-foreground" />
+              </div>
+            </div>
+            <div className="vyndi-cinematic-vignette" />
+            <div className="vyndi-cinematic-grain" />
           </div>
 
-          <div className="vyndi-range-hero__content mx-auto flex min-h-[88svh] max-w-6xl flex-col justify-end px-4 pb-24 sm:px-6">
+          <div className="vyndi-range-hero__shade" />
+
+          <div className="vyndi-range-hero__content vyndi-cinematic-copy mx-auto flex min-h-[88svh] max-w-6xl flex-col justify-end px-4 pb-24 sm:px-6">
             <p className="vyndi-public-eyebrow text-[11px] font-semibold uppercase tracking-[0.22em]">VYNDI · The range</p>
             <h1 className="mt-4 max-w-4xl text-5xl font-bold leading-[0.94] tracking-tight text-accent sm:text-7xl">
               Three altitudes. <span className="vyndi-public-cyan">One</span> aerodynamic language.
@@ -131,4 +170,19 @@ function ProductColumn({ label, id, setId, model }: { label: string; id: string;
 
 function Spec({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return <div className="grid grid-cols-[96px_1fr] gap-4 py-4 text-sm"><dt className="text-subtle">{label}</dt><dd className={strong ? "text-right font-semibold tabular-nums text-accent" : "text-right text-fg"}>{value}</dd></div>;
+}
+
+function handleScenePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+  if (event.pointerType !== "mouse") return;
+  const rect = event.currentTarget.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  const x = Math.max(-1, Math.min(1, ((event.clientX - rect.left) / rect.width - 0.5) * 2));
+  const y = Math.max(-1, Math.min(1, ((event.clientY - rect.top) / rect.height - 0.5) * 2));
+  event.currentTarget.style.setProperty("--pointer-x", x.toFixed(3));
+  event.currentTarget.style.setProperty("--pointer-y", y.toFixed(3));
+}
+
+function resetScenePointer(event: ReactPointerEvent<HTMLDivElement>) {
+  event.currentTarget.style.setProperty("--pointer-x", "0");
+  event.currentTarget.style.setProperty("--pointer-y", "0");
 }
