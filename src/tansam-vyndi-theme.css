@@ -68,6 +68,11 @@ section[aria-label="Global Command search"] {
   box-shadow: var(--vyndi-shadow), inset 0 1px 0 rgb(255 255 255 / 0.03);
 }
 
+/* The unified Command search is now the sole traceability entry point. */
+button[aria-label="Open Traceability and Print"] {
+  display: none !important;
+}
+
 /* Shared operating panels inherit the same TANSAM card language. */
 .vyndi-tansam-panel,
 .vyndi-tansam-kpi {
