@@ -5,6 +5,7 @@ import {
   Factory,
   LineChart,
   LogOut,
+  Search,
   Settings2,
   ShieldCheck,
   UsersRound,
@@ -53,6 +54,45 @@ const WORKSPACES = [
   { to: ADMIN_HOME, label: "Admin", icon: Settings2, context: ADMIN_CONTEXT, id: "admin" as const, adminOnly: true },
 ] as const;
 
+type WorkspaceId = (typeof WORKSPACES)[number]["id"];
+type SearchKind = "all" | "workspace" | "page";
+type SearchEntry = {
+  to: string;
+  label: string;
+  workspaceId: WorkspaceId;
+  workspaceLabel: string;
+  section: string;
+  kind: Exclude<SearchKind, "all">;
+};
+
+const SEARCH_ENTRIES: readonly SearchEntry[] = (() => {
+  const byRoute = new Map<string, SearchEntry>();
+  for (const workspace of WORKSPACES) {
+    byRoute.set(workspace.to, {
+      to: workspace.to,
+      label: workspace.label,
+      workspaceId: workspace.id,
+      workspaceLabel: workspace.label,
+      section: "Workspace",
+      kind: "workspace",
+    });
+    for (const section of WORKSPACE_NAVIGATION[workspace.id]) {
+      for (const item of section.items) {
+        if (byRoute.has(item.to)) continue;
+        byRoute.set(item.to, {
+          to: item.to,
+          label: item.label,
+          workspaceId: workspace.id,
+          workspaceLabel: workspace.label,
+          section: section.label,
+          kind: "page",
+        });
+      }
+    }
+  }
+  return [...byRoute.values()];
+})();
+
 function isAccessible(role: CommandRole | null, route: string) {
   return canAccessRoute(role, route);
 }
@@ -79,6 +119,139 @@ function ClientLink({
     >
       {children}
     </Link>
+  );
+}
+
+function CommandSearch({ role }: { role: CommandRole | null }) {
+  const navigate = useNavigate();
+  const [query, setQuery] = useState("");
+  const [workspaceFilter, setWorkspaceFilter] = useState<"all" | WorkspaceId>("all");
+  const [kindFilter, setKindFilter] = useState<SearchKind>("all");
+  const [open, setOpen] = useState(false);
+
+  const availableWorkspaces = useMemo(
+    () => WORKSPACES.filter((item) => (!(item as { adminOnly?: boolean }).adminOnly || role === "admin") && isAccessible(role, item.to)),
+    [role],
+  );
+
+  const hasCriteria = query.trim().length > 0 || workspaceFilter !== "all" || kindFilter !== "all";
+  const results = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return SEARCH_ENTRIES.filter((entry) => isAccessible(role, entry.to))
+      .filter((entry) => workspaceFilter === "all" || entry.workspaceId === workspaceFilter)
+      .filter((entry) => kindFilter === "all" || entry.kind === kindFilter)
+      .filter((entry) => {
+        if (!needle) return workspaceFilter !== "all" || kindFilter !== "all";
+        return `${entry.label} ${entry.workspaceLabel} ${entry.section} ${entry.to}`.toLowerCase().includes(needle);
+      })
+      .slice(0, 12);
+  }, [role, query, workspaceFilter, kindFilter]);
+
+  function clearSearch() {
+    setQuery("");
+    setWorkspaceFilter("all");
+    setKindFilter("all");
+    setOpen(false);
+  }
+
+  async function goToResult(to: string) {
+    setQuery("");
+    setOpen(false);
+    await navigate({ to: to as never });
+  }
+
+  return (
+    <section className="relative z-20 mb-4 rounded-xl border border-border bg-surface/45 p-3" aria-label="Global Command search">
+      <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_180px_150px_auto]">
+        <label className="relative block">
+          <span className="sr-only">Search VYNDI OS</span>
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setOpen(true);
+            }}
+            onFocus={() => setOpen(true)}
+            placeholder="Search pages, workspaces or routes…"
+            autoComplete="off"
+            className="control w-full pl-9"
+          />
+        </label>
+
+        <label>
+          <span className="sr-only">Filter search by workspace</span>
+          <select
+            value={workspaceFilter}
+            onChange={(event) => {
+              setWorkspaceFilter(event.target.value as "all" | WorkspaceId);
+              setOpen(true);
+            }}
+            className="control w-full"
+            aria-label="Filter search by workspace"
+          >
+            <option value="all">All workspaces</option>
+            {availableWorkspaces.map((workspace) => (
+              <option key={workspace.id} value={workspace.id}>{workspace.label}</option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          <span className="sr-only">Filter search by type</span>
+          <select
+            value={kindFilter}
+            onChange={(event) => {
+              setKindFilter(event.target.value as SearchKind);
+              setOpen(true);
+            }}
+            className="control w-full"
+            aria-label="Filter search by type"
+          >
+            <option value="all">All types</option>
+            <option value="workspace">Workspaces</option>
+            <option value="page">Pages</option>
+          </select>
+        </label>
+
+        <button
+          type="button"
+          onClick={clearSearch}
+          disabled={!hasCriteria}
+          className="rounded-md border border-border px-3 py-2 text-xs font-semibold text-muted hover:bg-bg hover:text-fg disabled:cursor-default disabled:opacity-40"
+        >
+          Clear
+        </button>
+      </div>
+
+      {open && hasCriteria ? (
+        <div className="absolute left-3 right-3 top-[calc(100%-0.25rem)] max-h-[360px] overflow-y-auto rounded-xl border border-border bg-bg p-2 shadow-xl">
+          {results.length ? (
+            <div className="space-y-1" role="listbox" aria-label="Search results">
+              {results.map((entry) => (
+                <button
+                  key={entry.to}
+                  type="button"
+                  onClick={() => void goToResult(entry.to)}
+                  className="flex w-full items-start justify-between gap-3 rounded-lg px-3 py-2 text-left hover:bg-surface"
+                  role="option"
+                  aria-label={`Open ${entry.label}`}
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold text-fg">{entry.label}</span>
+                    <span className="block truncate text-[11px] text-muted">{entry.workspaceLabel} · {entry.section}</span>
+                  </span>
+                  <span className="max-w-[42%] truncate text-[10px] text-subtle">{entry.to}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="px-3 py-4 text-sm text-muted" role="status">No matching pages in the selected filters.</p>
+          )}
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -306,6 +479,7 @@ export function CommandShell({ initialRole }: { initialRole: CommandRole }) {
         <div className="min-w-0 flex-1">
           <MobileNavigation role={role} logout={logout} loggingOut={loggingOut} logoutError={logoutError} />
           <div className="px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
+            <CommandSearch role={role} />
             <WorkspaceTabs role={role} routes={PLAN_SALES_TABS} label="Plan and Commercial workspace" />
             <WorkspaceTabs role={role} routes={ENGINEERING_TABS} label="Product and Engineering workspace" />
             <WorkspaceTabs role={role} routes={OPERATIONS_TABS} label="Supply and Operations workspace" />
