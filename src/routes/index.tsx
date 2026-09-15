@@ -1,4 +1,3 @@
-import type { PointerEvent as ReactPointerEvent } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,51 +14,19 @@ function Home() {
     <div className="vyndi-public-page min-h-dvh bg-bg">
       <SiteHeader ghost />
 
-      <section className="vyndi-public-hero vyndi-cinematic-hero">
-        <div
-          className="vyndi-public-hero__stage vyndi-cinematic-stage"
-          onPointerMove={handleScenePointerMove}
-          onPointerLeave={resetScenePointer}
-        >
-          <div className="vyndi-cinematic-scene" aria-hidden="true">
-            <div className="vyndi-cinematic-scroll vyndi-cinematic-scroll--back">
-              <div className="vyndi-cinematic-pointer vyndi-cinematic-pointer--back">
-                <img
-                  src="/bikes/hero.jpg"
-                  alt=""
-                  className="media vyndi-public-hero__media vyndi-cinematic-backdrop"
-                />
-              </div>
-            </div>
-
-            <div className="vyndi-cinematic-grid vyndi-public-hero__grid" />
-            <div className="vyndi-cinematic-depth-field" />
-            <div className="vyndi-cinematic-orb vyndi-cinematic-orb--lime" />
-            <div className="vyndi-cinematic-orb vyndi-cinematic-orb--cyan" />
-            <div className="vyndi-cinematic-light-beam" />
-
-            <div className="vyndi-cinematic-scroll vyndi-cinematic-scroll--subject">
-              <div className="vyndi-cinematic-pointer vyndi-cinematic-pointer--subject">
-                <div className="vyndi-cinematic-subject-shell">
-                  <img src="/bikes/apex.jpg" alt="" className="vyndi-cinematic-subject-image" />
-                  <div className="vyndi-cinematic-subject-edge" />
-                </div>
-              </div>
-            </div>
-
-            <div className="vyndi-cinematic-floor" />
-            <div className="vyndi-cinematic-scroll vyndi-cinematic-scroll--foreground">
-              <div className="vyndi-cinematic-pointer vyndi-cinematic-pointer--foreground">
-                <div className="vyndi-cinematic-foreground" />
-              </div>
-            </div>
-            <div className="vyndi-cinematic-vignette" />
-            <div className="vyndi-cinematic-grain" />
-          </div>
-
+      <section className="vyndi-public-hero">
+        <div className="vyndi-public-hero__stage">
+          <img
+            src="/bikes/hero.jpg"
+            alt="VYNDI carbon endurance bicycle in studio light"
+            className="media vyndi-public-hero__media"
+          />
           <div className="vyndi-public-hero__shade" />
+          <div className="vyndi-public-hero__grid" />
+          <div className="vyndi-public-hero__orb vyndi-public-hero__orb--lime" />
+          <div className="vyndi-public-hero__orb vyndi-public-hero__orb--cyan" />
 
-          <div className="vyndi-public-hero__content vyndi-cinematic-copy mx-auto flex min-h-[100svh] max-w-6xl flex-col justify-end px-4 pb-16 sm:px-6 sm:pb-20">
+          <div className="vyndi-public-hero__content mx-auto flex min-h-[100svh] max-w-6xl flex-col justify-end px-4 pb-16 sm:px-6 sm:pb-20">
             <div className="mb-6 flex items-center gap-4">
               <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/75 sm:size-16">
                 <img src={VAYU_LOGO} alt="Vāyú Shastr" className="size-full object-contain" />
@@ -150,19 +117,4 @@ function Home() {
       <SiteFooter />
     </div>
   );
-}
-
-function handleScenePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
-  if (event.pointerType !== "mouse") return;
-  const rect = event.currentTarget.getBoundingClientRect();
-  if (!rect.width || !rect.height) return;
-  const x = Math.max(-1, Math.min(1, ((event.clientX - rect.left) / rect.width - 0.5) * 2));
-  const y = Math.max(-1, Math.min(1, ((event.clientY - rect.top) / rect.height - 0.5) * 2));
-  event.currentTarget.style.setProperty("--pointer-x", x.toFixed(3));
-  event.currentTarget.style.setProperty("--pointer-y", y.toFixed(3));
-}
-
-function resetScenePointer(event: ReactPointerEvent<HTMLDivElement>) {
-  event.currentTarget.style.setProperty("--pointer-x", "0");
-  event.currentTarget.style.setProperty("--pointer-y", "0");
 }
