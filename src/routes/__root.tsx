@@ -1,8 +1,13 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { Analytics } from "@vercel/analytics/react";
-import { AuthProvider } from "@/lib/auth/provider";
-import { PrintBrandHeader } from "@/components/brand-lockup";
-import { VAYU_LEGAL_NAME, VYNDI_BRAND_HIERARCHY_LABEL, VYNDI_OS_NAME } from "@/lib/brand";
+import {
+  VAYU_LEGAL_NAME,
+  VAYU_LOGO_PATH,
+  VYNDI_BRAND_HIERARCHY_LABEL,
+  VYNDI_OS_NAME,
+  VYNDI_PRODUCT_NAME,
+  VIBPE_COPILOT_LABEL,
+} from "@/lib/brand";
 import { lazy, Suspense, useEffect, useState } from "react";
 import "../styles.css";
 import "../tansam-vyndi-theme.css";
@@ -25,9 +30,6 @@ export const Route = createRootRoute({
     ],
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/brand/vayu-official.svg" },
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&display=swap" },
       { rel: "manifest", href: "/__grok/manifest.webmanifest" },
       { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
     ],
@@ -50,6 +52,18 @@ function PreviewBridgeBoundary() {
   );
 }
 
+function PrintBrandHeader() {
+  return (
+    <header className="vyndi-print-brand" aria-hidden="true">
+      <img src={VAYU_LOGO_PATH} alt="" className="vyndi-print-brand__mark" />
+      <span>
+        <strong>{VAYU_LEGAL_NAME}</strong>
+        <span>{VYNDI_OS_NAME} → {VIBPE_COPILOT_LABEL} → {VYNDI_PRODUCT_NAME}</span>
+      </span>
+    </header>
+  );
+}
+
 function LegalFooter() {
   return (
     <footer className="vyndi-legal-footer" aria-label="Vāyú Shastr copyright notice">
@@ -68,11 +82,9 @@ function Root() {
       <head><HeadContent /></head>
       <body className="bg-bg text-fg">
         <PreviewBridgeBoundary />
-        <AuthProvider>
-          <PrintBrandHeader />
-          <Outlet />
-          <LegalFooter />
-        </AuthProvider>
+        <PrintBrandHeader />
+        <Outlet />
+        <LegalFooter />
         <Scripts />
         <Analytics />
       </body>

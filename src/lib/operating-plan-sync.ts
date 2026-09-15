@@ -1,6 +1,4 @@
 import { useEffect } from "react";
-import { getOperatingPlanState, saveOperatingPlanDraft } from "@/lib/operating-plan-authority";
-import { listOperatingActionStatus, saveOperatingActionStatus } from "@/lib/operating-action-authority";
 import { useVeloxis } from "@/lib/store";
 
 const planSnapshot = (state: ReturnType<typeof useVeloxis.getState>) => ({
@@ -22,9 +20,18 @@ export function useOperatingPlanSync() {
     let lastActions: Record<string, "open" | "doing" | "done"> = {};
 
     void (async () => {
+      // These authority modules are only needed after the protected shell has
+      // mounted. Loading them here keeps their server-action graph out of the
+      // critical Command render chunk without changing business authority.
+      const [planAuthority, actionAuthority] = await Promise.all([
+        import("@/lib/operating-plan-authority"),
+        import("@/lib/operating-action-authority"),
+      ]);
+      if (!active) return;
+
       const [authority, actionStatus] = await Promise.all([
-        getOperatingPlanState(),
-        listOperatingActionStatus(),
+        planAuthority.getOperatingPlanState(),
+        actionAuthority.listOperatingActionStatus(),
       ]);
       if (!active) return;
 
@@ -56,7 +63,7 @@ export function useOperatingPlanSync() {
           lastPlan = serialized;
           if (planTimer) clearTimeout(planTimer);
           planTimer = setTimeout(() => {
-            void saveOperatingPlanDraft({ data: nextPlan }).catch((error) => {
+            void planAuthority.saveOperatingPlanDraft({ data: nextPlan }).catch((error) => {
               console.error("[operating-plan] central draft sync failed", error);
             });
           }, 600);
@@ -65,7 +72,7 @@ export function useOperatingPlanSync() {
         for (const [actionId, status] of Object.entries(state.actions)) {
           if (lastActions[actionId] === status) continue;
           lastActions[actionId] = status;
-          void saveOperatingActionStatus({ data: { actionId, status } }).catch((error) => {
+          void actionAuthority.saveOperatingActionStatus({ data: { actionId, status } }).catch((error) => {
             console.error(`[operating-action] ${actionId} sync failed`, error);
           });
         }
