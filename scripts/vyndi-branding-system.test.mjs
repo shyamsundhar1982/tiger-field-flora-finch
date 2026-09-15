@@ -12,7 +12,7 @@ test("brand source defines the required legal-to-product hierarchy", async () =>
   assert.match(brand, /VYNDI_BRAND_HIERARCHY\.join\(" → "\)/);
 });
 
-test("official Vāyú logo reaches shell, sidebar, mobile, login, loading, and favicon", async () => {
+test("official Vāyú logo reaches shell, sidebar, mobile, login, and favicon without a global route pending screen", async () => {
   const [lockup, shell, login, router, root] = await Promise.all([
     source("src/components/brand-lockup.tsx"),
     source("src/components/command-shell-v2.tsx"),
@@ -25,7 +25,7 @@ test("official Vāyú logo reaches shell, sidebar, mobile, login, loading, and f
   assert.match(shell, /<VayuMark decorative className="size-8"/);
   assert.match(login, /vy-login__intro-mark/);
   assert.match(login, /vy-login__boot-ring/);
-  assert.match(router, /defaultPendingComponent: BrandLoadingState/);
+  assert.doesNotMatch(router, /BrandLoadingState|defaultPendingComponent/);
   assert.match(root, /href: "\/brand\/vayu-official\.svg"/);
 });
 
