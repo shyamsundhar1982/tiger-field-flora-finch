@@ -5,24 +5,44 @@ import test from "node:test";
 const shell = readFileSync(new URL("../src/components/command-shell-v2.tsx", import.meta.url), "utf8");
 const workflow = readFileSync(new URL("../src/lib/operating-workflow.ts", import.meta.url), "utf8");
 const manual = readFileSync(new URL("../src/routes/command/user-manual.tsx", import.meta.url), "utf8");
+const traceability = readFileSync(new URL("../src/components/traceability-document-centre-v2.tsx", import.meta.url), "utf8");
+const theme = readFileSync(new URL("../src/tansam-vyndi-theme.css", import.meta.url), "utf8");
 
-test("global Command search is role-aware and filterable without runtime DOM indexing", () => {
+test("global Command search is a governed universal entry point without runtime DOM indexing", () => {
   assert.match(shell, /function CommandSearch\(/);
   assert.match(shell, /const SEARCH_ENTRIES/);
   assert.match(shell, /WORKSPACE_NAVIGATION\[workspace\.id\]/);
   assert.match(shell, /isAccessible\(role, entry\.to\)/);
-  assert.match(shell, /Search pages, workspaces or routes/);
-  assert.match(shell, /Filter search by workspace/);
-  assert.match(shell, /Filter search by type/);
-  assert.match(shell, /All workspaces/);
-  assert.match(shell, /All types/);
-  assert.match(shell, /Workspaces/);
-  assert.match(shell, /Pages/);
+  assert.match(shell, /Search orders, job cards, serials, POs, GRNs, suppliers, SKUs, quality, pages/);
+  assert.match(shell, /Search records/);
+  assert.match(shell, /Search governed records for/);
+  assert.match(shell, /vyndi:traceability-search/);
+  assert.match(shell, /new CustomEvent/);
+  assert.match(shell, /detail: \{ query: trimmed \}/);
+  assert.match(shell, /RBAC-filtered governed records and traceability/);
+  assert.match(shell, /Matching pages remain quick navigation shortcuts/);
   assert.match(shell, /<CommandSearch role=\{role\} \/>/);
+  assert.doesNotMatch(shell, /Filter search by workspace/);
+  assert.doesNotMatch(shell, /Filter search by type/);
   assert.doesNotMatch(shell, /MutationObserver/);
   assert.doesNotMatch(shell, /createTreeWalker/);
   assert.doesNotMatch(shell, /document\.body\.innerText/);
   assert.doesNotMatch(shell, /document\.querySelectorAll/);
+});
+
+test("free-text Command searches hand off to the existing permission-aware Traceability Centre", () => {
+  assert.match(traceability, /window\.addEventListener\("vyndi:traceability-search"/);
+  assert.match(traceability, /DIRECT_SEARCH_SENTINEL/);
+  assert.match(traceability, /interpretTraceabilityQuery\(trimmed\)/);
+  assert.match(traceability, /searchTraceability\(\{ data: \{ query: serverQuery, limit: 60 \} \}\)/);
+  assert.match(traceability, /direct partial-ID, SKU, supplier, model and vernacular search/i);
+});
+
+test("unified Command search replaces the redundant floating Traceability trigger", () => {
+  assert.match(theme, /button\[aria-label="Open Traceability and Print"\]/);
+  assert.match(theme, /display:\s*none\s*!important/);
+  assert.match(traceability, /Traceability & Print Centre/);
+  assert.match(traceability, /window\.addEventListener\("vyndi:traceability-search"/);
 });
 
 test("User Manual is a searchable Command reference page without global runtime scanning", () => {
