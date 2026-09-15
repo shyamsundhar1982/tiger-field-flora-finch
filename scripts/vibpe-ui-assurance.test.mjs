@@ -163,7 +163,7 @@ test("finance, legal and risk have persisted canonical source authority", () => 
   assert.match(financeAuthority, /Math\.abs\(balanceError\) > 0\.01/);
 });
 
-test("runtime observer records only active-route DOM evidence while Playwright owns temporal session proof", () => {
+test("runtime observer stays available for explicit assurance tooling but is not mounted in normal Command navigation", () => {
   for (const id of [
     "UI-AUTH-SESSION","UI-SALES-LOAD","UI-SALES-CONFIRM","UI-PRODUCT-LOAD","UI-ENGINEERING-LOAD","UI-BOM-LOAD",
     "UI-INVENTORY-LOAD","UI-PROCUREMENT-LOAD","UI-PRODUCTION-LOAD","UI-QUALITY-LOAD","UI-PEOPLE-OFFICE-LOAD",
@@ -180,7 +180,7 @@ test("runtime observer records only active-route DOM evidence while Playwright o
   assert.doesNotMatch(observer, /sweepAuthenticatedRoutes/);
   assert.doesNotMatch(observer, /authenticated-route-sweep/);
   assert.doesNotMatch(observer, /router\.invalidate/);
-  assert.match(commandRoute, /VibpeRuntimeObserver/);
+  assert.doesNotMatch(commandRoute, /VibpeRuntimeObserver/);
 });
 
 test("read-only Command mount hydrates central plan state without manufacturing a draft revision", () => {
