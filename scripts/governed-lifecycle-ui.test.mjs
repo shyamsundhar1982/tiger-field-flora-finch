@@ -75,7 +75,7 @@ test("Production prints a dedicated material requisition record instead of the w
   const source = read("src/routes/command/production.tsx");
   assert.match(source, /function printRequisitionRecord/);
   assert.match(source, /Material Requisition &amp; Issue Record/);
-  assert.match(source, /Controlled Production Record/);
+  assert.match(source, /vyndiPrintBrandMarkup/);
   assert.match(source, /Stores issue \/ verification/);
   assert.match(source, /Production receipt/);
   assert.match(source, /const rows = materialLines\.map/);
