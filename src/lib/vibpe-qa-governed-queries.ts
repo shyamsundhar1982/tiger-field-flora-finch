@@ -163,7 +163,9 @@ async function jobTravellerAnswer(sql: Sql) {
 
 function isActualVsPlanQuestion(question: string) {
   const q = question.toLowerCase();
-  return /actual/.test(q) && /plan|forecast|reconcil|variance|separate/.test(q);
+  const actualsSubject = /transaction[-\s]?derived|monthly actuals?|actual (?:units?|revenue|sales|receivables?)|units? and revenue/.test(q);
+  const reconciliation = /plan|forecast|reconcil|variance|separate/.test(q);
+  return actualsSubject && reconciliation;
 }
 
 async function actualVsPlanAnswer(sql: Sql) {
