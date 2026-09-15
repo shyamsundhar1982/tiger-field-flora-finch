@@ -100,8 +100,15 @@ export function IbpeWorkspaceProjection() {
   const findings = useMemo(() => {
     if (!run || !Array.isArray(run.result?.findings)) return [];
     const domains = Array.isArray(current?.domains) ? current.domains : [];
+    const seenTitles = new Set<string>();
     return run.result.findings
       .filter((finding) => finding && typeof finding.domain === "string" && domains.includes(finding.domain))
+      .filter((finding) => {
+        const title = typeof finding.title === "string" ? finding.title.trim() : "";
+        if (!title || seenTitles.has(title)) return false;
+        seenTitles.add(title);
+        return true;
+      })
       .slice(0,3);
   }, [run,current]);
 
