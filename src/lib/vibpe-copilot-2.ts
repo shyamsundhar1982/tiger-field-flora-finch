@@ -6,6 +6,7 @@ import { parseVibpeIntent, type VibpeScenarioParse } from "@/lib/vibpe-intent";
 import { retrieveVibpeKnowledgeEvidence, type VibpeKnowledgeEvidence } from "@/lib/vibpe-knowledge-retrieval";
 import { tryGovernanceDataAnswer } from "@/lib/vibpe-governance-queries";
 import { tryOperationalDataAnswer } from "@/lib/vibpe-operational-queries";
+import { tryVibpeQaGovernedDataAnswer } from "@/lib/vibpe-qa-governed-queries";
 import { explainVibpeHorizon } from "@/lib/vibpe-planning";
 import { vibpeBusinessOperatorContext } from "@/lib/vibpe-business-operator";
 import { getVibpeSession, updateVibpeSession } from "@/lib/vibpe-session";
@@ -223,9 +224,11 @@ function intentAnswer(intent: VibpeScenarioParse["intent"], question: string, re
       .sort((a, b) => (b.purchaseCostLakh ?? 0) - (a.purchaseCostLakh ?? 0) || b.recommendedPurchaseQty - a.recommendedPurchaseQty)
       .slice(0, 6);
     return [
-      `Procurement assessment: recommended procurement is ${money(result.summary.totalRecommendedProcurementLakh)}.`,
+      `Procurement assessment: governed planning recommended procurement is ${money(result.summary.totalRecommendedProcurementLakh)}.`,
       purchases.length ? `Priority recommendations: ${purchases.map((row) => `${row.sku} M${row.period}: buy ${quantity(row.recommendedPurchaseQty)}${row.purchaseCostLakh != null ? ` (${money(row.purchaseCostLakh)})` : ""}${row.recommendationIsLate ? ", inside lead time" : ""}`).join("; ")}.` : "No purchase recommendation is active in the governed packet.",
+      "Truth class: this is a governed planning recommendation, not an approved supplier commitment or transaction.",
       actions.length ? `Controlled next actions: ${actions.join(" ")}` : "No procurement action is currently ranked.",
+      "VIBPE is advisory and does not create, approve or issue a PO automatically; any commitment remains in the Procurement owning workspace with human authority.",
     ].join("\n\n");
   }
 
@@ -244,9 +247,11 @@ function intentAnswer(intent: VibpeScenarioParse["intent"], question: string, re
   if (intent === "funding") {
     const trough = [...result.cash].sort((a, b) => a.freeLiquidityAfterRecommendationsLakh - b.freeLiquidityAfterRecommendationsLakh)[0];
     return [
-      `Funding assessment: minimum free liquidity after recommendations is ${money(result.summary.minimumFreeLiquidityAfterRecommendationsLakh)}${trough ? ` at M${trough.period}` : ""}.`,
+      `Funding assessment: governed IBPE planning minimum free liquidity after recommendations is ${money(result.summary.minimumFreeLiquidityAfterRecommendationsLakh)}${trough ? ` at M${trough.period}` : ""}.`,
       `Incremental funding need is ${money(result.funding.incrementalFundingNeedLakh)}; first post-recommendation liquidity breach is ${result.funding.firstLiquidityBreachAfterRecommendationsPeriod ? `M${result.funding.firstLiquidityBreachAfterRecommendationsPeriod}` : "not present in the modeled horizon"}.`,
-      actions.length ? `Controlled next actions: ${actions.join(" ")}` : "No funding action is currently ranked.",
+      "Truth class: this is planning liquidity / a funding recommendation, not current cash ledger truth and not an approved funding commitment.",
+      actions.length ? `Controlled next actions: ${actions.join(" ")}` : "Controlled next actions: review the liquidity driver and funding/cost/pace options.",
+      "VIBPE is advisory; funding requires human approval in the owning Finance/Funding workspace and is never committed automatically.",
     ].join("\n\n");
   }
 
@@ -295,6 +300,22 @@ export async function runVibpeCopilot2(
   const sessionKey = options.sessionKey ?? "default";
   const session = getVibpeSession(sessionKey);
   const priorScenario = session.activeScenario ?? options.uiScenario;
+
+  try {
+    const specialistAnswer = await tryVibpeQaGovernedDataAnswer(sql, question);
+    if (specialistAnswer) {
+      updateVibpeSession(sessionKey, { lastIntent: parsed.intent, lastQuestion: question });
+      return {
+        intent: parsed.intent,
+        answer: specialistAnswer,
+        doctrine: vibpeBusinessOperatorContext(),
+        advisoryOnly: true,
+      };
+    }
+  } catch {
+    // QA-governed specialist queries are read-only. If one canonical source is
+    // unavailable, continue through existing governed routing rather than fail open.
+  }
 
   try {
     const governanceAnswer = await tryGovernanceDataAnswer(sql, question);

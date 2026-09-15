@@ -6,7 +6,7 @@ on:
       - 'src/lib/ibpe-copilot.ts'
       - 'src/lib/ibpe-scenario-lab.ts'
       - 'src/lib/vibpe-*.ts'
-      - 'scripts/vibpe-*.test.mjs'
+      - 'scripts/vibpe-*.mjs'
       - 'docs/VIBPE-*.md'
       - '.github/workflows/vibpe-copilot-2.yml'
   workflow_dispatch:
@@ -34,9 +34,6 @@ jobs:
       - name: Typecheck application
         run: npm run typecheck
 
-      - name: Existing governed regression suite
-        run: npm test
-
       - name: VIBPE Co-Pilot 2 regression suite
         run: >-
           node --test
@@ -53,3 +50,28 @@ jobs:
           scripts/vibpe-cycling-performance.test.mjs
           scripts/vibpe-indian-bike-fit.test.mjs
           scripts/vibpe-carbon-bike-designer.test.mjs
+
+      - name: Autonomous VIBPE QA guardrails
+        run: node --test scripts/vibpe-copilot-qa.test.mjs
+
+      - name: Autonomous VIBPE governed-fixture QA
+        run: node scripts/vibpe-copilot-qa-runner.mjs
+
+      - name: Verify VIBPE QA audit output
+        if: always()
+        run: |
+          test -d artifacts/vibpe-qa
+          test -n "$(find artifacts/vibpe-qa -maxdepth 1 -type f -name 'vibpe-qa-*.json' -print -quit)"
+          test -n "$(find artifacts/vibpe-qa -maxdepth 1 -type f -name 'vibpe-qa-*.md' -print -quit)"
+
+      - name: Upload VIBPE QA cycle audits
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vibpe-qa-cycle-audits
+          path: artifacts/vibpe-qa/
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Existing governed regression suite
+        run: npm test
