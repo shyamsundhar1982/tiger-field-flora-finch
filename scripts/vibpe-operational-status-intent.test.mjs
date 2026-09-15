@@ -23,7 +23,7 @@ test("plain pending orders route to the commercial operational ledger", () => {
   assert.match(operational, /addIntent\(intents, "customer_orders"\)/);
   assert.match(operational, /Pending customer orders:/);
   assert.match(operational, /vyndi_sales_orders/);
-  assert.match(operational, /delivered","closed","cancelled","canceled","void/);
+  assert.match(operational, /"delivered",\s*"closed",\s*"cancelled",\s*"canceled",\s*"void"/);
 });
 
 test("supplier pending PO wording uses supplier-filtered open PO evidence", () => {
