@@ -143,7 +143,7 @@ export function assessVibpeAnswer(testCase: VibpeQaCase, answer: string): VibpeQ
   if ((c.actionTerms ?? []).length && !(c.actionTerms ?? []).some((term) => has(answer, term))) {
     actionability.push(`Missing controlled next action: ${(c.actionTerms ?? []).join(" | ")}`);
   }
-  if (c.requireAdvisoryBoundary && !/(advisory|does not create|remain(?:s)? controlled|human confirmation|owning workspace)/i.test(answer)) {
+  if (c.requireAdvisoryBoundary && !/(advisory|does not create|remain(?:s)? controlled|human confirmation|human approval|owning workspace|cannot .*automatically)/i.test(answer)) {
     actionability.push("Missing advisory/human-authority boundary.");
   }
 
@@ -206,11 +206,13 @@ export async function runVibpeQaCycle(input: {
       afterAnswer: rawAnswer,
     };
     audits.push(audit);
-    if (assessment.pass || !input.propose || !input.apply) return audits;
+    if (assessment.pass || !input.propose) return audits;
 
     const proposal = await input.propose(audit);
     if (!proposal) return audits;
     audit.proposal = validateVibpeCorrectionProposal(proposal);
+    if (!input.apply) return audits;
+
     const applied = await input.apply(audit.proposal, audit);
     audit.changedFiles = applied.changedFiles;
     audit.testResults = applied.testResults;
