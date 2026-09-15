@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VEDM-301 Rev 5.2 — Conventional Seatstay General Arrangement</title>
+<style>
+:root{--ink:#10243c;--muted:#65758a;--line:#243e5a;--grid:#dce5ee;--accent:#b8892d;--danger:#9f2f2f;--paper:#fff;--screen:#071018}
+*{box-sizing:border-box}html,body{margin:0}body{font-family:Arial,Helvetica,sans-serif;background:var(--screen);color:#e9eef4;padding:22px}.shell{max-width:1500px;margin:auto}.toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;margin:0 0 18px;padding:15px 18px;border:1px solid #233447;background:#0b1620}.toolbar h1{font-size:17px;margin:0;letter-spacing:.08em;text-transform:uppercase}.toolbar p{margin:5px 0 0;color:#9fb0c2;font-size:12px}.tabs{display:flex;gap:8px;flex-wrap:wrap}.tabs button,.toolbar button{border:1px solid #40566d;background:#0e1c28;color:#e9eef4;padding:8px 12px;font:700 11px Arial;letter-spacing:.08em;cursor:pointer}.tabs button.active{border-color:#d2a84e;color:#f6d27c;background:#18202a}.toolbar .print{border-color:#b8892d;color:#f6d27c}.sheet{background:var(--paper);color:var(--ink);margin:0 auto 22px;box-shadow:0 18px 45px #0008;border:1px solid #6e7d8b;min-height:930px;display:none}.sheet.active{display:block}.sheet-head{display:grid;grid-template-columns:1fr auto;gap:20px;align-items:end;padding:22px 26px 14px;border-bottom:3px solid var(--ink)}.sheet-head h2{margin:0;font-size:22px;letter-spacing:.04em}.sheet-head .sub{margin-top:7px;font-size:11px;color:var(--muted);letter-spacing:.09em;text-transform:uppercase}.sheet-head .status{font-size:11px;font-weight:700;border:1px solid var(--accent);color:#745514;padding:8px 11px;text-transform:uppercase;letter-spacing:.08em}.sheet-body{display:grid;grid-template-columns:minmax(0,1fr) 315px;gap:16px;padding:18px 20px}.drawing-wrap{border:1px solid #9aa9b8;background-color:#fbfdff;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:20px 20px;min-width:0}.drawing{display:block;width:100%;height:auto;aspect-ratio:14/8.6}.drawing .frame{stroke:#112b45;stroke-width:10;stroke-linecap:round;stroke-linejoin:round;fill:none}.drawing .stay{stroke:#112b45;stroke-width:7;stroke-linecap:round;fill:none}.drawing .fork{stroke:#1e3f5d;stroke-width:8;stroke-linecap:round}.drawing .wheel{stroke:#1d3349;stroke-width:3;fill:none}.drawing .rim{stroke:#70859a;stroke-width:1.5;fill:none}.drawing .datum{stroke:#7e8f9e;stroke-width:1.2;stroke-dasharray:10 8}.drawing .dim{stroke:#a2741f;stroke-width:1.5;fill:none}.drawing .ext{stroke:#a2741f;stroke-width:1;stroke-dasharray:4 4}.drawing .dimtext{fill:#7a5819;font:bold 16px Arial}.drawing .label{fill:#10243c;font:bold 15px Arial}.drawing .note{fill:#9f2f2f;font:bold 14px Arial}.drawing .small{fill:#526579;font:13px Arial}.drawing .joint{fill:#b8892d;stroke:#6c4b12;stroke-width:2}.panel{border:1px solid #9aa9b8;padding:0;background:#fff}.panel h3{margin:0;padding:11px 12px;background:#10243c;color:#fff;font-size:12px;text-transform:uppercase;letter-spacing:.08em}.kv{width:100%;border-collapse:collapse;font-size:11px}.kv td{padding:7px 9px;border-bottom:1px solid #d8e0e8;vertical-align:top}.kv td:first-child{color:#617287;width:54%}.kv td:last-child{font-weight:700;text-align:right}.notes{padding:11px 12px;font-size:10.5px;line-height:1.45;color:#43586d}.notes strong{color:#10243c}.notes .warning{color:#8f2e2e}.titleblock{margin:0 20px 20px;border:2px solid #10243c;display:grid;grid-template-columns:1.5fr .65fr .65fr .65fr .75fr;font-size:10px}.titleblock>div{padding:8px 10px;border-right:1px solid #10243c;min-height:48px}.titleblock>div:last-child{border-right:0}.titleblock b{display:block;font-size:11px;margin-top:3px}.titleblock .brand{font-size:13px;font-weight:800;letter-spacing:.08em}.legend{padding:0 20px 18px;color:#53677a;font-size:10px;line-height:1.45}.legend b{color:#10243c}
+@media(max-width:980px){body{padding:8px}.sheet-body{grid-template-columns:1fr}.panel{margin-top:2px}.titleblock{grid-template-columns:1fr 1fr}.titleblock>div{border-bottom:1px solid #10243c}.sheet-head{grid-template-columns:1fr}.sheet{min-height:0}}
+@media print{body{background:#fff;padding:0}.toolbar{display:none}.shell{max-width:none}.sheet{display:block!important;box-shadow:none;border:0;margin:0;min-height:0;page-break-after:always;break-after:page}.sheet:last-child{page-break-after:auto;break-after:auto}.sheet-head{padding-top:10mm}.sheet-body{grid-template-columns:minmax(0,1fr) 76mm;padding:5mm}.titleblock{margin:0 5mm 5mm}.legend{padding:0 5mm 5mm}@page{size:A3 landscape;margin:8mm}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="toolbar">
+    <div><h1>VEDM-301 Rev 5.2 — General Arrangement</h1><p>Historical pre-DSS+ geometry · conventional upper seat-cluster seatstay junction · NTS engineering reference</p></div>
+    <div class="tabs" id="tabs"></div>
+    <button class="print" onclick="window.print()">PRINT / SAVE PDF — ALL 5 SHEETS</button>
+  </div>
+  <main id="sheets"></main>
+</div>
+<script>
+const sizes=[
+ {size:'XS',stack:520,reach:365,ett:518,st:450,ht:105,ha:71.0,sa:74.5,cs:415,bb:75,offset:52,trail:60.4,fc:578,wb:993,bbh:260,tire:35},
+ {size:'S', stack:538,reach:376,ett:532,st:478,ht:125,ha:71.5,sa:74.0,cs:415,bb:75,offset:52,trail:57.3,fc:589,wb:1004,bbh:260,tire:35},
+ {size:'M', stack:555,reach:388,ett:548,st:505,ht:145,ha:72.0,sa:73.7,cs:418,bb:75,offset:48,trail:58.4,fc:598,wb:1016,bbh:260,tire:35},
+ {size:'L', stack:578,reach:398,ett:563,st:535,ht:170,ha:72.3,sa:73.3,cs:420,bb:75,offset:48,trail:56.5,fc:610,wb:1030,bbh:260,tire:35},
+ {size:'XL',stack:602,reach:408,ett:578,st:565,ht:195,ha:72.5,sa:73.0,cs:422,bb:75,offset:45,trail:58.4,fc:622,wb:1044,bbh:260,tire:35}
+];
+const rad=d=>d*Math.PI/180, S=.75, AX=520, RX=280, R=335*S;
+function n(v,d=0){return Number(v).toFixed(d)}
+function dimH(x1,x2,y,ey1,ey2,label,id){return `<line class="ext" x1="${x1}" y1="${ey1}" x2="${x1}" y2="${y}"/><line class="ext" x1="${x2}" y1="${ey2}" x2="${x2}" y2="${y}"/><line class="dim" x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" marker-start="url(#a${id})" marker-end="url(#a${id})"/><text class="dimtext" x="${(x1+x2)/2}" y="${y-8}" text-anchor="middle">${label}</text>`}
+function dimV(x,y1,y2,ex1,ex2,label,id){return `<line class="ext" x1="${ex1}" y1="${y1}" x2="${x}" y2="${y1}"/><line class="ext" x1="${ex2}" y1="${y2}" x2="${x}" y2="${y2}"/><line class="dim" x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" marker-start="url(#a${id})" marker-end="url(#a${id})"/><text class="dimtext" x="${x+18}" y="${(y1+y2)/2}" transform="rotate(-90 ${x+18} ${(y1+y2)/2})" text-anchor="middle">${label}</text>`}
+function svg(g){
+ const id=g.size, axleY=520, bbx=RX+g.cs*S, bby=axleY+g.bb*S, fx=RX+g.wb*S;
+ const htx=bbx+g.reach*S, hty=bby-g.stack*S;
+ const hbx=htx+g.ht*Math.cos(rad(g.ha))*S, hby=hty+g.ht*Math.sin(rad(g.ha))*S;
+ const stx=bbx-g.st*Math.cos(rad(g.sa))*S, sty=bby-g.st*Math.sin(rad(g.sa))*S;
+ const vsi=bbx-(g.stack/Math.tan(rad(g.sa)))*S;
+ const reachY=Math.max(48,hty-55), wbY=836, fcY=797, csY=758, stackX=Math.min(1340,htx+84);
+ return `<svg class="drawing" viewBox="0 0 1400 860" role="img" aria-label="VEDM-301 Rev 5.2 size ${id} conventional-seatstay engineering general arrangement">
+ <defs><marker id="a${id}" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#a2741f"/></marker></defs>
+ <line class="datum" x1="30" y1="${axleY}" x2="1360" y2="${axleY}"/><text class="small" x="38" y="${axleY-9}">AXLE DATUM</text>
+ <line class="datum" x1="30" y1="${axleY+R}" x2="1360" y2="${axleY+R}"/><text class="small" x="38" y="${axleY+R-9}">GROUND / NOMINAL R335</text>
+ <circle class="wheel" cx="${RX}" cy="${axleY}" r="${R}"/><circle class="rim" cx="${RX}" cy="${axleY}" r="${R-18}"/><circle class="wheel" cx="${fx}" cy="${axleY}" r="${R}"/><circle class="rim" cx="${fx}" cy="${axleY}" r="${R-18}"/>
+ <line class="stay" x1="${RX}" y1="${axleY}" x2="${stx}" y2="${sty}"/><line class="stay" x1="${RX}" y1="${axleY+5}" x2="${stx+5}" y2="${sty+8}"/>
+ <line class="frame" x1="${stx}" y1="${sty}" x2="${bbx}" y2="${bby}"/><line class="frame" x1="${stx}" y1="${sty}" x2="${htx}" y2="${hty}"/><line class="frame" x1="${bbx}" y1="${bby}" x2="${hbx}" y2="${hby}"/><line class="stay" x1="${RX}" y1="${axleY}" x2="${bbx}" y2="${bby}"/>
+ <line class="frame" x1="${htx}" y1="${hty}" x2="${hbx}" y2="${hby}"/><line class="fork" x1="${hbx}" y1="${hby}" x2="${fx}" y2="${axleY}"/>
+ <circle class="joint" cx="${stx}" cy="${sty}" r="8"/><circle cx="${bbx}" cy="${bby}" r="18" fill="#fff" stroke="#10243c" stroke-width="7"/>
+ <line class="ext" x1="${vsi}" y1="${hty-25}" x2="${vsi}" y2="${bby}" stroke-dasharray="8 6"/>
+ ${dimH(bbx,htx,reachY,bby,hty,`REACH ${g.reach}`,id)}
+ ${dimH(vsi,htx,hty-22,hty,hty,`ETT ${g.ett}`,id)}
+ ${dimV(stackX,hty,bby,htx,bbx,`STACK ${g.stack}`,id)}
+ ${dimH(RX,fx,wbY,axleY,axleY,`WHEELBASE ${g.wb}`,id)}
+ ${dimH(bbx,fx,fcY,bby,axleY,`FRONT CENTRE ${g.fc}`,id)}
+ ${dimH(RX,bbx,csY,axleY,bby,`CHAINSTAY ${g.cs}`,id)}
+ ${dimV(bbx-48,axleY,bby,RX,bbx,`BB DROP ${g.bb}`,id)}
+ <text class="dimtext" x="${(htx+hbx)/2+22}" y="${(hty+hby)/2}">HT ${g.ht}</text>
+ <text class="dimtext" x="${(stx+bbx)/2-54}" y="${(sty+bby)/2}">ST ${g.st}</text>
+ <text class="label" x="${bbx+28}" y="${bby+20}">SA ${n(g.sa,1)}°</text><text class="label" x="${hbx+20}" y="${hby+28}">HA ${n(g.ha,1)}°</text>
+ <text class="label" x="${fx-185}" y="${axleY-92}">FORK OFFSET ${g.offset} — PROPOSED</text><text class="small" x="${fx-185}" y="${axleY-72}">Trail ${n(g.trail,1)} mm provisional</text>
+ <path class="dim" d="M ${stx+10} ${sty-9} L ${stx-105} ${sty-76} L ${stx-260} ${sty-76}"/><text class="note" x="${stx-255}" y="${sty-84}">CONVENTIONAL UPPER SEAT-CLUSTER JUNCTION</text><text class="small" x="${stx-255}" y="${sty-63}">No DSS+ dropped-seatstay feature in Rev 5.2 source</text>
+ <text class="small" x="55" y="65">SIDE ELEVATION / GEOMETRY CONTROL REFERENCE — NTS</text><text class="small" x="55" y="86">Wheel/fork shown for interface context. Fork A-C is not a controlled Rev 5.2 dimension.</text>
+ </svg>`;
+}
+function row(k,v){return `<tr><td>${k}</td><td>${v}</td></tr>`}
+function sheet(g,i){return `<section class="sheet${i===2?' active':''}" data-size="${g.size}">
+ <header class="sheet-head"><div><h2>VĀYÚ / VELOXIS — VEDM-301 REV 5.2 · SIZE ${g.size}</h2><div class="sub">General Arrangement · conventional seatstay architecture · historical controlled geometry reference</div></div><div class="status">Historical / pre-DSS+</div></header>
+ <div class="sheet-body"><div class="drawing-wrap">${svg(g)}</div><aside class="panel"><h3>Controlled / source dimensions</h3><table class="kv">
+ ${row('Stack',g.stack+' mm')}${row('Reach',g.reach+' mm')}${row('Effective top tube',g.ett+' mm')}${row('Seat tube C-T',g.st+' mm')}${row('Head tube',g.ht+' mm')}${row('Head angle',n(g.ha,1)+'°')}${row('Seat angle',n(g.sa,1)+'°')}${row('Chainstay',g.cs+' mm')}${row('BB drop',g.bb+' mm')}${row('Front centre',g.fc+' mm')}${row('Wheelbase',g.wb+' mm')}${row('Fork offset',g.offset+' mm — proposed')}${row('Trail',n(g.trail,1)+' mm — provisional')}${row('Nominal BB height',g.bbh+' mm')}${row('Tyre clearance envelope',g.tire+' mm minimum')}
+ </table><div class="notes"><strong>Seatstay architecture:</strong> seatstay terminates at the upper seat cluster. This drawing intentionally does not use the later DSS+ dropped-seatstay architecture.<br><br><strong>Fork control:</strong> offset is proposed and remains pending physical structural/steering validation in the Rev 5.2 source. <span class="warning">Do not infer fork tooling or axle-to-crown from the schematic fork leg.</span><br><br><strong>Status:</strong> engineering/historical reference only. Rev 5.3.8 remains the later controlling geometry master where applicable.</div></aside></div>
+ <div class="titleblock"><div><span class="brand">VĀYÚ SHASTR · ENGINEERING</span><b>GENERAL ARRANGEMENT — CONVENTIONAL SEATSTAY</b></div><div>DOCUMENT<b>VLX-102-001-R52-${g.size}</b></div><div>MASTER SOURCE<b>VEDM-301 Rev 5.2</b></div><div>SCALE<b>NTS</b></div><div>SHEET<b>${i+1} OF 5</b></div></div>
+ <div class="legend"><b>Drawing basis:</b> geometry values transcribed from DOSSIER 1 · Design-Controlled Master Geometry (VEDM-301) · Rev 5.2. Drawing geometry is a controlled-reference visualisation, not a production manufacturing release. Dimension text governs over graphical scaling. No DSS+ drop dimension is introduced because the Rev 5.2 source predates the later DSS+ dropped-seatstay definition.</div>
+ </section>`}
+document.getElementById('sheets').innerHTML=sizes.map(sheet).join('');
+document.getElementById('tabs').innerHTML=sizes.map((g,i)=>`<button class="${i===2?'active':''}" data-size="${g.size}">${g.size}</button>`).join('');
+document.querySelectorAll('#tabs button').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.sheet').forEach(s=>s.classList.toggle('active',s.dataset.size===b.dataset.size));}));
+</script>
+</body>
+</html>
