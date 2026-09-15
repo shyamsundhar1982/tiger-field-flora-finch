@@ -40,10 +40,12 @@
 }
 
 .vyndi-cinematic-stage {
-  --pointer-x-shift: 0px;
-  --pointer-y-shift: 0px;
-  --pointer-x-tilt: 0deg;
-  --pointer-y-tilt: 0deg;
+  --pointer-x: 0;
+  --pointer-y: 0;
+  --pointer-x-shift: calc(var(--pointer-x) * 18px);
+  --pointer-y-shift: calc(var(--pointer-y) * 14px);
+  --pointer-x-tilt: calc(var(--pointer-x) * -2.4deg);
+  --pointer-y-tilt: calc(var(--pointer-y) * 1.8deg);
   perspective: 1450px;
   perspective-origin: 50% 48%;
   transform-style: preserve-3d;
