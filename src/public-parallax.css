@@ -1,6 +1,6 @@
 /* Public-only cinematic motion for the VYNDI Home and Range pages.
  * CSS scroll-driven transforms only: no JS scroll listeners, no canvas,
- * no MutationObserver and no effect on protected Command routes.
+ * no runtime DOM observers and no effect on protected Command routes.
  */
 
 .vyndi-public-page {
