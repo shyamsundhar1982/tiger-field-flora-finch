@@ -29,14 +29,14 @@ test("plain pending orders route to the commercial operational ledger", () => {
 test("supplier pending PO wording uses supplier-filtered open PO evidence", () => {
   assert.match(operational, /purchaseOrder && asksOpen && supplierish/);
   assert.match(operational, /intent: "supplier_purchase_orders"/);
-  assert.match(operational, /\boda\b/);
+  assert.ok(operational.includes("\\boda\\b"));
   assert.match(operational, /supplierMatchScore/);
-  assert.match(operational, /Pending purchase orders: 0|pending purchase orders: 0/i);
+  assert.match(operational, /pending purchase orders: 0/i);
   assert.match(operational, /received\/closed\/cancelled\/void records are excluded/);
 });
 
 test("JBC GRN dispatch and invoice status phrases have dedicated live handlers", () => {
-  assert.match(operational, /\bjbc\b/);
+  assert.ok(operational.includes("\\bjbc\\b"));
   assert.match(operational, /intent: "job_cards"/);
   assert.match(operational, /intent: "grn_pending"/);
   assert.match(operational, /intent: "dispatch_pending"/);
@@ -49,7 +49,7 @@ test("JBC GRN dispatch and invoice status phrases have dedicated live handlers",
 
 test("explicit document references remain traceability territory", () => {
   assert.match(operational, /hasExplicitTraceReference/);
-  assert.match(operational, /(?:so\|jbc\|po\|grn\|mr\|batch\|vyndi\|autopo\|vibpe-autopo)/i);
+  assert.ok(operational.includes("(?:so|jbc|po|grn|mr|batch|vyndi|autopo|vibpe-autopo)"));
   assert.match(operational, /if \(hasExplicitTraceReference\(question\)\) return \{ recognized: false \}/);
 });
 
