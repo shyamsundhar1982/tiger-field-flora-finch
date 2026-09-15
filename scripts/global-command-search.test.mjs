@@ -6,6 +6,7 @@ const shell = readFileSync(new URL("../src/components/command-shell-v2.tsx", imp
 const workflow = readFileSync(new URL("../src/lib/operating-workflow.ts", import.meta.url), "utf8");
 const manual = readFileSync(new URL("../src/routes/command/user-manual.tsx", import.meta.url), "utf8");
 const traceability = readFileSync(new URL("../src/components/traceability-document-centre-v2.tsx", import.meta.url), "utf8");
+const theme = readFileSync(new URL("../src/tansam-vyndi-theme.css", import.meta.url), "utf8");
 
 test("global Command search is a governed universal entry point without runtime DOM indexing", () => {
   assert.match(shell, /function CommandSearch\(/);
@@ -35,6 +36,13 @@ test("free-text Command searches hand off to the existing permission-aware Trace
   assert.match(traceability, /interpretTraceabilityQuery\(trimmed\)/);
   assert.match(traceability, /searchTraceability\(\{ data: \{ query: serverQuery, limit: 60 \} \}\)/);
   assert.match(traceability, /direct partial-ID, SKU, supplier, model and vernacular search/i);
+});
+
+test("unified Command search replaces the redundant floating Traceability trigger", () => {
+  assert.match(theme, /button\[aria-label="Open Traceability and Print"\]/);
+  assert.match(theme, /display:\s*none\s*!important/);
+  assert.match(traceability, /Traceability & Print Centre/);
+  assert.match(traceability, /window\.addEventListener\("vyndi:traceability-search"/);
 });
 
 test("User Manual is a searchable Command reference page without global runtime scanning", () => {
