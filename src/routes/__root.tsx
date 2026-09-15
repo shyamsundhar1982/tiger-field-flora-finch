@@ -5,6 +5,7 @@ import { PrintBrandHeader } from "@/components/brand-lockup";
 import { VAYU_LEGAL_NAME, VYNDI_BRAND_HIERARCHY_LABEL, VYNDI_OS_NAME } from "@/lib/brand";
 import { lazy, Suspense, useEffect, useState } from "react";
 import "../styles.css";
+import "../tansam-vyndi-theme.css";
 
 const LazyPreviewHostBridge = lazy(async () => {
   const module = await import("@/components/preview-host-bridge");
@@ -20,7 +21,7 @@ export const Route = createRootRoute({
       { name: "application-name", content: VYNDI_OS_NAME },
       { name: "apple-mobile-web-app-title", content: VYNDI_OS_NAME },
       { name: "description", content: `${VYNDI_BRAND_HIERARCHY_LABEL}. Governed business execution for Vāyú's VYNDI carbon bicycle platform.` },
-      { name: "theme-color", content: "#0c0c0e" },
+      { name: "theme-color", content: "#060809" },
     ],
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/brand/vayu-official.svg" },
