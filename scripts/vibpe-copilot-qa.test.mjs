@@ -36,10 +36,10 @@ test("correction engine classifies all requested dimensions and fails closed on 
     "actionability",
   ]) assert.match(qa, new RegExp(`"${dimension}"`));
 
-  assert.match(qa, /migrations\\\//);
-  assert.match(qa, /transaction(?:al)?\\s\+business\\s\+data/);
-  assert.match(qa, /Any QA mutation requires a governed test fixture or sandbox/);
-  assert.match(qa, /VIBPE QA correction scope violation/);
+  assert.ok(qa.includes("/^migrations\\//"));
+  assert.ok(qa.includes("transaction(?:al)?\\s+business\\s+data"));
+  assert.ok(qa.includes("Any QA mutation requires a governed test fixture or sandbox."));
+  assert.ok(qa.includes("VIBPE QA correction scope violation"));
 });
 
 test("specialist answer layer is read-only and uses canonical governed authorities", () => {
