@@ -8,7 +8,8 @@ async function text(path) {
 
 test("shared controlled transaction document renderer preserves electronic authority", async () => {
   const renderer = await text("src/lib/controlled-document.ts");
-  assert.match(renderer, /Vāyú Shastr Pvt Ltd · Controlled Business Record/);
+  assert.match(renderer, /vyndiPrintBrandMarkup/);
+  assert.match(renderer, /VĀYÚ SHASTR PVT\. LTD\. → VYNDI OS → VIBPE Co-Pilot 2\.0 → VYNDI/);
   assert.match(renderer, /Electronic VYNDI system record is authoritative/);
   assert.match(renderer, /Printed copy is uncontrolled unless specifically issued as a controlled copy/);
   assert.match(renderer, /A4 \$\{orientation\}/);

@@ -138,6 +138,48 @@
   opacity: 0.42;
 }
 
+.vyndi-print-brand {
+  display: none;
+}
+
+@media print {
+  .vyndi-legal-footer {
+    display: none;
+  }
+
+  .vyndi-print-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #333;
+    color: #111;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+
+  .vyndi-print-brand__mark {
+    width: 36px;
+    height: 36px;
+  }
+
+  .vyndi-print-brand strong,
+  .vyndi-print-brand span {
+    display: block;
+  }
+
+  .vyndi-print-brand strong {
+    font-size: 9px;
+    letter-spacing: 0.12em;
+  }
+
+  .vyndi-print-brand span span {
+    margin-top: 3px;
+    color: #444;
+    font-size: 8px;
+  }
+}
+
 /* Command Centre login: adapted from the approved Saturnian-ring concept. */
 .command-entry {
   position: relative;

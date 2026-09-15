@@ -2,6 +2,8 @@ import { Link } from "@tanstack/react-router";
 import { Menu, X } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { BrandLockup } from "@/components/brand-lockup";
+import { VYNDI_BRAND_HIERARCHY_LABEL } from "@/lib/brand";
 
 const LINKS = [
   { to: "/", label: "House" },
@@ -9,8 +11,6 @@ const LINKS = [
 ] as const;
 
 const COMMAND_RETURN_TO = "/command";
-const VAYU_LOGO = "/brand/vayu-official.svg";
-
 type SiteHeaderProps = {
   ghost?: boolean;
   showNavigation?: boolean;
@@ -22,12 +22,8 @@ export function SiteHeader({ ghost = false, showNavigation = true, brandHref = "
   return (
     <header className={cn("sticky top-0 z-40 border-b border-border/80", ghost ? "bg-bg/95" : "bg-bg")}>
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:h-16 sm:px-6">
-        <Link to={brandHref as never} className="flex items-center gap-3" aria-label="VYNDI by Vāyú Shastr Pvt Ltd">
-          <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-black sm:size-11">
-            <img src={VAYU_LOGO} alt="Vāyú Shastr" className="size-full object-contain" />
-          </span>
-          <span className="h-6 w-px bg-border" aria-hidden="true" />
-          <span className="text-xl font-bold tracking-tight text-accent sm:text-2xl">VYNDI</span>
+        <Link to={brandHref as never} className="min-w-0" aria-label={VYNDI_BRAND_HIERARCHY_LABEL}>
+          <BrandLockup compact className="max-w-[min(70vw,24rem)]" />
         </Link>
         {showNavigation ? (
           <>
@@ -74,7 +70,7 @@ export function SiteFooter() {
   return (
     <footer className="border-t border-border">
       <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-8 text-sm text-muted sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <p className="font-semibold text-accent">Vāyú Shastr Pvt Ltd · VYNDI</p>
+        <p className="font-semibold text-accent">VĀYÚ SHASTR PVT. LTD. → VYNDI OS → VIBPE Co-Pilot 2.0 → VYNDI</p>
         <p>Designed and developed in India, for Indian riders.</p>
       </div>
     </footer>

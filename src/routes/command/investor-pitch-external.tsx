@@ -39,7 +39,7 @@ function InvestorPitchExternal() {
             to="/command/investor-pitch"
             className="inline-flex rounded-md border border-border px-4 py-2 text-sm text-muted hover:bg-surface hover:text-fg"
           >
-            Back to VINDY showcase
+            Back to VYNDI showcase
           </Link>
         </div>
 

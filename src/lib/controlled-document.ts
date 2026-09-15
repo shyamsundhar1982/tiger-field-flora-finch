@@ -1,3 +1,5 @@
+import { VYNDI_PRINT_BRAND_CSS, vyndiPrintBrandMarkup } from "@/lib/print-brand";
+
 export type ControlledDocumentField = {
   label: string;
   value: unknown;
@@ -106,8 +108,7 @@ export function printControlledDocument(options: ControlledDocumentOptions) {
     html, body { margin: 0; padding: 0; background: #fff; color: #171717; font-family: Arial, Helvetica, sans-serif; font-size: 9px; }
     .sheet { width: 100%; }
     .brand { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 10px; }
-    .brand h1 { margin: 0; font-size: 22px; letter-spacing: .06em; }
-    .company { margin-top: 3px; font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    ${VYNDI_PRINT_BRAND_CSS}
     .document { text-align: right; }
     .document h2 { margin: 0; font-size: 15px; }
     .document p { margin: 3px 0 0; color: #555; }
@@ -133,7 +134,7 @@ export function printControlledDocument(options: ControlledDocumentOptions) {
 <body>
   <main class="sheet">
     <section class="brand">
-      <div><h1>VYNDI</h1><div class="company">Vāyú Shastr Pvt Ltd · Controlled Business Record</div></div>
+      ${vyndiPrintBrandMarkup(window.location.origin)}
       <div class="document"><h2>${escapeHtml(options.recordType)}</h2><p><strong>${escapeHtml(options.title)}</strong></p><span class="status">${escapeHtml(status)}</span></div>
     </section>
     ${options.subtitle ? `<p>${escapeHtml(options.subtitle)}</p>` : ""}
@@ -141,7 +142,7 @@ export function printControlledDocument(options: ControlledDocumentOptions) {
     ${options.lineage?.length ? `<section class="lineage"><h3>Digital thread / lineage</h3>${renderFields(options.lineage)}</section>` : ""}
     ${renderSections(options.sections)}
     <section class="authority"><strong>Authority:</strong> ${escapeHtml(authority)}<br /><strong>Source / evidence:</strong> ${escapeHtml(sourceReference)}<br /><strong>Generated:</strong> ${escapeHtml(generatedAt())} IST<br /><strong>Control rule:</strong> Electronic VYNDI system record is authoritative. Printed copy is uncontrolled unless specifically issued as a controlled copy.</section>
-    <footer class="footer"><span>${escapeHtml(options.title)} · ${escapeHtml(route)}</span><span>VYNDI · Vāyú Shastr Pvt Ltd</span></footer>
+    <footer class="footer"><span>${escapeHtml(options.title)} · ${escapeHtml(route)}</span><span>VĀYÚ SHASTR PVT. LTD. → VYNDI OS → VIBPE Co-Pilot 2.0 → VYNDI</span></footer>
   </main>
   <script>window.addEventListener("load",()=>{setTimeout(()=>window.print(),80)});window.addEventListener("afterprint",()=>window.close(),{once:true});</script>
 </body>

@@ -1,3 +1,5 @@
+import { VYNDI_PRINT_BRAND_CSS, vyndiPrintBrandMarkup } from "@/lib/print-brand";
+
 export type ControlledPrintOptions = {
   title: string;
   recordType?: string;
@@ -103,8 +105,7 @@ export function printControlledElement(element: HTMLElement, options: Controlled
     html, body { margin: 0; padding: 0; background: #fff; color: #171717; font-family: Arial, Helvetica, sans-serif; font-size: 9px; }
     .sheet { width: 100%; }
     .brand { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 10px; }
-    .brand h1 { margin: 0; font-size: 22px; letter-spacing: .06em; }
-    .company { margin-top: 3px; font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    ${VYNDI_PRINT_BRAND_CSS}
     .document { text-align: right; }
     .document h2 { margin: 0; font-size: 15px; }
     .document p { margin: 3px 0 0; color: #555; }
@@ -135,7 +136,7 @@ export function printControlledElement(element: HTMLElement, options: Controlled
 <body>
   <main class="sheet">
     <section class="brand">
-      <div><h1>VYNDI</h1><div class="company">Vāyú Shastr Pvt Ltd · Controlled Business Record</div></div>
+      ${vyndiPrintBrandMarkup(window.location.origin)}
       <div class="document"><h2>${escapeHtml(recordType)}</h2><p><strong>${escapeHtml(options.title)}</strong></p></div>
     </section>
     <section class="meta">
@@ -147,7 +148,7 @@ export function printControlledElement(element: HTMLElement, options: Controlled
     ${options.subtitle ? `<p>${escapeHtml(options.subtitle)}</p>` : ""}
     <div class="extract">${clone.outerHTML}</div>
     <section class="authority"><strong>Source / extract reference:</strong> ${escapeHtml(sourceReference)}<br /><strong>Control rule:</strong> Electronic VYNDI system record is authoritative. Printed copy is uncontrolled unless specifically issued as a controlled copy.</section>
-    <footer class="footer"><span>${escapeHtml(options.title)} · ${escapeHtml(route)}</span><span>VYNDI · Vāyú Shastr Pvt Ltd</span></footer>
+    <footer class="footer"><span>${escapeHtml(options.title)} · ${escapeHtml(route)}</span><span>VĀYÚ SHASTR PVT. LTD. → VYNDI OS → VIBPE Co-Pilot 2.0 → VYNDI</span></footer>
   </main>
   <script>window.addEventListener("load",()=>{setTimeout(()=>window.print(),80)});window.addEventListener("afterprint",()=>window.close(),{once:true});</script>
 </body>

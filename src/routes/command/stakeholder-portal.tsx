@@ -13,7 +13,7 @@ function StakeholderPortal() {
   return <div className="space-y-7">
     <header>
       <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-green">External stakeholder · read-only</p>
-      <h1 className="mt-2 font-display text-4xl text-accent">VINDY Stakeholder Portal</h1>
+      <h1 className="mt-2 font-display text-4xl text-accent">VYNDI Stakeholder Portal</h1>
       <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">{STAKEHOLDER_PORTAL_STATUS.headline} A presentation view that separates verified evidence, modeled assumptions, pending validation and reserved decisions.</p>
       <div className="mt-3 flex flex-wrap gap-3 text-sm font-semibold"><Link to="/command/investor-board" className="text-accent">Board evidence →</Link><Link to="/command/financial-cockpit" className="text-accent">Finance evidence →</Link><Link to="/command/qa-verification" className="text-accent">QA evidence →</Link><Link to="/command/epr-live" className="text-accent">EPR evidence →</Link></div>
     </header>

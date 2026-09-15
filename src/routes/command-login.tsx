@@ -107,7 +107,7 @@ function CommandLogin() {
               <LockKeyhole className="size-5" />
             </div>
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-accent">VYNDI BIKES</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-accent">VĀYÚ SHASTR PVT. LTD. · VYNDI OS</p>
               <h1 className="text-2xl font-semibold tracking-tight">Legacy Command Access</h1>
             </div>
           </div>

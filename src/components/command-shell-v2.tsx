@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { SiteHeader } from "@/components/site-header";
+import { BrandLockup, VayuMark } from "@/components/brand-lockup";
 import { authEnabled, signOut } from "@/lib/auth/client";
 import { getCommandRole } from "@/lib/command-access";
 import {
@@ -217,6 +218,13 @@ function MobileNavigation({
   const [open, setOpen] = useState(false);
   return (
     <div className="border-b border-border px-3 py-2 lg:hidden">
+      <div className="mb-2 flex items-center gap-2 rounded-lg border border-border bg-surface/30 px-3 py-2">
+        <VayuMark decorative className="size-8" />
+        <span className="min-w-0">
+          <span className="block truncate text-[9px] font-semibold uppercase tracking-[0.14em] text-muted">VĀYÚ SHASTR PVT. LTD.</span>
+          <span className="block truncate text-xs font-bold text-accent">VYNDI OS · VIBPE Co-Pilot 2.0 → VYNDI</span>
+        </span>
+      </div>
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
@@ -282,7 +290,9 @@ export function CommandShell() {
       <SiteHeader showNavigation={false} brandHref="/command" />
       <div className="mx-auto flex max-w-7xl">
         <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-72 shrink-0 flex-col border-r border-border py-6 lg:flex">
-          <p className="px-5 pb-3 text-[10px] uppercase tracking-[0.2em] text-subtle">VYNDI 2.0 · Operating System</p>
+          <div className="mx-3 mb-4 rounded-xl border border-border bg-surface/30 p-3">
+            <BrandLockup compact />
+          </div>
           <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-4 pr-1 [scrollbar-width:thin]">
             <WorkspaceNavigation role={role} />
           </nav>

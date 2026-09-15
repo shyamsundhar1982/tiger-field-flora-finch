@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "@tanstack/react-router";
 import { Bot, BrainCircuit, ChevronRight, FileSearch, Printer, Send, ShieldCheck, Sparkles, X } from "lucide-react";
 import { VIBPE_COPILOT_NAME } from "@/lib/ibpe-brand";
+import { VYNDI_PRINT_BRAND_CSS, vyndiPrintBrandMarkup } from "@/lib/print-brand";
 import { askIbpeCopilot } from "@/lib/ibpe-copilot";
 import { getAdvancedPlanningVibpeEvidence } from "@/lib/advanced-planning-vibpe-evidence";
 import type { IbpeScenarioRequest } from "@/lib/ibpe-scenario-lab";
@@ -87,7 +88,8 @@ function printAssistantResult(message: Message, workspace: string) {
     * { box-sizing: border-box; }
     body { margin: 0; color: #161616; background: #fff; font-family: Arial, Helvetica, sans-serif; font-size: 10.5pt; line-height: 1.5; }
     .document { max-width: 180mm; margin: 0 auto; }
-    .header { border-bottom: 2px solid #232323; padding-bottom: 12px; margin-bottom: 18px; }
+    .header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; border-bottom: 2px solid #232323; padding-bottom: 12px; margin-bottom: 18px; }
+    ${VYNDI_PRINT_BRAND_CSS}
     .eyebrow { margin: 0 0 4px; font-size: 8pt; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
     h1 { margin: 0; font-size: 20pt; line-height: 1.15; }
     h2 { margin: 0 0 7px; font-size: 9pt; line-height: 1.2; letter-spacing: .08em; text-transform: uppercase; }
@@ -107,9 +109,8 @@ function printAssistantResult(message: Message, workspace: string) {
 <body>
   <main class="document">
     <header class="header">
-      <p class="eyebrow">VYNDI Intelligence</p>
-      <h1>VIBPE Co-Pilot Result</h1>
-      <div id="context" class="context"></div>
+      ${vyndiPrintBrandMarkup(window.location.origin)}
+      <div><p class="eyebrow">Governed Intelligence</p><h1>VIBPE Co-Pilot 2.0 Result</h1><div id="context" class="context"></div></div>
     </header>
     <section id="question-section" class="question" hidden>
       <h2>Question</h2>
@@ -120,7 +121,7 @@ function printAssistantResult(message: Message, workspace: string) {
       <div id="result" class="result"></div>
     </section>
     <div id="meta" class="meta"></div>
-    <footer class="footer"><strong>Advisory / read-only analysis.</strong> Authorised transaction workspaces and governed records remain the controlling business authority.<br />© 2026 Vāyú Shastr Pvt Ltd. All Rights Reserved.</footer>
+    <footer class="footer"><strong>Advisory / read-only analysis.</strong> Authorised transaction workspaces and governed records remain the controlling business authority.<br />© 2026 VĀYÚ SHASTR PVT. LTD. · VYNDI OS · VIBPE Co-Pilot 2.0 · VYNDI. All Rights Reserved.</footer>
   </main>
 </body>
 </html>`);

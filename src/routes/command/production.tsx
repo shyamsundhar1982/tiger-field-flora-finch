@@ -10,6 +10,7 @@ import { getProductionJobCardView } from "@/lib/production-job-card-view";
 import { issueProductionReservation, syncProductionJobCard } from "@/lib/production-job-card";
 import { approveProductionBatch } from "@/lib/production-release-authority";
 import { useVeloxis } from "@/lib/store";
+import { VYNDI_PRINT_BRAND_CSS, vyndiPrintBrandMarkup } from "@/lib/print-brand";
 
 export const Route = createFileRoute("/command/production")({
   loader: () => getProductionJobCardView(),
@@ -97,8 +98,7 @@ function printRequisitionRecord({
     body { margin: 0; color: #171717; background: #fff; font-family: Arial, Helvetica, sans-serif; font-size: 10px; }
     .sheet { width: 100%; }
     .brand { display: flex; align-items: flex-end; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 12px; }
-    .brand h1 { margin: 0; font-size: 22px; letter-spacing: .06em; }
-    .brand .company { margin-top: 3px; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    ${VYNDI_PRINT_BRAND_CSS}
     .document { text-align: right; }
     .document h2 { margin: 0; font-size: 16px; }
     .document p { margin: 4px 0 0; }
@@ -128,7 +128,7 @@ function printRequisitionRecord({
 <body>
   <main class="sheet">
     <section class="brand">
-      <div><h1>VYNDI</h1><div class="company">Vāyú Shastr Pvt Ltd · Controlled Production Record</div></div>
+      ${vyndiPrintBrandMarkup(window.location.origin)}
       <div class="document"><h2>Material Requisition &amp; Issue Record</h2><p><strong>${escapePrintHtml(requisitionId)}</strong></p></div>
     </section>
 
@@ -160,7 +160,7 @@ function printRequisitionRecord({
       <div><strong>Quality / traceability reference</strong>Reference / sign / date</div>
     </section>
 
-    <footer class="footer"><span>${escapePrintHtml(requisitionId)} · ${escapePrintHtml(card.id)}</span><span>VYNDI · Vāyú Shastr Pvt Ltd</span></footer>
+    <footer class="footer"><span>${escapePrintHtml(requisitionId)} · ${escapePrintHtml(card.id)}</span><span>VĀYÚ SHASTR PVT. LTD. → VYNDI OS → VIBPE Co-Pilot 2.0 → VYNDI</span></footer>
   </main>
   <script>window.addEventListener("load",()=>{setTimeout(()=>window.print(),80)});window.addEventListener("afterprint",()=>window.close(),{once:true});<\/script>
 </body>

@@ -3,6 +3,7 @@ import { LockKeyhole, Mail, ShieldCheck } from "lucide-react";
 import { FormEvent, MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from "react";
 import { isBearerTransportHost } from "@/lib/auth/bearer-transport";
 import "../login-rev1.css";
+import { VayuMark } from "@/components/brand-lockup";
 
 type LoginSearch = {
   returnTo?: string;
@@ -541,9 +542,11 @@ function LoginPage() {
       <div className="vy-login__flash" aria-hidden="true" />
 
       <section className={`vy-login__intro ${introVisible ? "" : "is-gone"}`} aria-label="VYNDI introduction">
+        <VayuMark decorative className="vy-login__intro-mark" />
         <div className="vy-login__intro-company">VĀYÚ <strong>SHASTR</strong> PVT. LTD.</div>
-        <div className="vy-login__intro-sub">Advanced Carbon Composite Division</div>
-        <div className="vy-login__intro-brand">VYNDI</div>
+        <div className="vy-login__intro-sub">VYNDI OS</div>
+        <div className="vy-login__intro-brand">VIBPE Co-Pilot 2.0</div>
+        <div className="vy-login__intro-product">VYNDI</div>
         <div className="vy-login__intro-tag">Wind — Rendered in Carbon</div>
         <button type="button" className="vy-login__skip" onClick={beginCinematic}>Skip Intro</button>
       </section>
@@ -555,10 +558,10 @@ function LoginPage() {
 
       <header className="vy-login__header">
         <div className="vy-login__brand">
-          <div className="vy-login__brand-mark" aria-hidden="true"><span>VY</span></div>
+          <div className="vy-login__brand-mark" aria-hidden="true"><VayuMark decorative /></div>
           <div className="vy-login__brand-copy">
-            <strong>VĀYÚ SHASTR</strong>
-            <small>Advanced Carbon Composite Division</small>
+            <strong>VĀYÚ SHASTR PVT. LTD.</strong>
+            <small>VYNDI OS → VIBPE Co-Pilot 2.0 → VYNDI</small>
           </div>
         </div>
         <div className="vy-login__status"><span className="vy-login__status-dot" />Governed System · Online</div>
@@ -566,7 +569,7 @@ function LoginPage() {
 
       <div className="vy-login__main">
         <section className="vy-login__welcome" aria-label="VYNDI Command Centre">
-          <div className="vy-login__eyebrow">Secure Access · VYNDI Operating System</div>
+          <div className="vy-login__eyebrow">Secure Access · VYNDI OS</div>
           <h1>WIND<span className="vy-login__tagline">— RENDERED IN CARBON —</span></h1>
           <p className="vy-login__desc">
             Enter the governed VYNDI business operating system for engineering, planning, supply and production, commercial, finance, and governance.
@@ -636,7 +639,7 @@ function LoginPage() {
 
       {bootMessage ? (
         <div className="vy-login__boot" role="status" aria-live="polite">
-          <div className="vy-login__boot-ring" aria-hidden="true" />
+          <div className="vy-login__boot-ring" aria-hidden="true"><VayuMark decorative /></div>
           <p>{bootMessage}</p>
         </div>
       ) : null}
