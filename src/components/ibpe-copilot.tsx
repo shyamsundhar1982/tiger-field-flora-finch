@@ -6,6 +6,7 @@ import { VYNDI_PRINT_BRAND_CSS, vyndiPrintBrandMarkup } from "@/lib/print-brand"
 import { askIbpeCopilot } from "@/lib/ibpe-copilot";
 import { getAdvancedPlanningVibpeEvidence } from "@/lib/advanced-planning-vibpe-evidence";
 import type { IbpeScenarioRequest } from "@/lib/ibpe-scenario-lab";
+import { askVibpeOperationalStatus } from "@/lib/vibpe-operational-status";
 import { askTraceabilityCopilot } from "@/lib/traceability-search";
 import { askVibpeGovernanceCopilot } from "@/lib/vibpe-governance-server";
 
@@ -175,6 +176,14 @@ export function IbpeCopilot() {
       return {
         text: governance.answer,
         meta: "Governed VIBPE control state · live read-only sources",
+      };
+    }
+
+    const operational = await askVibpeOperationalStatus({ data: { question: clean } });
+    if (operational.handled) {
+      return {
+        text: operational.answer,
+        meta: "Governed operational status · live read-only sources",
       };
     }
 
@@ -352,7 +361,7 @@ export function IbpeCopilot() {
                       {message.meta ? <p className="mt-3 text-[10px] text-subtle">{message.meta}</p> : null}
                     </article>
                   ))}
-                  {busy ? <div className="mr-4 rounded-xl border border-border bg-surface/35 p-4 text-sm text-muted">Resolving governed control state, traceability or analysing the IBPE packet…</div> : null}
+                  {busy ? <div className="mr-4 rounded-xl border border-border bg-surface/35 p-4 text-sm text-muted">Resolving governed control state, operational status, traceability or analysing the IBPE packet…</div> : null}
                   <div ref={endRef} />
                 </div>
               )}
@@ -382,7 +391,7 @@ export function IbpeCopilot() {
                 />
                 <button type="button" disabled={busy || !question.trim()} onClick={() => void ask()} className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-accent text-bg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40" aria-label={`Ask ${VIBPE_COPILOT_NAME}`}><Send className="size-4" /></button>
               </div>
-              <p className="mt-2 text-[10px] leading-4 text-subtle">Read-only governance and traceability can be queried here; numbered multi-question reviews are routed one question at a time. Authorised transaction workspaces remain the only place to approve or execute business actions.</p>
+              <p className="mt-2 text-[10px] leading-4 text-subtle">Read-only governance, operational status and traceability can be queried here; numbered multi-question reviews are routed one question at a time. Authorised transaction workspaces remain the only place to approve or execute business actions.</p>
             </footer>
           </aside>
         </div>
