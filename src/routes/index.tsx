@@ -81,7 +81,7 @@ function Home() {
         ))}
       </section>
 
-      <section className="border-y border-white/8 bg-bg-elevated/20">
+      <section className="border-y border-white/10 bg-bg-elevated/20">
         <div className="mx-auto grid max-w-6xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-2">
           <div>
             <div className="mb-5 flex items-center gap-3">
@@ -100,7 +100,7 @@ function Home() {
               ["Validation", "FEA and physical validation remain development milestones; final compliance claims follow completed testing."],
             ].map(([k, v], index) => (
               <li key={k} className="vyndi-public-card rounded-lg border p-4 transition-colors duration-200">
-                <p className={index === 1 ? "font-semibold text-cyan-300" : "font-semibold text-accent"}>{k}</p>
+                <p className={index === 1 ? "vyndi-public-cyan font-semibold" : "font-semibold text-accent"}>{k}</p>
                 <p className="mt-1 leading-6 text-muted">{v}</p>
               </li>
             ))}
