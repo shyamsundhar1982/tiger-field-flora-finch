@@ -20,7 +20,7 @@ test("respective transaction workspaces expose canonical controlled document typ
   const toolbar = await text("src/components/controlled-document-toolbar.tsx");
   const route = await text("src/routes/command/route.tsx");
 
-  for (const pathname of [
+  const controlledRoutes = [
     "/command/sales",
     "/command/production",
     "/command/purchase-execution",
@@ -28,8 +28,12 @@ test("respective transaction workspaces expose canonical controlled document typ
     "/command/quality",
     "/command/operations",
     "/command/receivables",
-  ]) {
-    assert.match(toolbar, new RegExp(pathname.replaceAll("/", "\\/")));
+  ];
+
+  for (const pathname of controlledRoutes) {
+    const routePattern = new RegExp(pathname.replaceAll("/", "\\/"));
+    assert.match(toolbar, routePattern);
+    assert.match(route, routePattern);
   }
 
   for (const label of [
@@ -47,8 +51,12 @@ test("respective transaction workspaces expose canonical controlled document typ
     assert.ok(toolbar.includes(label), `${label} controlled document must remain available`);
   }
 
-  assert.match(route, /ControlledDocumentToolbar/);
-  assert.match(route, /<ControlledDocumentToolbar \/>/);
+  assert.match(route, /const LazyControlledDocumentToolbar = lazy/);
+  assert.match(route, /import\("@\/components\/controlled-document-toolbar"\)/);
+  assert.match(route, /const CONTROLLED_DOCUMENT_ROUTES = new Set/);
+  assert.match(route, /CONTROLLED_DOCUMENT_ROUTES\.has\(routePath\)/);
+  assert.match(route, /<LazyControlledDocumentToolbar \/>/);
+  assert.doesNotMatch(route, /<ControlledDocumentToolbar \/>/);
 });
 
 test("end-to-end print uses canonical persisted lineage and never invents pending stages", async () => {
