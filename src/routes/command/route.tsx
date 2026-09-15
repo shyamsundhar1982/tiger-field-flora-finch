@@ -5,7 +5,6 @@ import { IbpeCopilot } from "@/components/ibpe-copilot";
 import { IbpeWorkspaceProjection } from "@/components/ibpe-workspace-projection";
 import { ProtectedNavigationBridge } from "@/components/protected-navigation-bridge";
 import { TraceabilityDocumentCentreV2 } from "@/components/traceability-document-centre-v2";
-import { VibpeRuntimeObserver } from "@/components/vibpe-runtime-observer";
 import { getCommandRole } from "@/lib/command-access";
 import { canAccessRoute } from "@/lib/page-access";
 import { getRouteMeta } from "@/lib/page-metadata";
@@ -47,5 +46,5 @@ export const Route = createFileRoute("/command")({
 function CommandRoot() {
   const { commandRole } = Route.useRouteContext();
   useOperatingPlanSync();
-  return <><ProtectedNavigationBridge /><VibpeRuntimeObserver /><IbpeWorkspaceProjection /><CommandShell initialRole={commandRole} /><ControlledDocumentToolbar /><TraceabilityDocumentCentreV2 /><IbpeCopilot /></>;
+  return <><ProtectedNavigationBridge /><IbpeWorkspaceProjection /><CommandShell initialRole={commandRole} /><ControlledDocumentToolbar /><TraceabilityDocumentCentreV2 /><IbpeCopilot /></>;
 }
