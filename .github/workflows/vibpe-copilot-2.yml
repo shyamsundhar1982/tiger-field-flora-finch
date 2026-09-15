@@ -34,9 +34,6 @@ jobs:
       - name: Typecheck application
         run: npm run typecheck
 
-      - name: Existing governed regression suite
-        run: npm test
-
       - name: VIBPE Co-Pilot 2 regression suite
         run: >-
           node --test
@@ -75,3 +72,6 @@ jobs:
           path: artifacts/vibpe-qa/
           retention-days: 30
           if-no-files-found: error
+
+      - name: Existing governed regression suite
+        run: npm test
