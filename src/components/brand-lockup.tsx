@@ -53,26 +53,6 @@ export function BrandLockup({
   );
 }
 
-export function BrandLoadingState() {
-  return (
-    <main className="grid min-h-dvh place-items-center bg-bg px-6" aria-live="polite" aria-busy="true">
-      <div className="flex flex-col items-center text-center" role="status">
-        <span className="relative flex size-20 items-center justify-center rounded-xl border border-border bg-surface/60 shadow-2xl">
-          <span className="absolute inset-0 animate-ping rounded-xl border border-accent/35 motion-reduce:animate-none" aria-hidden="true" />
-          <VayuMark decorative className="size-16" />
-        </span>
-        <p className="mt-5 text-xs font-semibold uppercase tracking-[0.2em] text-muted">{VAYU_LEGAL_NAME}</p>
-        <p className="mt-2 text-xl font-bold text-accent">{VYNDI_OS_NAME}</p>
-        <p className="mt-2 text-xs text-subtle">{VIBPE_COPILOT_LABEL} → {VYNDI_PRODUCT_NAME}</p>
-        <span className="mt-5 h-0.5 w-24 overflow-hidden bg-border" aria-hidden="true">
-          <span className="block h-full w-1/2 animate-pulse bg-accent motion-reduce:animate-none" />
-        </span>
-        <span className="sr-only">Loading VYNDI OS</span>
-      </div>
-    </main>
-  );
-}
-
 export function PrintBrandHeader() {
   return (
     <header className="vyndi-print-brand" aria-hidden="true">
