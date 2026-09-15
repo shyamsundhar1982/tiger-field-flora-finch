@@ -6,7 +6,7 @@ import { IbpeWorkspaceProjection } from "@/components/ibpe-workspace-projection"
 import { ProtectedNavigationBridge } from "@/components/protected-navigation-bridge";
 import { TraceabilityDocumentCentreV2 } from "@/components/traceability-document-centre-v2";
 import { VibpeRuntimeObserver } from "@/components/vibpe-runtime-observer";
-import { getCommandAccess, getCommandRole } from "@/lib/command-access";
+import { getCommandRole } from "@/lib/command-access";
 import { canAccessRoute } from "@/lib/page-access";
 import { getRouteMeta } from "@/lib/page-metadata";
 import { useOperatingPlanSync } from "@/lib/operating-plan-sync";
@@ -18,8 +18,11 @@ function normalizeCommandPath(pathname: string) {
 
 export const Route = createFileRoute("/command")({
   beforeLoad: async ({ location }) => {
-    const access = await getCommandAccess();
-    if (!access) {
+    // One scalar role lookup proves both authenticated Command access and RBAC.
+    // This avoids resolving the same Better Auth identity + persisted role two
+    // or three times during every protected navigation.
+    const role = await getCommandRole();
+    if (!role) {
       throw redirect({
         to: "/login",
         search: { returnTo: location.pathname },
@@ -27,10 +30,7 @@ export const Route = createFileRoute("/command")({
     }
 
     const routePath = normalizeCommandPath(location.pathname);
-    if (routePath === "/command") return;
-
-    const role = await getCommandRole();
-    if (!canAccessRoute(role, routePath)) {
+    if (routePath !== "/command" && !canAccessRoute(role, routePath)) {
       const page = getRouteMeta(routePath);
       const preferredTarget =
         page?.adminOnly && page.domain === "inventory" ? "/command/inventory" : "/command";
@@ -38,11 +38,14 @@ export const Route = createFileRoute("/command")({
         to: normalizeCommandPath(preferredTarget) === routePath ? "/command" : preferredTarget,
       });
     }
+
+    return { commandRole: role };
   },
   component: CommandRoot,
 });
 
 function CommandRoot() {
+  const { commandRole } = Route.useRouteContext();
   useOperatingPlanSync();
-  return <><ProtectedNavigationBridge /><VibpeRuntimeObserver /><IbpeWorkspaceProjection /><CommandShell /><ControlledDocumentToolbar /><TraceabilityDocumentCentreV2 /><IbpeCopilot /></>;
+  return <><ProtectedNavigationBridge /><VibpeRuntimeObserver /><IbpeWorkspaceProjection /><CommandShell initialRole={commandRole} /><ControlledDocumentToolbar /><TraceabilityDocumentCentreV2 /><IbpeCopilot /></>;
 }

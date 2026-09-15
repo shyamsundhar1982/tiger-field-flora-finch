@@ -47,12 +47,15 @@ test("individual identity never inherits a legacy shared-password role", () => {
   assert.doesNotMatch(roleAuthority, /getLegacyRole\(\).*\?\? "viewer"/s);
 });
 
-test("Command route uses production-safe scalar auth contracts and cannot redirect its landing page to itself", () => {
-  assert.match(commandRoute, /const access = await getCommandAccess\(\)/);
+test("Command route resolves one production-safe scalar role and reuses it in the shell", () => {
   assert.match(commandRoute, /const role = await getCommandRole\(\)/);
+  assert.doesNotMatch(commandRoute, /getCommandAccess\(\)/);
   assert.doesNotMatch(commandRoute, /getCommandAuthorization\(\)/);
+  assert.match(commandRoute, /return \{ commandRole: role \}/);
+  assert.match(commandRoute, /<CommandShell initialRole=\{commandRole\} \/>/);
+  assert.doesNotMatch(shell, /getCommandRole/);
+  assert.match(shell, /CommandShell\(\{ initialRole \}: \{ initialRole: CommandRole \}\)/);
   assert.match(commandRoute, /const routePath = normalizeCommandPath\(location\.pathname\)/);
-  assert.match(commandRoute, /if \(routePath === "\/command"\) return/);
   assert.match(
     commandRoute,
     /normalizeCommandPath\(preferredTarget\) === routePath \? "\/command" : preferredTarget/,
