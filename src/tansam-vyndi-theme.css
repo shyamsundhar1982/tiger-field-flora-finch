@@ -27,7 +27,7 @@
   --vyndi-line-soft: rgb(255 255 255 / 0.065);
   --vyndi-panel-top: rgb(255 255 255 / 0.04);
   --vyndi-panel-bottom: rgb(255 255 255 / 0.012);
-  --vyndi-shadow: 0 18px 44px rgb(0 0 0 / 0.24);
+  --vyndi-shadow: 0 12px 28px rgb(0 0 0 / 0.18);
 }
 
 body {
@@ -54,7 +54,7 @@ body {
 aside[class*="h-dvh"][class*="border-r"] {
   background: linear-gradient(180deg, rgb(11 14 16 / 0.98), rgb(6 8 9 / 0.98));
   border-color: var(--vyndi-line-soft);
-  box-shadow: 20px 0 50px rgb(0 0 0 / 0.18);
+  box-shadow: 16px 0 32px rgb(0 0 0 / 0.14);
 }
 
 nav[aria-label$="workspace"],
@@ -73,6 +73,10 @@ section[aria-label="Global Command search"] {
 .vyndi-tansam-kpi {
   border-color: var(--vyndi-line);
   background-image: linear-gradient(145deg, var(--vyndi-panel-top), var(--vyndi-panel-bottom));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.025);
+}
+
+.vyndi-tansam-panel {
   box-shadow: var(--vyndi-shadow), inset 0 1px 0 rgb(255 255 255 / 0.025);
 }
 
@@ -106,15 +110,6 @@ textarea {
 .control:focus {
   border-color: rgb(255 122 26 / 0.72);
   box-shadow: 0 0 0 1px rgb(255 122 26 / 0.2);
-}
-
-/* Accent hierarchy from the TANSAM deck: orange action, lime governed state. */
-.text-accent {
-  text-shadow: 0 0 18px rgb(255 122 26 / 0.08);
-}
-
-.text-green {
-  text-shadow: 0 0 16px rgb(185 255 44 / 0.06);
 }
 
 /* Existing legal footer becomes cheaper than the old blur treatment. */
