@@ -10,10 +10,9 @@ import {
   UsersRound,
   Wallet,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { BrandLockup, VayuMark } from "@/components/brand-lockup";
 import { authEnabled, signOut } from "@/lib/auth/client";
-import { getCommandRole } from "@/lib/command-access";
 import {
   ADMIN_CONTEXT,
   ADMIN_HOME,
@@ -252,15 +251,11 @@ function MobileNavigation({
   );
 }
 
-export function CommandShell() {
+export function CommandShell({ initialRole }: { initialRole: CommandRole }) {
   const navigate = useNavigate();
-  const [role, setRole] = useState<CommandRole | null>(null);
+  const [role, setRole] = useState<CommandRole | null>(initialRole);
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState("");
-
-  useEffect(() => {
-    getCommandRole().then(setRole).catch(() => setRole(null));
-  }, []);
 
   const viewer = role === "viewer";
 
