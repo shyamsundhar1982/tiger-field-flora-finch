@@ -33,9 +33,10 @@ export function BrandLockup({
 }: BrandLockupProps) {
   return (
     <span className={cn("inline-flex min-w-0 items-center", compact ? "gap-2.5" : "gap-3", className)}>
-      <span className={cn("flex shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-bg", compact ? "size-9" : "size-11", markClassName)}>
-        <VayuMark decorative className="size-full" />
-      </span>
+      <VayuMark
+        decorative
+        className={cn(compact ? "size-9" : "size-11", markClassName)}
+      />
       <span className="min-w-0 leading-none">
         <span className="block truncate text-[9px] font-semibold uppercase tracking-[0.16em] text-muted">
           {VAYU_LEGAL_NAME}

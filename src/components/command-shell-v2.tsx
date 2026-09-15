@@ -11,7 +11,6 @@ import {
   Wallet,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { SiteHeader } from "@/components/site-header";
 import { BrandLockup, VayuMark } from "@/components/brand-lockup";
 import { authEnabled, signOut } from "@/lib/auth/client";
 import { getCommandRole } from "@/lib/command-access";
@@ -287,9 +286,8 @@ export function CommandShell() {
 
   return (
     <div className="min-h-dvh bg-bg">
-      <SiteHeader showNavigation={false} brandHref="/command" />
       <div className="mx-auto flex max-w-7xl">
-        <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-72 shrink-0 flex-col border-r border-border py-6 lg:flex">
+        <aside className="sticky top-0 hidden h-dvh w-72 shrink-0 flex-col border-r border-border py-6 lg:flex">
           <div className="mx-3 mb-4 rounded-xl border border-border bg-surface/30 p-3">
             <BrandLockup compact />
           </div>

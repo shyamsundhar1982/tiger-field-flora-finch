@@ -23,7 +23,8 @@ const ibpeProjection = read("src/components/ibpe-workspace-projection.tsx");
 
 test("command workspace exposes one canonical primary navigation layer", () => {
   assert.match(shellEntry, /export \{ CommandShell \} from "\.\/command-shell-v2"/);
-  assert.match(shell, /<SiteHeader showNavigation=\{false\} brandHref="\/command" \/>/);
+  assert.doesNotMatch(shell, /<SiteHeader\b/);
+  assert.match(shell, /<BrandLockup compact/);
   assert.match(shell, /Operating workspaces/);
   assert.match(shell, /from "@\/lib\/operating-workflow"/);
   assert.match(shell, /WORKSPACE_NAVIGATION/);
