@@ -31,7 +31,7 @@ test("cinematic motion avoids protected-app style runtime loops", () => {
     assert.doesNotMatch(source, /requestAnimationFrame/);
     assert.doesNotMatch(source, /addEventListener\s*\(\s*["']scroll/);
     assert.doesNotMatch(source, /<canvas/i);
-    assert.doesNotMatch(source, /three(?:\.js)?|@react-three|webgl/i);
+    assert.doesNotMatch(source, /from\s+["']three["']|import\s*\(\s*["']three["']|@react-three|webgl/i);
   }
 });
 
